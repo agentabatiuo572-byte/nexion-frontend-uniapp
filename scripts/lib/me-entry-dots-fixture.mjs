@@ -1,5 +1,6 @@
 import { demoEarningReceipt, demoReceiptWire } from './prototype-demo-notifications.mjs';
 import { demoReceiptPage, demoReceiptSummary } from './prototype-demo-secondary.mjs';
+import { demoTeamWeek } from './prototype-demo-wallet.mjs';
 import { demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
 
 const sources = {
@@ -10,14 +11,17 @@ const sources = {
 };
 const day = 86_400_000;
 const weekLength = 7 * day;
-const chinaOffset = 8 * 60 * 60 * 1000;
+const vietnamOffset = 7 * 60 * 60 * 1000;
+const weeklyQuestCode = 'demo-me-dot-week-0';
+const weeklyRewardNex = 150;
+const weeklyProgress = ['PENDING', 'COMPLETED', 'CLAIMABLE', 'CLAIMED'];
 const modelTaskSuffixPrefix = '0000000000004000800000000000';
 const receiptPrefix = 'CTR-' + modelTaskSuffixPrefix;
 
 function weekStart(now) {
-  const localMidnight = Math.floor((now + chinaOffset) / day) * day;
+  const localMidnight = Math.floor((now + vietnamOffset) / day) * day;
   const weekday = (new Date(localMidnight).getUTCDay() + 6) % 7;
-  return localMidnight - weekday * day - chinaOffset;
+  return localMidnight - weekday * day - vietnamOffset;
 }
 
 function specimenReceipt(completedAt, index, device) {
@@ -76,25 +80,36 @@ function specimenOrders(payload, fixture) {
   return rows.sort((left, right) => right.placedAt - left.placedAt);
 }
 
-function specimenQuests(payload, fixture) {
-  const template = payload.quests.find(row => row.layer === 'WEEKLY_T2' && row.status === 'PENDING');
-  const start = fixture.weekStart + (fixture.weekState === 'next' ? weekLength : 0);
-  // Every issued task comes from the same frozen week header. A closed
-  // period contributes no weekly rows; the next header reuses the codes.
-  const week = {
-    instanceKey: 'WEEK:' + start.toString(16).padStart(32, '0'),
+function newWeek(start) {
+  return {
+    instanceKey: 'WEEK:' + demoTeamWeek(start),
     eligibleFrom: new Date(start).toISOString(),
     eligibleUntil: new Date(start + weekLength).toISOString(),
+    status: 'PENDING',
+    claimKey: null,
   };
-  const quests = fixture.weekState === 'closed' ? [] : fixture.waves.map((_at, index) => ({
-    ...template, ...week, questCode: 'demo-me-dot-week-' + index, eligible: true,
-    status: index === 0 ? fixture.weeklyStatus : 'PENDING',
-  }));
+}
+
+// Only progress can change on an existing published definition.
+function advanceWeek(week, status) {
+  if (week && weeklyProgress.indexOf(status) > weeklyProgress.indexOf(week.status)) week.status = status;
+}
+
+function specimenQuests(payload, fixture) {
+  const week = fixture.weeks[fixture.weekState];
+  const quests = week ? [{
+    questCode: weeklyQuestCode,
+    name: payload.quests.find(row => row.questCode === 'demo-week-2')?.name ?? 'Invite a friend',
+    layer: 'WEEKLY_T2', rewardNex: weeklyRewardNex, category: 'social', actionRoute: '/pages/team/team',
+    instanceKey: week.instanceKey, eligibleFrom: week.eligibleFrom, eligibleUntil: week.eligibleUntil,
+    eligible: true, status: week.status,
+  }] : [];
   const dayOne = fixture.dayOne ? payload.quests.filter(row => row.layer === 'DAY_ONE').map(row => ({
     ...row, status: fixture.dayOne, eligible: true,
   })) : [];
   return {
     ...payload, quests: [...dayOne, ...quests],
+    questBonusMultiplier: 1,
     dayOneSnapshotStatus: dayOne.length ? 'SNAPSHOT' : 'EMPTY',
     dayOneRequiredTaskCount: dayOne.length,
   };
@@ -105,11 +120,18 @@ export function createMeEntryDotsFixture(previewState) {
 
   function configure(accountId, update) {
     if (update.reset) accounts.delete(accountId);
-    const fixture = accounts.get(accountId) ?? {
-      waves: [], payment: 'none', newerOrders: 0, weeklyStatus: 'PENDING', dayOne: null,
-      weekStart: weekStart(Date.now()), weekState: 'current',
-      fail: null, delay: null, paymentPlacedAt: Date.now() - paymentWindow - 5000,
-    };
+    let fixture = accounts.get(accountId);
+    if (!fixture) {
+      const start = weekStart(Date.now());
+      fixture = {
+        waves: [], payment: 'none', newerOrders: 0, dayOne: null,
+        weeks: { current: newWeek(start), next: newWeek(start + weekLength) }, weekState: 'current',
+        fail: null, delay: null, paymentPlacedAt: Date.now() - paymentWindow - 5000,
+      };
+    }
+    if (['current', 'closed', 'next'].includes(update.weekState)) fixture.weekState = update.weekState;
+    const week = fixture.weeks[fixture.weekState];
+    const addsWave = update.wave > fixture.waves.length;
     if (update.wave !== undefined) {
       if (![0, 1, 2, 3].includes(update.wave)) throw Object.assign(new Error('ME_DOTS_WAVE_INVALID'), { status: 422 });
       fixture.waves.length = Math.min(fixture.waves.length, update.wave);
@@ -117,15 +139,10 @@ export function createMeEntryDotsFixture(previewState) {
         fixture.waves.push(Math.max(Date.now() - 1000, (fixture.waves.at(-1) ?? 0) + 1));
       }
     }
+    if (['COMPLETED', 'CLAIMABLE'].includes(update.weeklyStatus)) advanceWeek(week, update.weeklyStatus);
+    else if (addsWave) advanceWeek(week, 'CLAIMABLE');
     if (['none', 'placed', 'paid', 'expired', 'failed'].includes(update.payment)) fixture.payment = update.payment;
     if ([0, 20].includes(update.newerOrders)) fixture.newerOrders = update.newerOrders;
-    if (['current', 'closed', 'next'].includes(update.weekState) && update.weekState !== fixture.weekState) {
-      fixture.weekState = update.weekState;
-      fixture.weeklyStatus = 'PENDING';
-    }
-    if (['PENDING', 'COMPLETED', 'CLAIMABLE', 'CLAIMED'].includes(update.weeklyStatus)) {
-      fixture.weeklyStatus = update.weeklyStatus;
-    }
     if ([null, 'PENDING', 'COMPLETED', 'CLAIMABLE'].includes(update.dayOne)) fixture.dayOne = update.dayOne;
     if (update.fail === null || Object.values(sources).includes(update.fail)) fixture.fail = update.fail;
     if (update.delay === null || [...Object.values(sources), 'receipt-detail'].includes(update.delay)) fixture.delay = update.delay;
@@ -185,5 +202,32 @@ export function createMeEntryDotsFixture(previewState) {
     return data;
   }
 
-  return { configure, read };
+  function handlesClaim(path) {
+    return path === '/api/quests/' + weeklyQuestCode + '/claim';
+  }
+
+  function claim(accountId, body, commandKey) {
+    const instanceKey = body?.instanceKey;
+    const reject = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
+    if (!accountId) reject('AUTH_REQUIRED', 401);
+    if (typeof commandKey !== 'string' || !commandKey.trim()) reject('QUEST_IDEMPOTENCY_KEY_REQUIRED', 422);
+    if (typeof instanceKey !== 'string' || !instanceKey.trim()) reject('QUEST_INSTANCE_KEY_REQUIRED', 422);
+    const fixture = accounts.get(accountId);
+    if (!fixture) reject('QUEST_INSTANCE_NOT_FOUND');
+    const requested = Object.values(fixture.weeks).find(week => week.instanceKey === instanceKey);
+    if (!requested) reject('QUEST_INSTANCE_NOT_FOUND');
+    if (requested.claimKey !== commandKey) {
+      if (requested !== fixture.weeks[fixture.weekState]) reject('QUEST_EXPIRED');
+      if (requested.status === 'CLAIMED') reject('QUEST_ALREADY_CLAIMED');
+      if (!['COMPLETED', 'CLAIMABLE'].includes(requested.status)) reject('QUEST_NOT_COMPLETED');
+      requested.status = 'CLAIMED';
+      requested.claimKey = commandKey;
+    }
+    return {
+      questId: weeklyQuestCode, rewardNex: weeklyRewardNex, status: 'CLAIMED', instanceKey,
+      serverCanonical: true, sourceEnvironment: 'PRODUCTION', runId: '',
+    };
+  }
+
+  return { configure, read, handlesClaim, claim };
 }

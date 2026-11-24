@@ -1,8 +1,9 @@
 import { invalidateBeforePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
-import { reactive, ref, shallowRef, watch } from "vue";
+import { computed, reactive, ref, shallowRef, watch } from "vue";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
 import { readQuestState } from "@/lib/quest-state-read";
+import { remoteAccountScope, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { isReadAuthorizationDenial } from "@/lib/remote-read-failure";
 import type { CanonicalQuest, DayOneSnapshotStatus, QuestSnapshot } from "@/api/quest-api";
 import { normalizeAccountKey } from "./account-cloud";
@@ -94,7 +95,8 @@ export const useQuest = defineStore("quest", () => {
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
-  const remoteSnapshot = shallowRef<QuestSnapshot | null>(null);
+  const remoteSnapshotRead = shallowRef<{ snapshot: QuestSnapshot; scope: RemoteAccountRequest } | null>(null);
+  const remoteSnapshot = computed(() => remoteSnapshotRead.value?.snapshot ?? null);
   const remoteLoading = ref(false);
 
   function clearRemoteFacts() {
@@ -123,7 +125,7 @@ export const useQuest = defineStore("quest", () => {
 
   function discardRemoteSnapshot() {
     hasRemoteSnapshot = false;
-    remoteSnapshot.value = null;
+    remoteSnapshotRead.value = null;
     clearRemoteFacts();
   }
 
@@ -144,8 +146,10 @@ export const useQuest = defineStore("quest", () => {
     invalidateBeforePassiveTabRead("quest");
     if (!remoteApiEnabled) return null;
     const epoch = accountEpoch;
+    const scope = remoteAccountScope.snapshot();
     const requestSequence = ++refreshSequence;
-    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
+    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence
+      && scope.accountKey === boundKey && remoteAccountScope.isCurrent(scope);
     claimNotice.value = null;
     remoteLoading.value = true;
     // Background refreshes use stale-while-revalidate semantics: a route or
@@ -174,12 +178,12 @@ export const useQuest = defineStore("quest", () => {
       Object.assign(completedMap, nextCompleted);
       hasRemoteSnapshot = true;
       remoteStatus.value = "ready";
-      remoteSnapshot.value = snapshot;
+      remoteSnapshotRead.value = { snapshot, scope };
       scheduleEligibilityRefresh(nextQuests);
       return snapshot;
     } catch (cause) {
       if (!isCurrentRequest()) return null;
-      if (isReadAuthorizationDenial(cause)) remoteSnapshot.value = null;
+      if (isReadAuthorizationDenial(cause)) remoteSnapshotRead.value = null;
       if (hasRemoteSnapshot) {
         remoteStatus.value = "ready";
       } else {
@@ -337,5 +341,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, ensureRemote, refreshRemote, readRemoteSnapshot, remoteSnapshot, remoteLoading, claimRemote, remoteStatus, claimNotice, claimDayOne, dayOneClaiming, dayOneClaimError };
+  return { completedMap, remoteQuests, dayOneRewardNex, dayOneRequiredTaskCount, dayOneSnapshotStatus, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, ensureRemote, refreshRemote, readRemoteSnapshot, remoteSnapshot, remoteSnapshotRead, remoteLoading, claimRemote, remoteStatus, claimNotice, claimDayOne, dayOneClaiming, dayOneClaimError };
 });

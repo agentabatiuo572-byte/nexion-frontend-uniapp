@@ -390,6 +390,10 @@ const server=http.createServer(async(req,res)=>{
       }
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
+      if(req.method==='POST'&&meEntryDots.handlesClaim(url.pathname)){
+        const data=meEntryDots.claim(previewAccountId(state,req.headers),JSON.parse(body||'{}'),req.headers['idempotency-key']);
+        return sendJson(res,{code:0,message:'OK',data});
+      }
       const delayedEvent=beginDelayedDemoH4EventCommand(url,req.method,state,req.headers,Date.now());
       if(delayedEvent){
         await new Promise(resolve=>setTimeout(resolve,5000));

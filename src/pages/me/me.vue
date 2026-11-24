@@ -94,7 +94,6 @@ import { meEntryLocalDay, useMeEntrySeen, type SeenOrders } from "@/store/me-ent
 import { hasNewMeOrders, isShownInventoryDevice, latestMeOrders, meMissionFacts } from "@/lib/me-entry-facts";
 import { readMeReceiptSummary } from "@/lib/me-receipt-summary";
 import { isReadAuthorizationDenial } from "@/lib/remote-read-failure";
-import type { QuestSnapshot } from "@/api/quest-api";
 import { useLocaleStore } from "@/store/locale";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useSecurity } from "@/store/security";
@@ -184,7 +183,11 @@ const meClock = useNow(() => entryRead.visible.value);
 const meLocalDay = computed(() => meEntryLocalDay(meClock.value * 1000));
 const latestOrders = ref<SeenOrders | null>(null);
 const placedOrder = ref(false);
-const missionSnapshot = ref<QuestSnapshot | null>(null);
+const missionSnapshotRead = computed(() => {
+  const result = quest.remoteSnapshotRead;
+  return entryRead.visible.value && entryRead.ready.value && result
+    && result.scope.accountKey === app.accountKey && isCurrentAccountScope(result.scope) ? result : null;
+});
 const latestReceipt = ref<number | null>(null);
 const fleetDeviceIds = ref<string[]>([]);
 const missionReadFailed = ref(false);
@@ -197,8 +200,8 @@ const entryDots = computed(() => {
   const missions = seen.missions;
   const receipts = seen.receipts;
   const inventory = seen.inventory;
-  const taskFacts = missionSnapshot.value
-    ? meMissionFacts(missionSnapshot.value, meClock.value * 1000, config.isEnabled("stakingVisible"))
+  const taskFacts = missionSnapshotRead.value
+    ? meMissionFacts(missionSnapshotRead.value.snapshot, meClock.value * 1000, config.isEnabled("stakingVisible"))
     : null;
   return {
     orders: entryRead.ready.value && (placedOrder.value || Boolean(orders && latestOrders.value
@@ -426,16 +429,16 @@ async function refreshMissionDots(force = false) {
   const read = entryRead.capture("missions");
   if (!read.current()) return;
   const success = await (force ? quest.refreshRemote() : quest.ensureRemote());
-  if (!read.current()) return;
-  const snapshot = quest.remoteSnapshot;
-  missionReadFailed.value = !success;
-  if (!success || !snapshot) {
-    if (!snapshot) missionSnapshot.value = null;
-    return;
-  }
-  entrySeen.record("missions", meMissionFacts(snapshot, Date.now(), config.isEnabled("stakingVisible")), read.scope, false);
-  missionSnapshot.value = snapshot;
+  if (read.current()) missionReadFailed.value = !success;
 }
+
+watch([() => quest.remoteSnapshotRead, missionSnapshotRead], ([readback, visibleReadback], [previous]) => {
+  if (!readback || readback !== visibleReadback) return;
+  if (readback !== previous) missionReadFailed.value = false;
+  if (entrySeen.entries.missions) return;
+  const facts = meMissionFacts(readback.snapshot, Date.now(), config.isEnabled("stakingVisible"));
+  entrySeen.record("missions", facts, readback.scope, false);
+});
 
 async function refreshReceiptDots(force = false) {
   const read = entryRead.capture("receipts");
@@ -551,7 +554,6 @@ watch([() => app.accountKey, () => app.accountBindingEpoch, () => auth.accountId
   remoteOrdersRequest += 1;
   latestOrders.value = null;
   placedOrder.value = false;
-  missionSnapshot.value = null;
   latestReceipt.value = null;
   fleetDeviceIds.value = [];
   missionReadFailed.value = false;
