@@ -296,7 +296,6 @@ function device(value: unknown): CanonicalE3Device {
   const source = record(value);
   if (!Object.prototype.hasOwnProperty.call(source, "capacitySubsidyEndsAt")) return invalid();
   const capacityPct = number(source.capacityPct);
-  if (capacityPct > 100) return invalid();
   const capabilityTier = source.capabilityTier == null ? null : integer(source.capabilityTier, 1);
   if (capabilityTier !== null && capabilityTier > 5) return invalid();
   const id = integer(source.id, 1);

@@ -145,7 +145,7 @@ export function getEfficiency(monthsOwned: number): number {
 export interface DeviceLifecycleSummary {
   isDegradable: boolean;
   monthsOwned: number;
-  efficiency: number;       // 0..1 capacity multiplier, applied to baseRate
+  efficiency: number;       // capacity multiplier applied to baseRate; a server projection may exceed 1
   dailyRateAtFull: number;  // baseRate (USD/day at 100% capacity)
   dailyRateNow: number;     // baseRate × capacity
   dailyLossUSD: number;     // dailyRateAtFull − dailyRateNow
@@ -157,7 +157,6 @@ export function hasServerLifecycleProjection(device: Device): boolean {
     && typeof device.capacityPct === "number"
     && Number.isFinite(device.capacityPct)
     && device.capacityPct >= 0
-    && device.capacityPct <= 100
     && Number.isInteger(device.capacityAgeMonths)
     && (device.capacityAgeMonths ?? -1) >= 0
     && typeof device.capacitySubsidized === "boolean"

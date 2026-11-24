@@ -718,7 +718,7 @@ export const useApp = defineStore("app", () => {
     serverNow: number,
     capacitySnapshotReceivedAt: number,
   ): Device {
-    const capacity = Math.max(0, Math.min(1, device.capacityPct / 100));
+    const capacity = device.capacityPct / 100;
     const fullDailyUsdt = capacity > 0 ? device.dailyUsdt / capacity : 0;
     const fullDailyNex = capacity > 0 ? device.dailyNex / capacity : 0;
     const activeLifecycle = ["ACTIVE", "ONLINE", "BUSY", "RUNNING", "OFFLINE"].includes(device.status);
