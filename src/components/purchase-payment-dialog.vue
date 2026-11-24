@@ -318,8 +318,13 @@ let placeRetry: ReturnType<typeof setTimeout> | undefined;
 const sharedBarHeight = inject(PAYMENT_BAR_HEIGHT_KEY, null);
 // Pages without the chassis (sign-in, support chat) have no scope; uni then searches its current page.
 const chassisScope = inject(CHASSIS_QUERY_SCOPE, null);
+// Bumped when the tray's rows or the native window change: an App query answer from before that (it crosses the bridge
+// and can land after a newer one) must not place or show the bar.
+let layoutGen = 0;
 function placeBar() {
+  const gen = layoutGen;
   (chassisScope ? uni.createSelectorQuery().in(chassisScope) : uni.createSelectorQuery()).selectAll('.nx-tabbar-pill, .nx-glass-bar').boundingClientRect(found => {
+    if (gen !== layoutGen) return;
     const tops = (Array.isArray(found) ? found : [found]).filter(rect => rect && (rect.height ?? 0) > 0).map(rect => rect.top as number);
     barBottom.value = tops.length ? Math.max(0, uni.getSystemInfoSync().windowHeight - Math.min(...tops) + 12) : null;
     // A tray can render after the page: until the pill or a tray is found, one retry chain looks again every 100ms, and
@@ -344,7 +349,7 @@ watch(barShown, shown => { if (!shown && sharedBarHeight) sharedBarHeight.value 
 const stickyCta = useStickyCTA();
 const trayRows = (cta: StickyCTAPayload | null) => cta ? `${!!cta.note}${!!cta.quantity}${!!cta.amountSubtext}` : '';
 watch(() => stickyCta.cta, (cta, old) => {
-  if (trayRows(cta) !== trayRows(old)) { placed.value = false; placeSince = null; }
+  if (trayRows(cta) !== trayRows(old)) { layoutGen += 1; placed.value = false; placeSince = null; }
   void nextTick(placeBar);
 });
 // ✕ removes the control that had focus. A keyboard or assistive activation (click without a pointer) lands focus on the
@@ -358,12 +363,24 @@ function closeBar(event: Event) {
 // resize measures again as well. The browser's resize event comes before that frame paints; uni's own callback on H5
 // waits 50ms.
 function placeOnResize() { if (barShown.value) placeBar(); }
+// The App answers a frame or more later, so a native resize hides the bar until it has measured the rewrapped tray.
+function placeOnNativeResize() {
+  if (!barShown.value) return;
+  layoutGen += 1; placed.value = false; placeSince = null;
+  placeBar();
+}
 onMounted(() => {
+  // #ifdef APP-PLUS
+  uni.onWindowResize(placeOnNativeResize);
+  // #endif
   if (typeof window !== 'undefined') window.addEventListener('resize', placeOnResize);
 });
 onUnmounted(() => {
   clearTimeout(placeRetry);
   if (sharedBarHeight) sharedBarHeight.value = 0;
+  // #ifdef APP-PLUS
+  uni.offWindowResize(placeOnNativeResize);
+  // #endif
   if (typeof window !== 'undefined') window.removeEventListener('resize', placeOnResize);
 });
 watch(() => barShown.value && s.revision, shown => { if (shown !== false) setTimeout(placeBar, 50); }, { immediate: true });
