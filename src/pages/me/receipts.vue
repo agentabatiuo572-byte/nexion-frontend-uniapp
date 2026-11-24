@@ -374,10 +374,10 @@ async function loadRemoteComputeReceipts(offset: number, append: boolean, cursor
       && expectedBindingEpoch === app.accountBindingEpoch) {
         remoteComputeReceiptLoading.value = false;
         if (!append) {
-        remoteComputeInitialLoading.value = false;
-        await nextTick();
-        confirmVisibleReceiptList();
-      }
+          remoteComputeInitialLoading.value = false;
+          await nextTick();
+          confirmVisibleReceiptList();
+        }
       }
   }
 }
