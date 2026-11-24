@@ -18,15 +18,10 @@
         <text class="promotion-bundle__reward-key">{{ t.promotion.orderReward }}</text>
         <text v-for="(reward,index) in orderRewards" :key="index" class="promotion-bundle__reward-value"><text v-if="index" class="promotion-bundle__reward-sep"> · </text><text class="promotion-bundle__reward-amount">{{ reward.amount }}</text><text class="promotion-bundle__reward-unit" :class="{ 'is-uvt': reward.uvt }">{{ reward.unit }}</text></text>
       </view>
-      <!-- Quote warnings and reward messages stand out in the warning ink (design-rules: warnings). LOGIC: the tray note
-           should carry the most urgent one instead (ineligible / expired > terms > inventory > quote warning). -->
-      <view v-for="(message,index) in quoteMessages" :key="'w'+index" class="promotion-bundle__warning"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><text>{{ message }}</text></view>
     </view>
     <view v-if="singleActivityProduct" class="promotion-flat promotion-bundle__single" data-testid="single-activity-guidance"><text class="promotion-copy">{{ commerceCopy(locale.code).singleActivity }}</text><view class="promotion-action primary" role="button" tabindex="0" @click="openSingleProduct" @keydown.enter.prevent="openSingleProduct" @keydown.space.prevent="openSingleProduct"><text>{{ commerceCopy(locale.code).singlePurchase }}</text></view></view>
     <template v-else-if="!scopeId||activity">
-    <!-- LOGIC (promotion-bundle tiers): the page passes the bundle policy; show the rates only when this activity's quote
-         carries the bundle discount (stacking allowed), not on a deny-stacking activity. -->
-    <BundleHero :count="selection.length" :tiers="tiers ?? null" :items="tiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
+    <BundleHero :count="selection.length" :tiers="quotedTiers" :items="tiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
       <template #tile="{ item }">
         <text v-if="levelsFor(item.id)" class="promotion-bundle__tile-note">{{ levelsFor(item.id) }}</text>
         <text v-if="!productFor(item.id)" class="promotion-bundle__tile-note">{{ t.promotion.noMatchingProducts }}</text>
@@ -71,14 +66,19 @@ import { formatGroupedAmount } from '@/lib/amount-display';
 import { platformDisplayText } from '@/lib/brand-copy';
 import { productDailyEstimateRange } from '@/lib/product-estimates';
 import { formatEstimateRange } from '@/lib/estimate-display';
-import type { BundleDiscountTier } from '@/store/cart';
+import { bundleDiscountForCount } from '@/store/cart';
+import type { BundleDiscountSnapshot } from '@/api/bundle-discount-api';
+import { quoteBundleAmountUsdt } from '@/api/bundle-quote';
+import { asApiError } from '@/api/errors';
+import { hasVisiblePullRefresh } from '@/lib/active-page-refresh';
+import { foregroundReadAllowed } from '@/lib/foreground-read';
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue';
+import { computed,onBeforeUnmount,ref,watch } from 'vue';
 import { onHide,onShow } from '@dcloudio/uni-app';
 import { commerceCopy } from '@/lib/commerce-review';
 import { promotionApi,sessionVault } from '@/api/runtime';
-import { checkoutQuoteBlock,type CheckoutQuoteBlock } from '@/api/promotion-api';
-import type { ExpectedReward,Quote } from '@/api/promotion-contracts';
+import { checkoutQuoteBlock,type CheckoutQuoteBlock,type Quote } from '@/api/promotion-api';
+import type { ExpectedReward } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
@@ -94,16 +94,18 @@ import { fmt } from '@/i18n/format';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
 
 import PromotionTerms from './promotion-terms.vue';
-const props=defineProps<{activityId:string;initialItems:EntryItem[];tiers?:ReadonlyArray<BundleDiscountTier>|null}>();
+const props=defineProps<{activityId:string;initialItems:EntryItem[];policy:BundleDiscountSnapshot|null}>();
 const app=useApp(),locale=useLocaleStore(),t=useT(),phase=useProductPhase();
 const scopeId=ref(props.activityId),selection=ref<EntryItem[]>([]),termsOpen=ref(false);
-const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId);
+const {activity,status:contextStatus,available,refresh:refreshContext}=usePromotionContext(scopeId,true);
 const quote=ref<Quote|null>(null),quoteStatus=ref<'idle'|'loading'|'ready'|'error'>('idle');
 const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
+const quoteExpired=ref(false),quoteIneligible=ref(false);
 const capacityRecheckPending=ref(false);
 const fence=createPromotionReadFence();const visible=ref(true);
 const clockNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
-let quoteReceivedAt=0;let expiryTimer:ReturnType<typeof setInterval>|null=null;
+let quoteReceivedAt=0;
+let expiryTimer:ReturnType<typeof setTimeout>|undefined;
 const storageKey='growth-promotion-selection:'+props.activityId;
 function restore(initial:EntryItem[]=props.initialItems){
   const saved=readAccountRow<EntrySelectionDraft>(storageKey,app.accountKey);
@@ -111,8 +113,9 @@ function restore(initial:EntryItem[]=props.initialItems){
 }
 restore(props.initialItems);
 const catalogStatus=computed(()=>productCatalogState.status);
-useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
-useAutoRecovery({ failed: () => contextStatus.value === "error", retry: () => refreshContext() });
+const repeatWithoutPull = { repeatMs: 30_000, repeatWhile: () => !hasVisiblePullRefresh() };
+useAutoRecovery({ ...repeatWithoutPull, failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
+useAutoRecovery({ ...repeatWithoutPull, failed: () => contextStatus.value === "error", retry: () => refreshContext() });
 const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
 const levelsFor=(id:string)=>productTaskLevelsText(t.value,productFor(id)?.taskLevels??[]);
@@ -168,7 +171,36 @@ function rewardsFor(productNo:string){
   const lines=quote.value.items.filter(line=>line.productNo===productNo).map(line=>line.lineId);
   return rewardTotals(quote.value.expectedRewards.filter(entry=>lines.includes(entry.lineId)));
 }
-const quoteMessages=computed(()=>quote.value?[...quote.value.warnings.map(warning=>localized(warning,locale.code)),...quote.value.expectedRewards.filter(entry=>entry.message).map(entry=>localized(entry.message,locale.code))].filter(Boolean):[]);
+const quoteWarning = computed(() => {
+  const current = quote.value;
+  if (!current) return '';
+  return [...current.warnings, ...current.expectedRewards.map(reward => reward.message)]
+    .map(message => localized(message, locale.code)).find(Boolean) ?? '';
+});
+const quotedTiers = computed(() => {
+  const current = quote.value;
+  const policy = props.policy;
+  if (!current || current.eligibility !== 'ELIGIBLE' || !policy?.serverCanonical
+    || current.bundlePolicyVersion !== policy.policyVersion) return null;
+  const rate = bundleDiscountForCount(current.itemCount, policy.tiers);
+  const expected = quoteBundleAmountUsdt([Number(current.subtotalUsdt)], rate)?.discountUsdt;
+  const micros = (amount: string | number) => Math.round(Number(amount) * 1_000_000);
+  // The total discount can also include an activity discount that is unrelated to the bundle tier.
+  const bundleDiscount = micros(current.discountUsdt) - micros(current.promotionDiscountUsdt ?? 0);
+  return expected !== undefined && bundleDiscount > 0 && bundleDiscount === micros(expected) ? policy.tiers : null;
+});
+const termsMissing = computed(() => quote.value?.expectedRewards.some(({ disclosure }) =>
+  !disclosure || [disclosure.title, disclosure.terms, disclosure.refundTerms, disclosure.benefitDescription]
+    .some(text => !text?.zh?.trim() || !text.en?.trim() || !text.vi?.trim())) ?? false);
+const inventoryNote = computed(() => {
+  const current = quote.value;
+  if (!current) return '';
+  const slots = current.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
+  const count = current.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, current.quantity - slots));
+  if (count === 0) return '';
+  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count });
+});
 // The dashed 「添加」 tile scrolls to 「继续添加」 and moves focus there (same in-page jump as the rule guides' directory).
 function jumpToSuggestions(){
   const reduce=typeof window!=='undefined'&&window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -180,26 +212,35 @@ function jumpToSuggestions(){
   // #endif
 }
 const productsReady=computed(()=>catalogStatus.value==='ready'&&selection.value.every(item=>{const product=productFor(item.productNo);return product&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(item.productNo));}));
-const canReadQuote=computed(()=>visible.value&&signedIn.value&&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
-const canQuote=computed(()=>canReadQuote.value&&quoteStatus.value!=='loading'&&!quoteBlock.value);
-const canContinue=computed(()=>canQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE');
+const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
+  &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
+const canContinue=computed(()=>canReadQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE'&&!termsMissing.value);
 const canOpenDevices=computed(()=>visible.value&&signedIn.value&&quoteBlock.value==='capacity');
 useAutoRecovery({
   active:()=>visible.value,
-  failed:()=>quoteBlock.value==='unavailable'&&canReadQuote.value,
-  retry:refreshQuote,
-  repeatMs:30_000,
-  quiet:false,
+  failed:()=>canReadQuote.value&&(quoteStatus.value==='error'||quoteBlock.value==='unavailable'),
+  retry:()=>refreshQuote(),
+  ...repeatWithoutPull,
 });
 function invalidate(preserveBlock=false){
   fence.invalidate();
+  clearTimeout(expiryTimer);
   quote.value=null;
   quoteStatus.value='idle';
-  if(!preserveBlock){quoteBlock.value=null;capacityRecheckPending.value=false;}
+  quoteExpired.value=false;
+  if(!preserveBlock){quoteBlock.value=null;quoteIneligible.value=false;capacityRecheckPending.value=false;}
 }
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
-watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate(true);termsOpen.value=false;},{flush:'sync'});
+watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate();termsOpen.value=false;},{flush:'sync'});
 watch([()=>app.accountKey,()=>app.accountBindingEpoch],()=>{invalidate();termsOpen.value=false;restore();});
+watch(canReadQuote, ready => {
+  if (!ready && (quote.value || quoteStatus.value === 'loading')) invalidate(true);
+});
+watch([selection, canReadQuote, quoteStatus, quoteBlock, quoteIneligible], (_, __, onCleanup) => {
+  if (!canReadQuote.value || quoteStatus.value !== 'idle' || quoteBlock.value || quoteIneligible.value) return;
+  const timer = setTimeout(() => { void refreshQuote(); }, 200);
+  onCleanup(() => clearTimeout(timer));
+}, { immediate: true });
 function add(productNo:string){if(selection.value.length>=8||totalUnits.value>=100||!suggestions.value.some(product=>product.id===productNo))return;selection.value=[...selection.value,{productNo,quantity:1}];}
 function remove(productNo:string){selection.value=selection.value.filter(item=>item.productNo!==productNo);}
 function changeQuantity(productNo:string,delta:number){const item=selection.value.find(entry=>entry.productNo===productNo);if(!item||item.quantity+delta<1||totalUnits.value+delta>100)return;selection.value=selection.value.map(entry=>entry.productNo===productNo?{...entry,quantity:entry.quantity+delta}:entry);}
@@ -214,46 +255,63 @@ async function refreshQuote(recheckCapacity=false){
   try{
     const result=await promotionApi.quote(chosen,scopeId.value||null);
     if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
-    quoteBlock.value=null;quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
+    quoteBlock.value=null;
+    const lifetime = Date.parse(result.expiresAt) - Date.parse(result.serverTime);
+    if (!isEntryQuoteFresh(result.expiresAt, result.serverTime, 0)) {
+      quoteExpired.value = true;
+      quoteStatus.value = 'error';
+      return;
+    }
+    quoteExpired.value=false;quoteReceivedAt=clockNow();quote.value=result;quoteStatus.value='ready';
+    expiryTimer = setTimeout(expireQuote, lifetime);
   }catch(cause){
     if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
     quoteBlock.value=checkoutQuoteBlock(cause);
-    quoteStatus.value=quoteBlock.value?'idle':'error';
+    quoteIneligible.value=asApiError(cause).message==='PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE';
+    quoteStatus.value=quoteBlock.value||quoteIneligible.value?'idle':'error';
   }
 }
+const footerNote = computed(() => {
+  if (scopeId.value && contextStatus.value === 'ready' && !available.value)
+    return localized(activity.value?.eligibilityMessage,locale.code) || t.value.promotion.disabled;
+  if (quoteIneligible.value || (quote.value && quote.value.eligibility !== 'ELIGIBLE')) return t.value.promotion.disabledNote;
+  if (quoteExpired.value) return t.value.promotion.quoteExpired;
+  const block = checkoutQuoteBlockCopy(quoteBlock.value, t.value);
+  if (block) return block;
+  if (termsMissing.value) return t.value.promotion.termsMissing;
+  if (inventoryNote.value) return inventoryNote.value;
+  if (quoteWarning.value) return quoteWarning.value;
+  if (selection.value.length < 2) return t.value.promotion.selectTwo;
+  if (quoteStatus.value === 'error') return t.value.promotion.errorNote;
+  return signedIn.value && !quote.value ? t.value.promotion.loading : '';
+});
 // The page renders these states and actions in its existing tray.
 const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
-  note:scopeId.value&&contextStatus.value==='ready'&&!available.value?localized(activity.value?.eligibilityMessage,locale.code)||t.value.promotion.disabled
-    :checkoutQuoteBlockCopy(quoteBlock.value,t.value)||(quoteStatus.value==='loading'?t.value.promotion.loading
-      :quoteStatus.value==='error'?t.value.promotion.errorNote
-      :selection.value.length<2?t.value.promotion.selectTwo
-      :quote.value&&quote.value.eligibility!=='ELIGIBLE'?t.value.promotion.disabledNote
-      // LOGIC (promotion-bundle footer): with the quote button gone, quote again on its own whenever the selection,
-      // activity or visibility changes (debounced, same fence); then this 「待重新试算」 note gives way to 「正在读取最新信息」.
-      :signedIn.value&&!quote.value&&quoteStatus.value==='idle'?t.value.promotion.awaitingQuote:''),
-  signedIn:signedIn.value,canQuote:canQuote.value,canContinue:canOpenDevices.value||canContinue.value,
+  note:footerNote.value,
+  signedIn:signedIn.value,canContinue:canOpenDevices.value||canContinue.value,
   continueLabel:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
   // Tray price slot: the quote's amount due and its discount (已省); null until a quote is in.
   total:quote.value&&quoteStatus.value==='ready'?quote.value.amountUsdt:null,
   saved:quote.value&&quoteStatus.value==='ready'&&Number(quote.value.discountUsdt)>0?quote.value.discountUsdt:null,
   devices:canOpenDevices.value,
-  // LOGIC: no control calls `quote` any more; the automatic quote above uses refreshQuote / requestQuote.
-  quote:requestQuote,continue:continueCheckout,signIn,
+  continue:continueCheckout,signIn,
 });
 defineExpose({footer});
-function requestQuote(){if(canQuote.value)void refreshQuote();}
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
+function expireQuote(){
+  invalidate();
+  quoteExpired.value=true;
+}
 function continueCheckout(){
   if(canOpenDevices.value){void navTo('/pages/me/devices');return;}
   if(!quote.value)return;
-  if(!freshQuote()){invalidate();return;}
+  if(!freshQuote()){expireQuote();return;}
   if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
 }
-onMounted(()=>{expiryTimer=setInterval(()=>{if(quote.value&&!freshQuote())invalidate();},1000);});
 onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;});
 onShow(()=>{
   const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
-  visible.value=true;invalidate(true);
+  visible.value=true;invalidate(recheckCapacity);
   if(recheckCapacity)capacityRecheckPending.value=true;
 });
 watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQuote.value,ready=>{
@@ -261,7 +319,7 @@ watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQu
   capacityRecheckPending.value=false;
   void refreshQuote(true);
 },{flush:'post'});
-onBeforeUnmount(()=>{visible.value=false;fence.invalidate();if(expiryTimer)clearInterval(expiryTimer);});
+onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryTimer);});
 </script>
 <style src="./promotion.css"></style>
 <style scoped>

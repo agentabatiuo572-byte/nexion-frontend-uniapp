@@ -22,7 +22,7 @@
 <template>
   <AppChassis active="store">
     <!-- Activity bundle: the same layout (board B), with the activity strip on top; tiers are the policy this page reads. -->
-    <PromotionBundle v-if="promotionActivityId" :key="promotionActivityId" ref="promotionBundle" :activity-id="promotionActivityId" :initial-items="promotionInitialItems" :tiers="activeDiscountTiers" />
+    <PromotionBundle v-if="promotionActivityId" :key="promotionActivityId" ref="promotionBundle" :activity-id="promotionActivityId" :initial-items="promotionInitialItems" :policy="policy" />
     <template v-else>
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
@@ -32,15 +32,13 @@
       <!-- Remote and explicit sandbox catalogs start empty. Do not render the
            compatibility PRODUCTS array until the authoritative snapshot is
            ready; a cold first frame must never look like a real quote.
-           First load is a still placeholder in the focal card's shape (03 §3.4: keep the structure). LOGIC (bundle.vue
-           onShow → refreshBundlePolicy): coming back to the page must keep the last content and refresh quietly instead
-           of returning to this placeholder. -->
-      <view v-if="catalogStatus === 'loading' || policyStatus === 'loading'" data-testid="bundle-catalog-loading" class="bundle-skeleton nx-soft-glass" role="status" :aria-label="t.store.catalogLoadingTitle">
+           The first load keeps the focal card's shape while later reads keep the catalog presentation. -->
+      <view v-if="!hasCatalog && catalogStatus === 'loading'" data-testid="bundle-catalog-loading" class="bundle-skeleton nx-soft-glass" role="status" :aria-label="t.store.catalogLoadingTitle">
         <view class="bundle-skeleton__bar bundle-skeleton__bar--title" />
         <view class="bundle-skeleton__bar" />
         <view class="bundle-skeleton__grid"><view class="bundle-skeleton__tile" /><view class="bundle-skeleton__tile" /></view>
       </view>
-      <EmptyState v-else-if="catalogStatus === 'error' || policyStatus === 'error'" kind="recoverable-error" page :title="t.store.catalogErrorTitle" :desc="t.store.catalogErrorBody" :cta-label="t.ui.reload" @cta="retryCatalog" />
+      <EmptyState v-else-if="!hasCatalog && catalogStatus === 'error'" kind="recoverable-error" page :title="t.store.catalogErrorTitle" :desc="t.store.catalogErrorBody" :cta-label="t.ui.reload" @cta="retryCatalog" />
       <template v-else>
 
       <!-- Legacy receipt rewrite: the user's own submitted action, so it keeps its in-place retry, a text button (03 §3.5.2, 10.2). -->
@@ -51,7 +49,7 @@
       </view>
       <template v-else>
 
-      <BundleHero class="bundle-rise" :count="products.length" :tiers="activeDiscountTiers" :items="heroTiles" :rules="t.bundle.sameModel" :daily="products.length ? `$${cumulativeDailyEarnText}${t.store.cardPerDaySuffix}` : ''" :addable="suggestions.length > 0" @remove="remove" @add="jumpToSuggestions">
+      <BundleHero class="bundle-rise" :count="products.length" :tiers="activeDiscountTiers" :items="heroTiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :daily="products.length ? `$${cumulativeDailyEarnText}${t.store.cardPerDaySuffix}` : ''" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
         <template #tile="{ item }">
           <text v-if="productById(item.id)?.productType === 'SHARE'" class="bundle-tile-note">{{ t.store.shareYieldDisclaimer }}</text>
           <text v-if="productById(item.id)?.taskLevels.length" class="bundle-tile-note">{{ productTaskLevelsText(t, productById(item.id)?.taskLevels ?? []) }}</text>
@@ -64,9 +62,7 @@
       </BundleHero>
       <text v-if="products.length > 0" class="bundle-estimate-note">{{ t.store.cardEstimateNote }}</text>
 
-      <!-- LOGIC (bundle.vue suggestions): list every purchasable model not yet chosen (drop the old .slice(0, 3)), and open
-           the product page from the row body (`openable`), as the activity bundle does. -->
-      <BundleSuggestions v-if="suggestions.length > 0" class="bundle-section bundle-rise" anchor="bundle-more" :title="t.bundle.addMore" :items="suggestionRows" @add="addSuggestionById" />
+      <BundleSuggestions v-if="suggestions.length > 0" class="bundle-section bundle-rise" anchor="bundle-more" :title="t.bundle.addMore" :items="suggestionRows" @add="addSuggestionById" @open="openDetail" />
 
       <!-- Room for the bottom action bar: a hidden copy of the tray's rows keeps the last row above it (04 §4.0). -->
       <view class="bundle-bar-space" aria-hidden="true">
@@ -92,7 +88,7 @@
         </template>
         <view v-else class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
       </view>
-      <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure" class="bundle-bar nx-glass-bar">
+      <view v-if="!promotionActivityId && hasCatalog && !receiptWriteFailure" class="bundle-bar nx-glass-bar">
         <text v-if="bundleTrayNote" class="nx-tray-note" role="status">{{ bundleTrayNote }}</text>
         <view v-if="products.length > 0" class="bundle-bar__copy nx-tray-copy">
           <CheckoutAmount class="bundle-bar__total" :value="total" currency="USD" />
@@ -112,7 +108,9 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { promotionCheckoutHref } from "@/lib/promotion-entry";
+import { useBundleDiscountPolicy } from "@/composables/use-bundle-discount-policy";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
+import { promotionCheckoutHref, promotionDetailHref, validEntryItems } from "@/lib/promotion-entry";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
@@ -136,22 +134,20 @@ import { formatGroupedAmount } from "@/lib/amount-display";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
-import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
+import { PRODUCTS, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
 // 🔴 zentao #244:线上模式必须问**服务端**资格,本地门仅 mock 用 —— 与 detail.vue 同一口径。
 import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
-import { isProductAvailable } from "@/store/product-availability";
 import { useLocaleStore } from "@/store/locale";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
-import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
+import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { bundleCatalogReady, isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { confirm, toast } from "@/store/ui";
 import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { matchesBundleQuote, normalizeBundleExpectedAmountUsdt } from "@/api/bundle-order-api";
 import { quoteBundleAmountUsdt } from "@/api/bundle-quote";
 import { restoreBundleCommand, type PendingBundleCommand } from "@/api/bundle-command";
-import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
@@ -180,38 +176,20 @@ const orders = useOrders();
 const pending = usePendingCheckout();
 
 const catalogStatus = computed(() => productCatalogState.status);
-const policy = ref<BundleDiscountSnapshot | null>(null);
-const policyStatus = ref<"loading" | "ready" | "error">("loading");
-// LOGIC (bundle.vue catalogReady): a policy that is not server-canonical should only hide the rates (tiers → null),
-// keeping the chosen models and suggestions; today it empties both.
-const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value)
-  && policyStatus.value === "ready" && policy.value?.serverCanonical === true);
+const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
+const hasCatalog = computed(() => catalogReady.value || !!productCatalogPresentation.value?.products.length);
+const { policy, failed: policyReadFailed, refresh: refreshBundlePolicy } = useBundleDiscountPolicy();
 
-async function refreshBundlePolicy(): Promise<void> {
-  policyStatus.value = "loading";
-  try {
-    policy.value = await bundleDiscountApi.current();
-    policyStatus.value = "ready";
-  } catch {
-    policy.value = null;
-    policyStatus.value = "error";
-  }
-}
-
-onLoad(async (options) => {
+onLoad((options) => {
   const query=(options??{}) as Record<string,string>;
   const fallback=new URLSearchParams(takeNavigationQuery('/pages/store/bundle'));
   promotionInitialItems.value=parseEntryItems(query.items||fallback.get('items'))??[];
   promotionActivityId.value=(query.activityId||fallback.get('activityId')||'').trim();
-  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 });
 
-// LOGIC (bundle.vue onShow): refreshBundlePolicy sets the page back to "loading", so every return from checkout or the
-// orders swaps the page for the first-load placeholder; refresh quietly and keep the last content instead.
 onShow(() => {
   void refreshProductCatalog(true);
   void ensureServerProductPhase();
-  void refreshBundlePolicy();
   void refreshBundleWallet();
   restoreReceiptRecovery();
 });
@@ -224,20 +202,17 @@ useSetPageHeader(() => ({
   backHref: "/store",
 }));
 
-const products = computed<Product[]>(() =>
-  catalogReady.value
-    ? cart.items
-      .map((id) => getProduct(id))
-      .filter((p): p is Product => !!p)
-      .filter((p) => isProductAvailable(p, phase.value))
-    : [],
-);
-const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier>>(() => policy.value?.tiers ?? []);
-const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value));
-const bundleQuote = computed(() => quoteBundleAmountUsdt(
+const hardware = computed(() => (remoteApiEnabled ? productCatalogPresentation.value?.products ?? [] : PRODUCTS)
+  .filter(p => isBundleHardwareAvailable(p, phase.value)));
+const products = computed(() => cart.items
+  .map(id => hardware.value.find(p => p.id === id))
+  .filter((p): p is Product => !!p));
+const limitReached = computed(() => products.value.length >= 8);
+const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier> | null>(() => policy.value?.tiers ?? null);
+const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value ?? []));
+const bundleQuote = computed(() => activeDiscountTiers.value ? quoteBundleAmountUsdt(
   products.value.map((product) => product.price), discountPct.value,
-));
-const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
+) : null);
 const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
 const cumulativeDailyEarnText = computed(() => {
@@ -258,17 +233,7 @@ function estimateText(p: Product): string {
 const productById = (id: string) => products.value.find((p) => p.id === id);
 const heroTiles = computed<BundleTile[]>(() => products.value.map((p) => ({ id: p.id, name: p.name, imageUrl: p.imageUrl, price: p.price, estimate: estimateText(p) })));
 
-// 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
-const suggestions = computed(() =>
-  catalogReady.value
-    ? PRODUCTS.filter(
-      (p) =>
-        !cart.items.includes(p.id) &&
-        p.productType !== "SHARE" &&
-        isProductAvailable(p, phase.value),
-    ).slice(0, 3)
-    : [],
-);
+const suggestions = computed(() => hardware.value.filter(p => !cart.has(p.id)));
 // Display rows for 「继续添加」: the trailing control follows the purchase eligibility read (add, locked → detail, none
 // when out of stock); the handler stays onAddSuggestion.
 const suggestionRows = computed<BundleSuggestion[]>(() => suggestions.value.map((p) => {
@@ -284,11 +249,16 @@ const suggestionRows = computed<BundleSuggestion[]>(() => suggestions.value.map(
     tag: unavailable ? t.value.store.temporarilyOutOfStock : undefined,
     action: unavailable ? "none" : locked ? "locked" : "add",
     actionLabel: locked ? `${p.name} · ${t.value.store.gateBlockedToast}` : fmt(t.value.uiChrome.addItem, { name: p.name }),
+    openable: true,
+    disabled: limitReached.value,
   };
 }));
 function addSuggestionById(id: string) {
   const product = suggestions.value.find((p) => p.id === id);
   if (product) void onAddSuggestion(product);
+}
+function openDetail(id: string) {
+  void navTo(promotionDetailHref(id));
 }
 // The dashed 「添加」 tile scrolls to 「继续添加」 and moves focus there (same in-page jump as the rule guides' directory).
 function jumpToSuggestions() {
@@ -337,7 +307,13 @@ function eligibilityLabel(productNo: string, ineligible: string): string {
 async function retryCatalog() {
   await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 }
-useAutoRecovery({ failed: () => catalogStatus.value !== "loading" && policyStatus.value !== "loading" && (catalogStatus.value === "error" || policyStatus.value === "error"), retry: retryCatalog });
+useAutoRecovery({
+  active: () => !promotionActivityId.value,
+  failed: () => catalogStatus.value === "error",
+  retry: () => refreshProductCatalog(true),
+  repeatMs: 30_000,
+  repeatWhile: () => !hasVisiblePullRefresh(),
+});
 
 function retryReceiptWrite() {
   const failure = receiptWriteFailure.value;
@@ -368,10 +344,7 @@ function activate(event: KeyboardEvent, action: () => void | Promise<void>) {
   void action();
 }
 
-function formatBundleUsdt(value: number): string {
-  return formatAmount(value);
-}
-const totalText = computed(() => formatBundleUsdt(total.value));
+const totalText = computed(() => Number.isFinite(total.value) ? formatAmount(total.value) : "—");
 /** "$7,006.08" for the tray's 已省 and the button's screen-reader name; unknown is "—". */
 function moneyText(value: number | string | null | undefined): string {
   const text = formatGroupedAmount(value);
@@ -401,7 +374,8 @@ async function refreshBundleWallet(): Promise<void> {
   }
 }
 
-const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || products.value.length < 2
+const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || !catalogReady.value
+  || products.value.length < 2 || products.value.length > 8 || (!remoteApiEnabled && !bundleQuote.value)
   || (remoteApiEnabled && products.value.some((p) => {
     const entry = purchaseEligibilityStore.state(p.id);
     return entry.status !== "ready" || !entry.eligible;
@@ -458,7 +432,6 @@ watch(() => app.accountKey, () => {
   if (remoteApiEnabled && app.accountKey !== "default") {
     void refreshProductCatalog(true);
     void refreshServerProductPhase(true);
-    void refreshBundlePolicy();
   }
 });
 
@@ -469,6 +442,7 @@ function clear() {
   cart.clear();
 }
 async function onAddSuggestion(p: Product) {
+  if (!catalogReady.value || limitReached.value) return;
   if (remoteApiEnabled) {
     const entry = purchaseEligibilityStore.state(p.id);
     if (entry.status === "unavailable") return;
@@ -487,7 +461,7 @@ async function onAddSuggestion(p: Product) {
       return;
     }
   }
-  if (!catalogReady.value || !isProductAvailable(p, phase.value) || cart.has(p.id)) return;
+  if (!catalogReady.value || limitReached.value || !suggestions.value.some(product => product.id === p.id)) return;
   cart.add(p.id);
   toast.success(fmt(t.value.bundle.addedToBundle, { name: (p.name) }));
 }
@@ -581,7 +555,8 @@ async function openBundleReview(list:Product[]):Promise<boolean> {
 }
 async function onCheckout() {
   const list = products.value;
-  if (list.length < 2 || submitting.value || walletRefreshing.value) return;
+  if (!catalogReady.value || !validEntryItems(list.map(p => ({ productNo: p.id, quantity: 1 })), 2)
+      || submitting.value || walletRefreshing.value) return;
   if (remoteApiEnabled) {
     if(await openBundleReview(list))return;
     if (list.some((p) => eligibilityUnavailable(p.id))) return;
@@ -609,9 +584,10 @@ async function onCheckout() {
       }
       const latestPolicy = await bundleDiscountApi.current();
       if (!scopeIsCurrent()) return;
+      if (latestPolicy.serverCanonical !== true) return;
       if (!policy.value || latestPolicy.policyVersion !== policy.value.policyVersion) {
         policy.value = latestPolicy;
-        policyStatus.value = "ready";
+        policyReadFailed.value = false;
         toast.warn(t.value.bundle.policyChanged);
         return;
       }
@@ -740,7 +716,7 @@ async function onCheckout() {
         navTo("/pages/store/orders");
         return;
       }
-      policyStatus.value = "error";
+      policyReadFailed.value = true;
       toast.warn(t.value.store.catalogErrorBody);
     } finally {
       submitting.value = false;

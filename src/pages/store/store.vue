@@ -78,6 +78,7 @@
 <script setup lang="ts">
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useBundleDiscountPolicy } from "@/composables/use-bundle-discount-policy";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/tab-page-frame.vue";
@@ -87,7 +88,8 @@ import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import ProductCard from "@/components/store/product-card.vue";
 import BundleEntryCard from "@/components/store/bundle-entry-card.vue";
-import { useCart, type BundleDiscountTier } from "@/store/cart";
+import { useCart } from "@/store/cart";
+import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
 import PromotionEntry from '@/components/promotion/promotion-entry.vue';
 import { promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { useLocaleStore } from '@/store/locale';
@@ -166,6 +168,7 @@ async function refreshVisibleStore() {
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
     revalidateProductCatalog(), phoneTierReadFailed() ? undefined : earnConfig.ensure(), app.ensureRemoteFleet(),
+    bundlePolicy.failed.value ? undefined : bundlePolicy.refresh(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -307,12 +310,11 @@ const lockedProducts = computed(() =>
   }),
 );
 
-// Bundle entry card. LOGIC (store.vue): the store page does not read the bundle tiers yet. Read
-// GET /api/store/bundle-discount (bundleDiscountApi.current(), signed in only) when the page shows, keep the last good
-// snapshot when a refresh fails, recover on its own (03 §3.5.2), and keep null while unknown: null is the degraded card.
-const bundleTiers = ref<ReadonlyArray<BundleDiscountTier> | null>(null);
-const bundleHardware = computed(() => unlockedProducts.value.filter((p) => p.productType !== "SHARE"));
-// The account's bundle draft, limited to models still on sale (LOGIC: same filter as bundle.vue's `products`).
+const bundlePolicy = useBundleDiscountPolicy(() => !publicOnly.value && !voucherContext.value.voucherId);
+const bundleTiers = computed(() => bundlePolicy.policy.value?.tiers ?? null);
+const bundleHardware = computed(() => mounted.value
+  ? displayProducts.value.filter(p => isBundleHardwareAvailable(p, phase.value))
+  : []);
 const cart = useCart();
 const bundleSelectedProducts = computed(() => cart.items
   .map((id) => bundleHardware.value.find((p) => p.id === id))
