@@ -227,7 +227,7 @@ function ladderView(data: { creditRatesPct: number[]; outputRatioCutsPct: number
   // Rates step down from the first tier; cuts are the boundaries between tiers, so there is one fewer of them.
   const known = rates.length > 1 && cuts.length === rates.length - 1;
   const count = known ? rates.length : 5;
-  const ranges = known ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${pct(cuts[i - 1])}–${pct(cuts[i])}`)
+  const ranges = known ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${Number(cuts[i - 1].toFixed(1))}–${pct(cuts[i])}`)
     : Array.from({ length: count }, () => "—");
   const output = known && !hidden && data?.outputRatioPct != null ? data.outputRatioPct : null;
   const current = output == null ? -1 : cuts.filter((cut) => output >= cut).length;
