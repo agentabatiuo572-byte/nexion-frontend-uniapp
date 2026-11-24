@@ -471,6 +471,10 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       : { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
+    // Refunded to the original payment method (user 2026-11-24): the payment has ended, nothing is left to do here.
+    case 'refunded': return { icon: 'info', tone: 'neutral', title: c.refundedTitle, body: c.refunded,
+      primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
+      ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
       // Trial conversion, trade-in and capacity payments have no order page; they resume from Orders.
