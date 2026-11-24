@@ -149,7 +149,7 @@ import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import ConversationSwipeRow from "@/components/support/conversation-swipe-row.vue";
-import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, orderPaymentDeadline, purchaseRecordPayload, refreshPendingPayments, rememberHiddenOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
+import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, orderPaymentDeadline, purchaseRecordPayload, refreshPendingPayments, rememberOrderPaymentBeforeHide, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { GENESIS_MEDIA, getProductMedia } from "@/lib/product-media";
@@ -233,7 +233,7 @@ const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap(
   if (row.kind === "ORDER_PAY") {
     if (typeof payload.orderNo !== "string") return [];
     const order = orders.getById(payload.orderNo);
-    // An absent order needs a recorded hide before its payment can appear here.
+    // An absent order needs the expired order facts saved at hide confirmation.
     if (order?.status === "placed") return [];
     const details = order ? { sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, amount: commerceOrderAmount(order) }
       : row.hiddenOrder && { sku: row.hiddenOrder.sku, imageUrl: row.hiddenOrder.imageUrl, amount: { value: row.hiddenOrder.total, currency: "USD" as const } };
@@ -282,11 +282,11 @@ async function confirmDeleteExpired() {
   if (!order || !swipeable(order) || hidingOrderId.value) return;
   const epoch = app.accountBindingEpoch;
   hidingOrderId.value = order.id;
+  rememberOrderPaymentBeforeHide(app.accountKey, order);
   const hidden = await orders.hideExpiredOrder(order.id);
   if (epoch !== app.accountBindingEpoch) return;
   hidingOrderId.value = "";
-  if (hidden) rememberHiddenOrderPayment(app.accountKey, order);
-  else toast.error(t.value.security.opFailed);
+  if (!hidden) toast.error(t.value.security.opFailed);
 }
 // One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
 const tintedPendingId = computed(() => filteredCards.value.find((order): order is CommerceOrderListItem =>

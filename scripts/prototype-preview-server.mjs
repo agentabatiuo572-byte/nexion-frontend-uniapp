@@ -199,7 +199,7 @@ const server=http.createServer(async(req,res)=>{
       let raw='';for await(const chunk of req)raw+=chunk;
       const update=JSON.parse(raw||'{}'),accountId=String(update.accountId??previewSelectedAccountId(state)??'');
       if(!/^\d+$/.test(accountId))return sendJson(res,{code:422,message:'ME_DOTS_ACCOUNT_REQUIRED',data:null},422);
-      return sendJson(res,{accountId,...meEntryDots.configure(accountId,update)});
+      return sendJson(res,{accountId,...meEntryDots.configure(accountId,update,checkoutFlow?.resetOrderHides)});
     }
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {

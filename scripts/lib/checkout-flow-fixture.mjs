@@ -42,6 +42,13 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   }
   const isExpired = order => order.orderStatus === 'EXPIRED' && order.paymentStatus === 'EXPIRED';
   const scopedOrder = (owner, orderNo) => JSON.stringify([owner, orderNo]);
+  function resetOrderHides(owner, matchesOrder) {
+    for (const [command, result] of hideCommands) {
+      if (result.owner !== owner || !matchesOrder(result.orderNo)) continue;
+      hideCommands.delete(command);
+      hiddenOrders.delete(scopedOrder(owner, result.orderNo));
+    }
+  }
   function orderProjection(url, request, owner) {
     const page = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=>'GET'});
     const meOrders = projectMeOrders?.(owner, page);
@@ -83,7 +90,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     const response = isExpired(order) ? ok({orderNo,hidden:true,paymentStatus:'EXPIRED',orderStatus:'EXPIRED',
       serverCanonical:true,source:'server',sourceEnvironment:'PRODUCTION',runId:''})
       : {status:409,message:'ORDER_NOT_HIDEABLE',data:null};
-    hideCommands.set(command,{orderNo,response});
+    hideCommands.set(command,{owner,orderNo,response});
     if (response.status !== 200) return response;
     hiddenOrders.add(scopedOrder(owner,orderNo));
     // A gateway failure can hide the result even though the order was saved.
@@ -275,7 +282,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  return {handles,handle,pin,syncScenario,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
+  return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
     confirmLateOrderPayment:external.confirmLateOrderPayment,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},

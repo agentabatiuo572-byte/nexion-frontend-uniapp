@@ -955,13 +955,12 @@ export function orderPaymentDeadline(row: PendingExternal, order?: Pick<Order, '
   if (order) return order.expiresAt ?? order.placedAt + 30 * 60_000;
 }
 
-/** Keep the payment's facts when B81 removes the original order from the list. */
-export function rememberHiddenOrderPayment(accountKey: string, order: Order) {
+/** Keep the expired order's facts before B81 can remove it from later reads. */
+export function rememberOrderPaymentBeforeHide(accountKey: string, order: Order) {
   if (accountKey !== account()) return;
   try {
     for (const row of displayRecords()) {
-      if (row.kind !== 'ORDER_PAY' || !row.intentNo || row.validated || row.businessDelivered
-        || (row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'MANUAL_REVIEW')
+      if (row.kind !== 'ORDER_PAY' || row.lastStatus !== 'EXPIRED' || !row.intentNo || row.validated || row.businessDelivered
         || !isOrdersPurchaseRecord(row) || purchaseRecordPayload(row).orderNo !== order.id) continue;
       save({ ...row, orderDeadlineAt: orderPaymentDeadline(row, order),
         hiddenOrder: { sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, total: order.total } }, accountKey);
