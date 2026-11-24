@@ -48,7 +48,7 @@ export function demoOrderTopupResponse(url, state, locale, now) {
   const long = state.contentState === 'long';
   const due = micro(long ? '12345678.123456' : order?.amountUsdt ?? 899);
   const balance = micro({
-    covered: long ? '12400000.5' : String(demoWalletUsdt(state)), partial: long ? '501.358024' : '620.5', debt: '-12.123456',
+    covered: long ? '12400000.5' : String(demoWalletUsdt(state)), 'min-floor': decimal(due - micro('10')), partial: long ? '501.358024' : '620.5', debt: '-12.123456',
   }[scenario] ?? (long ? '1.234567' : '120.5'));
   const paid = scenario === 'paid', closed = ['expired', 'closed'].includes(scenario), pending = !paid && !closed;
   const blocker = scenario === 'open-intent' ? 'OPEN_INTENT' : scenario === 'review' ? 'NEEDS_REVIEW' : 'NONE';

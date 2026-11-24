@@ -332,19 +332,19 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 /* The way on from this card is its footer action into the next page (03 §3.1 P-67), not a private chip. */
 .tx-bills-footer { margin-top: 12px; }
 /* Top-up detail: result head (03 §3.6.1) with the credited amount, then one solid facts card (1.1.2). */
-.tx-dep { padding: 8px 16px 0; }
-.tx-dep__amt { display: block; margin-top: 12px; color: var(--v5-success-ink); font: 500 28px/36px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tx-dep__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
-.tx-dep__card { margin-top: 24px; padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+.tx-dep { padding: var(--v5-space-2) var(--v5-space-4) 0; }
+.tx-dep__amt { display: block; margin-top: var(--v5-space-3); color: var(--v5-success-ink); font: 500 var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tx-dep__unit { color: var(--v5-ink-3); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; }
+.tx-dep__card { margin-top: var(--v5-space-6); padding: var(--v5-space-1) var(--v5-space-4); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
 [data-theme="light"] .tx-dep__card { box-shadow: var(--v5-glass-shadow); }
-.tx-dep__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 12px 0; }
+.tx-dep__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--v5-space-1) var(--v5-space-3); padding: var(--v5-space-3) 0; }
 .tx-dep__row + .tx-dep__row, .tx-dep__na + .tx-dep__row, .tx-dep__row + .tx-dep__hash { border-top: 1px solid var(--v5-border); }
 .tx-dep__k { display: block; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight, 400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .tx-dep__v { margin-left: auto; color: var(--v5-ink); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); white-space: nowrap; }
 .tx-dep__num { font-family: var(--font-amount); font-variant-numeric: tabular-nums; }
-.tx-dep__na { display: block; padding: 12px 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
-.tx-dep__hash { padding: 12px 0 4px; }
-.tx-dep__code { margin-top: 6px; color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); user-select: text; }
+.tx-dep__na { display: block; padding: var(--v5-space-3) 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.tx-dep__hash { padding: var(--v5-space-3) 0 var(--v5-space-1); }
+.tx-dep__code { margin-top: var(--v5-space-1); color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); user-select: text; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>

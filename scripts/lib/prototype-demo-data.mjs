@@ -139,7 +139,7 @@ export const demoOptions = {
   stakingOpenState:[['unmodeled','开仓未配置（演示拒绝）'],['disclosure','开仓拒绝·需风险确认（HTTP 200 / code 409）']],
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
   // Order top-up page scenarios (scripts/lib/prototype-demo-order-topup.mjs).
-  orderTopupState:[['off','跟随其他场景'],['waiting','为订单充值 · 等待到账'],['partial','为订单充值 · 已到账一部分'],['covered','为订单充值 · 余额已够'],['debt','为订单充值 · 余额为负（含欠款）'],['below-min','为订单充值 · 有一笔低于最低额'],['preparing','为订单充值 · 地址准备中'],['paused','为订单充值 · 充值暂停'],['address-error','为订单充值 · 地址读不到'],['order-error','为订单充值 · 订单读不到（503）'],['open-intent','为订单充值 · 有在途银行卡付款'],['review','为订单充值 · 有需要核对的记录'],['expired','为订单充值 · 已超时取消'],['closed','为订单充值 · 已关闭（非超时）'],['deadline','为订单充值 · 已到截止、待读回结果'],['missing','为订单充值 · 订单不存在（404）'],['paid','为订单充值 · 已付款']],
+  orderTopupState:[['off','跟随其他场景'],['waiting','为订单充值 · 等待到账'],['partial','为订单充值 · 已到账一部分'],['min-floor','为订单充值 · 还差很少（按最低额建议）'],['covered','为订单充值 · 余额已够'],['debt','为订单充值 · 余额为负（含欠款）'],['below-min','为订单充值 · 有一笔低于最低额'],['preparing','为订单充值 · 地址准备中'],['paused','为订单充值 · 充值暂停'],['address-error','为订单充值 · 地址读不到'],['order-error','为订单充值 · 订单读不到（503）'],['open-intent','为订单充值 · 有在途银行卡付款'],['review','为订单充值 · 有需要核对的记录'],['expired','为订单充值 · 已超时取消'],['closed','为订单充值 · 已关闭（非超时）'],['deadline','为订单充值 · 已到截止、待读回结果'],['missing','为订单充值 · 订单不存在（404）'],['paid','为订单充值 · 已付款']],
   withdrawRecoveryState:withdrawRecoveryOptions,
   withdrawNetworksState:[['bep20-erc20','提现网络 · BEP20 和 ERC20'],['bep20','提现网络 · 仅 BEP20'],['erc20','提现网络 · 仅 ERC20'],['closed','提现网络 · 全部关闭']],
   billRefsState:[['normal','账单 · 默认'],['long-refs','账单 · 真实长单号（订单、退款、学习奖励）']],
