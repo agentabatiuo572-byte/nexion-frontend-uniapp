@@ -9,6 +9,19 @@ export interface BundleQuoteAmount {
   amountUsdt: number;
 }
 
+/** A multi-product quote excludes vouchers. Its total includes any activity discount. */
+export function attributedBundleDiscount(
+  distinctProducts: number,
+  total: string | number | undefined,
+  activity: string | undefined,
+): number | undefined {
+  if (distinctProducts < 2 || total == null || activity == null || total === '' || activity === '') return;
+  const discount = Number(total);
+  const promotionDiscount = Number(activity);
+  if (!Number.isFinite(discount) || !Number.isFinite(promotionDiscount) || promotionDiscount < 0 || discount <= promotionDiscount) return;
+  return Number((discount - promotionDiscount).toFixed(MICRO_SCALE)) || undefined;
+}
+
 function power10(exponent: number): bigint | null {
   if (!Number.isSafeInteger(exponent) || exponent < 0 || exponent > 24) return null;
   return 10n ** BigInt(exponent);

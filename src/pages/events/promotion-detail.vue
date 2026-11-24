@@ -287,6 +287,7 @@ import type { PublicPromotion, PublicPurchaseRule, ReferralProgress } from '@/ap
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { refreshProductCatalog } from '@/store/product-catalog';
+import { productOutOfStock } from '@/store/product-availability';
 import { useT } from '@/i18n/use-t';
 import { fmt } from '@/i18n/format';
 import { formatGroupedAmount } from '@/lib/amount-display';
@@ -548,6 +549,9 @@ const bar = computed<Bar | null>(() => {
   }
   if (k === 'referral') return signInNeeded.value ? { wide: true, label: c.value.signInInvite, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) } : { wide: true, label: c.value.invite, variant: 'primary', share: true };
   if (k === 'bundle' && !signInNeeded.value) return { wide: true, label: c.value.buyBundle, variant: 'primary', href: promotionBundleHref(a.activityId) };
+  if (a.productNos.length === 1 && productOutOfStock(landingProduct(a.productNos[0]))) {
+    return { label: t.value.store.temporarilyOutOfStock, variant: 'primary', disabled: true };
+  }
   if (signInNeeded.value) return { label: copy.signInBuy, variant: 'primary', href: '/pages/login/login?return=' + encodeURIComponent(promotionLandingHref(a.activityId)) };
   return { label: k === 'gift' ? copy.buyNow : k === 'first' ? copy.firstOrder : copy.addNow, variant: 'primary', ...(a.productNos.length === 1 ? { href: promotionDetailHref(a.productNos[0], a.activityId) } : { devices: true }) };
 });

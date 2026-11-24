@@ -21,187 +21,86 @@
 -->
 <template>
   <AppChassis active="store">
-    <PromotionBundle v-if="promotionActivityId" :key="promotionActivityId" ref="promotionBundle" :activity-id="promotionActivityId" :initial-items="promotionInitialItems" />
+    <!-- Activity bundle: the same layout (board B), with the activity strip on top; tiers are the policy this page reads. -->
+    <PromotionBundle v-if="promotionActivityId" :key="promotionActivityId" ref="promotionBundle" :activity-id="promotionActivityId" :initial-items="promotionInitialItems" :policy="policy" />
     <template v-else>
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
-    <view class="pb-6" style="color: var(--v5-ink); padding-top: 24px">
-      <!-- Back + "Bundle" title now live in the sticky chassis nav header
-           (useSetPageHeader below), mirroring the prototype's <SetPageHeader>. -->
+    <view class="bundle-page pb-6" style="color: var(--v5-ink); padding-top: 24px">
+      <!-- Back + title live in the sticky chassis nav header (useSetPageHeader below). -->
 
       <!-- Remote and explicit sandbox catalogs start empty. Do not render the
            compatibility PRODUCTS array until the authoritative snapshot is
-           ready; a cold first frame must never look like a real quote. -->
-      <view v-if="catalogStatus === 'loading' || policyStatus === 'loading'" data-testid="bundle-catalog-loading" class="nx-glass-card mx-4" :style="catalogStateStyle">
-        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
-        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
+           ready; a cold first frame must never look like a real quote.
+           The first load keeps the focal card's shape while later reads keep the catalog presentation. -->
+      <view v-if="!hasCatalog && catalogStatus === 'loading'" data-testid="bundle-catalog-loading" class="bundle-skeleton nx-soft-glass" role="status" :aria-label="t.store.catalogLoadingTitle">
+        <view class="bundle-skeleton__bar bundle-skeleton__bar--title" />
+        <view class="bundle-skeleton__bar" />
+        <view class="bundle-skeleton__grid"><view class="bundle-skeleton__tile" /><view class="bundle-skeleton__tile" /></view>
       </view>
-      <EmptyState v-else-if="catalogStatus === 'error' || policyStatus === 'error'" kind="recoverable-error" page :title="t.store.catalogErrorTitle" :desc="t.store.catalogErrorBody" :cta-label="t.ui.reload" @cta="retryCatalog" />
+      <EmptyState v-else-if="!hasCatalog && catalogStatus === 'error'" kind="recoverable-error" page :title="t.store.catalogErrorTitle" :desc="t.store.catalogErrorBody" :cta-label="t.ui.reload" @cta="retryCatalog" />
       <template v-else>
 
-      <view v-if="receiptWriteFailure" class="nx-glass-card mx-4 rounded-2xl text-center" :style="receiptFailureCardStyle">
+      <!-- Legacy receipt rewrite: the user's own submitted action, so it keeps its in-place retry, a text button (03 §3.5.2, 10.2). -->
+      <view v-if="receiptWriteFailure" class="bundle-receipt mx-4">
         <text class="block" :style="catalogStateTitleStyle">{{ t.errors.billMissingTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.errors.billMissingMsg }}</text>
-        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" :aria-disabled="receiptRetrying" @click="retryReceiptWrite" @keydown="activate($event, retryReceiptWrite)">
-          <text>{{ receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
-        </view>
+        <NxButton class="bundle-receipt__retry" variant="text" size="small" :label="t.store.catalogRetry" :busy="receiptRetrying" @click="retryReceiptWrite" />
       </view>
       <template v-else>
 
-      <!-- Hero — the page's focal card, tinted brand (its colour used to come from an aurora wash);
-           the total card below takes a brand-2 tint from its old corner glow. -->
-      <view class="nx-tint mx-4 relative overflow-hidden" style="--nx-tint: var(--v5-brand); padding: 18px; border-radius: 20px">
-        <view class="relative">
-          <view class="flex items-center" style="gap: 6px; margin-bottom: 8px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
-            <text :style="heroLabelStyle">{{ t.bundle.heroLabel }}</text>
-          </view>
-          <text class="block" :style="heroTitleStyle">{{ t.bundle.heroTitle }}</text>
-          <view class="grid grid-cols-3 gap-2" style="margin-top: 14px">
-            <view v-for="tier in tiersReversed" :key="tier.minItems" class="p-2 text-center" :style="tierCellStyle(tier)">
-              <text class="block" :style="tierLabelStyle(tier)">{{ tierText(tier) }}</text>
-              <text class="block tabular-nums" :style="tierPctStyle(tier)">−{{ (tier.pct * 100).toFixed(0) }}%</text>
-            </view>
-          </view>
-        </view>
-      </view>
+      <BundleHero class="bundle-rise" :count="products.length" :tiers="activeDiscountTiers" :items="heroTiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :daily="products.length ? `$${cumulativeDailyEarnText}${t.store.cardPerDaySuffix}` : ''" :addable="suggestions.length > 0" :add-disabled="limitReached || !catalogReady" @remove="remove" @add="jumpToSuggestions">
+        <template #tile="{ item }">
+          <text v-if="productById(item.id)?.productType === 'SHARE'" class="bundle-tile-note">{{ t.store.shareYieldDisclaimer }}</text>
+          <text v-if="productById(item.id)?.taskLevels.length" class="bundle-tile-note">{{ productTaskLevelsText(t, productById(item.id)?.taskLevels ?? []) }}</text>
+          <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(item.id)" class="bundle-tile-tag" tone="unavailable" :label="t.bundle.tileOutOfStock" />
+          <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(item.id).eligible" class="bundle-tile-note">{{ eligibilityLabel(item.id, t.store.purchaseEligibilityIneligible) }}</text>
+        </template>
+        <template #rules-end>
+          <view v-if="products.length > 0" class="bundle-clear nx-reverse-action" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear" @keydown="activate($event, clear)"><text>{{ t.bundle.clear }}</text></view>
+        </template>
+      </BundleHero>
+      <text v-if="products.length > 0" class="bundle-estimate-note">{{ t.store.cardEstimateNote }}</text>
 
-      <!-- Items -->
-      <view class="nx-glass-card mx-4 mt-3 overflow-hidden" :style="cardStyle">
-        <view class="px-4 py-2.5 flex items-center justify-between" style="border-bottom: 1px solid var(--v5-border)">
-          <text :style="itemsHeadingStyle">{{ t.bundle.itemsHeading }}</text>
-          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 12px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear" @keydown="activate($event, clear)">{{ t.bundle.clear }}</text>
-        </view>
+      <BundleSuggestions v-if="suggestions.length > 0" class="bundle-section bundle-rise" anchor="bundle-more" :title="t.bundle.addMore" :items="suggestionRows" @add="addSuggestionById" @open="openDetail" />
 
-        <!-- Empty state -->
-        <EmptyState v-if="products.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
-
-        <!-- Item rows -->
-        <view
-          v-for="(p, i) in products"
-          v-else
-          :key="p.id"
-          class="px-4 py-2.5 flex items-center gap-3"
-          :style="{ borderBottom: i === products.length - 1 ? 'none' : '1px solid var(--v5-border)' }"
-        >
-          <view class="flex-1 min-w-0">
-            <text class="block" :style="itemNameStyle">{{ (p.name) }}</text>
-            <text class="block" :style="itemMetaStyle">
-              {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
-            </text>
-            <text v-if="p.productType === 'SHARE'" class="block" :style="itemMetaStyle">{{ t.store.shareYieldDisclaimer }}</text>
-            <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: break-word">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
-            <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
-            <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.purchaseEligibilityIneligible) }}</text>
-          </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 44px; height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.removeItem, { name: (p.name) })" @click.stop="remove(p.id)" @keydown="activate($event, () => remove(p.id))">
-            <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-surface-2)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <!-- Suggestions -->
-      <view v-if="suggestions.length > 0" class="mx-4" style="margin-top: var(--ui-space-section-gap)">
-        <text class="block" :style="suggestionsHeadingStyle">{{ t.bundle.suggestionsHeading }}</text>
-        <view class="nx-glass-card overflow-hidden" :style="cardStyle">
-          <view
-            v-for="(p, i) in suggestions"
-            :key="p.id"
-            class="w-full flex items-center gap-3"
-            :class="{ 'active:opacity-80': !eligibilityUnavailable(p.id) }"
-            :style="suggestionRowStyle(i === suggestions.length - 1)"
-            role="button"
-            :tabindex="eligibilityUnavailable(p.id) ? undefined : 0"
-            :aria-disabled="eligibilityUnavailable(p.id) ? 'true' : undefined"
-            :aria-label="eligibilityUnavailable(p.id) ? `${(p.name)} · ${t.store.temporarilyOutOfStock}`
-              : remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible
-              ? `${(p.name)} · ${t.store.gateBlockedToast}` : fmt(t.uiChrome.addItem, { name: (p.name) })"
-            @click.stop="onAddSuggestion(p)"
-            @keydown="activate($event, () => onAddSuggestion(p))"
-          >
-            <view class="flex-1 min-w-0 text-left">
-              <text class="block" :style="suggestionNameStyle">{{ (p.name) }}</text>
-              <text class="block" :style="itemMetaStyle">
-                {{ t.uiChrome.price }} ${{ formatAmount(p.price) }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-brand)">{{ bundleProductYieldText(p) }}</text>
-              </text>
-              <NxTag v-if="remoteApiEnabled && eligibilityUnavailable(p.id)" tone="unavailable" :label="t.store.temporarilyOutOfStock" style="margin-top: 6px" />
-              <text v-else-if="remoteApiEnabled && !purchaseEligibilityStore.state(p.id).eligible" class="block" :style="itemMetaStyle">{{ eligibilityLabel(p.id, t.store.gateBlockedToast) }}</text>
-              <text v-if="p.taskLevels.length" class="block" :style="itemMetaStyle" style="overflow-wrap: break-word">{{ productTaskLevelsText(t, p.taskLevels) }}</text>
-            </view>
-            <view v-if="!eligibilityUnavailable(p.id)" class="shrink-0 flex items-center" style="gap: 4px">
-            <view class="rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
-              <svg v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
-              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-            </view>
-            <NxIcon v-if="remoteApiEnabled && purchaseEligibilityStore.state(p.id).status === 'ready' && !purchaseEligibilityStore.state(p.id).eligible" name="chevron-right" :size="16" style="color: var(--v5-ink-4)" />
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <!-- Total summary -->
-      <view v-if="products.length > 0" class="nx-glass-card nx-tint mx-4 relative overflow-hidden" style="margin-top: var(--ui-space-section-gap)" :style="heroStyle">
-        <view class="relative">
-          <!-- Subtotal -->
-          <view class="flex items-center justify-between" style="min-height: 24px">
-            <text :style="rowLabelStyle(false)">{{ t.bundle.subtotal }}</text>
-            <text class="tabular-nums" :style="rowValueStyle()">${{ formatBundleUsdt(subtotal) }}</text>
-          </view>
-          <!-- Discount -->
-          <view v-if="discountPct > 0" class="flex items-center justify-between" style="min-height: 24px">
-            <text :style="rowLabelStyle(false)">{{ discountLabel }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">−${{ formatBundleUsdt(discountUSD) }}</text>
-          </view>
-          <!-- Divider -->
-          <view style="height: 1px; background: var(--v5-border); margin-top: 10px; margin-bottom: 10px" />
-          <!-- Total -->
-          <view class="flex items-center justify-between" style="min-height: 24px">
-            <text :style="rowLabelStyle(true)">{{ t.bundle.total }}</text>
-            <text class="tabular-nums" :style="rowValueStyle(undefined, true)">${{ totalText }}</text>
-          </view>
-          <!-- Combined daily -->
-          <view class="flex items-center justify-between" style="min-height: 24px">
-            <text :style="rowLabelStyle(false)">{{ t.bundle.estimatedDaily }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">${{ cumulativeDailyEarnText }}{{ t.store.cardPerDaySuffix }}</text>
-          </view>
-        </view>
-      </view>
-      <!-- Room for the bottom action bar: the hidden note copy tracks the tray note's height. -->
-      <view v-if="products.length > 0" class="bundle-bar-space" :class="{ 'bundle-bar-space--tray': bundleTrayNote }" aria-hidden="true">
+      <!-- Room for the bottom action bar: a hidden copy of the tray's rows keeps the last row above it (04 §4.0). -->
+      <view class="bundle-bar-space" aria-hidden="true">
         <text v-if="bundleTrayNote" class="bundle-bar-space__note">{{ bundleTrayNote }}</text>
+        <view v-if="products.length > 0" class="bundle-bar-space__copy"><text class="bundle-bar-space__total">{{ totalText }}</text><text class="bundle-bar-space__meta">{{ trayMetaText }}</text></view>
+        <text class="bundle-bar-space__cta">{{ t.bundle.checkout }}</text>
       </view>
       </template>
       </template>
     </view>
     </template>
-    <!-- Page main action in the shared bottom action bar (04 §4.0): a lone button floats; the
-         disabled reason sits above the button in the tray. -->
+    <!-- Page main action in the shared bottom tray (04 §4.0, 03 §3.1): the total and 已省 in the price slot, one solid
+         「去结算」; under two models the reason sits above the button and the button is the tray's flat grey. -->
     <template #pageFixed>
-      <!-- Activity bundle: the quote step is a plain text button, the purchase the one primary; the reason the primary is
-           disabled sits above both (03 §3.1, 04 §4.0). Signed out, signing in is the only action. -->
-      <view v-if="promotionActivityId && promotionBundle?.footer" class="promotion-bar nx-glass-bar">
+      <!-- Activity with one model on sale: its one action as a lone floating button (the bar's floating form). -->
+      <view v-if="promotionActivityId && promotionBundle?.single" class="bundle-bar nx-glass-bar">
+        <view class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.single.open" @keydown="activate($event, promotionBundle.single.open)"><text>{{ promotionBundle.single.label }}</text><NxIcon name="arrow-right" :size="20" /></view>
+      </view>
+      <view v-if="promotionActivityId && promotionBundle?.footer" class="bundle-bar nx-glass-bar">
         <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
         <template v-if="promotionBundle.footer.signedIn">
-          <view class="promotion-bar__text nx-tray-text" role="button" :tabindex="promotionBundle.footer.canQuote ? 0 : -1" :aria-disabled="!promotionBundle.footer.canQuote" @click="promotionBundle.footer.quote" @keydown="activate($event, promotionBundle.footer.quote)"><text>{{ t.promotion.quote }}</text></view>
-          <view class="promotion-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon name="arrow-right" :size="20" /></view>
+          <view v-if="promotionBundle.footer.showTotal" class="bundle-bar__copy nx-tray-copy">
+            <CheckoutAmount class="bundle-bar__total" :value="promotionBundle.footer.total" currency="USD" />
+            <text class="bundle-bar__meta"><template v-if="promotionBundle.footer.saved !== null">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(promotionBundle.footer.saved) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
+          </view>
+          <view class="bundle-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" :aria-label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></view>
         </template>
-        <view v-else class="promotion-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
+        <view v-else class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
       </view>
-      <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure && products.length > 0" class="bundle-bar nx-glass-bar">
+      <view v-if="!promotionActivityId && hasCatalog && !receiptWriteFailure" class="bundle-bar nx-glass-bar">
         <text v-if="bundleTrayNote" class="nx-tray-note" role="status">{{ bundleTrayNote }}</text>
-        <view
-          class="bundle-bar__cta"
-          role="button"
-          tabindex="0"
-          :aria-disabled="checkoutUnavailable"
-          :aria-label="ctaText"
-          @click.stop="onCheckout"
-          @keydown="activate($event, onCheckout)"
-        >
-          <text>{{ ctaText }}</text>
-          <NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" />
+        <view v-if="products.length > 0" class="bundle-bar__copy nx-tray-copy">
+          <CheckoutAmount class="bundle-bar__total" :value="total" currency="USD" />
+          <text class="bundle-bar__meta"><template v-if="discountUSD > 0">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(discountUSD) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
+        </view>
+        <view class="bundle-bar__cta" role="button" :tabindex="checkoutUnavailable ? -1 : 0" :aria-disabled="checkoutUnavailable" :aria-busy="checkoutBusy" :aria-label="ctaLabel" @click.stop="onCheckout" @keydown="activate($event, onCheckout)">
+          <view class="bundle-bar__label" :class="{ 'bundle-bar__label--busy': checkoutBusy }"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></view>
+          <view v-if="checkoutBusy" class="bundle-bar__spinner" aria-hidden="true" />
         </view>
       </view>
     </template>
@@ -210,7 +109,9 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { promotionCheckoutHref } from "@/lib/promotion-entry";
+import { useBundleDiscountPolicy } from "@/composables/use-bundle-discount-policy";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
+import { promotionCheckoutHref, promotionDetailHref, validEntryItems } from "@/lib/promotion-entry";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
@@ -225,26 +126,30 @@ import PromotionBundle from '@/components/promotion/promotion-bundle.vue';
 import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
+import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
+import BundleHero, { type BundleTile } from "@/components/store/bundle-hero.vue";
+import BundleSuggestions, { type BundleSuggestion } from "@/components/store/bundle-suggestions.vue";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, type BundleDiscountTier } from "@/store/cart";
-import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
+import { PRODUCTS, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
 // 🔴 zentao #244:线上模式必须问**服务端**资格,本地门仅 mock 用 —— 与 detail.vue 同一口径。
 import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
-import { isProductAvailable } from "@/store/product-availability";
 import { useLocaleStore } from "@/store/locale";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
+import { isProductAvailable, productHasStock, productOutOfStock } from "@/store/product-availability";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { confirm, toast } from "@/store/ui";
 import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { matchesBundleQuote, normalizeBundleExpectedAmountUsdt } from "@/api/bundle-order-api";
 import { quoteBundleAmountUsdt } from "@/api/bundle-quote";
 import { restoreBundleCommand, type PendingBundleCommand } from "@/api/bundle-command";
-import type { BundleDiscountSnapshot } from "@/api/bundle-discount-api";
 import { ApiError, asApiError, isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
@@ -273,34 +178,22 @@ const orders = useOrders();
 const pending = usePendingCheckout();
 
 const catalogStatus = computed(() => productCatalogState.status);
-const policy = ref<BundleDiscountSnapshot | null>(null);
-const policyStatus = ref<"loading" | "ready" | "error">("loading");
-const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value)
-  && policyStatus.value === "ready" && policy.value?.serverCanonical === true);
+const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
+const hasCatalog = computed(() => catalogReady.value || !!productCatalogPresentation.value?.products.length);
+const { policy, failed: policyReadFailed, refresh: refreshBundlePolicy } = useBundleDiscountPolicy();
+const reviewVisit = ref(0);
 
-async function refreshBundlePolicy(): Promise<void> {
-  policyStatus.value = "loading";
-  try {
-    policy.value = await bundleDiscountApi.current();
-    policyStatus.value = "ready";
-  } catch {
-    policy.value = null;
-    policyStatus.value = "error";
-  }
-}
-
-onLoad(async (options) => {
+onLoad((options) => {
   const query=(options??{}) as Record<string,string>;
   const fallback=new URLSearchParams(takeNavigationQuery('/pages/store/bundle'));
   promotionInitialItems.value=parseEntryItems(query.items||fallback.get('items'))??[];
   promotionActivityId.value=(query.activityId||fallback.get('activityId')||'').trim();
-  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 });
 
 onShow(() => {
+  reviewVisit.value++;
   void refreshProductCatalog(true);
   void ensureServerProductPhase();
-  void refreshBundlePolicy();
   void refreshBundleWallet();
   restoreReceiptRecovery();
 });
@@ -313,20 +206,17 @@ useSetPageHeader(() => ({
   backHref: "/store",
 }));
 
-const products = computed<Product[]>(() =>
-  catalogReady.value
-    ? cart.items
-      .map((id) => getProduct(id))
-      .filter((p): p is Product => !!p)
-      .filter((p) => isProductAvailable(p, phase.value))
-    : [],
-);
-const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier>>(() => policy.value?.tiers ?? []);
-const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value));
-const bundleQuote = computed(() => quoteBundleAmountUsdt(
+const hardware = computed(() => (remoteApiEnabled ? productCatalogPresentation.value?.products ?? [] : PRODUCTS)
+  .filter(p => p.productType !== "SHARE" && isProductAvailable(p, phase.value)));
+const products = computed(() => cart.items
+  .map(id => hardware.value.find(p => p.id === id))
+  .filter((p): p is Product => !!p));
+const limitReached = computed(() => products.value.length >= 8);
+const activeDiscountTiers = computed<ReadonlyArray<BundleDiscountTier> | null>(() => policy.value?.tiers ?? null);
+const discountPct = computed(() => bundleDiscountForCount(products.value.length, activeDiscountTiers.value ?? []));
+const bundleQuote = computed(() => activeDiscountTiers.value ? quoteBundleAmountUsdt(
   products.value.map((product) => product.price), discountPct.value,
-));
-const subtotal = computed(() => bundleQuote.value?.subtotalUsdt ?? Number.NaN);
+) : null);
 const discountUSD = computed(() => bundleQuote.value?.discountUsdt ?? Number.NaN);
 const total = computed(() => bundleQuote.value?.amountUsdt ?? Number.NaN);
 const cumulativeDailyEarnText = computed(() => {
@@ -339,24 +229,50 @@ const cumulativeDailyEarnText = computed(() => {
   }
   return formatEstimateRange(low, high, products.value.length > 1);
 });
-function bundleProductYieldText(p: Product): string {
+function estimateText(p: Product): string {
   const estimate = productDailyEstimateRange(p);
-  if (estimate) return `${t.value.bundle.estimatedDaily} · $${formatEstimateRange(estimate.low, estimate.high)}`;
   // No server estimate: "—", never an annual rate or a figure derived from one.
-  return `${t.value.bundle.estimatedDaily} · —`;
+  return estimate ? `$${formatEstimateRange(estimate.low, estimate.high)}${t.value.store.cardPerDaySuffix}` : "—";
 }
+const productById = (id: string) => products.value.find((p) => p.id === id);
+const heroTiles = computed<BundleTile[]>(() => products.value.map((p) => ({ id: p.id, name: p.name, imageUrl: p.imageUrl, price: p.price, estimate: estimateText(p) })));
 
-// 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
-const suggestions = computed(() =>
-  catalogReady.value
-    ? PRODUCTS.filter(
-      (p) =>
-        !cart.items.includes(p.id) &&
-        p.productType !== "SHARE" &&
-        isProductAvailable(p, phase.value),
-    ).slice(0, 3)
-    : [],
-);
+const suggestions = computed(() => hardware.value.filter(p => !cart.has(p.id)));
+// Display rows for 「继续添加」: the trailing control follows the purchase eligibility read (add, locked → detail, none
+// when out of stock); the handler stays onAddSuggestion.
+const suggestionRows = computed<BundleSuggestion[]>(() => suggestions.value.map((p) => {
+  const entry = purchaseEligibilityStore.state(p.id);
+  const unavailable = remoteApiEnabled && eligibilityUnavailable(p.id);
+  const locked = remoteApiEnabled && entry.status === "ready" && !entry.eligible;
+  return {
+    id: p.id, name: p.name, imageUrl: p.imageUrl, price: p.price, estimate: estimateText(p),
+    notes: [
+      ...(remoteApiEnabled && !unavailable && !entry.eligible ? [eligibilityLabel(p.id, t.value.store.gateBlockedToast)] : []),
+      ...(p.taskLevels.length ? [productTaskLevelsText(t.value, p.taskLevels)] : []),
+    ],
+    tag: unavailable ? t.value.store.temporarilyOutOfStock : undefined,
+    action: unavailable ? "none" : locked ? "locked" : "add",
+    actionLabel: locked ? `${p.name} · ${t.value.store.gateBlockedToast}` : fmt(t.value.uiChrome.addItem, { name: p.name }),
+    openable: true,
+    disabled: limitReached.value || !catalogReady.value,
+  };
+}));
+function addSuggestionById(id: string) {
+  const product = suggestions.value.find((p) => p.id === id);
+  if (product) void onAddSuggestion(product);
+}
+function openDetail(id: string) {
+  void navTo(promotionDetailHref(id));
+}
+// The dashed 「添加」 tile scrolls to 「继续添加」 and moves focus there (same in-page jump as the rule guides' directory).
+function jumpToSuggestions() {
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (typeof document !== "undefined") {
+    const target = document.getElementById("bundle-more");
+    target?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    target?.focus({ preventScroll: true });
+  }
+}
 const eligibilityProductIds = computed(() => [...products.value, ...suggestions.value].map((p) => p.id));
 watch([eligibilityProductIds, () => app.accountKey], ([ids, account], [previousIds, previousAccount]) => {
   if (!remoteApiEnabled) return;
@@ -364,9 +280,19 @@ watch([eligibilityProductIds, () => app.accountKey], ([ids, account], [previousI
     if (account !== previousAccount || !previousIds?.includes(id)) void purchaseEligibilityStore.ensure(id, true);
   }
 }, { immediate: true });
+watch(productCatalogPresentation, snapshot => {
+  if (!remoteApiEnabled || promotionActivityId.value) return;
+  for (const product of snapshot?.products ?? []) {
+    if (eligibilityProductIds.value.includes(product.id) && productHasStock(product)
+      && purchaseEligibilityStore.state(product.id).error === "PRODUCT_OUT_OF_STOCK") {
+      void purchaseEligibilityStore.ensure(product.id, true);
+    }
+  }
+});
 
 function eligibilityUnavailable(productNo: string): boolean {
-  return purchaseEligibilityStore.state(productNo).status === "unavailable";
+  return productOutOfStock(hardware.value.find(product => product.id === productNo))
+    || purchaseEligibilityStore.state(productNo).status === "unavailable";
 }
 
 const failedEligibilityIds = computed(() => remoteApiEnabled
@@ -389,7 +315,13 @@ function eligibilityLabel(productNo: string, ineligible: string): string {
 async function retryCatalog() {
   await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true), refreshBundlePolicy()]);
 }
-useAutoRecovery({ failed: () => catalogStatus.value !== "loading" && policyStatus.value !== "loading" && (catalogStatus.value === "error" || policyStatus.value === "error"), retry: retryCatalog });
+useAutoRecovery({
+  active: () => !promotionActivityId.value,
+  failed: () => catalogStatus.value === "error",
+  retry: () => refreshProductCatalog(true),
+  repeatMs: 30_000,
+  repeatWhile: () => !hasVisiblePullRefresh(),
+});
 
 function retryReceiptWrite() {
   const failure = receiptWriteFailure.value;
@@ -414,20 +346,26 @@ function retryReceiptWrite() {
   }
 }
 
-const tiersReversed = computed(() => activeDiscountTiers.value.slice().reverse());
-
 function activate(event: KeyboardEvent, action: () => void | Promise<void>) {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   void action();
 }
 
-function formatBundleUsdt(value: number): string {
-  return formatAmount(value);
+const totalText = computed(() => Number.isFinite(total.value) ? formatAmount(total.value) : "—");
+/** "$7,006.08" for the tray's 已省 and the button's screen-reader name; unknown is "—". */
+function moneyText(value: number | string | null | undefined): string {
+  const text = formatGroupedAmount(value);
+  return text === "-" ? "—" : `$${text}`;
 }
-const totalText = computed(() => formatBundleUsdt(total.value));
-const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
-const checkoutCtaText = computed(() => t.value.promotion.continue);
+/** 「已省 {amount}」 split around the amount, so the amount alone takes the main ink in every language's word order. */
+const savedParts = computed(() => {
+  const [before = "", after = ""] = t.value.bundle.saved.split("{amount}");
+  return [before, after];
+});
+const trayMetaText = computed(() => (discountUSD.value > 0 ? fmt(t.value.bundle.saved, { amount: moneyText(discountUSD.value) }) : t.value.bundle.total));
+const ctaLabel = computed(() => (products.value.length > 0 && Number.isFinite(total.value)
+  ? fmt(t.value.bundle.checkoutAria, { amount: moneyText(total.value) }) : t.value.bundle.checkout));
 const submitting = ref(false);
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
@@ -444,25 +382,30 @@ async function refreshBundleWallet(): Promise<void> {
   }
 }
 
-const checkoutUnavailable = computed(() => submitting.value || walletRefreshing.value || products.value.length < 2
-  || (remoteApiEnabled && products.value.some((p) => {
-    const entry = purchaseEligibilityStore.state(p.id);
-    return entry.status !== "ready" || !entry.eligible;
-  })));
-const ctaText = computed(() => (
-  submitting.value || walletRefreshing.value ? "…" : checkoutUnavailable.value ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
-));
-const checkoutHint = computed(() => {
-  if (products.value.length < 2) return t.value.bundle.checkoutUnavailableHint;
-  if (!remoteApiEnabled) return "";
-  const entries = products.value.map((p) => purchaseEligibilityStore.state(p.id));
-  if (entries.some((entry) => entry.status === "unavailable")) return t.value.store.temporarilyOutOfStock;
+const catalogNote = computed(() => catalogReady.value ? "" : catalogStatus.value === "error"
+  ? t.value.store.catalogErrorTitle : t.value.store.catalogLoadingTitle);
+const reviewTarget = computed(() => {
+  void reviewVisit.value;
+  void app.accountBindingEpoch;
+  return bundleReviewTarget(products.value);
+});
+const checkoutBusy = computed(() => submitting.value || (walletRefreshing.value && !isRecoveryTarget(reviewTarget.value)));
+const checkoutUnavailable = computed(() => checkoutBusy.value || !!checkoutBlock(products.value, reviewTarget.value));
+function checkoutBlock(list: Product[], target: BundleReviewTarget): string {
+  if (isRecoveryTarget(target)) return "";
+  if (catalogNote.value) return catalogNote.value;
+  if (list.length < 2) return t.value.promotion.selectTwo;
+  if (list.length > 8) return t.value.promotion.quantityLimit;
+  if (!remoteApiEnabled) return bundleQuote.value ? "" : t.value.store.coTotalQuoteChanged;
+  const entries = list.map(p => purchaseEligibilityStore.state(p.id));
+  if (list.some(product => eligibilityUnavailable(product.id))) return t.value.store.temporarilyOutOfStock;
   if (entries.some((entry) => entry.status === "error")) return t.value.store.purchaseEligibilityError;
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
-});
+}
 const bundleTrayNote = computed(() => {
-  if (checkoutUnavailable.value && checkoutHint.value) return checkoutHint.value;
+  const reason = checkoutBlock(products.value, reviewTarget.value) || catalogNote.value;
+  if (reason) return reason;
   if (!remoteApiEnabled || products.value.length < 2 || app.remoteSlotsUsed === null) return "";
   const slots = Math.max(0, app.slotCap - app.remoteSlotsUsed);
   const inventory = products.value.length - slots;
@@ -504,16 +447,8 @@ watch(() => app.accountKey, () => {
   if (remoteApiEnabled && app.accountKey !== "default") {
     void refreshProductCatalog(true);
     void refreshServerProductPhase(true);
-    void refreshBundlePolicy();
   }
 });
-
-function tierIsActive(tier: BundleDiscountTier): boolean {
-  return products.value.length >= tier.minItems;
-}
-function tierText(tier: BundleDiscountTier): string {
-  return fmt(t.value.bundle.tier, { n: tier.minItems });
-}
 
 function remove(id: string) {
   cart.remove(id);
@@ -524,11 +459,12 @@ function clear() {
 async function onAddSuggestion(p: Product) {
   if (remoteApiEnabled) {
     const entry = purchaseEligibilityStore.state(p.id);
-    if (entry.status === "unavailable") return;
+    if (eligibilityUnavailable(p.id)) return;
     if (entry.status === "ready" && !entry.eligible) {
-      navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
+      openDetail(p.id);
       return;
     }
+    if (!catalogReady.value || limitReached.value) return;
     const scope = captureAccountScope();
     const eligible = await purchaseEligibilityStore.ensure(p.id, entry.status !== "loading");
     if (!isCurrentAccountScope(scope)) return;
@@ -536,11 +472,11 @@ async function onAddSuggestion(p: Product) {
       const status = purchaseEligibilityStore.state(p.id).status;
       if (status === "unavailable") return;
       if (status === "error") toast.warn(t.value.store.purchaseEligibilityError);
-      else navTo(`/pages/store/detail?id=${encodeURIComponent(p.id)}`);
+      else openDetail(p.id);
       return;
     }
   }
-  if (!catalogReady.value || !isProductAvailable(p, phase.value) || cart.has(p.id)) return;
+  if (!catalogReady.value || limitReached.value || !suggestions.value.some(product => product.id === p.id)) return;
   cart.add(p.id);
   toast.success(fmt(t.value.bundle.addedToBundle, { name: (p.name) }));
 }
@@ -604,40 +540,57 @@ async function offerBundleWalletTopup(requiredUsdt: number): Promise<void> {
   if (accepted && isCurrentAccountScope(accountScope)) navTo("/pages/me/wallet-topup");
 }
 
-// Existing durable commands stay in their original recovery path. New bundles
-// use the shared items review, legal terms and explicit payment confirmation.
-async function openBundleReview(list:Product[]):Promise<boolean> {
-  if(receiptWriteFailure.value)return true;
-  submitting.value=true;
+type BundleReviewTarget = "new" | "checkout-original" | "legacy-inline" | "orders" | "storage-error";
+
+function isRecoveryTarget(target: BundleReviewTarget): boolean {
+  return target === "checkout-original" || target === "legacy-inline" || target === "orders";
+}
+
+function bundleReviewTarget(list: Product[]): BundleReviewTarget {
+  if (!remoteApiEnabled) return "new";
   try {
     const rows=readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY,orders.currentAccountKey(),true);
     const commands=rows?.commands??{};
-    if(Object.keys(commands).length){
-      if(commands[bundleFingerprint(list)])return false;
-      toast.warn(t.value.bundle.checkoutOutcomeUnknown);void navTo('/pages/store/orders');return true;
-    }
+    if (Object.keys(commands).length) return commands[bundleFingerprint(list)] ? "legacy-inline" : "orders";
+  } catch {
+    return "storage-error";
+  }
+  try {
     const items=list.map(product=>({productNo:product.id,quantity:1}));
-    // Unresolved originals (a checkout command, an unpaid original order, a
-    // capacity KEEP/REPLACE command) resume in the checkout before any
-    // new-purchase gate. If they cannot be read, the checkout shows that state.
-    let original=true;
-    try{
-      const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
-      original=!!record?.pending||record?.order?.paymentStatus==='PENDING'
-        ||list.some(product=>!!readCapacityPending(app.accountKey,product.id));
-    }catch{/* unreadable originals: the checkout reads them again and offers recovery */}
-    if (!original && list.some((p) => eligibilityUnavailable(p.id))) return true;
-    await navTo(promotionCheckoutHref(items));
+    const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:'',items});
+    if (record?.pending || record?.order?.paymentStatus === 'PENDING'
+      || list.some(product => !!readCapacityPending(app.accountKey, product.id))) return "checkout-original";
+  } catch { /* The checkout reads its recovery storage again before allowing a new purchase. */ }
+  return "new";
+}
+
+// Existing commands stay on their recovery path, while new bundles open the shared review.
+async function openBundleReview(list: Product[], target: BundleReviewTarget): Promise<boolean> {
+  if (receiptWriteFailure.value || target === "storage-error") {
+    if (target === "storage-error") toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+    return true;
+  }
+  if (target === "legacy-inline") return false;
+  submitting.value = true;
+  try {
+    const items = list.map(product => ({ productNo: product.id, quantity: 1 }));
+    if (target === "orders" || !validEntryItems(items)) {
+      toast.warn(t.value.bundle.checkoutOutcomeUnknown);
+      await navTo("/pages/store/orders");
+    } else {
+      await navTo(promotionCheckoutHref(items, undefined, { fromBundle: true }));
+    }
   }catch{toast.warn(t.value.bundle.checkoutOutcomeUnknown);}
   finally{submitting.value=false;}
   return true;
 }
 async function onCheckout() {
   const list = products.value;
-  if (list.length < 2 || submitting.value || walletRefreshing.value) return;
+  const target = bundleReviewTarget(list);
+  if (submitting.value || (walletRefreshing.value && !isRecoveryTarget(target)) || checkoutBlock(list, target)) return;
+  if (!isRecoveryTarget(target) && !validEntryItems(list.map(p => ({ productNo: p.id, quantity: 1 })), 2)) return;
   if (remoteApiEnabled) {
-    if(await openBundleReview(list))return;
-    if (list.some((p) => eligibilityUnavailable(p.id))) return;
+    if(await openBundleReview(list, target))return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)
@@ -662,9 +615,10 @@ async function onCheckout() {
       }
       const latestPolicy = await bundleDiscountApi.current();
       if (!scopeIsCurrent()) return;
+      if (latestPolicy.serverCanonical !== true) return;
       if (!policy.value || latestPolicy.policyVersion !== policy.value.policyVersion) {
         policy.value = latestPolicy;
-        policyStatus.value = "ready";
+        policyReadFailed.value = false;
         toast.warn(t.value.bundle.policyChanged);
         return;
       }
@@ -793,7 +747,7 @@ async function onCheckout() {
         navTo("/pages/store/orders");
         return;
       }
-      policyStatus.value = "error";
+      policyReadFailed.value = true;
       toast.warn(t.value.store.catalogErrorBody);
     } finally {
       submitting.value = false;
@@ -881,11 +835,6 @@ async function onCheckout() {
 }
 
 // ───── style objects ─────
-const catalogStateStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  padding: "18px 16px",
-  borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-};
 const catalogStateTitleStyle: CSSProperties = {
   fontSize: "var(--ui-type-card-title)",
   fontWeight: "var(--ui-type-card-title-weight)",
@@ -896,171 +845,66 @@ const catalogStateBodyStyle: CSSProperties = {
   lineHeight: "19px",
   color: "var(--v5-ink-3)",
 };
-const catalogRetryStyle: CSSProperties = {
-  minHeight: "36px",
-  alignItems: "center",
-  padding: "0 14px",
-  borderRadius: "9999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "13px",
-  fontWeight: 600,
-};
-const receiptFailureCardStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius)", boxShadow: "var(--nx-glass-edge)",
-  padding: "24px 20px",
-  background: "var(--nx-glass-fill)",
-};
-const heroStyle: CSSProperties = {
-  "--nx-tint": "var(--v5-brand-2)",
-  padding: "18px",
-  borderRadius: "var(--nx-glass-radius)",
-} as CSSProperties;
-const heroLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-brand)",
-  letterSpacing: "0.06em",
-};
-const heroTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "20px",
-  letterSpacing: "-0.014em",
-  color: "var(--v5-ink)",
-  lineHeight: 1.3,
-};
-
-function tierCellStyle(tier: BundleDiscountTier): CSSProperties {
-  const active = tierIsActive(tier);
-  return {
-    borderRadius: "12px",
-    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
-  };
-}
-function tierLabelStyle(_tier: BundleDiscountTier): CSSProperties {
-  return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "12px",
-    fontWeight: 500,
-    color: "var(--v5-ink-3)",
-    letterSpacing: "0.06em",
-  };
-}
-function tierPctStyle(tier: BundleDiscountTier): CSSProperties {
-  const active = tierIsActive(tier);
-  return {
-    marginTop: "2px",
-    fontFamily: "var(--font-v5)",
-    fontWeight: 600,
-    fontSize: "15px",
-    letterSpacing: "-0.014em",
-    color: active ? "var(--v5-brand)" : "var(--v5-ink)",
-  };
-}
-
-// Shared form-b container (items list + suggestions list): surface, no border,
-// internal hairline rows. overflow-hidden on the element clips the row corners.
-const cardStyle: CSSProperties = { boxShadow: "var(--nx-glass-edge)",
-  borderRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-};
-const itemsHeadingStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
-const emptyTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13px",
-  color: "var(--v5-ink)",
-  letterSpacing: "-0.008em",
-};
-const itemNameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: "var(--ui-type-list-title-weight)",
-  fontSize: "var(--ui-type-list-title)",
-  lineHeight: "var(--ui-type-list-title-lh)",
-  overflowWrap: "break-word",
-  color: "var(--v5-ink)",
-};
-const itemMetaStyle: CSSProperties = {
-  marginTop: "2px",
-  fontFamily: "var(--font-v5)",
-  fontWeight: "var(--ui-type-list-subtitle-weight)",
-  fontSize: "var(--ui-type-list-subtitle)",
-  lineHeight: "var(--ui-type-list-subtitle-lh)",
-  fontVariantNumeric: "tabular-nums",
-  color: "var(--v5-ink-3)",
-};
-
-const suggestionsHeadingStyle: CSSProperties = {
-  marginBottom: "12px",
-  fontFamily: "var(--font-v5)",
-  fontWeight: "var(--ui-type-section-weight)",
-  fontSize: "var(--ui-type-section)",
-  lineHeight: "var(--ui-type-section-lh)",
-  color: "var(--v5-ink)",
-};
-// Suggestion rows now live in one form-b container → hairline-separated rows.
-function suggestionRowStyle(isLast: boolean): CSSProperties {
-  return {
-    padding: "12px 16px",
-    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
-  };
-}
-const suggestionNameStyle = itemNameStyle;
-
-function rowLabelStyle(big: boolean): CSSProperties {
-  return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "var(--ui-type-list-subtitle)",
-    fontWeight: big ? 600 : 500,
-    color: big ? "var(--v5-ink)" : "var(--v5-ink-3)",
-  };
-}
-function rowValueStyle(tint?: string, big = false): CSSProperties {
-  return {
-    fontFamily: "var(--font-v5)",
-    fontWeight: 600,
-    fontSize: big ? "18px" : "13px",
-    letterSpacing: big ? "-0.014em" : "-0.008em",
-    color: tint ?? "var(--v5-ink)",
-  };
-}
 
 </script>
 
 <style scoped>
-.bundle-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
-/* Primary L 48 (03 §3.1); the shared bar rules restyle it while aria-disabled. */
-.bundle-bar__cta { display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 20px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+/* Section rhythm (01 §1.3): 32 between sections, 24 at ≤374 (--ui-space-section-gap). */
+.bundle-section { display: block; margin-top: var(--ui-space-section-gap); }
+/* Entrance once (07): the focal card, then the list, rise into place; transform and opacity only. */
+.bundle-rise { animation: bundle-rise .42s cubic-bezier(.16,1,.3,1) both; }
+.bundle-rise + .bundle-estimate-note + .bundle-rise, .bundle-rise + .bundle-rise { animation-delay: .06s; }
+@keyframes bundle-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.bundle-estimate-note { display: block; margin: 8px 18px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
+.bundle-tile-note { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
+/* Out of stock on a chosen model: the shared neutral tag (03 §3.8), one short word; the reason is in the tray note. */
+.bundle-tile-tag { align-self: flex-start; margin-top: 6px; }
+/* 「全部清空」 is a reverse action (03 §3.1 .nx-reverse-action): quiet ink-3 text, 13/18 400, no container, 44 target. */
+.bundle-clear { position: relative; flex: none; cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+.bundle-clear::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: -10px; right: -10px; }
+.bundle-clear:active { opacity: .6; }
+.bundle-clear:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; border-radius: 8px; }
+/* First load: a still placeholder in the focal card's shape (03 §3.4), no shimmer. */
+.bundle-skeleton { margin: 0 16px; padding: 20px; border-radius: var(--ui-radius-surface); }
+.bundle-skeleton__bar { width: 60%; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.bundle-skeleton__bar--title { width: 40%; height: 20px; margin: 4px 0 12px; }
+.bundle-skeleton__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.bundle-skeleton__tile { min-height: 128px; border-radius: 16px; background: var(--v5-surface-2); }
+.bundle-receipt { padding: 24px 20px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); border: 1px solid var(--v5-border); text-align: center; }
+.bundle-receipt__retry { margin-top: 4px; }
+/* Bottom tray (04 §4.0): the shared .nx-glass-bar gives position, material and the disabled grey; the page sets layout.
+   Price slot: total 20/24 Montserrat (the checkout total) over 「已省 $x」; the button keeps one line and moves to its
+   own row, right-aligned, when the row cannot hold both (03 §3.6.1). */
+.bundle-bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; align-items: center; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
+.bundle-bar .nx-tray-note { flex: 1 1 100%; }
+.bundle-bar__copy { flex: 1 1 auto; min-width: 0; }
+.bundle-bar__total { display: block; color: var(--v5-ink); font: 500 20px/24px var(--font-amount); white-space: nowrap; }
+.bundle-bar__meta { display: block; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); white-space: nowrap; }
+.bundle-bar__saved { color: var(--v5-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Primary L 48 (03 §3.1): solid brand while available; the shared tray rules restyle it while aria-disabled (flat grey in
+   the tray, grey glass when it floats alone). */
+.bundle-bar__cta { position: relative; flex: 0 0 auto; min-width: 150px; margin-left: auto; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 48px; padding: 0 20px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .bundle-bar__cta :deep(uni-text), .bundle-bar__cta :deep(text) { white-space: nowrap; }
-.bundle-bar__cta[aria-disabled="false"]:active { transform: scale(.98); }
+.bundle-bar__cta:not([aria-disabled="true"]):active { transform: scale(.98); }
 .bundle-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-/* Sub-page content already ends 64px above the screen bottom (pb-6 24 + chassis 40). Floating: 48 + 22 + 16;
-   tray: 8 + note + 8 + 48 + 8, plus 22 + 16. */
-.bundle-bar-space { visibility: hidden; padding: 0 32px 22px; }
-.bundle-bar-space--tray { padding-bottom: 46px; }
-.bundle-bar-space__note { display: block; padding-top: 4px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: break-word; text-wrap: pretty; }
-.promotion-bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; align-items: center; animation: bundle-bar-in .42s cubic-bezier(.16,1,.3,1) .2s both; }
-.promotion-bar .nx-tray-note { flex: 1 1 100%; }
-/* Each button keeps its label on one line; when both do not fit one row they stack full width (03 §3.6.1). */
-.promotion-bar__text, .promotion-bar__cta { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 48px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
-.promotion-bar__text { padding: 0 12px; }
-.promotion-bar__cta { padding: 0 20px; background: var(--v5-brand); color: var(--v5-on-brand); }
-.promotion-bar :deep(uni-text), .promotion-bar :deep(text) { white-space: nowrap; }
-.promotion-bar .nx-tray-note :deep(uni-text), .promotion-bar .nx-tray-note { white-space: normal; }
-.promotion-bar__text[aria-disabled="false"]:active { opacity: .6; }
-.promotion-bar__cta[aria-disabled="false"]:active, .promotion-bar__cta:not([aria-disabled]):active { transform: scale(.98); }
-.promotion-bar__text:focus-visible, .promotion-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.bundle-bar > .nx-tray-note + .bundle-bar__cta, .bundle-bar > .bundle-bar__cta:only-child { flex: 1 1 100%; }
+.bundle-bar__label { display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* Busy: the label stays laid out but transparent (width and name hold), a spinner takes its place. */
+.bundle-bar__label--busy { opacity: 0; }
+.bundle-bar__spinner { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: bundle-spin 800ms linear infinite; }
+@keyframes bundle-spin { to { transform: rotate(360deg); } }
+/* Room for the tray: a hidden copy of its rows (same widths: 12 sides, 8 padding and gap). The page already ends 64
+   below the last row (pb-6 24 + chassis 40); the tray needs its height + 22 + 16, so the copy gives back 26. */
+.bundle-bar-space { visibility: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px -26px; padding: 8px; }
+.bundle-bar-space__note { flex: 1 1 100%; padding: 4px 12px 0; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: break-word; text-wrap: pretty; }
+.bundle-bar-space__copy { flex: 1 1 auto; min-width: 0; padding: 0 12px; }
+.bundle-bar-space__total { display: block; font: 500 20px/24px var(--font-amount); white-space: nowrap; }
+.bundle-bar-space__meta { display: block; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); white-space: nowrap; }
+.bundle-bar-space__cta { flex: 0 0 auto; min-width: 150px; margin-left: auto; box-sizing: border-box; min-height: 48px; padding: 14px 46px 14px 20px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+.bundle-bar-space__note + .bundle-bar-space__cta { flex: 1 1 100%; }
 @keyframes bundle-bar-in { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .bundle-bar, .promotion-bar { animation: none; }
-  .promotion-bar__cta:active { transform: none; }
-  .bundle-bar__cta[aria-disabled="false"]:active { transform: none; }
+  .bundle-bar, .bundle-rise, .bundle-bar__spinner { animation: none; }
+  .bundle-bar__cta:active { transform: none; }
 }
 </style>

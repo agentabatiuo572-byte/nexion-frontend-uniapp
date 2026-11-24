@@ -254,7 +254,7 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import NxCodeValue from '@/components/ui/nx-code-value.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
-import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, PAYMENT_BAR_HEIGHT_KEY, type PurchaseNotice } from '@/store/purchase-payment';
+import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, unfinishedPurchasePayments, PAYMENT_BAR_HEIGHT_KEY, type PurchaseNotice } from '@/store/purchase-payment';
 import { appDeviceOffline, appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
@@ -281,8 +281,7 @@ const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
 const showsCheckoutCapacityResume = inject(showsCheckoutCapacityResumeKey, null);
-const records = computed(() => unsettled.value.filter(row => !row.validated && !row.businessDelivered
-  && row.lastStatus !== 'DELIVERED' && !showsCheckoutCapacityResume?.(row)));
+const records = computed(() => unfinishedPurchasePayments(unsettled.value).filter(row => !showsCheckoutCapacityResume?.(row)));
 const pending = computed(() => records.value.filter(row => !payment.resumeDismissed(row)));
 const ownsCheckoutCapacityPayment = inject(ownsCheckoutCapacityPaymentKey, null);
 const openCheckoutCapacityProgress = inject(openCheckoutCapacityProgressKey, null);

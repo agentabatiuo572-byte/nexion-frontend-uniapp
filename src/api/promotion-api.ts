@@ -158,7 +158,7 @@ export function createPromotionApi(client:ApiClient){return {
   async create(quote:Quote,key:string,voucherId:string|null=null):Promise<OrderReceipt>{const items=quote.items.map(({productNo,quantity})=>({productNo,quantity}));validatePromotionItems(items);const bundle=items.length>1;return parsePromotedOrder(await client.request({method:'POST',path:bundle?'/api/orders/bundle':'/api/orders',idempotencyKey:key,body:bundle?{items,policyVersion:quote.bundlePolicyVersion,expectedAmountUsdt:quote.amountUsdt,promotionQuoteId:quote.quoteId}:{...items[0],voucherId,promotionQuoteId:quote.quoteId}}));},
   async pay(orderNo:string,key:string,authorization?:import('./payment-password-api').PaymentPasswordAuthorization):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/pay',idempotencyKey:key,body:authorization,retryAfterAuth:false}));},
   async paymentCommand(key:string){const result=await readPaymentCommand(client,'order-pay',key);return {...result,...(result.status==='SUCCEEDED'?{order:parsePromotedOrder(result.receipt)}:{})};},
-  async cancel(orderNo:string,key:string):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/cancel',idempotencyKey:key}));},
+  async cancel(orderNo:string,key:string):Promise<OrderReceipt>{return parsePromotedOrder(await client.request({method:'POST',path:'/api/orders/'+encodeURIComponent(orderNo)+'/cancel',idempotencyKey:key,retryAfterAuth:false}));},
   async findOrder(orderNo:string):Promise<PromotionOrder|null>{
     let cursor:string|null=null;
     const seen=new Set<string>();

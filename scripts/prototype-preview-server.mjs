@@ -204,6 +204,7 @@ const server=http.createServer(async(req,res)=>{
           return sendJson(res,{simulation:true,message:'PREVIEW_EXPIRED_ORDER_PAYMENT_REQUIRED'},409);
         if(typeof update.confirmLateOrderPayment==='string'&&!checkoutFlow.confirmLateOrderPayment(update.confirmLateOrderPayment))
           return sendJson(res,{simulation:true,message:'PREVIEW_LATE_ORDER_PAYMENT_REQUIRED'},409);
+        checkoutFlow.configureCheckoutReadback(update);
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,setupWrites:checkoutFlow.pin.state.setupWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }

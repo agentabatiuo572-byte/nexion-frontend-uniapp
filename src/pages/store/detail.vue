@@ -237,7 +237,8 @@ import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable } from "@/store/product-availability";
+import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
+import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { warrantyMonths } from "@/lib/warranty-months";
@@ -382,8 +383,6 @@ watch([catalogStatus, () => product.value?.id], () => {
 
 const isShare = computed(() => product.value?.productType === "SHARE");
 const earnConfig = useEarnConfig();
-const stockUnavailable = computed(() => product.value?.inventoryMode === "FINITE"
-  && product.value.stock === 0);
 // Localized SKU copy (tagline / badge). Empty strings until `id` resolves —
 // both consumers are inside `v-if="product"`, so the blanks never render.
 const copy = computed(() =>
@@ -395,7 +394,7 @@ const copy = computed(() =>
 );
 
 const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
-  && product.value.purchaseBlockedReason !== "PRODUCT_OUT_OF_STOCK");
+  && !productOutOfStock(product.value));
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
@@ -411,6 +410,7 @@ const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(
   () => product.value?.id ?? "",
   () => stickyPageVisible.value && foregroundReadAllowed(),
 );
+const stockUnavailable = computed(() => productOutOfStock(product.value) || eligibility.value.outOfStock);
 const purchaseEligibilityMessage = computed(() => resolvePurchaseEligibilityMessage(
   eligibility.value.status,
   eligibility.value.snapshot,
@@ -476,7 +476,7 @@ const hardwareSpecs = computed<SpecRow[]>(() => {
   ].filter((r): r is SpecRow => r !== null);
 });
 
-const bundleActivityVisible = computed(()=>(productCatalogPresentation.value?.products??[]).filter(p=>p.productType!=='SHARE'&&activity.value?.productNos.includes(p.id)&&isProductAvailable(p,phase.value)).length>=2);
+const bundleActivityVisible = computed(()=>(productCatalogPresentation.value?.products??[]).filter(p=>activity.value?.productNos.includes(p.id)&&isBundleHardwareAvailable(p,phase.value)).length>=2);
 const canBundleActivity = computed(() => promotionAvailable.value && bundleActivityVisible.value);
 
 const productAuditSection = computed(() => trustSections.value.find((section) => section.sectionKey === "auditsReserves"));

@@ -4,7 +4,7 @@ import {
   type PurchaseEligibilitySnapshot,
 } from "@/api/purchase-eligibility-api";
 
-export type PurchaseEligibilityRequestStatus = "idle" | "loading" | "ready" | "error";
+export type PurchaseEligibilityRequestStatus = "idle" | "loading" | "ready" | "error" | "unavailable";
 export type PurchaseEligibilityMessage = "eligible" | "ineligible" | "quotaDepleted" | "error";
 
 /** Empty conditions are open only when the server names a known open policy. */

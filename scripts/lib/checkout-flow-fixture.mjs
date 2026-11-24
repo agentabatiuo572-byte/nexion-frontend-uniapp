@@ -15,9 +15,10 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   let orderListScene;
   let nextHideFailure;
   const commandKeys = new Intl.Collator("en", {sensitivity:"base"});
-  let delayCreate;
+  let delayCreate, omitCancelReceipt, omitWalletReceipt, failOrderRead;
   const configureCreateDelay = () => { delayCreate = { scenario: state.scenarioEpoch }; };
   const ok = data => ({status:200,message:'OK',data});
+  const unavailableReceipt = {status:503,message:'ORDER_RECEIPT_UNAVAILABLE',data:null};
   const external = createPurchasePaymentPreviewFixture(state, locale);
   const tradeinCommands = new Map([
     ['/api/app/trade-in/submit', 'trade-in'],
@@ -37,6 +38,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       hideCommands.clear();
       orderListScene = undefined;
       nextHideFailure = undefined;
+      omitCancelReceipt = omitWalletReceipt = failOrderRead = undefined;
       for (const key of pin.commands.keys()) if (!key.startsWith('security:')) pin.commands.delete(key);
     }
   }
@@ -237,7 +239,13 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       pin.commands.set(command,{kind,commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt});
       return ok(receipt);
     }
-    if (path === '/api/orders' && method === 'GET') return ok(paginateOrderPage(url, owner, orderProjection(url, request, owner)));
+    if (path === '/api/orders' && method === 'GET') {
+      if (failOrderRead) {
+        failOrderRead = undefined;
+        return {status:503,message:'ORDER_HISTORY_UNAVAILABLE',data:null};
+      }
+      return ok(paginateOrderPage(url, owner, orderProjection(url, request, owner)));
+    }
     if (path === '/api/orders/quote') return ok(demoFixture(url,locale(),state,request));
     if (path === '/api/orders/bundle' && method === 'POST') {
       if (receipts.has(path+key)) return receipts.get(path+key);
@@ -256,7 +264,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
         if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
       }
       if (external.openOrderPayment(orderNo)) return {status:409,message:'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS',data:null};
-      if (action[2] === 'cancel') return ok(demoFixture(url,locale(),state,request));
+      if (action[2] === 'cancel') {
+        const result = ok(demoFixture(url,locale(),state,request));
+        if (omitCancelReceipt) { omitCancelReceipt = undefined; return unavailableReceipt; }
+        return result;
+      }
       // Like AppPaymentPasswordService: a command key answers the outcome recorded for it.
       const command = 'order-pay:' + key, recorded = key && pin.commands.get(command);
       if (recorded) return recorded.status === 'SUCCEEDED' ? ok(recorded.receipt) : {status:recorded.code,message:recorded.message,data:null};
@@ -278,14 +290,28 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       }
       if(firstPayment)pin.state.payWrites++;
       if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
+      if (omitWalletReceipt) { omitWalletReceipt = undefined; return unavailableReceipt; }
       return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
+  }
+  function configureCheckoutReadback(update) {
+    if (update.omitNextCancelReceipt === true) omitCancelReceipt = true;
+    if (update.omitNextWalletReceipt === true) omitWalletReceipt = true;
+    if (update.failNextOrderRead === true) failOrderRead = true;
+    if (typeof update.expirePlacedOrder !== 'string') return;
+    const order = state.createdOrders?.find(row => row.orderNo === update.expirePlacedOrder);
+    if (!order || order.canonicalStatus !== 'placed' || external.openOrderPayment(order.orderNo)) return;
+    // Within the minute before the expiry scheduler, payment is past due but history still reports placed.
+    const deadline = Date.now() - 1000;
+    order.placedAt -= order.expiresAt - deadline;
+    order.expiresAt = deadline;
+    if (order.promotionQuoteId) order.payBy = new Date(deadline).toISOString();
   }
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
     confirmLateOrderPayment:external.confirmLateOrderPayment,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
-    selectPaymentMode:external.selectPaymentMode};
+    selectPaymentMode:external.selectPaymentMode,configureCheckoutReadback};
 }

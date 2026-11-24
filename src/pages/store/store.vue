@@ -48,24 +48,24 @@
         <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogEmptyTitle }}</text>
         <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogEmptyBody }}</text>
       </view>
+      <NxSection v-if="catalogHasProducts" class="store-catalogue" :title="t.store.allProducts" :meta="String(unlockedProducts.length)">
+        <view class="store-product-grid">
+          <ProductCard v-for="p in catalogProducts" :key="p.id" :product="p" :voucher-context="voucherContext" compact />
+        </view>
+        <text class="store-estimate-note">{{ t.store.cardEstimateNote }}</text>
+      </NxSection>
+
+      <!-- Bundle entry card (board B): after the on-sale grid and before Genesis, shown whatever the catalogue state;
+           signed out and voucher arrivals do not show it (unchanged). -->
+      <BundleEntryCard v-if="!publicOnly && !voucherContext.voucherId" :tiers="bundleTiers" :products="bundleHardware" :selected="bundleSelectedProducts" />
+
       <template v-if="catalogHasProducts">
-        <NxSection class="store-catalogue" :title="t.store.allProducts" :meta="String(unlockedProducts.length)">
-          <view class="store-product-grid">
-            <ProductCard v-for="p in catalogProducts" :key="p.id" :product="p" :voucher-context="voucherContext" compact />
-          </view>
-          <text class="store-estimate-note">{{ t.store.cardEstimateNote }}</text>
-        </NxSection>
         <NxListGroup v-if="genesisCfg.config.showcaseEnabled || lockedProducts.length" class="store-more">
           <NxListRow v-if="genesisCfg.config.showcaseEnabled" :title="t.store.secGenesis" :subtitle="t.store.genesisCardPerks" :value="genesisCfg.config.marketOpenState === 'closed' ? auditCopy.comingSoon : undefined" @click="navTo('/pages/genesis/genesis')"><template #leading><view class="store-more__icon store-more__icon--gold"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m2 8 4 10h12l4-10-5 3-5-7-5 7z" /></svg></view></template></NxListRow>
           <NxListRow v-if="lockedProducts.length" :title="t.store.secComingSoon" :subtitle="lockedProducts.map(p => p.name).join(' · ')" :value="comingSoonOpen ? auditCopy.collapse : auditCopy.expand" :disclosure="comingSoonOpen ? 'open' : 'closed'" @click="comingSoonOpen = !comingSoonOpen"><template #leading><view class="store-more__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></view></template></NxListRow>
         </NxListGroup>
         <view v-if="comingSoonOpen && lockedProducts.length" class="store-locked-list"><LockedProductCard v-for="p in lockedProducts" :key="p.id" :product="p" /></view>
       </template>
-
-      <view v-if="!publicOnly && !voucherContext.voucherId" class="store-bundle-entry" data-testid="store-bundle-entry" role="button" tabindex="0" :aria-label="t.promotion.bundle"
-        @click="navTo('/pages/store/bundle')" @keydown.enter.prevent="navTo('/pages/store/bundle')" @keydown.space.prevent="navTo('/pages/store/bundle')">
-        <text>{{ t.promotion.bundle }}</text><NxIcon name="chevron-right" />
-      </view>
 
       <!-- 《02》§7:Mono 仅限 <5 词短标签/数字;这是 8 词促销 callout 整句,改正文字体 -->
       <text class="store-footer">{{ t.store.pageFooter }}</text>
@@ -75,9 +75,9 @@
 </template>
 
 <script setup lang="ts">
-import NxIcon from "@/components/ui/nx-icon.vue";
 import { readTabSnapshot } from "@/lib/tab-first-screen-snapshot";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useBundleDiscountPolicy } from "@/composables/use-bundle-discount-policy";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { onUnmounted, ref, computed, nextTick, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/tab-page-frame.vue";
@@ -86,6 +86,9 @@ import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
 // The voucher ticket is a LoopScope: its art bobs only while the ticket is on screen and the page is shown.
 import LoopScope from "@/components/loop-scope.vue";
 import ProductCard from "@/components/store/product-card.vue";
+import BundleEntryCard from "@/components/store/bundle-entry-card.vue";
+import { useCart } from "@/store/cart";
+import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
 import PromotionEntry from '@/components/promotion/promotion-entry.vue';
 import { promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import { useLocaleStore } from '@/store/locale';
@@ -104,11 +107,11 @@ import { voucherSupportsSurface } from "@/lib/voucher-sheet-authority";
 import NxSection from "@/components/ui/nx-section.vue";
 import NxListGroup from "@/components/ui/nx-list-group.vue";
 import NxListRow from "@/components/ui/nx-list-row.vue";
-import { PRODUCTS } from "@/mock/products";
+import { PRODUCTS, type Product } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable } from "@/store/product-availability";
+import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import StoreHero from "@/components/store/store-hero.vue";
@@ -163,6 +166,7 @@ async function refreshVisibleStore() {
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
     revalidateProductCatalog(), phoneTierReadFailed() ? undefined : earnConfig.ensure(), app.ensureRemoteFleet(),
+    bundlePolicy.failed.value ? undefined : bundlePolicy.refresh(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -304,7 +308,18 @@ const lockedProducts = computed(() =>
   }),
 );
 
-const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices.value));
+const bundlePolicy = useBundleDiscountPolicy(() => !publicOnly.value && !voucherContext.value.voucherId);
+const bundleTiers = computed(() => bundlePolicy.policy.value?.tiers ?? null);
+const bundleHardware = computed(() => mounted.value
+  ? displayProducts.value.filter(p => isBundleHardwareAvailable(p, phase.value))
+  : []);
+const cart = useCart();
+const bundleSelectedProducts = computed(() => cart.items
+  .map((id) => bundleHardware.value.find((p) => p.id === id))
+  .filter((p): p is Product => !!p));
+
+const purchasableProducts = computed(() => unlockedProducts.value.filter(product => !productOutOfStock(product)));
+const upgrade = computed(() => storeUpgrade(purchasableProducts.value, ownedDevices.value));
 const upgradeBaseImageUrl = computed(() => {
   const base = upgrade.value?.base;
   return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
@@ -344,7 +359,7 @@ const goalFocus = computed(() => resolveStoreGoalFocus(
   focusProductId.value,
   focusProductName.value,
   displayProducts.value,
-  unlockedProducts.value,
+  purchasableProducts.value,
   catalogHasProducts.value,
 ));
 const focusFeatured = computed(() => goalFocus.value.featured);
@@ -462,8 +477,5 @@ const goalFocusRetryStyle: CSSProperties = {
 .store-more__icon--gold { color:var(--v5-warning-ink); background:color-mix(in srgb,var(--v5-warning) 18%,transparent); }
 .store-more :deep(.nx-list-row__subtitle) { color:var(--v5-ink-3); }
 .store-locked-list { display:flex; flex-direction:column; gap:10px; }
-.store-bundle-entry { display:flex; align-items:center; justify-content:flex-end; gap:6px; min-height:44px; padding:0 2px; color:var(--v5-brand); font:500 var(--ui-type-list-subtitle)/18px var(--font-v5); cursor:pointer; }
-.store-bundle-entry:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:8px; }
-.store-bundle-entry:active { opacity:.75; }
 .store-footer { display:block; margin-top:20px; padding-bottom:8px; font:400 12px/18px var(--font-v5); text-align:center; color:var(--v5-ink-3); }
 </style>

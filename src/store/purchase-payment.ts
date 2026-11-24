@@ -84,6 +84,12 @@ const state = reactive({ open: false, coldResume: false, accountKey: '', summary
   quote: null as PurchaseQuote | null, intent: null as PurchasePaymentIntent | null, pending: null as PendingExternal | null,
   originalRecovery: null as { intentNo: string; kind: PurchaseKind; fingerprint: string; summary: string } | null,
   loading: false, retrying: false, reading: false, busy: false, canResubmit: false, pendingReadError: false, concluded: false, revision: 0 });
+// Detail can discover the original payment in another H5 tab while checkout and its floating bar stay mounted.
+// #ifdef H5
+if (typeof window !== 'undefined') window.addEventListener('storage', event => {
+  if (event.storageArea === window.localStorage && event.key === TABLE) state.revision++;
+});
+// #endif
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
 let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void; onExpired?: () => void } | null = null;
@@ -195,6 +201,13 @@ function pendingPayments() {
     state.pendingReadError = true;
     return [];
   }
+}
+export function unfinishedPurchasePayments(records = pendingPayments()) {
+  return records.filter(isUnfinishedPurchaseRecord);
+}
+
+export function unfinishedOrderPayment(orderNo: string) {
+  return unfinishedPurchasePayments().find(row => row.kind === 'ORDER_PAY' && purchaseRecordPayload(row).orderNo === orderNo);
 }
 // Rows closed on the floating bar, for this run of the App only. The records stay; a new payment or a new status shows again.
 const dismissedResume = reactive(new Set<string>());

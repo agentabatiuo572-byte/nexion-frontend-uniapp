@@ -11,11 +11,11 @@
           <template v-else><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
         </svg>
       </view>
-      <text class="nx-notice__title" role="heading">{{ title }}</text>
+      <text :id="id + '-title'" class="nx-notice__title" role="heading" :tabindex="focusTitle ? -1 : undefined">{{ title }}</text>
       <text v-if="body" class="nx-notice__body">{{ body }}</text>
       <slot />
       <view class="nx-notice__actions">
-        <NxButton :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
+        <NxButton :class="{ 'nx-notice__primary--danger': primaryTone === 'danger' }" :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
         <NxButton v-if="secondary" :label="secondary" variant="text" :disabled="busy && !secondaryWhileBusy" @click="$emit('secondary')" />
       </view>
     </view>
@@ -30,11 +30,18 @@ import { useDialogA11y } from '@/composables/use-dialog-a11y';
 const props = withDefaults(defineProps<{ open: boolean; title: string; body?: string; primary: string; secondary?: string;
   icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info' | 'trash'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean;
   // A busy primary that only reads (no write in flight) can still be left: the quiet exit, Esc and back stay live (03 §3.5.2).
-  secondaryWhileBusy?: boolean }>(), { icon: 'alert', tone: 'warning' });
+  secondaryWhileBusy?: boolean;
+  // A decision whose primary is the destructive step (03 §3.1: the last step of a confirm may use the error colour).
+  primaryTone?: 'danger';
+  // Opening focus on the title instead of the first button, so Enter on open does not run the primary (03 §3.5).
+  focusTitle?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
-// Esc / Android back take the quiet action when there is one; a notice without one must be answered.
-useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary'); }, true, 6);
+// Esc / Android back take the quiet action when there is one; a notice without one must be answered. With focusTitle the
+// layer's first focus is the title itself (no control is focused first); Tab still cycles through the buttons (the title
+// has tabindex -1 and is no Tab stop).
+useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary'); }, true, 6,
+  () => props.focusTitle ? document.getElementById(`${id}-title`) : null);
 </script>
 <style scoped>
 .nx-notice-mask { position: fixed; inset: 0; z-index: 960; display: flex; align-items: center; justify-content: center; padding: 24px 23px; box-sizing: border-box; background: var(--v5-bg-color-mask); }
@@ -49,4 +56,8 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
 .nx-notice__body { display: block; margin-top: 8px; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
 /* The secondary exit is a text button (03 §3.5): 12px below the primary, so its 44px target stays off the primary's. */
 .nx-notice__actions { align-self: stretch; display: grid; gap: 12px; margin-top: 24px; }
+/* Danger primary: error fill with the on-brand ink, which is the matching pair in both themes (dark #FF5C5C / #0A0A0A,
+   light #99443B / white, about 7:1). Disabled, busy and pressed states stay NxButton's. */
+.nx-notice__primary--danger :deep(.nx-button__surface) { background: var(--v5-danger); color: var(--v5-on-brand); }
+.nx-notice__title:focus { outline: none; }
 </style>

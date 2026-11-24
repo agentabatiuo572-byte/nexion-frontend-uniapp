@@ -1,5 +1,6 @@
 // Frontend acceptance fixture only. Never imported by src or shipped in the production bundle.
-import { fixture as reviewFixture } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity } from './design-review-fixture.mjs';
+import { applyDemoPromotionDiscounts, applyDemoQuotePricing, demoBundlePricing, demoOrderDelivery, demoPaymentDeadline, demoPurchasedOrderDevices, demoQuoteDeadline, validateDemoOrderItems } from './prototype-demo-data.mjs';
 
 // Synthetic SMS code for the local harness only; it is never included in an API response or product UI.
 export const paymentPinFixtureOtp = '012345';
@@ -32,6 +33,26 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     return ok(current);
   };
   const session=()=>({accessToken:'payment-flow-fixture',refreshToken:null,tokenType:'Bearer',user:{userId:90211,countryCode:'+86',phone:'13800138001',nickname:'Frontend acceptance',onboardingComplete:true}});
+  function readFleet(url, request) {
+    const fleet = reviewFixture(new URL('/api/devices/earnings', url.origin), 'zh', {}, request);
+    const { products } = reviewFixture(new URL('/api/store/catalog', url.origin), 'zh', {}, request);
+    const template = { ...fleet.devices[0], runtimeStatus: 'ONLINE' };
+    const purchased = demoPurchasedOrderDevices(state, orders.values(), products, template);
+    const serverNow = now();
+    const seedDevices = fleet.devices.map(device => ({ ...device, ...previewCapacity(device, fleet.capacitySchedule, serverNow) }));
+    const purchasedDevices = purchased.map(device => {
+      const product = products.find(row => row.id.toUpperCase() === device.productCode);
+      const capacity = previewCapacity(device, fleet.capacitySchedule, serverNow);
+      return { ...device, ...capacity, imageUrl: new URL(new URL(product.imageUrl).pathname, url.origin).href,
+        gpuModel: product.gpu, vramTotalGb: Number.parseInt(product.vram, 10), basePowerW: Number.parseInt(product.power, 10),
+        dailyUsdt: Number((product.dailyEarn * capacity.capacityPct / 100).toFixed(6)) };
+    });
+    const devices = [...seedDevices, ...purchasedDevices];
+    const active = devices.filter(device => device.activatedAt !== null);
+    return { ...fleet, devices, serverNow, slotsUsed: active.length, walletUsdt: state.balance,
+      dailyUsdt: active.reduce((sum, device) => sum + device.dailyUsdt, 0),
+      dailyNex: active.reduce((sum, device) => sum + device.dailyNex, 0) };
+  }
   function handle(url, request) {
     const method=request.method(), body=request.postDataJSON?.()??{}, path=url.pathname, key=request.headers()['idempotency-key'];
     if(path==='/auth/users/login'){state.loggedIn=true;return ok(session());}
@@ -87,25 +108,76 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     }
     if(path.startsWith(pin+'/commands/'))return ok(commands.get('security:'+decodeURIComponent(path.split('/').at(-1)))??{commandKey:decodeURIComponent(path.split('/').at(-1)),status:'NOT_SEEN',canResumeSameKey:false});
     if(path==='/api/orders/quote'){
-      const quote=reviewFixture(url,'zh',{},request);quote.quoteId='pin-quote-'+(quotes.size+1);quote.quoteHash=quote.quoteId;
-      quotes.set(quote.quoteId,quote);return ok(quote);
+      const quotedAt=now();
+      try { validateDemoOrderItems(body.items); }
+      catch (error) { if (error.status !== 422) throw error; return fail(error.status,error.message); }
+      const quote=reviewFixture(url,'zh',{},request);
+      const pricing=demoBundlePricing(quote.items.map(line=>Number(line.subtotalUsdt)));
+      applyDemoQuotePricing(quote,pricing.discountUsdt);
+      let activityEndsAt=Infinity;
+      if(body.activityId){
+        const {items:offers}=reviewFixture(new URL('/api/promotions',url.origin),'zh',{promotions:true},request);
+        const activity=offers.find(offer=>offer.activityId===body.activityId);
+        activityEndsAt=Date.parse(activity?.endsAt);
+        if(!activity||activity.state!=='ACTIVE'||Date.parse(activity.startsAt)>quotedAt||!(activityEndsAt>quotedAt))
+          return fail(409,'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
+        for(const item of quote.items){
+          const rule=activity.rewardRules.find(rule=>rule.productNo===item.productNo&&item.quantity>=rule.minBuyQty);
+          if(!rule)continue;
+          const {disclosure,...reward}=rule.buyerReward;
+          quote.expectedRewards.push({lineId:item.lineId,activityId:activity.activityId,version:activity.version,
+            ruleId:rule.ruleId,rewardRuleId:reward.rewardRuleId,beneficiaryRole:reward.beneficiaryRole,
+            groups:1,reward,disclosure,eligibility:'ELIGIBLE',message:null});
+        }
+        if(!quote.expectedRewards.length)return fail(409,'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE');
+        quote.activityId=activity.activityId;quote.activityVersion=activity.version;
+      }
+      try { applyDemoPromotionDiscounts(quote); }
+      catch (error) { if (error.status !== 409) throw error; return fail(error.status,error.message); }
+      quote.quoteId='pin-quote-'+(quotes.size+1);quote.quoteHash=quote.quoteId;
+      quote.serverTime=new Date(quotedAt).toISOString();
+      quote.expiresAt=new Date(demoQuoteDeadline(quotedAt,activityEndsAt)).toISOString();
+      quotes.set(quote.quoteId,{quote,activityEndsAt});return ok(quote);
     }
     if((path==='/api/orders'||path==='/api/orders/bundle')&&method==='POST'){
-      const quote=quotes.get(body.promotionQuoteId);if(!quote)return fail(422,'QUOTE_REQUIRED');
-      quote.quantity=quote.items.reduce((total,item)=>total+item.quantity,0);
-      const now=Date.now(), orderNo='PIN-FLOW-'+(orders.size+1), amount=Number(quote.amountUsdt);
-      const order={orderNo,productId:1,productNo:quote.items[0].productNo,productName:'UVEL Box S1',quantity:quote.quantity,subtotalUsdt:Number(quote.subtotalUsdt),unitPriceUsdt:1299,discountUsdt:0,amountUsdt:quote.amountUsdt,promotionQuoteId:quote.quoteId,paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',orderType:quote.items.length>1?'BUNDLE':'SINGLE',placedAt:now,expiresAt:now+300000,paidAt:null,activatedAt:null,refundedAt:null,refundAmountUsdt:null,refundChannel:null,refundBillNo:null,dataCenter:null,tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:null,itemCount:quote.itemCount,payBy:new Date(now+300000).toISOString(),rewards:[],items:quote.items.map((item,i)=>({...item,lineId:'pin-line-'+i,productName:'UVEL Box S1'})),lineItems:null};
+      const entry=quotes.get(body.promotionQuoteId);if(!entry)return fail(422,'QUOTE_REQUIRED');
+      const {quote,activityEndsAt}=entry,placedAt=now();
+      if(placedAt>=Date.parse(quote.expiresAt))return fail(409,'PROMOTION_QUOTE_EXPIRED');
+      if((path==='/api/orders/bundle')!==(quote.items.length>1))return fail(409,'PROMOTION_QUOTE_INPUT_CHANGED');
+      const expiresAt=demoPaymentDeadline(placedAt,activityEndsAt);
+      const {products}=reviewFixture(new URL('/api/store/catalog',url.origin),'zh',{},request);
+      const items=quote.items.map(item=>({...item,productName:products.find(product=>product.id===item.productNo).name}));
+      const lineItems=items.map(({productNo,productName,quantity,unitPriceUsdt,subtotalUsdt})=>({
+        sku:productNo,name:productName,quantity,unitPriceUsdt:Number(unitPriceUsdt),lineAmountUsdt:Number(subtotalUsdt),
+      }));
+      const [first]=lineItems,orderNo='PIN-FLOW-'+(orders.size+1);
+      const order={orderNo,productId:products.findIndex(product=>product.id===first.sku)+1,
+        productNo:first.sku,productName:first.name,quantity:quote.quantity,subtotalUsdt:Number(quote.subtotalUsdt),
+        unitPriceUsdt:first.unitPriceUsdt,discountUsdt:Number(quote.discountUsdt),amountUsdt:quote.amountUsdt,
+        promotionQuoteId:quote.quoteId,promotionDiscountUsdt:quote.promotionDiscountUsdt,paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',
+        orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',
+        orderType:items.length>1?'BUNDLE':'SINGLE',placedAt,expiresAt,paidAt:null,activatedAt:null,
+        refundedAt:null,refundAmountUsdt:null,refundChannel:null,refundBillNo:null,dataCenter:null,
+        tradeinNo:null,sourceDeviceId:null,targetDeviceId:null,targetDeviceInstanceNo:null,
+        itemCount:items.length,payBy:new Date(expiresAt).toISOString(),rewards:quote.expectedRewards,items,lineItems};
       orders.set(orderNo,order);return ok({...order,paymentMethod:null});
     }
     const pay=path.match(/^\/api\/orders\/([^/]+)\/pay$/);
     if(pay&&method==='POST'){
       const order=orders.get(decodeURIComponent(pay[1]));if(!order)return fail(404,'ORDER_NOT_FOUND');
       if(order.paymentStatus==='PAID')return ok(order);
+      if(order.expiresAt<=now())return fail(409,'ORDER_PAYMENT_EXPIRED');
       const authorization=authorize(body);
       if(authorization.status!==200)return authorization;
       const amount=Number(order.amountUsdt);
+      if(amount>state.balance)return fail(409,'ORDER_WALLET_INSUFFICIENT');
+      const fleet=readFleet(url,request);
+      const assignableSlots=Math.max(0,fleet.slotCap-fleet.slotsUsed);
+      const paidAt=now();
+      const delivery=demoOrderDelivery(state,order,paidAt,assignableSlots);
       state.payWrites++;state.balance-=amount;
-      Object.assign(order,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt:Date.now(),activatedAt:Date.now(),targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
+      Object.assign(order,delivery,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',paidAt,inventoryUsedAt:paidAt,paymentNo:'PAY-'+order.orderNo});
+      if(order.quantity===1)Object.assign(order,{targetDeviceId:delivery.activatedDeviceIds[0]??delivery.inventoryDeviceIds[0],targetDeviceInstanceNo:order.orderNo+'-0-0'});
       commands.set('order-pay:'+key,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,receipt:order});
       return {...ok(order),drop:state.dropNextPayment?(state.dropNextPayment=false,true):false};
     }
@@ -118,9 +190,9 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       const commandKey=decodeURIComponent(path.split('/').at(-1)), original=commands.get('order-pay:'+commandKey);
       return ok({commandId:commandKey,operation:url.searchParams.get('operation'),targetId:url.searchParams.get('targetId'),idempotencyKey:commandKey,status:original?'SUCCEEDED':'NOT_FOUND',resource:null,order:original?.receipt??null,error:null});
     }
+    if(path==='/api/devices/earnings')return ok(readFleet(url,request));
     const data=reviewFixture(url,'zh',{offers:false,promotions:false},request);
     if(path==='/api/store/catalog')return ok({...data,products:data.products.map(product=>({...product,imageUrl:new URL(new URL(product.imageUrl).pathname,url.origin).href}))});
-    if(path==='/api/devices/earnings')return ok({...data,walletUsdt:state.balance});
     if(path==='/api/app/trade-in/capacity-quote')return ok({...data,walletBalanceUsdt:state.balance,sufficientFunds:true});
     if(path==='/api/trial/state'||path==='/api/trial/eligibility')return ok({...data,canStart:false,reason:'used',state:'ELIGIBLE',version:1});
     return ok(data??{});

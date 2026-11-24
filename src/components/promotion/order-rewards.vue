@@ -1,5 +1,5 @@
 <template>
-  <view v-if="loading || error || receipt?.promotionQuoteId || rewards.length" class="promotion promotion-flat" style="margin:20px 16px">
+  <view v-if="receipt?.rewards?.length || rewards.length" class="promotion promotion-flat order-rewards">
     <text class="promotion-title">{{ t.promotion.orderRewards }}</text><text class="promotion-copy">{{ t.promotion.refundNote }}</text>
     <text v-if="loading" class="promotion-copy" role="status">{{ t.promotion.loading }}</text>
     <RewardRows :expected="receipt?.rewards?.filter(row=>row.reward.type==='DISCOUNT_USDT')" :lines="receipt?.items" />
@@ -7,22 +7,14 @@
     <RewardRows v-else :expected="receipt?.rewards?.filter(row=>row.reward.type!=='DISCOUNT_USDT')" :lines="receipt?.items" />
     <text v-if="error && !receipt && !rewards.length" class="promotion-copy">—</text>
 
-    <PromotionAction v-if="resumeAllowed" class="promotion-action primary" role="button" tabindex="0" @click="resume"><text>{{ t.promotion.resume }}</text></PromotionAction>
-    <view v-if="rewards.length||receipt?.rewards?.some(row=>row.reward.type!=='DISCOUNT_USDT')" class="promotion-link" role="button" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion&orderNo='+encodeURIComponent(orderNo))"><text>{{ t.promotion.rewards }}</text></view>
+    <view v-if="rewards.length||receipt?.rewards?.some(row=>row.reward.type!=='DISCOUNT_USDT')" class="promotion-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=promotion&orderNo='+encodeURIComponent(orderNo))" @keydown.enter.prevent="navTo('/pages/me/rewards-list?cat=promotion&orderNo='+encodeURIComponent(orderNo))"><text class="nx-after-chevron">{{ t.promotion.rewards }}</text></view>
   </view>
 </template>
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import PromotionAction from '@/components/promotion/promotion-action.vue';
-import {ref,computed,watch,onBeforeUnmount} from 'vue';import {useT} from '@/i18n/use-t';import {useApp} from '@/store/app';import {promotionApi,remoteApiEnabled} from '@/api/runtime';import type{PromotionOrder,Reward} from '@/api/promotion-api';import {navTo} from '@/lib/route';import RewardRows from './reward-rows.vue';
-const props=defineProps<{orderNo:string;paymentAllowed:boolean}>();const t=useT(),app=useApp();const receipt=ref<PromotionOrder|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
-function canResume():boolean {
-  return props.paymentAllowed&&!loading.value&&!error.value&&receipt.value?.orderNo===props.orderNo
-    &&Boolean(receipt.value.promotionQuoteId)&&receipt.value.paymentStatus==='PENDING'
-    &&receipt.value.orderStatus==='PENDING_PAYMENT'&&receipt.value.payBy!=null
-    &&Date.parse(receipt.value.payBy)>Date.now();
-}
-const resumeAllowed=computed(canResume);
+import {ref,watch,onBeforeUnmount} from 'vue';import {useT} from '@/i18n/use-t';import {useApp} from '@/store/app';import {promotionApi,remoteApiEnabled} from '@/api/runtime';import type{PromotionOrder,Reward} from '@/api/promotion-api';import {navTo} from '@/lib/route';import RewardRows from './reward-rows.vue';
+// The order's one pay entry is the detail page's bottom bar (contract P1); this card only reports discounts and rewards.
+const props=defineProps<{orderNo:string}>();const t=useT(),app=useApp();const receipt=ref<PromotionOrder|null>(null),rewards=ref<Reward[]>([]),error=ref(false),loading=ref(false);let generation=0,alive=true;
 useAutoRecovery({ failed: () => error.value && !loading.value, retry: load });
 async function load(){
   if(!props.orderNo||!remoteApiEnabled||loading.value)return;
@@ -35,7 +27,14 @@ async function load(){
   if(page.status==='fulfilled')rewards.value=page.value.items;
   error.value=order.status==='rejected'||page.status==='rejected';loading.value=false;
 }
-function resume(){if(canResume())void navTo('/pages/store/checkout?promotion=1&orderNo='+encodeURIComponent(props.orderNo));}
 watch(()=>[props.orderNo,app.accountKey,app.accountBindingEpoch],()=>{generation++;receipt.value=null;rewards.value=[];loading.value=false;error.value=false;void load();},{immediate:true});onBeforeUnmount(()=>{alive=false;generation++;});
 </script>
 <style src="./promotion.css"></style>
+<style scoped>
+/* Same solid block as the order summary above it (order-detail .order-block): card gap 12, radius 22, light shadow. */
+.order-rewards { margin: var(--ui-space-card-gap) 16px 0; border-radius: var(--ui-radius-surface); background: var(--v5-content-surface); }
+[data-theme="light"] .order-rewards { box-shadow: var(--v5-glass-shadow); }
+.order-rewards .promotion-title + .promotion-copy { margin-top: var(--v5-space-1); }
+/* 我的奖励 goes one level down: a text link, 13/18 500 in the muted ink with a trailing chevron (03 §3.9). */
+.order-rewards .promotion-link { width: fit-content; color: var(--v5-ink-3); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
+</style>

@@ -32,7 +32,11 @@
             </g>
           </g>
         </svg>
-        <image v-if="productImage && !imageFailed" class="checkout-result__image" :src="productImage" :alt="productName || copy.device" mode="aspectFit" @error="imageFailed = true" />
+        <!-- A bundle stands its models on the one base (up to three), the first in front; the name line under the stage says them. -->
+        <template v-if="groupImages.length > 1">
+          <image v-for="shot in groupImages" :key="shot.src" class="checkout-result__image checkout-result__image--group" :class="'checkout-result__image--' + shot.slot" :src="shot.src" alt="" mode="aspectFit" @error="failedImages.push(shot.src)" />
+        </template>
+        <image v-else-if="productImage && !imageFailed" class="checkout-result__image" :src="productImage" :alt="productName || copy.device" mode="aspectFit" @error="imageFailed = true" />
         <view v-else class="checkout-result__fallback" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="16" y="8" width="32" height="44" rx="4"/><path d="M24 18h16M24 26h16M24 34h16M20 56h24"/><circle cx="32" cy="43" r="2"/></svg></view>
         <view v-if="celebrating && phase === 'confirmed'" class="checkout-result__confetti" aria-hidden="true"><view v-for="spark in sparks" :key="spark.index" class="checkout-result__spark" :style="spark.style" /></view>
         <view v-if="(state === 'activated' || state === 'inventory') && phase === 'complete'" class="checkout-result__check" :class="{ 'is-pop': popped }" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></view>
@@ -69,7 +73,7 @@ import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import CheckoutAmount from './CheckoutAmount.vue';
 // 'failed' is a server-confirmed provisioning failure (order PAID + PROVISIONING_FAILED); 'error' is only a read-back that has not succeeded yet.
-const props = defineProps<{ orderNo: string | null; state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; amount?: string | number | null; delivery?: OrderDeviceDelivery; inventoryFallbackDeviceId?: string; currency?: 'USD' | 'USDT'; error?: string; completeLine?: string; saved?: string | number }>();
+const props = defineProps<{ orderNo: string | null; state: 'activated' | 'inventory' | 'processing' | 'error' | 'failed'; paymentConfirmed: boolean; productName?: string; productImage?: string; productImages?: string[]; amount?: string | number | null; delivery?: OrderDeviceDelivery; inventoryFallbackDeviceId?: string; currency?: 'USD' | 'USDT'; error?: string; completeLine?: string; saved?: string | number }>();
 // order: 查看订单 on a provisioning failure (PRD purchase payment, line 72). A host without an order view leaves it unwired.
 const emit = defineEmits<{ (event: 'devices'): void; (event: 'support'): void; (event: 'order'): void }>();
 const app = useApp();
@@ -100,6 +104,16 @@ const phase = ref<'confirmed' | 'activating' | 'complete'>('complete');
 const celebrating = ref(false);
 const popped = ref(false);
 const imageFailed = ref(false);
+const failedImages = ref<string[]>([]);
+// Bundle stage: two models stand side by side (board RsAct: the second larger behind on the right, the first in front on
+// the left); a third takes the middle behind them. Back images come first so the front ones paint over them.
+const GROUP_SLOTS: Record<number, string[]> = { 2: ['front-left', 'back-right'], 3: ['trio-left', 'back-middle', 'trio-right'] };
+const groupImages = computed(() => {
+  const sources = (props.productImages ?? []).filter(src => src && !failedImages.value.includes(src)).slice(0, 3);
+  const slots = GROUP_SLOTS[sources.length];
+  if (!slots) return [];
+  return sources.map((src, index) => ({ src, slot: slots[index] })).sort((a, b) => Number(b.slot.startsWith('back')) - Number(a.slot.startsWith('back')));
+});
 const reduced = ref(false);
 // Phase timing matches the CSS below. Timers, not animationend, drive the phases
 // so the replay also advances where the native renderer drops animation events.
@@ -112,7 +126,8 @@ let preference: MediaQueryList | undefined;
 const presentable = computed(() => props.state === 'activated' || props.state === 'inventory');
 
 const title = computed(() => phase.value === 'confirmed' ? copy.value.paid
-  : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activating : copy.value.activated
+  : props.state === 'activated' ? phase.value === 'activating' ? copy.value.activating
+    : (props.delivery?.activatedQuantity ?? 0) > 1 ? fmt(copy.value.activatedCount, { n: props.delivery!.activatedQuantity }) : copy.value.activated
   : props.state === 'inventory' ? copy.value.inventory : props.state === 'processing' ? copy.value.processing
   : props.state === 'failed' ? paymentCopy.value.deliveryTitle : copy.value.resultError);
 const description = computed(() => phase.value === 'confirmed' ? props.state === 'activated' ? copy.value.paidHint : copy.value.paidInventoryHint
@@ -223,6 +238,7 @@ watch([() => props.state, () => props.orderNo, () => app.accountKey], () => {
   if (mounted) startPresentation();
 });
 watch(() => props.productImage, () => { imageFailed.value = false; });
+watch(() => props.productImages?.join('|'), () => { failedImages.value = []; });
 onHide(() => { visible = false; skipPresentation(); });
 onShow(() => { visible = true; });
 onMounted(() => {
@@ -262,6 +278,13 @@ onBeforeUnmount(() => {
 .checkout-result__image, .checkout-result__fallback { z-index: 2; left: 0; top: -6.667%; width: 100%; height: 115.15%; }
 .checkout-result.is-confirmed .checkout-result__image, .checkout-result.is-confirmed .checkout-result__fallback { animation: checkout-device-rise 600ms cubic-bezier(.16, 1, .3, 1) both; }
 .checkout-result__fallback { display: grid; place-items: center; color: var(--v5-brand); }
+/* Group slots, in the art box's 380 × 330 units (board RsAct on the 390 stage). */
+.checkout-result__image--front-left { left: 2.63%; top: 25.06%; width: 60.53%; height: 69.7%; }
+.checkout-result__image--back-right { left: 34.74%; top: 19.55%; width: 65.79%; height: 75.76%; }
+/* Three models (no board): the second behind in the middle, the first and third in front at either side. */
+.checkout-result__image--back-middle { left: 21.05%; top: 8%; width: 57.89%; height: 66.67%; }
+.checkout-result__image--trio-left { left: 0; top: 30.3%; width: 52.63%; height: 60.61%; }
+.checkout-result__image--trio-right { left: 47.37%; top: 30.3%; width: 52.63%; height: 60.61%; }
 .checkout-result__fallback svg { width: 80px; height: 80px; }
 /* Page effects (01 §1.1.2): floor light and halo in the device hues, teal + sky; light theme lowers the strength. */
 .checkout-result__floor { z-index: 0; left: 5.26%; top: 62.1%; width: 89.47%; height: 27.3%; border-radius: 50%; background: radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--v5-tech-cyan) 34%, transparent) 0, color-mix(in srgb, var(--v5-aura-sky) 12%, transparent) 45%, transparent 72%); }

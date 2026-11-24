@@ -53,10 +53,11 @@ export function promotionDetailHref(productNo: string, activityId?: string, cont
     + (activityId ? '&activityId=' + encodeURIComponent(activityId) : '')+voucherEntryQuery(context);
 }
 
-export function promotionCheckoutHref(items: EntryItem[], activityId?: string, context?:VoucherEntryContext): string {
+export function promotionCheckoutHref(items: EntryItem[], activityId?: string, context?:VoucherEntryContext & { fromBundle?: boolean }): string {
   if (!validEntryItems(items)) throw new Error('Invalid purchase selection');
   return '/pages/store/checkout?items=' + encodeURIComponent(JSON.stringify(items))
-    + (activityId ? '&activityId=' + encodeURIComponent(activityId) : '')+voucherEntryQuery(context);
+    + (activityId ? '&activityId=' + encodeURIComponent(activityId) : '')+voucherEntryQuery(context)
+    + (context?.fromBundle ? '&fromBundle=1' : '');
 }
 
 export function promotionBundleHref(activityId?: string, items?: EntryItem[]): string {
