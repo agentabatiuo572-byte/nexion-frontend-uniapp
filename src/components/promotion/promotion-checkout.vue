@@ -138,10 +138,11 @@
       <view v-if="!footer&&displayQuote?.warnings.length" class="promotion-notice"><text v-for="(warning,index) in displayQuote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text></view>
     </template>
     <slot v-if="order?.paymentStatus!=='PAID'" name="review-footer" />
-    <!-- In-flow clearance for the host's bottom tray (04 §4.0), so the last line scrolls to 16 above it: a lone button
-         48 + 22 + 16, a one-row tray 64 + 22 + 16, a note tray its own height + 38. An invisible copy of the note at the
-         note's width and type reserves the lines the note really takes. -->
-    <view v-if="footer&&order?.paymentStatus!=='PAID'" class="promotion-tray-space" :class="{ 'promotion-tray-space--note': footer.note||trayNotice, 'promotion-tray-space--float': footer.amountless&&!(footer.note||trayNotice) }" aria-hidden="true"><text v-if="footer.note||trayNotice" class="promotion-tray-space__note">{{ footer.note||trayNotice }}</text></view>
+    <!-- In-flow clearance for the host's bottom tray (04 §4.0), so the last line scrolls to 16 above it: the tray's own
+         height + 38, whatever its rows (a long language wraps the button under the price). With the measured height the
+         spacer takes it as is; without it, a lone button 48 + 22 + 16, a one-row tray 64 + 22 + 16, and an invisible copy
+         of the note at the note's width and type reserving the lines the note really takes. -->
+    <view v-if="footer&&order?.paymentStatus!=='PAID'" class="promotion-tray-space" :class="trayHeight ? 'promotion-tray-space--measured' : { 'promotion-tray-space--note': footer.note||trayNotice, 'promotion-tray-space--float': footer.amountless&&!(footer.note||trayNotice) }" :style="trayHeight ? { height: 'calc(' + trayHeight + 'px - 2px)' } : undefined" aria-hidden="true"><text v-if="!trayHeight&&(footer.note||trayNotice)" class="promotion-tray-space__note">{{ footer.note||trayNotice }}</text></view>
     <NxSheet :open="voucherOpen" :title="p.voucher" @close="voucherOpen=false">
       <view class="checkout-voucher-options" role="group" :aria-label="p.voucher">
         <PromotionAction class="promotion-action" role="button" tabindex="0" :aria-pressed="voucherId===null" @click="selectVoucher(null)" @keydown.enter.prevent="selectVoucher(null)" @keydown.space.prevent="selectVoucher(null)"><text>{{ p.noVoucher }}</text></PromotionAction>
@@ -208,7 +209,8 @@ import { openOrderAdvisorChat } from '@/lib/advisor-chat-route';
 import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-review';
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
-const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean}>();
+// trayHeight: the host's bottom tray as rendered (H5 measures it); without it the tray spacer estimates from the footer.
+const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number}>();
 function formatDiscount(value: Parameters<typeof formatAmount>[0]): string {
   return formatCheckoutReviewAmount(value, 'USD', { discount: true });
 }
@@ -1108,6 +1110,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .promotion-tray-space { flex:none; margin-top:calc(-1 * var(--ui-space-card-gap)); height:calc(var(--nx-tray-clearance) - var(--nx-tray-bottom) - 18px); visibility:hidden; pointer-events:none; }
 .promotion-tray-space--float { height:calc(48px + 16px - 18px); }
 .promotion-tray-space--note { height:auto; padding:12px 16px calc(8px + 48px + 8px - 2px); }
+.promotion-tray-space--measured { padding:0; }
 .promotion-tray-space__note { display:block; font:var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
 [data-theme="light"] .checkout-group, [data-theme="light"] .checkout-bundle, [data-theme="light"] .checkout-paying { box-shadow:var(--v5-glass-shadow); }
