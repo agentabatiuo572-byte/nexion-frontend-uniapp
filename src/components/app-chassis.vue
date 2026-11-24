@@ -11,7 +11,7 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visit="pageVisit" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
+  <view v-bind="$attrs" :id="chassisHostId" class="nx-chassis" :class="{ 'nx-chassis--dialog-lifted': liftedLocks > 0 }" :lang="contentLang" :data-tab-key="tabHost ? tabLocationKey : undefined" :data-tab-revision="tabHost ? tabRevision : undefined" :data-page-visit="pageVisit" :data-page-visible="pageVisible && hostVisible ? 'true' : 'false'" style="background: var(--v5-bg)" :chrome-config="chromeConfiguration" :change:chrome-config="chromeView.update">
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
     <DeviceStatusBar />
 

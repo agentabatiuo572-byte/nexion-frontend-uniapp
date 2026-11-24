@@ -45,7 +45,7 @@
             <view class="pp-opt" :class="{ on: s.method === 'WALLET' }" role="radio" :tabindex="s.method === 'WALLET' ? 0 : -1" :aria-checked="s.method === 'WALLET'" @click="payment.choose('WALLET')" @keydown.enter.prevent="payment.choose('WALLET')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg></view>
-                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.wallet }}</text><text class="pp-opt__h">{{ !balanceKnown ? copy.walletUnavailable : app.user.usdtBalance < 0 ? fill(copy.walletDebt, { amt: walletAmount(-app.user.usdtBalance) }) : fill(copy.walletAvailable, { amt: walletAmount(app.user.usdtBalance) }) }}</text></view>
+                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.wallet }}</text><text class="pp-opt__h">{{ !balanceKnown ? (payment.available('HDPAY_BANK') || usdtAvailable ? copy.walletUnavailable : copy.walletUnread) : app.user.usdtBalance < 0 ? fill(copy.walletDebt, { amt: walletAmount(-app.user.usdtBalance) }) : fill(copy.walletAvailable, { amt: walletAmount(app.user.usdtBalance) }) }}</text></view>
                 <view class="pp-radio" aria-hidden="true" />
               </view>
               <view v-if="shortfall > 0" class="pp-short" @click.stop>
@@ -894,6 +894,9 @@ onUnmounted(() => { uni.offAppHide(appHide); uni.offAppShow(appShow); if (active
 
 /* Amber status bar (user 2026-11-24, board A): the unread amber, solid in both themes, with one light shadow. placeBar puts
    it 12px above the tab pill or the page's action tray; until it measures, the default sits about there. */
+/* An in-page dialog lifts the chassis scroller to 785 (app-chassis .nx-content--lifted); the bar then steps below it, so that
+   dialog's mask and panel cover the bar like the rest of the page. It returns to 890 when the dialog closes. */
+.nx-chassis--dialog-lifted .purchase-payment-resume { z-index: 784; }
 .purchase-payment-resume { position: fixed; z-index: 890; left: var(--v5-space-4); right: var(--v5-space-4); bottom: calc(var(--nx-overlay-safe-bottom, 24px) + 78px); box-sizing: border-box; min-height: 56px; display: flex; align-items: center; padding: 6px 6px 6px var(--v5-space-3); border-radius: 28px; background: var(--ui-unread-badge); color: var(--ui-unread-badge-ink); box-shadow: var(--v5-glass-shadow); }
 .purchase-payment-resume__icon { flex: none; width: 32px; height: 32px; margin-right: 10px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .4); }
 .purchase-payment-resume__text { flex: 1 1 auto; min-width: 0; margin-right: var(--v5-space-2); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: pretty; }

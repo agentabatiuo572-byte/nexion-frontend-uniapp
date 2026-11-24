@@ -1714,6 +1714,7 @@ export const ru: Messages = {
     tiersAria: "Уровни цены комплекта",
     tileOutOfStock: "Нет в наличии",
     tileUnavailable: "Недоступно",
+    tileGoneName: "Товар снят с продажи",
   },
   tx: {
     navTitle: "Детали операции",
@@ -3763,7 +3764,7 @@ export const ru: Messages = {
     paymentInProgressContinue: "Продолжить оплату",
     cancelBlockedTitle: "Идёт оплата",
     cancelBlockedBody: "Этот заказ сейчас оплачивается, поэтому отменить его нельзя. Если вы уже заплатили, дождитесь подтверждения; неоплаченный заказ закроется автоматически в срок.",
-    cancelBlockedOk: "Понятно",
+    cancelBlockedOk: "Не сейчас",
     detailTitle: "Детали заказа",
     placedAt: "Оформлен",
     expiresAt: "Оплатить до",

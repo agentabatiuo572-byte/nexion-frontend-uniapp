@@ -1714,6 +1714,7 @@ export const uz: Messages = {
     tiersAria: "Toʻplam narxi darajalari",
     tileOutOfStock: "Tugagan",
     tileUnavailable: "Mavjud emas",
+    tileGoneName: "Sotuvdan olingan mahsulot",
   },
   tx: {
     navTitle: "Tranzaksiya tafsilotlari",
@@ -3763,7 +3764,7 @@ export const uz: Messages = {
     paymentInProgressContinue: "Toʻlovni davom ettirish",
     cancelBlockedTitle: "Toʻlov jarayonda",
     cancelBlockedBody: "Bu buyurtma toʻlanmoqda, shuning uchun uni hozir bekor qilib boʻlmaydi. Toʻlagan boʻlsangiz, tasdiqni kuting; toʻlanmagan buyurtma muddati tugaganda avtomatik yopiladi.",
-    cancelBlockedOk: "OK",
+    cancelBlockedOk: "Keyinroq",
     detailTitle: "Buyurtma tafsilotlari",
     placedAt: "Berilgan vaqt",
     expiresAt: "Toʻlov muddati",

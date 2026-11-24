@@ -1714,6 +1714,7 @@ export const kk: Messages = {
     tiersAria: "Жиынтық баға деңгейлері",
     tileOutOfStock: "Қоймада жоқ",
     tileUnavailable: "Қолжетімсіз",
+    tileGoneName: "Сатылымнан алынған тауар",
   },
   tx: {
     navTitle: "Транзакция мәліметі",
@@ -3763,7 +3764,7 @@ export const kk: Messages = {
     paymentInProgressContinue: "Төлеуді жалғастыру",
     cancelBlockedTitle: "Төлем жүріп жатыр",
     cancelBlockedBody: "Бұл тапсырыс төленіп жатыр, сондықтан қазір одан бас тарту мүмкін емес. Төлеп қойсаңыз, растауды күтіңіз; төленбеген тапсырыс мерзімі біткенде автоматты жабылады.",
-    cancelBlockedOk: "Жарайды",
+    cancelBlockedOk: "Кейінірек",
     detailTitle: "Тапсырыс мәліметі",
     placedAt: "Берілген уақыты",
     expiresAt: "Төлеу мерзімі",

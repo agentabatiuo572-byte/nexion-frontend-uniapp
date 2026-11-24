@@ -1714,6 +1714,7 @@ export const ms: Messages = {
     tiersAria: "Peringkat harga gabungan",
     tileOutOfStock: "Habis stok",
     tileUnavailable: "Tidak tersedia",
+    tileGoneName: "Produk tidak dijual lagi",
   },
   tx: {
     navTitle: "Butiran transaksi",
@@ -3763,7 +3764,7 @@ export const ms: Messages = {
     paymentInProgressContinue: "Teruskan bayaran",
     cancelBlockedTitle: "Bayaran sedang diproses",
     cancelBlockedBody: "Pesanan ini sedang dibayar, jadi ia tidak boleh dibatalkan sekarang. Jika anda sudah membayar, tunggu pengesahan; pesanan yang belum dibayar ditutup secara automatik pada tarikh akhirnya.",
-    cancelBlockedOk: "OK",
+    cancelBlockedOk: "Nanti dulu",
     detailTitle: "Butiran pesanan",
     placedAt: "Dibuat",
     expiresAt: "Tarikh akhir bayaran",

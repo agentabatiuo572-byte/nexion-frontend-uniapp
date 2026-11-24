@@ -10,8 +10,10 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || pendingCreateTerms }">
-        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalCheckoutClosedTitle || pendingCreateTitle" :description="originalCheckoutClosed ? undefined : pendingCreateDescription" />
+      <view v-if="(originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateTerms }">
+        <!-- A closed original order (expired, cancelled, not found) is a closed state: neutral tone (03 §3.8, 已关闭), the status
+             as the result; its way on is the floating 查看原订单 / 我的订单 below (04 §4.0). -->
+        <NxResultHead :tone="originalCheckoutClosed ? 'neutral' : 'warning'" :icon="originalCheckoutClosed === 'expired' ? 'clock' : originalCheckoutClosed === 'cancelled' ? 'failed' : originalCheckoutClosed || originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalCheckoutClosedTitle || pendingCreateTitle" :description="originalCheckoutClosed ? undefined : pendingCreateDescription" />
         <view v-if="pendingCreateTerms" class="checkout-group checkout-fees">
           <CheckoutRow :label="t.store.coRowTotal" :value="reviewMoney(pendingCreateTerms.amount, false, true)" class="checkout-fee" />
           <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" :code="pendingCreateTerms.productCode" class="checkout-fee" />
@@ -138,7 +140,9 @@
               <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
               <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" class="checkout-fee" />
               <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" class="checkout-fee" />
-              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ flowCopy.paymentTotal }}</text><CheckoutAmount :value="confirmationTotal" currency="USD" /></view>
+              <!-- While the original order's external payment is under way, this is the order's amount, not what that payment
+                   charges (its total, fees included, lives on the payment itself). -->
+              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><CheckoutAmount :value="confirmationTotal" currency="USD" /></view>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
               <text>{{ trialCopy.afterPurchaseLabel }}</text>
@@ -268,8 +272,9 @@
         <NxButton variant="secondary" :label="t.tradein.recoveryContactSupport" :busy="recoverySupportOpening" @click="openRecoverySupport" />
         <NxButton variant="primary" :label="t.tradein.recoveryViewOrders" @click="navTo('/pages/store/orders')" />
       </view>
-      <view v-if="!promotionRoute && (originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
-        <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
+      <view v-if="!promotionRoute && (originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
+        <NxButton v-if="originalCheckoutClosed" variant="primary" :label="originalCheckoutClosed === 'missing' ? t.orders.title : t.store.coOpenOriginalOrder" @click="openClosedOriginal" />
+        <NxButton v-else variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
@@ -2282,6 +2287,11 @@ function requestCheckoutBack() {
     } catch { /* An unreadable command stays with the original order. */ }
   }
   leaveCheckout();
+}
+// A closed original: its detail (where 再买一台 starts a new purchase), or the order list when the order is not found.
+function openClosedOriginal() {
+  const orderNo = createdCheckoutOrder.value?.orderNo;
+  void navTo(originalCheckoutClosed.value === 'missing' || !orderNo ? '/pages/store/orders' : '/pages/store/order-detail?id=' + encodeURIComponent(orderNo));
 }
 async function retryOriginalCheckout() {
   if (serverOrderRecovery.value || checkoutLeaving.value) return;
