@@ -1841,7 +1841,7 @@ export const id: Messages = {
     purchaseHardwarePolicy: "Syarat kuota perangkat keras",
     purchaseMet: "Terpenuhi",
     purchaseUnmet: "Belum terpenuhi",
-    purchaseBlockedTitle: "Syarat upgrade belum terpenuhi",
+    purchaseBlockedTitle: "Syarat belum terpenuhi",
     purchaseEligible: "Memenuhi syarat untuk membeli produk ini",
     purchaseQuotaDepleted: "Kuota penjualan habis",
     purchaseQuotaRequired: "Kuota penjualan juga harus masih tersedia",

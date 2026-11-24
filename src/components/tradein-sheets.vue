@@ -2154,7 +2154,9 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-status__text { min-width: 0; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .tis-spin { color: var(--v5-brand); animation: tis-spin 800ms linear infinite; }
 @keyframes tis-spin { to { transform: rotate(360deg); } }
-.tis-status-row { display: flex; align-items: center; gap: var(--v5-space-2); }
+/* Status beside its retry: when the text would be squeezed past two lines the retry drops to the next line, right-aligned (03 §3.6.1). */
+.tis-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v5-space-1) var(--v5-space-2); }
+.tis-status-row > .tis-status { flex: 1 1 calc(var(--ui-type-description) * 16); }
 /* Retire: the source device and what to pick for it. */
 .tis-lead { display: flex; flex-direction: column; gap: calc(var(--v5-space-1) * 1.5); margin-top: -10px; }
 .tis-source { display: flex; align-items: center; gap: var(--v5-space-2); }

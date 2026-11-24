@@ -82,10 +82,15 @@ watch(() => props.open, (open, wasOpen) => {
     void nextTick(place);
     return;
   }
-  // Closed by Esc, back or a second tap: focus stays on (or returns to) the icon unless the user moved it elsewhere.
+  // Closed by Esc, back, a second tap or a tap elsewhere: focus comes back to the icon, unless that tap moved it to another
+  // control. Checked after the tap's own focus change, which lands on the layer root when the tap hit no control.
   const el = root();
-  const active = document.activeElement;
-  if (wasOpen && el && (!active || active === document.body || el.contains(active))) el.querySelector<HTMLElement>('.nx-hint__trigger')?.focus();
+  if (!wasOpen || !el) return;
+  setTimeout(() => {
+    const trigger = el.querySelector<HTMLElement>('.nx-hint__trigger');
+    const active = document.activeElement as HTMLElement | null;
+    if (trigger && el.isConnected && (!active || active === document.body || el.contains(active) || active.tabIndex < 0)) trigger.focus();
+  }, 0);
 }, { immediate: true });
 onBeforeUnmount(() => { if (typeof document !== 'undefined') listen(false); });
 </script>

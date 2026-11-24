@@ -1841,7 +1841,7 @@ export const ms: Messages = {
     purchaseHardwarePolicy: "Syarat kuota perkakasan",
     purchaseMet: "Dipenuhi",
     purchaseUnmet: "Belum dipenuhi",
-    purchaseBlockedTitle: "Syarat naik taraf belum dipenuhi",
+    purchaseBlockedTitle: "Syarat belum dipenuhi",
     purchaseEligible: "Layak membeli produk ini",
     purchaseQuotaDepleted: "Kuota jualan telah habis",
     purchaseQuotaRequired: "Kuota jualan juga mesti masih ada",

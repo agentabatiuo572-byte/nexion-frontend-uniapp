@@ -1841,7 +1841,7 @@ export const kk: Messages = {
     purchaseHardwarePolicy: "Жабдық квотасы шарттары",
     purchaseMet: "Орындалды",
     purchaseUnmet: "Әлі орындалмады",
-    purchaseBlockedTitle: "Жақсарту шарттары әлі орындалмады",
+    purchaseBlockedTitle: "Шарттар орындалмады",
     purchaseEligible: "Бұл тауарды сатып алуға болады",
     purchaseQuotaDepleted: "Сату квотасы қалмады",
     purchaseQuotaRequired: "Сату квотасы да қалған болуы керек",

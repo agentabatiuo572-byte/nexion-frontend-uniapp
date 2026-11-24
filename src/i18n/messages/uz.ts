@@ -1841,7 +1841,7 @@ export const uz: Messages = {
     purchaseHardwarePolicy: "Qurilma kvotasi shartlari",
     purchaseMet: "Bajarildi",
     purchaseUnmet: "Bajarilmagan",
-    purchaseBlockedTitle: "Yangilash shartlari bajarilmagan",
+    purchaseBlockedTitle: "Shartlar bajarilmagan",
     purchaseEligible: "Bu mahsulotni sotib olishingiz mumkin",
     purchaseQuotaDepleted: "Sotuv kvotasi qolmadi",
     purchaseQuotaRequired: "Sotuv kvotasi ham qolgan boʻlishi kerak",

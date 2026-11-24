@@ -1841,7 +1841,7 @@ export const fil: Messages = {
     purchaseHardwarePolicy: "Kondisyon sa quota ng hardware",
     purchaseMet: "Pasok",
     purchaseUnmet: "Hindi pa pasok",
-    purchaseBlockedTitle: "Hindi pa pasok sa kondisyon ng upgrade",
+    purchaseBlockedTitle: "Hindi pa pasok sa kondisyon",
     purchaseEligible: "Kwalipikadong bilhin ang produktong ito",
     purchaseQuotaDepleted: "Ubos na ang quota ng benta",
     purchaseQuotaRequired: "Kailangan ding may natitirang quota ng benta",
