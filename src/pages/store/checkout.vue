@@ -979,8 +979,10 @@ watch(productCatalogPresentation, snapshot => {
   if (productOutOfStock(listing)) checkoutStockRefused.value = true;
   else if (productHasStock(listing)) checkoutStockRefused.value = false;
 }, { flush: "sync" });
-const checkoutOutOfStock = computed(() => !hasOriginalCheckout.value && !activeSession.value
+const checkoutStockUnavailable = computed(() => !activeSession.value
   && (checkoutStockRefused.value ?? productOutOfStock(product.value)));
+const checkoutOutOfStock = computed(() => !hasOriginalCheckout.value && checkoutStockUnavailable.value);
+const originalCheckoutOutOfStock = computed(() => checkoutStockUnavailable.value && originalCheckoutAwaitingPayment());
 const checkoutEligibilityBlock = computed(() => {
   if (hasOriginalCheckout.value || activeSession.value) return "";
   if (eligibilityCatalogUnconfirmed.value) return t.value.store.purchaseEligibilityError;
@@ -1657,7 +1659,7 @@ const checkoutCapacityBlocked = computed(() => !hasOriginalCheckout.value
 const checkoutCapacityMessage = computed(() => checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
   : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value] : "");
-const checkoutTrayBlock = computed(() => checkoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
+const checkoutTrayBlock = computed(() => checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
   : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : ""));
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
@@ -2167,21 +2169,26 @@ function releaseSessionOnLeave() {
   }
 }
 
-function canConfirmCheckoutLeave(): boolean {
-  if (checkoutBackApproved || !pageAlive || !pageVisible || !isTopCheckoutPage()
-      || purchasePayment.state.open || paymentSheetOpen.value) return false;
-  if (promotionRoute.value) return promotionCheckout.value?.canConfirmLeave() === true;
+function originalCheckoutAwaitingPayment(): boolean {
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value || created.paymentStatus !== 'PENDING'
-      || confirming || paymentFlowBusy.value || checkoutLeaving.value || pendingCheckoutCreate.value) return false;
+      || pendingCheckoutCreate.value) return false;
   if (cancelBlockedPayment.value?.orderNo === created.orderNo) return false;
   const original = orders.getById(created.orderNo);
   if (original && original.status !== 'placed') return false;
+  void purchasePayment.state.revision;
   try {
     return !readOrderAction(app.accountKey, created.orderNo) && !pendingOrderPayment(app.accountKey, created.orderNo);
   } catch {
     return false;
   }
+}
+
+function canConfirmCheckoutLeave(): boolean {
+  if (checkoutBackApproved || !pageAlive || !pageVisible || !isTopCheckoutPage()
+      || purchasePayment.state.open || paymentSheetOpen.value) return false;
+  if (promotionRoute.value) return promotionCheckout.value?.canConfirmLeave() === true;
+  return !confirming && !paymentFlowBusy.value && !checkoutLeaving.value && originalCheckoutAwaitingPayment();
 }
 
 async function showCancelPaymentRefusal(orderNo: string, summary: string) {
@@ -2790,7 +2797,7 @@ async function submitRemoteOrder(): Promise<void> {
   const walletReceiptScope = app.captureRemoteAccountRequest();
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
-  if (!p || checkoutOutOfStock.value || (!hasOriginalCheckout.value && purchaseUnavailable.value)) {
+  if (!p || checkoutOutOfStock.value || originalCheckoutOutOfStock.value || (!hasOriginalCheckout.value && purchaseUnavailable.value)) {
     confirming = false;
     return;
   }
@@ -2907,6 +2914,7 @@ async function submitRemoteOrder(): Promise<void> {
     const paymentCurrent = () => scopeIsCurrent()&&createdCheckoutOrder.value?.orderNo===created.orderNo
       &&createdCheckoutOrder.value.amountUsdt===created.amountUsdt&&reviewedTotal===netPrice.value
       &&(persisted.expiresAt===null || nowTick.value<persisted.expiresAt);
+    if (originalCheckoutOutOfStock.value) return;
     const paid = await executeSelectedPurchase({amount:created.amountUsdt,currency:'USDT',summary:p.name},
       async authorization=>{
         if (!paymentCurrent()) return null;
