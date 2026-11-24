@@ -1853,7 +1853,7 @@ export const uz: Messages = {
     purchasePeople: "{n} kishi",
     purchaseRanks: "{n} daraja",
     purchaseUnits: "{n} ta qurilma",
-    purchaseFundsGap: "Hamyonda {amount} yetishmaydi",
+    purchaseFundsGap: "Hamyonda ${amount} yetishmaydi",
     purchaseConditions: {
       rank: "Jamoa darajasi",
       activeDirect: "Taklif etilib faollashtirilganlar",

@@ -1853,7 +1853,7 @@ export const fil: Messages = {
     purchasePeople: "{n} tao",
     purchaseRanks: "{n} rank",
     purchaseUnits: "{n} device",
-    purchaseFundsGap: "Kulang nang {amount} ang wallet",
+    purchaseFundsGap: "Kulang nang ${amount} ang wallet",
     purchaseConditions: {
       rank: "Rank ng team",
       activeDirect: "Na-activate na inimbitahan mo",

@@ -1853,7 +1853,7 @@ export const id: Messages = {
     purchasePeople: "{n} orang",
     purchaseRanks: "{n} peringkat",
     purchaseUnits: "{n} perangkat",
-    purchaseFundsGap: "Saldo dompet kurang {amount}",
+    purchaseFundsGap: "Saldo dompet kurang ${amount}",
     purchaseConditions: {
       rank: "Peringkat tim",
       activeDirect: "Teman undangan yang telah diaktifkan",

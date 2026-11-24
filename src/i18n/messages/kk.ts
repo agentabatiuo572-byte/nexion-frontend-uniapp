@@ -1853,7 +1853,7 @@ export const kk: Messages = {
     purchasePeople: "{n} адам",
     purchaseRanks: "{n} дәреже",
     purchaseUnits: "{n} құрылғы",
-    purchaseFundsGap: "Әмиянда {amount} жетпейді",
+    purchaseFundsGap: "Әмиянда ${amount} жетпейді",
     purchaseConditions: {
       rank: "Команда дәрежесі",
       activeDirect: "Сіз шақырған белсендірілген достар",

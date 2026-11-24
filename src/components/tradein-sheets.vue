@@ -1005,10 +1005,11 @@ function amountParts(value: number): { int: string; dec: string } {
   return { int, dec: dec === undefined ? "" : `.${dec}` };
 }
 // A translated sentence split around its placeholders, so the filled-in figures can take their own weight in any word order.
+// A "$" written right before a placeholder (the existing "${amount}" copy, also as published at runtime) belongs to the figure.
 function fmtParts(template: string, values: Record<string, string>): { text: string; value: boolean }[] {
-  return template.split(/(\{\w+\})/).filter(Boolean).map((part) => {
-    const key = /^\{(\w+)\}$/.exec(part)?.[1];
-    return key !== undefined && key in values ? { text: values[key], value: true } : { text: part, value: false };
+  return template.split(/(\$?\{\w+\})/).filter(Boolean).map((part) => {
+    const match = /^(\$?)\{(\w+)\}$/.exec(part);
+    return match && match[2] in values ? { text: match[1] + values[match[2]], value: true } : { text: part, value: false };
   });
 }
 
@@ -1119,7 +1120,7 @@ const tradeinView = computed(() => {
     // An active old device loses its running job on payment (PRD §7.5.1, BUG-542); same condition as before, both branches.
     taskVoid: remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null,
     fundsGap: remoteQuote && !remoteQuote.sufficientFunds
-      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: `$${formatGroupedAmount(remoteQuote.walletShortfallUsdt)}` }) : null,
+      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(remoteQuote.walletShortfallUsdt) }) : null,
     ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet) }),
   };
 });

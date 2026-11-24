@@ -1853,7 +1853,7 @@ export const ru: Messages = {
     purchasePeople: "Человек: {n}",
     purchaseRanks: "Рангов: {n}",
     purchaseUnits: "{n} шт.",
-    purchaseFundsGap: "В кошельке не хватает {amount}",
+    purchaseFundsGap: "В кошельке не хватает ${amount}",
     purchaseConditions: {
       rank: "Ранг",
       activeDirect: "Приглашённые друзья, прошедшие активацию",

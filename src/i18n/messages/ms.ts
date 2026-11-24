@@ -1853,7 +1853,7 @@ export const ms: Messages = {
     purchasePeople: "{n} orang",
     purchaseRanks: "{n} pangkat",
     purchaseUnits: "{n} peranti",
-    purchaseFundsGap: "Baki dompet kurang {amount}",
+    purchaseFundsGap: "Baki dompet kurang ${amount}",
     purchaseConditions: {
       rank: "Pangkat pasukan",
       activeDirect: "Rakan jemputan yang telah diaktifkan",
