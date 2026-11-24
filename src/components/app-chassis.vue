@@ -635,6 +635,8 @@ function receiveChassisScrolling(value: boolean) {
 // The page content changed size (renderjs observes it): the floating support shortcut re-checks its spot.
 const layoutRevision = ref(0);
 function receiveChassisLayout() {
+  // A kept page that is hidden re-measures on its next show (visit), not on every size change while hidden.
+  if (!pageVisible.value || !props.hostVisible) return;
   layoutRevision.value += 1;
 }
 function receiveChassisRefresh(visit: string) {
