@@ -537,7 +537,7 @@ async function offerBundleWalletTopup(requiredUsdt: number): Promise<void> {
 type BundleReviewTarget = "new" | "checkout-original" | "legacy-inline" | "orders" | "storage-error";
 
 function isRecoveryTarget(target: BundleReviewTarget): boolean {
-  return target === "checkout-original" || target === "orders";
+  return target === "checkout-original" || target === "legacy-inline" || target === "orders";
 }
 
 function bundleReviewTarget(list: Product[]): BundleReviewTarget {
@@ -585,7 +585,6 @@ async function onCheckout() {
   if (!isRecoveryTarget(target) && !validEntryItems(list.map(p => ({ productNo: p.id, quantity: 1 })), 2)) return;
   if (remoteApiEnabled) {
     if(await openBundleReview(list, target))return;
-    if (list.some((p) => eligibilityUnavailable(p.id))) return;
     const submissionScope = captureAccountScope();
     const accountKey = orders.currentAccountKey();
     const scopeIsCurrent = () => isCurrentAccountScope(submissionScope)

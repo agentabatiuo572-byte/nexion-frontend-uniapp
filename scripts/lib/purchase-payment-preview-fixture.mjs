@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderFitsCapacity,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoOrderFitsCapacity,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 
@@ -167,8 +167,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!order) return null;
       (state.createdOrders ||= []).push(order);
     }
-    if (status === 'activated') Object.assign(order, {canonicalStatus: 'activated', paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, activatedAt: Date.now(), inventoryUsedAt: Date.now(), hardwareQuotaUsedAt});
-    else Object.assign(order, demoTimedOutOrder);
+    if (status === 'paid') {
+      const now = Date.now();
+      const delivery = demoOrderDelivery(new URL(intent.origin), locale(), state, order, now);
+      Object.assign(order, delivery, {paymentStatus: 'PAID', orderStatus: 'COMPLETED', paymentMethod: intent.paymentMethod,
+        paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, inventoryUsedAt: now, hardwareQuotaUsedAt});
+    } else Object.assign(order, demoTimedOutOrder);
     return order;
   }
   // Recover the latest open intent for the same purchase after a replacement attempt.
@@ -265,9 +269,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
     // Delivery needs the order; funds for an order that cannot be found never become a success.
     if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
-    // Like AppOrderCommandService.prepare inside delivery: an unpaid order holds no slot, so paid funds that no
-    // longer fit the slots go to manual review with the capacity code instead of activating over the cap.
-    if (!demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
+    // The older single-device scenario requires its slot; a bundle places any overflow into inventory.
+    if (order.orderType !== 'BUNDLE' && !demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
       order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
       return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
     let hardwareQuotaUsedAt;
@@ -278,11 +281,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if(error.status!==409&&error.status!==404)throw error;
       return Object.assign(intent,{status:'MANUAL_REVIEW',reason:error.message});
     }
-    settle(intent.orderNo, 'activated', intent, hardwareQuotaUsedAt);
+    const paidOrder = settle(intent.orderNo, 'paid', intent, hardwareQuotaUsedAt);
     removeDemoPaymentQuotaHold(state, intent.quotaHold);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
-      ...(order?.promotionQuoteId ? order : {}),
-      orderNo: intent.orderNo, paymentNo: intent.intentNo, paymentStatus: 'PAID', orderStatus: 'COMPLETED', activationStatus: 'ACTIVATED', canonicalStatus: 'activated',
+      ...(paidOrder.promotionQuoteId ? paidOrder : {}),
+      orderNo: intent.orderNo, paymentNo: intent.intentNo, paymentStatus: 'PAID', orderStatus: 'COMPLETED', ...demoPaidOrderDelivery(paidOrder),
       amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
       walletBalanceAfterUsdt: null, idempotent: false, serverCanonical: true, source: 'server', sourceEnvironment: 'PRODUCTION', runId: ''}});
   }

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { demoAccountId, demoPurchasingAccountId, demoReferralBuyer, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
+import { quoteBundleAmountUsdt } from '../../src/api/bundle-quote.ts';
 import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
@@ -58,6 +59,15 @@ function demoVoucherRedemption(state,voucherId,lines,subtotal,now){
 }
 const bundleDiscountTiers=[{minItems:2,rate:.04},{minItems:3,rate:.07},{minItems:4,rate:.11}];
 const bundleRate=count=>bundleDiscountTiers.findLast(tier=>count>=tier.minItems)?.rate??0;
+const quoteMoney = value => Number(value).toFixed(6);
+const quoteMicros = value => BigInt(Math.round(Number(value) * 1e6));
+const moneyFromMicros = value => quoteMoney(Number(value) / 1e6);
+
+function demoBundlePricing(lineSubtotals) {
+  const price = quoteBundleAmountUsdt(lineSubtotals, bundleRate(lineSubtotals.length));
+  if (!price) throw new Error('Invalid demo bundle price');
+  return price;
+}
 const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||state.milestoneClaims?.includes(id)
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
@@ -440,6 +450,9 @@ function demoScenarioOrders(products,state,now,device41) {
     .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
 }
 const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
+function demoOrderDeviceId(state, instanceNo) {
+  return (state.deviceIds ??= {})[instanceNo] ??= (state.deviceSequence = (state.deviceSequence || 1000) + 1);
+}
 const accountOrderRows=(url,state,now)=>demoScenarioOrders(demoProducts(state,url.origin),state,now,
   state.fleetSeed?.find(device=>device.id===41));
 export const demoHasAccountOrder=(url,state,orderNo)=>accountOrderRows(url,state,Date.now()).some(order=>order.orderNo===orderNo);
@@ -538,14 +551,15 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
   // DEMO-ORDER-004 is seeded device 41's own order, also once checkout has adopted it: it never adds a device.
   for(const order of orders)if(order.orderNo!=='DEMO-ORDER-004'&&['activated','inventory'].includes(order.canonicalStatus))for(const [i,line]of order.lineItems.entries())for(let unit=0;unit<line.quantity;unit++){
     const product=products.find(p=>p.id===line.sku),instanceNo=demoOrderDeviceInstance(order.orderNo,i,unit);
-    state.deviceIds??={};state.deviceIds[instanceNo]??=(state.deviceSequence=(state.deviceSequence||1000)+1);
-    if(retired.includes(state.deviceIds[instanceNo]))continue;
+    const id = demoOrderDeviceId(state, instanceNo);
+    if (retired.includes(id)) continue;
+    const inInventory = order.inventoryDeviceIds?.includes(id) ?? order.canonicalStatus === 'inventory';
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
     const name=order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name;
-    session.push({...template,id:state.deviceIds[instanceNo],instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
-      activatedAt:order.activatedAt,purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
-      ...(order.canonicalStatus==='inventory'&&{status:'INACTIVE',activatedAt:null}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
+    session.push({...template,id,instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
+      activatedAt:inInventory ? null : (order.activatedAt ?? order.inventoryUsedAt),purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
+      ...(inInventory&&{status:'INACTIVE',runtimeStatus:'OFFLINE'}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
   }
   let reservedSlotCount=demoOrderSlots(orders);
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
@@ -628,6 +642,34 @@ export function demoOrderFitsCapacity(url,locale,state,products,lines,excludeOrd
   const fleet=demoFleetFacts(url,locale,state);
   // Paying an existing order reuses the slots it already holds.
   return fleet.slotsUsed-(excludeOrderNo?demoOrderSlots(demoScenarioOrders(products??demoProducts(state,url.origin),state,Date.now(),false),excludeOrderNo):0)+requested<=fleet.slotCap;
+}
+
+function demoBundlePlacement(url, locale, state, quantity) {
+  const fleet = demoFleetFacts(url, locale, state);
+  const assignableSlots = Math.max(0, fleet.slotCap - fleet.slotsUsed);
+  return { assignableSlots, inventoryQuantity: Math.max(0, quantity - assignableSlots) };
+}
+
+// Price estimates do not reserve slots. Both payment rails place the paid order against the fleet at delivery.
+export function demoOrderDelivery(url, locale, state, order, now) {
+  if (order.orderType !== 'BUNDLE') return { canonicalStatus:'activated', activationStatus:'ACTIVATED', activatedAt:now };
+  const { inventoryQuantity } = demoBundlePlacement(url, locale, state, order.quantity);
+  const ids = order.lineItems.flatMap((line, i) => Array.from({ length:line.quantity },
+    (_, unit) => demoOrderDeviceId(state, demoOrderDeviceInstance(order.orderNo, i, unit))));
+  const activatedQuantity = ids.length - inventoryQuantity;
+  return {
+    canonicalStatus: inventoryQuantity > 0 ? 'inventory' : 'activated',
+    activationStatus: inventoryQuantity > 0 ? 'INVENTORY' : 'ACTIVATED',
+    activatedAt: inventoryQuantity > 0 ? null : now,
+    activatedQuantity, inventoryQuantity,
+    activatedDeviceIds: ids.slice(0, activatedQuantity),
+    inventoryDeviceIds: ids.slice(activatedQuantity),
+  };
+}
+
+export function demoPaidOrderDelivery(order) {
+  const { canonicalStatus, activationStatus, activatedDeviceIds, inventoryDeviceIds, activatedQuantity, inventoryQuantity } = order;
+  return { canonicalStatus, activationStatus, ...(activatedDeviceIds && { activatedDeviceIds, inventoryDeviceIds, activatedQuantity, inventoryQuantity }) };
 }
 
 // Detail-page live activity (PRD §7.2.2; the backend follows the same rule, uvel-docs B24). Derived from
@@ -1098,11 +1140,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       throw Object.assign(new Error('PROMOTION_RESOURCE_NOT_FOUND'),{status:404});
     }
     requireDemoQuoteStock(quoteProducts);
+    const pricing = demoBundlePricing(input.items.map((item,index) => quoteProducts[index].price * item.quantity));
     const items=input.items.map((item,index)=>{
       const product=quoteProducts[index];
-      return {...item,lineId:'demo-line-'+index,unitPriceUsdt:product.price.toFixed(2),subtotalUsdt:(product.price*item.quantity).toFixed(2),discountUsdt:'0.00',payableUsdt:(product.price*item.quantity).toFixed(2)};
+      const lineSubtotal = quoteMoney(product.price * item.quantity);
+      return {...item,lineId:'demo-line-'+index,unitPriceUsdt:quoteMoney(product.price),subtotalUsdt:lineSubtotal,discountUsdt:quoteMoney(0),payableUsdt:lineSubtotal};
     });
-    const subtotal=items.reduce((sum,item)=>sum+Number(item.subtotalUsdt),0).toFixed(2);
+    const subtotal=quoteMoney(pricing.subtotalUsdt);
     const activity=input.activityId
       ? demoFixture(new URL('/api/promotions/'+input.activityId,url.origin),locale,state,request,now)
       : null;
@@ -1118,7 +1162,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     requireDemoPurchase(state,products,input.items,now);
     // Keep the single-item capacity scenario. Bundles have an inventory placement projection.
     if(items.length===1&&!demoOrderFitsCapacity(url,locale,state,products,input.items))refuse('CAPACITY_REPLACEMENT_REQUIRED');
-    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity,items,subtotalUsdt:subtotal,discountUsdt:'0.00',amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
+    const quote={quoteId:'demo-quote-'+now+'-'+(state.quoteSequence=(state.quoteSequence||0)+1),voucherId:input.voucherId||null,quoteHash:'demo-quote-hash',serverTime:iso,expiresAt:new Date(now+300000).toISOString(),itemCount:items.length,quantity,items,subtotalUsdt:subtotal,discountUsdt:quoteMoney(0),amountUsdt:subtotal,bundlePolicyVersion:1,activityId:input.activityId||null,activityVersion:activity?.version??null,eligibility:'ELIGIBLE',expectedRewards:[],warnings:[],reserved:false};
     for(const {line,rule} of matches){
       for(const spec of [rule.buyerReward,rule.inviterReward].filter(Boolean)){
         const {disclosure,...reward}=spec;
@@ -1128,24 +1172,31 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       }
     }
     if (items.length > 1) {
-      const fleet = demoFleetFacts(url, locale, state);
       const buyerGifts = quote.expectedRewards.reduce((sum, entry) =>
         entry.beneficiaryRole === 'BUYER' && entry.reward.type === 'DEVICE' ? sum + entry.reward.quantity * entry.groups : sum, 0);
-      quote.assignableSlots = Math.max(0, fleet.slotCap - fleet.slotsUsed);
-      quote.inventoryQuantity = Math.max(0, quantity + buyerGifts - quote.assignableSlots);
+      Object.assign(quote, demoBundlePlacement(url, locale, state, quantity + buyerGifts));
     }
-    const bundleDiscount=Number((Number(subtotal)*bundleRate(items.length)).toFixed(2));
-    const voucher=demoVoucherRedemption(state,quote.voucherId,items,Number(subtotal),now);
-    let remaining=bundleDiscount+(voucher?.discountUsdt??0);
-    quote.discountUsdt=remaining.toFixed(2);quote.amountUsdt=(Number(subtotal)-remaining).toFixed(2);
-    for(const line of items){const discount=Math.min(remaining,Number(line.subtotalUsdt));line.discountUsdt=discount.toFixed(2);line.payableUsdt=(Number(line.subtotalUsdt)-discount).toFixed(2);remaining-=discount;}
+    const voucher = demoVoucherRedemption(state, quote.voucherId, items, pricing.subtotalUsdt, now);
+    const subtotalMicros = quoteMicros(subtotal);
+    const discountMicros = quoteMicros(pricing.discountUsdt) + quoteMicros(voucher?.discountUsdt ?? 0);
+    let allocated = 0n;
+    quote.discountUsdt = moneyFromMicros(discountMicros);
+    quote.amountUsdt = moneyFromMicros(subtotalMicros - discountMicros);
+    for (const [index, line] of items.entries()) {
+      const lineSubtotal = quoteMicros(line.subtotalUsdt);
+      // As in the quote service, the last line receives the residual micros.
+      const part = index === items.length - 1 ? discountMicros - allocated : discountMicros * lineSubtotal / subtotalMicros;
+      line.discountUsdt = moneyFromMicros(part);
+      line.payableUsdt = moneyFromMicros(lineSubtotal - part);
+      allocated += part;
+    }
     // PromotionQuoteService.applyDiscounts: an order discount stays in its purchase line, never exceeds what that line
     // still owes, leaves something to pay, and never becomes a wallet reward.
     for(const entry of quote.expectedRewards.filter(row=>row.reward.type==='DISCOUNT_USDT')){
-      const line=items.find(row=>row.lineId===entry.lineId),discount=Number(entry.reward.amount);
-      if(discount>Number(line.payableUsdt))refuse('PROMOTION_DISCOUNT_EXCEEDS_LINE_AMOUNT');
-      Object.assign(line,{promotionDiscountUsdt:discount.toFixed(2),discountUsdt:(Number(line.discountUsdt)+discount).toFixed(2),payableUsdt:(Number(line.payableUsdt)-discount).toFixed(2)});
-      Object.assign(quote,{promotionDiscountUsdt:(Number(quote.promotionDiscountUsdt??0)+discount).toFixed(2),discountUsdt:(Number(quote.discountUsdt)+discount).toFixed(2),amountUsdt:(Number(quote.amountUsdt)-discount).toFixed(2)});
+      const line=items.find(row=>row.lineId===entry.lineId),discount=quoteMicros(entry.reward.amount) * BigInt(entry.groups);
+      if(discount>quoteMicros(line.payableUsdt))refuse('PROMOTION_DISCOUNT_EXCEEDS_LINE_AMOUNT');
+      Object.assign(line,{promotionDiscountUsdt:moneyFromMicros(quoteMicros(line.promotionDiscountUsdt??0)+discount),discountUsdt:moneyFromMicros(quoteMicros(line.discountUsdt)+discount),payableUsdt:moneyFromMicros(quoteMicros(line.payableUsdt)-discount)});
+      Object.assign(quote,{promotionDiscountUsdt:moneyFromMicros(quoteMicros(quote.promotionDiscountUsdt??0)+discount),discountUsdt:moneyFromMicros(quoteMicros(quote.discountUsdt)+discount),amountUsdt:moneyFromMicros(quoteMicros(quote.amountUsdt)-discount)});
     }
     if(quote.promotionDiscountUsdt&&Number(quote.amountUsdt)<=0)refuse('PROMOTION_DISCOUNT_REQUIRES_PAYMENT');
     state.quotes||={};state.quotes[quote.quoteId]={...quote,voucherGrantId:voucher?.grantId};return quote;
@@ -1214,17 +1265,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       }else requireDemoPurchase(state,products,lines,now);
       if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse(quote?'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE':'PROMOTION_CAPACITY_UNAVAILABLE');
     }
-    const quantity=lines.reduce((s,l)=>s+l.quantity,0),subtotal=lines.reduce((s,l)=>s+products.find(p=>p.id===l.productNo).price*l.quantity,0),discountRate=bundleRate(lines.length),bundleDiscount=Number((subtotal*discountRate).toFixed(2));
+    const quantity=lines.reduce((s,l)=>s+l.quantity,0),discountRate=bundleRate(lines.length);
+    const pricing=demoBundlePricing(lines.map((line,index)=>lineProducts[index].price*line.quantity));
+    const subtotal=pricing.subtotalUsdt;
     const voucher=demoVoucherRedemption(state,quote?quote.voucherId:voucherId,lines,subtotal,now);
     if(quote&&quote.voucherGrantId!==voucher?.grantId)refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
-    const amount=Number(quote?.amountUsdt??(subtotal-bundleDiscount-(voucher?.discountUsdt??0)).toFixed(2));
+    const amount=Number(quote?.amountUsdt??quoteMoney(pricing.amountUsdt-(voucher?.discountUsdt??0)));
     if(bundle){
       if(!(Math.abs(input.expectedAmountUsdt-amount)<=0.000001))refuse('BUNDLE_QUOTE_STALE');
       if(lineProducts.some(p=>!p.available))refuse('BUNDLE_PRODUCT_NOT_RELEASED');
       if(lineProducts.some(p=>!demoE1PurchaseRule(state,p,now).eligible))refuse('PURCHASE_GATE_BLOCKED');
-      if(!demoOrderFitsCapacity(url,locale,state,products,lines))refuse(quote?'PROMOTION_DEVICE_CAPACITY_UNAVAILABLE':'CAPACITY_REPLACEMENT_REQUIRED');
     }
-    const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number((subtotal-amount).toFixed(6)),amountUsdt:quote?amount.toFixed(2):amount,placedAt:now,
+    const order={...demoOrders(products,state,now)[0],orderNo:'DEMO-ORDER-'+(state.nextOrderNo=(state.nextOrderNo??now)+1),productNo:product.id,productName:product.name,quantity,subtotalUsdt:subtotal,unitPriceUsdt:product.price,discountUsdt:Number(quoteMoney(subtotal-amount)),amountUsdt:quote?quote.amountUsdt:amount,placedAt:now,
       computePoints:lines.reduce((total,line)=>total+products.find(p=>p.id===line.productNo).computePoints*line.quantity,0),orderType:lines.length>1?'BUNDLE':'SINGLE',itemCount:lines.length,lineItems:lines.map(l=>({sku:l.productNo,name:products.find(p=>p.id===l.productNo).name,quantity:l.quantity,unitPriceUsdt:products.find(p=>p.id===l.productNo).price,lineAmountUsdt:products.find(p=>p.id===l.productNo).price*l.quantity}))};
     if(quote)Object.assign(order,{promotionQuoteId:quote.quoteId,payBy:new Date(now+paymentWindow).toISOString(),items:quote.items.map(l=>({...l,productName:products.find(p=>p.id===l.productNo).name})),rewards:quote.expectedRewards});
     Object.assign(order,{paymentMethod:'PENDING',paidTotalUsdt:null,paymentStatus:'PENDING',orderStatus:'PENDING_PAYMENT',activationStatus:'WAITING_PAYMENT',canonicalStatus:'placed',expiresAt:now+paymentWindow,paidAt:null,activatedAt:null,targetDeviceId:null,targetDeviceInstanceNo:null});
@@ -1260,27 +1312,28 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }
     const paymentNo='DEMO-PAY-'+orderNo,paymentMethod=amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt=amount.toFixed(2);
     if(replay){
-      if(order.orderStatus!=='COMPLETED'||order.activationStatus!=='ACTIVATED')refuse('ORDER_NOT_PAYABLE');
+      if(order.orderStatus!=='COMPLETED'||!['ACTIVATED','INVENTORY'].includes(order.activationStatus))refuse('ORDER_NOT_PAYABLE');
       if(order.paymentNo!==paymentNo)refuse('ORDER_PAYMENT_STATE_CONFLICT');
     }else{
       if(order.paymentStatus!=='PENDING')refuse('ORDER_NOT_PAYABLE');
       const lines=order.lineItems.map(line=>({productNo:line.sku,quantity:line.quantity}));
-      if(!demoOrderFitsCapacity(url,locale,state,products,lines,orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
+      if(order.orderType!=='BUNDLE'&&!demoOrderFitsCapacity(url,locale,state,products,lines,orderNo))refuse('PROMOTION_CAPACITY_UNAVAILABLE');
       const hardwareQuotaUsedAt=requireDemoPurchase(state,products,lines,now,true);
       if(amount>0&&amount>demoWalletUsdt(state))refuse('ORDER_WALLET_INSUFFICIENT');
       if(amount>0){
         postDemoWalletEntries(state,{bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',
           amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
-      (state.orderStatuses??={})[orderNo]='activated';
+      const delivery=demoOrderDelivery(url,locale,state,order,now);
+      (state.orderStatuses??={})[orderNo]=delivery.canonicalStatus;
       if(!writable)(state.createdOrders??=[]).push(order);
-      order=Object.assign(writable??order,{canonicalStatus:'activated',paymentStatus:'PAID',orderStatus:'COMPLETED',
-        activationStatus:'ACTIVATED',inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,activatedAt:now,paymentNo,paymentMethod,paidTotalUsdt});
+      order=Object.assign(writable??order,delivery,{paymentStatus:'PAID',orderStatus:'COMPLETED',
+        inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,paymentNo,paymentMethod,paidTotalUsdt});
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,
-      paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',
-      amountUsdt:order.promotionQuoteId?paidTotalUsdt:amount,paidTotalUsdt,paymentMethod,
+      paymentStatus:'PAID',orderStatus:'COMPLETED',...demoPaidOrderDelivery(order),
+      amountUsdt:order.promotionQuoteId?quoteMoney(amount):amount,paidTotalUsdt,paymentMethod,
       walletBalanceAfterUsdt:amount===0?null:balanceAfter,idempotent:replay};
     return remember('payOrder',orderNo,response,order);
   }
