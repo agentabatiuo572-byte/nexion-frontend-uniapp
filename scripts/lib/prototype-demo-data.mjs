@@ -924,8 +924,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       tiers:[demoHardwareQuota(approvedProduct,state,teamComputePoints,now)]};
   }
   const tradeinCuts=[25,50,75,100],tradeinRates=[75,60,45,30,15];
-  if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'L4_PLUS',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:30,source:'server'};
-  const tradeinRankAllowed=()=>demoH4Account(state,now).rank>=4;
+  if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'ALL',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:30,source:'server'};
   // All rows in the preview account's fleet are its own unless ownership says otherwise.
   const isTradeinSource=device=>{
     const sku=products.find(product=>product.id===device.productCode.toLowerCase());
@@ -953,7 +952,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   };
   if(pathname==='/api/app/trade-in/eligibility'){
     const {targetProductNo}=request.postDataJSON();
-    const refused=empty?'TRADEIN_DISABLED':!tradeinRankAllowed()?'TRADEIN_ELIGIBILITY_NOT_MET':null;
+    const refused=empty?'TRADEIN_DISABLED':null;
     const product=refused?null:products.find(p=>p.id===targetProductNo);
     let targetReason=refused??tradeinTargetReason(product);
     if(!targetReason){
@@ -971,7 +970,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   const tradeinQuote=(sourceDeviceId,targetProductNo)=>{
     if(empty)refuse('TRADEIN_DISABLED');
-    if(!tradeinRankAllowed())refuse('TRADEIN_ELIGIBILITY_NOT_MET');
     const product=products.find(p=>p.id===targetProductNo);
     const targetReason=tradeinTargetReason(product);
     if(targetReason)refuse('TRADEIN_'+targetReason);
