@@ -2958,6 +2958,8 @@ export const kk: Messages = {
     scanAppOnly: "Сканерлеуді қолданбада пайдаланыңыз.",
     shortcutNewAria: "{entry}, жаңа мазмұн бар",
     shortcutPendingPaymentAria: "{entry}, төлемді күтіп тұрған тапсырыстар бар",
+    shortcutRewardsAria: "{entry}, қолжетімді ваучерлер немесе жаңа сыйақылар бар",
+    messagesUnreadAria: "{entry}, оқылмаған хабарлар бар",
     bills: "Операциялар тарихы",
     billsThisMonth: "Осы айда {n} операция",
     viewAllOrders: "Барлық тапсырыс",

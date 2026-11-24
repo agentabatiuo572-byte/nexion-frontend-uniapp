@@ -2958,6 +2958,8 @@ export const ms: Messages = {
     scanAppOnly: "Sila guna Imbas dalam app.",
     shortcutNewAria: "{entry}, ada kandungan baharu",
     shortcutPendingPaymentAria: "{entry}, ada pesanan menunggu bayaran",
+    shortcutRewardsAria: "{entry}, ada baucar tersedia atau ganjaran baharu",
+    messagesUnreadAria: "{entry}, ada mesej belum dibaca",
     bills: "Sejarah transaksi",
     billsThisMonth: "{n} transaksi bulan ini",
     viewAllOrders: "Semua pesanan",

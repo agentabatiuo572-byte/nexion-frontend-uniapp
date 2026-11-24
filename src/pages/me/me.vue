@@ -10,7 +10,7 @@
       <NxSection :title="t.me.frequentFunctions" :action="t.me.deviceAddLabel" class="me-shortcuts" @action="navTo('/pages/store/store')">
         <view class="me-shortcut-grid">
           <template v-for="item in frequentItems" :key="item.key">
-          <view class="me-shortcut" :data-quick-key="item.key" role="button" tabindex="0" :aria-label="item.dot && item.key !== 'rewards' ? fmt(item.key === 'orders' && placedOrder ? t.me.shortcutPendingPaymentAria : t.me.shortcutNewAria, { entry: item.label }) : undefined" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
+          <view class="me-shortcut" :data-quick-key="item.key" role="button" tabindex="0" :aria-label="item.dot ? fmt(item.key === 'rewards' ? t.me.shortcutRewardsAria : item.key === 'orders' && placedOrder ? t.me.shortcutPendingPaymentAria : t.me.shortcutNewAria, { entry: item.label }) : undefined" @click="handleQuickItem(item)" @keydown.enter.prevent="handleQuickItem(item)" @keydown.space.prevent="handleQuickItem(item)">
             <NxIconTile :tone="tileTone(item.tone)" size="m"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg><view v-if="item.dot || item.badge" class="me-row-dot" /></NxIconTile>
             <text class="me-shortcut__label">{{ item.label }}</text>
           </view>
@@ -28,7 +28,7 @@
       </NxSection>
       <NxSection v-for="section in settingSections" :key="section.key" :title="section.title" :meta="section.count == null ? undefined : visibility.mask(section.count)">
         <NxListGroup>
-          <NxListRow v-for="item in section.items" :key="item.key" :data-quick-key="item.key" :title="item.label" :value="['inventory', 'slots', 'orders', 'genesis'].includes(item.key) && item.meta ? visibility.mask(item.meta) : item.meta" @click="handleQuickItem(item)">
+          <NxListRow v-for="item in section.items" :key="item.key" :data-quick-key="item.key" :title="item.label" :aria-label="item.key === 'messages' && item.badge ? fmt(t.me.messagesUnreadAria, { entry: item.label }) : item.label" :value="['inventory', 'slots', 'orders', 'genesis'].includes(item.key) && item.meta ? visibility.mask(item.meta) : item.meta" @click="handleQuickItem(item)">
             <template #leading><NxIconTile :tone="tileTone(item.tone)" size="s">
               <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path v-for="path in iconPaths[item.icon]" :key="path" :d="path" /></svg>
               <view v-if="item.dot || item.badge" class="me-row-dot me-row-dot--surface" />
@@ -710,32 +710,6 @@ function quickIconStyle(tone: QuickTone = "muted"): CSSProperties {
     color,
   };
 }
-// Plain unread dot — same accent family as the numeric badge, no count.
-const quickDotStyle: CSSProperties = {
-  position: "absolute",
-  top: "-2px",
-  right: "-2px",
-  width: "9px",
-  height: "9px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-2)",
-};
-const quickBadgeStyle: CSSProperties = {
-  position: "absolute",
-  top: "-4px",
-  right: "-4px",
-  minWidth: "17px",
-  height: "17px",
-  padding: "0 4px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-2)",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 600,
-  lineHeight: "17px",
-  textAlign: "center",
-};
 const quickLabelStyle: CSSProperties = {
   maxWidth: "100%",
   fontFamily: "var(--font-v5)",

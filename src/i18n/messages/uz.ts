@@ -2958,6 +2958,8 @@ export const uz: Messages = {
     scanAppOnly: "Skanerlash faqat ilovada ishlaydi.",
     shortcutNewAria: "{entry}, yangi maʼlumotlar bor",
     shortcutPendingPaymentAria: "{entry}, toʻlovni kutayotgan buyurtmalar bor",
+    shortcutRewardsAria: "{entry}, mavjud vaucherlar yoki yangi mukofotlar bor",
+    messagesUnreadAria: "{entry}, oʻqilmagan xabarlar bor",
     bills: "Operatsiyalar tarixi",
     billsThisMonth: "Shu oyda {n} ta operatsiya",
     viewAllOrders: "Barcha buyurtmalar",

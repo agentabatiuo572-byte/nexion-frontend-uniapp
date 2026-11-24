@@ -2958,6 +2958,8 @@ export const fil: Messages = {
     scanAppOnly: "Gamitin ang Scan sa app.",
     shortcutNewAria: "{entry}, may bagong nilalaman",
     shortcutPendingPaymentAria: "{entry}, may mga order na naghihintay ng bayad",
+    shortcutRewardsAria: "{entry}, may available na voucher o bagong reward",
+    messagesUnreadAria: "{entry}, may mga hindi pa nababasang mensahe",
     bills: "Talaan",
     billsThisMonth: "{n} transaksyon ngayong buwan",
     viewAllOrders: "Lahat ng order",
