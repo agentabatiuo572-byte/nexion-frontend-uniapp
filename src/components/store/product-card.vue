@@ -88,6 +88,8 @@
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <NxTag v-if="compactUnavailable" class="product-compact-status" tone="unavailable" wrap :label="gateLabel" />
+      <!-- Trial credit can buy this product now (PLAN §2.3): an attribute tag in the same status slot, brand tone, no amount. -->
+      <NxTag v-else-if="trialCredit" class="product-compact-status" tone="brand" wrap :label="t.store.trialCreditTag" />
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -140,6 +142,7 @@ import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDe
 import { uiLocale } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import { useTrialCreditOption } from "@/composables/use-trial-credit-option";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean; compact?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean; voucherContext?:VoucherEntryContext }>(), {
   featured: false,
@@ -268,9 +271,10 @@ const buyLabel = computed(() =>
 // reason, so a retained catalogue that is refreshing or failed to refresh never swaps it for a read status (03 §3.4).
 const compactUnavailable = computed(() => stockUnavailable.value
   || (remoteApiEnabled && eligibility.value.status === "ready" && !eligibility.value.eligible));
+const trialCredit = useTrialCreditOption(() => props.product.id);
 const compactAriaLabel = computed(() => [copy.value.badge, props.product.name,
   `${t.value.store.cardPriceLabel} $${formatGroupedAmount(props.product.price)}`,
-  compactUnavailable.value ? gateLabel.value : ""].filter(Boolean).join(" · "));
+  compactUnavailable.value ? gateLabel.value : trialCredit.value ? t.value.store.trialCreditTag : ""].filter(Boolean).join(" · "));
 function onBuy() {
   if (buyUnavailable.value) return;
   if(promotionSignIn.value){navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId)));return;}
