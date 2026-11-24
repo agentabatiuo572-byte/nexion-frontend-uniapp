@@ -49,7 +49,7 @@
             <view class="order-card__info">
               <view class="order-card__top">
                 <text class="order-card__title">{{ item.title }}</text>
-                <NxTag tone="warning" :label="item.tag" />
+                <NxTag :tone="item.tone" :label="item.tag" />
               </view>
               <view v-if="item.orderNo" class="order-card__meta order-card__code"><text class="order-card__code-label">{{ t.orders.orderId }}</text><NxCodeValue class="order-card__code-value" :value="item.orderNo" :label="t.orders.orderId" :copyable="false" /></view>
               <text v-else class="order-card__meta order-card__meta--wrap">{{ item.kindLabel }} · {{ item.method }}</text>
@@ -230,13 +230,15 @@ const payment = usePurchasePayment();
 const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 const slotCopy = useDeviceSlotReplacementCopy();
 type PaymentRow = ReturnType<typeof payment.records>[number];
-type PaymentCard = { kind: "payment"; key: string; row: PaymentRow; title: string; tag: string; sku?: string; imageUrl?: string; orderNo?: string; kindLabel: string; method: string; startedAt?: number; amount: { value: string | number | null; currency: "USD" | "USDT" } };
+type PaymentCard = { kind: "payment"; key: string; row: PaymentRow; title: string; tag: string; tone: "success" | "warning"; sku?: string; imageUrl?: string; orderNo?: string; kindLabel: string; method: string; startedAt?: number; amount: { value: string | number | null; currency: "USD" | "USDT" } };
 const paymentRecords = computed(() => payment.records());
 const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap((row): PaymentCard[] => {
   if (!isUnfinishedPurchaseRecord(row) || !isOrdersPurchaseRecord(row)) return [];
   const payload = purchaseRecordPayload(row), c = paymentCopy.value;
   const base = { kind: "payment" as const, key: row.commandKey, row, title: row.summary,
     tag: row.lastStatus === "MANUAL_REVIEW" ? c.confirming : row.lastStatus === "FUNDS_CONFIRMED" ? c.received : c.waiting,
+    // Money received (03 §3.8) reads as success; waiting and confirmation stay warning.
+    tone: row.lastStatus === "FUNDS_CONFIRMED" ? "success" as const : "warning" as const,
     startedAt: Number.isFinite(row.startedAt) ? row.startedAt : undefined };
   const currency = commercePaymentCurrency(row.paymentMethod);
   if (row.kind === "ORDER_PAY") {
@@ -247,7 +249,8 @@ const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap(
     const details = order ? { sku: order.lineItems?.[0]?.sku ?? order.productId, imageUrl: order.imageUrl, amount: commerceOrderAmount(order) }
       : row.hiddenOrder && { sku: row.hiddenOrder.sku, imageUrl: row.hiddenOrder.imageUrl, amount: { value: row.hiddenOrder.total, currency: "USD" as const } };
     if (!details) return [];
-    return [{ ...base, ...details, orderNo: payload.orderNo, kindLabel: "", method: "",
+    // A resumed original payment has no local start time; it sorts and dates by its order.
+    return [{ ...base, ...details, startedAt: base.startedAt ?? order?.placedAt, orderNo: payload.orderNo, kindLabel: "", method: "",
       amount: row.paymentMethod ? { ...details.amount, currency } : details.amount }];
   }
   const kindLabel = row.kind === "TRADE_IN" ? t.value.search.routes.tradeIn.label : row.kind === "CAPACITY_REPLACE" ? slotCopy.value.replace
@@ -350,7 +353,8 @@ const entrySeen = useMeEntrySeen();
 // acceptance cutoff. Limit the client's expired-intent snapshot reads to a day.
 const latePaymentReadWindow = 24 * 60 * 60_000;
 const orderPaymentReadKeys = computed(() => new Set(paymentRecords.value.filter(row => {
-  if (isUnfinishedPurchaseRecord(row)) return isOrdersPurchaseRecord(row);
+  // Any unfinished order payment is read here, also one only discovered: it keeps the delete guard true to its status.
+  if (isUnfinishedPurchaseRecord(row)) return isOrdersPurchaseRecord(row) || row.kind === "ORDER_PAY";
   // An expired order payment is read again for a late transfer even when it was only discovered (not opened) here:
   // a confirmation then shows the floating bar and keeps the expired order from being deleted.
   if (row.kind !== "ORDER_PAY" || row.lastStatus !== "EXPIRED" || !row.intentNo || row.businessDelivered || row.validated) return false;
