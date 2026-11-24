@@ -269,9 +269,9 @@
         <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
       <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
-        <text v-if="checkoutTrayBlock" class="nx-tray-note w-full" role="status">{{ checkoutTrayBlock }}</text>
+        <text v-if="originalExternalPaying || checkoutTrayBlock" class="nx-tray-note w-full" role="status">{{ originalExternalPaying ? flowCopy.payingTitle + ' ' + flowCopy.payingBody : checkoutTrayBlock }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
-        <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
+        <NxButton v-if="!originalExternalPaying" variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
            the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
@@ -419,9 +419,10 @@ const leaveKeepOpen = ref(false);
 const cancelBlockedOpen = ref(false);
 const cancelBlockedPayment = shallowRef<{ orderNo: string; summary: string } | null>(null);
 let checkoutBackApproved = false;
-type CheckoutLeaveIntent = 'back' | 'cancel' | 'confirmed-leave';
+type CheckoutLeaveIntent = 'resume-cancel' | 'cancel' | 'confirmed-leave';
 let checkoutLeaveRetry: CheckoutLeaveIntent = 'cancel';
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
+const originalOrderReadUnavailable = ref(false);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
 const confirmedMissingCreateKey = ref<string | null>(null);
@@ -1360,7 +1361,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   pendingCheckoutCreate.value = null;
   pendingCreatePointer.value = null;
   foregroundTradeinSignature = null;
-  foregroundPaymentSignature = null;
+  originalOrderReadUnavailable.value = false;
   confirmedMissingCreateKey.value = null;
   pendingCreateFound.value = false;
   pendingCreateReplayBusy.value = false;
@@ -1723,7 +1724,7 @@ const stepLabels = computed(() => [
 ]);
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
-  if (dialogsOpen > 0 || reAddingTradein.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
+  if (dialogsOpen > 0 || reAddingTradein.value || originalExternalPaying.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
       || checkoutPurchaseChecking.value || originalOrderNavigationFailed.value) return;
   if (cancelBlockedPayment.value && cancelBlockedPayment.value.orderNo === createdCheckoutOrder.value?.orderNo) {
     await resumeBlockedPayment();
@@ -2170,16 +2171,22 @@ function releaseSessionOnLeave() {
   }
 }
 
+const originalExternalPaying = computed(() => {
+  void purchasePayment.state.revision;
+  const created = createdCheckoutOrder.value;
+  if (!created || settledResultReplay.value) return false;
+  return !!pendingOrderPayment(app.accountKey, created.orderNo);
+});
+
 function originalCheckoutAwaitingPayment(): boolean {
   const created = createdCheckoutOrder.value;
   if (!created || settledResultReplay.value || created.paymentStatus !== 'PENDING'
-      || pendingCheckoutCreate.value) return false;
+      || pendingCheckoutCreate.value || originalOrderReadUnavailable.value || originalExternalPaying.value) return false;
   if (cancelBlockedPayment.value?.orderNo === created.orderNo) return false;
   const original = orders.getById(created.orderNo);
   if (original && original.status !== 'placed') return false;
-  void purchasePayment.state.revision;
   try {
-    return !readOrderAction(app.accountKey, created.orderNo) && !pendingOrderPayment(app.accountKey, created.orderNo);
+    return !readOrderAction(app.accountKey, created.orderNo);
   } catch {
     return false;
   }
@@ -2245,7 +2252,17 @@ function requestCheckoutBack() {
   if (leaveKeepOpen.value) { leaveKeepBack(); return; }
   if (canConfirmCheckoutLeave()) { leaveKeepOpen.value = true; return; }
   if (promotionRoute.value) { promotionCheckout.value?.back(); return; }
-  void cancelCheckout('back');
+  if (checkoutLeaving.value || paymentFlowBusy.value || confirming) return;
+  const created = createdCheckoutOrder.value;
+  if (created) {
+    try {
+      if (readOrderAction(app.accountKey, created.orderNo)?.kind === 'cancel') {
+        void cancelCheckout('resume-cancel');
+        return;
+      }
+    } catch { /* An unreadable command stays with the original order. */ }
+  }
+  leaveCheckout();
 }
 async function retryOriginalCheckout() {
   if (serverOrderRecovery.value || checkoutLeaving.value) return;
@@ -2302,7 +2319,7 @@ async function cancelCheckout(intent: CheckoutLeaveIntent) {
       return;
     }
     // Only an existing command needs reconciliation on back. A fresh cancellation needs an explicit choice.
-    if (intent === 'back' && !action && !pendingCheckoutCreate.value && created.paymentStatus === 'PENDING') return;
+    if (intent === 'resume-cancel' && action?.kind !== 'cancel') { leaveCheckout(); return; }
     if (explicitLeave && action?.kind === 'pay') return;
     let unseenPaymentKey: string | null = null;
     if (action?.kind === 'pay') {
@@ -2327,6 +2344,7 @@ async function cancelCheckout(intent: CheckoutLeaveIntent) {
       if (unseenPaymentKey) clearOrderAction(scope.accountKey, created.orderNo, unseenPaymentKey, false);
       // After an ambiguous response, the explicit retry only reads the original until its state is settled.
       if (explicitLeave && action?.kind === 'cancel') throw new Error('ORDER_CANCELLATION_UNCONFIRMED');
+      if (intent === 'resume-cancel' && readOrderAction(scope.accountKey, created.orderNo)?.key !== action?.key) { leaveCheckout(); return; }
       const cancellation = beginOrderAction(scope.accountKey, 'cancel', created.orderNo, null);
       const outcome = await orders.cancelOrderRemoteResult(created.orderNo);
       if (!isCurrentCheckoutRoute(scope)) return;
@@ -3032,7 +3050,6 @@ function isTopCheckoutPage(): boolean {
 }
 const purchasePayment = usePurchasePayment();
 let foregroundTradeinSignature: string | null = null;
-let foregroundPaymentSignature: string | null = null;
 function resumeCheckoutAfterCapacity(target: string) {
   if (promotionRoute.value) {
     promotionCheckout.value?.resumeAfterCapacityRecovery(target);
@@ -3147,9 +3164,22 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
   }
 }
 
+async function refreshKnownCheckoutOrder(scope: CheckoutRouteScope, orderNo: string) {
+  const order = await orders.ensureRemoteOrder(orderNo).catch(() => undefined);
+  if (!isCurrentCheckoutRoute(scope) || createdCheckoutOrder.value?.orderNo !== orderNo) return;
+  originalOrderReadUnavailable.value = !order;
+  if (order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
+    orderId.value = orderNo;
+    presentSettledPurchase(false);
+  }
+}
+
 function showCheckout() {
   pageVisible = true;
   if(promotionRoute.value){promotionCheckout.value?.show();return;}
+  if (createdCheckoutOrder.value && !settledResultReplay.value && !paymentFlowBusy.value && !checkoutLeaving.value) {
+    void refreshKnownCheckoutOrder(captureCheckoutRoute(), createdCheckoutOrder.value.orderNo);
+  }
   void freeTrial.refreshVisible();
   refreshVisibleCheckout();
   reassertTradeinContext();
@@ -3247,15 +3277,7 @@ async function refreshForegroundOrdinaryCheckout() {
 
   const knownOrder = createdCheckoutOrder.value?.orderNo;
   if (knownOrder) {
-    const signature = JSON.stringify([readOrderAction(scope.accountKey, knownOrder), pendingOrderPayment(scope.accountKey, knownOrder)]);
-    if (foregroundPaymentSignature === signature) return;
-    foregroundPaymentSignature = signature;
-    const order = await orders.ensureRemoteOrder(knownOrder);
-    if (isCurrentCheckoutRoute(scope) && order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
-      orderId.value = knownOrder;
-      presentSettledPurchase(false);
-    }
-    return;
+    return refreshKnownCheckoutOrder(scope, knownOrder);
   }
   // Register the original with the checkout host; only its recovery reads the intent.
   if (recoverCapacityBeforePurchase([scope.productNo])) return;
@@ -3290,17 +3312,24 @@ watch([documentReadVisible, foregroundReadAllowed], ([visible, allowed]) => {
   }
 }, { flush: "post" });
 let unregisterBrowserBack: (() => void) | undefined;
+function checkoutHandlesBack(): boolean {
+  return !checkoutBackApproved && pageAlive && pageVisible && isTopCheckoutPage();
+}
 function checkoutEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || hasOpenDialog() || !canConfirmCheckoutLeave()) return;
+  if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || hasOpenDialog()
+      || !checkoutHandlesBack()) return;
   event.preventDefault();
-  leaveKeepOpen.value = true;
+  requestCheckoutBack();
 }
 onMounted(() => {
   window.addEventListener("popstate", restoreCheckoutFromHistory);
   window.addEventListener("keydown", checkoutEscape);
-  unregisterBrowserBack = registerBrowserPageBack(() => canConfirmCheckoutLeave()
-    ? () => { leaveKeepOpen.value = true; }
-    : undefined);
+  unregisterBrowserBack = registerBrowserPageBack(() => {
+    if (!checkoutHandlesBack()) return;
+    if (canConfirmCheckoutLeave()) return () => { leaveKeepOpen.value = true; };
+    const busy = promotionRoute.value ? promotionCheckout.value?.backDisabled : confirming || paymentFlowBusy.value || checkoutLeaving.value;
+    if (busy) return () => {}; // The write still owns this back press.
+  });
 });
 // #endif
 

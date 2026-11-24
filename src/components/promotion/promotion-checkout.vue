@@ -463,7 +463,7 @@ watch(()=>productCatalogState.status,status=>{
   }
 });
 const canCreate=computed(()=>current()&&visible.value&&auth.isAuthenticated&&!busy.value&&!createBlock.value&&!quoteBlock.value&&(session.retryOriginal||productCatalogState.status==='ready')&&!unknown.value&&!keepRecoveryTarget.value&&completeTerms.value&&(quoteFresh.value||session.retryOriginal)&&quote.value?.eligibility==='ELIGIBLE'&&session.canExecute(quote.value.items.length>1?'createBundle':'createOrder'));
-const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!paymentEligibilityRecoveryBusy.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
+const canPay=computed(()=>!busy.value&&!recoveryRead.value&&!recoveryReadFailed.value&&!paymentEligibilityRecoveryBusy.value&&!externalPaying.value&&!unknown.value&&completeTerms.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&session.canExecute('payOrder'));
 const canCancel=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&order.value?.paymentStatus==='PENDING'
   &&order.value.orderNo!==props.externalOrderNo&&session.canExecute('cancelOrder');});
 const canStartNew=computed(()=>{revision.value;return !busy.value&&!unknown.value&&session.confirmed&&!session.record.pending&&!!order.value&&['PAID','CANCELLED','EXPIRED','REFUNDED'].includes(order.value.paymentStatus);});
@@ -923,26 +923,20 @@ function signIn(){void navTo('/pages/login/login?return='+encodeURIComponent(pro
 let disposeGuard:(()=>void)|null=null;
 // A leave the user confirmed inside the payment flow keeps the order for later; it is not a checkout cancel.
 let paymentLeaveApproved=false;
+const backDisabled=computed(()=>writeBusy.value||paymentConfirming.value||paymentEntryChecking.value||leaving.value);
 function canConfirmLeave():boolean{
-  const original=session.record.order;
-  return !!original&&original.paymentStatus==='PENDING'&&!session.unknown&&!session.record.pending
-    &&original.orderNo!==props.externalOrderNo&&!pendingOrderPayment(account,original.orderNo)&&current()&&visible.value&&!writeBusy.value
-    &&!paymentConfirming.value&&!paymentEntryChecking.value&&!leaving.value;
+  return current()&&visible.value&&!backDisabled.value&&session.confirmed&&!session.unknown&&!recoveryReadFailed.value
+    &&!session.record.pending&&order.value?.paymentStatus==='PENDING'&&!externalPaying.value;
 }
 async function requestLeave(intent:'back'|'route'|'cancel'):Promise<boolean>{
   const explicitCancel=intent==='cancel';
   if(nativeBackApproved||paymentLeaveApproved)return true;
-  if(order.value?.paymentStatus==='PAID')return current()&&visible.value;
-  // A bank or USDT payment already started cannot be cancelled: back leaves the order as it is.
+  if(order.value?.paymentStatus==='PAID')return !explicitCancel&&current()&&visible.value;
+  if(!current()||!visible.value||backDisabled.value)return false;
+  if(externalPaying.value)return !explicitCancel;
   const pending=session.record.pending;
-  if((pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused)
-    ||(order.value&&(order.value.orderNo===props.externalOrderNo||pendingOrderPayment(account,order.value.orderNo))))return !explicitCancel&&!writeBusy.value&&!paymentConfirming.value;
-  if(!current()||!visible.value||writeBusy.value||paymentConfirming.value||paymentEntryChecking.value||leaving.value)return false;
-  if(!explicitCancel&&!pending&&session.record.order?.paymentStatus==='PENDING'){
-    // A browser navigation already in the route guard keeps the order. A page back can wait for D1.
-    return intent==='route';
-  }
-  if(!session.record.order&&!session.record.pending)return true;
+  // A back can reconcile a cancellation the user already requested. All other commands stay with the order.
+  if(!explicitCancel&&pending?.operation!=='cancelOrder')return true;
   leaving.value=true;paymentSheetOpen.value=false;
   try{
     const recovered=await recover();
@@ -951,6 +945,7 @@ async function requestLeave(intent:'back'|'route'|'cancel'):Promise<boolean>{
     if(!original)return !session.record.pending;
     if(explicitCancel&&original.paymentStatus==='PAID')return false;
     if(original.paymentStatus!=='PENDING')return true;
+    if(!explicitCancel&&session.record.pending?.key!==pending?.key)return true;
     // Missing trusted time cannot turn an unresolved original order into a
     // successful cancellation. Keep it visible until a read settles it.
     if(payWindow.value===null){error.value=p.value.unknown;return false;}
@@ -1026,7 +1021,7 @@ function show(){
 }
 watch(busy,value=>{if(!value&&refreshOnIdle){refreshOnIdle=false;if(visible.value&&current())show();}});
 const footer = computed(() => {
-  if (loading.value || reopenPaidOnEntry.value || !auth.isAuthenticated || unknown.value || keepRecoveryTarget.value) return null;
+  if (loading.value || reopenPaidOnEntry.value || !auth.isAuthenticated || unknown.value || externalPaying.value || keepRecoveryTarget.value) return null;
   const rawAmount = order.value?.amountUsdt ?? displayQuote.value?.amountUsdt;
   const currency='USD' as const,amount=formatCheckoutReviewAmount(rawAmount,currency,{unit:true}),amountValue=rawAmount;
   if (order.value?.paymentStatus === 'PENDING') return { amount, amountValue, currency, label: t.value.orders.paymentInProgressContinue, disabled: rawAmount==null||!canPay.value||leaving.value||paymentConfirming.value||paymentEntryChecking.value, action: pay };
@@ -1065,8 +1060,12 @@ const trayNotice=computed(()=>{
 const orderPending=computed(()=>order.value?.paymentStatus==='PENDING');
 const purchasePayment=usePurchasePayment();
 const externalPaying=computed(()=>{
+  void revision.value;
   void purchasePayment.state.revision;
-  return unknown.value&&!!order.value&&!!pendingOrderPayment(account,order.value.orderNo);
+  const original=order.value,pending=session.record.pending;
+  return original?.paymentStatus==='PENDING'&&(original.orderNo===props.externalOrderNo
+    ||pending?.operation==='payOrder'&&pending.paymentMethod==='EXTERNAL'&&!session.externalPaymentRefused
+    ||!!pendingOrderPayment(account,original.orderNo));
 });
 // The quote carries a policy version but no tier rate.
 const bundleTierPct=null;
@@ -1078,8 +1077,6 @@ const bundleDiscountOnly=computed(()=>bundleDiscount.value!==undefined&&Number(d
 // Result stage: every model of a bundle on the one base; one model keeps productImage.
 // A receipt read back after payment can carry no image: the catalog image of the same model stands in.
 const resultImages=computed(()=>items.value.length>1?items.value.map(item=>item.imageUrl??getProduct(item.productNo)?.imageUrl).filter((src):src is string=>!!src):undefined);
-const backDisabled=computed(()=>order.value?.paymentStatus!=='PAID'
-  && (writeBusy.value||leaving.value||paymentConfirming.value||order.value?.paymentStatus==='PENDING'&&payWindow.value===null));
 const resultVisible = computed(() => !reopenPaidOnEntry.value && order.value?.paymentStatus === 'PAID');
 const resultView=ref<InstanceType<typeof CheckoutResult>|null>(null);
 // 再买一台 waits for a settled result (PRD purchase payment, line 49); the page puts it in the bar beside 查看设备. A failure

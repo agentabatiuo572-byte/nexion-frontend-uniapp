@@ -466,7 +466,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const now = Date.now(), deadline = now - graceEnd(intent.paymentMethod, 0) - 1000;
     const order = closeUnpaidOrder(intent);
     if (!order) return false;
-    Object.assign(order, {placedAt: deadline - paymentWindow, expiresAt: deadline});
+    Object.assign(order, {placedAt: deadline - paymentWindow, expiresAt: deadline,
+      ...(order.promotionQuoteId && {payBy: new Date(deadline).toISOString()})});
     Object.assign(intent, {createdAt: deadline - 60000, deadline, expiresAt: new Date(deadline).toISOString(),
       deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(intent.paymentMethod, deadline)).toISOString()});
     expire(intent, 'PAYMENT_TIMEOUT');
