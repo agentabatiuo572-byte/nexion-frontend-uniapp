@@ -377,7 +377,7 @@ function refreshVisibleResource(route: string) {
 
 function runScheduledReads(route: string, reconnected = false) {
   if (!remoteApiEnabled || !businessLoopsRunning || !foregroundReadAllowed()
-    || !route || isAuthWhitelisted(route) || isLegalTermsGateExemptRoute(`/${route}`)) return;
+    || !route || !isBusinessRoute(route) || isLegalTermsGateExemptRoute(`/${route}`)) return;
   const app = useApp();
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth) || app.accountKey !== auth.accountId) return;
