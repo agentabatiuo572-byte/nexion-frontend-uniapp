@@ -29,15 +29,17 @@
         <!-- Ticket: inviter (confirmed code, signed out) over the newcomer gift (same gate as the register page). -->
         <view v-if="whoShown || ticketGift" class="rf-stage">
           <view class="rf-aura" aria-hidden="true"><view class="rf-aura__mark" /></view>
-          <view class="rf-ticket" :class="{ 'rf-ticket--tear': whoShown && ticketGift }">
+          <view class="rf-ticket" :class="{ 'rf-ticket--tear': whoShown && ticketGift, 'rf-ticket--code-row': whoShown && codeOwnRow }">
             <view v-if="whoShown" class="rf-tk-sec rf-tk-sec--who">
-              <view class="rf-tk-row"><text class="rf-label">{{ isAdvisor ? t.ref.advisorLabel : t.ref.invitedBy }}</text><text class="rf-label">{{ t.ref.codeLabel }}</text></view>
+              <view class="rf-tk-row"><text class="rf-label">{{ isAdvisor ? t.ref.advisorLabel : t.ref.invitedBy }}</text><text v-if="!codeOwnRow" class="rf-label">{{ t.ref.codeLabel }}</text></view>
               <view class="rf-who">
                 <view class="rf-ava" aria-hidden="true"><text class="rf-ava__t nx-avatar-letter">{{ initial }}</text></view>
                 <text class="rf-name">{{ sponsor?.name }}</text>
                 <text v-if="friendShown && sponsor?.vRank" class="rf-rank">V{{ sponsor.vRank }}</text>
-                <text class="rf-who__code">{{ codeUpper }}</text>
+                <text v-if="!codeOwnRow" class="rf-who__code">{{ codeUpper }}</text>
               </view>
+              <!-- A real friend code (14 characters) gets its own row so it is always shown whole for checking. -->
+              <view v-if="codeOwnRow" class="rf-tk-row rf-code-row"><text class="rf-label">{{ t.ref.codeLabel }}</text><text class="rf-who__code">{{ codeUpper }}</text></view>
             </view>
             <view v-if="whoShown && ticketGift" class="rf-tear" aria-hidden="true" />
             <view v-if="ticketGift" class="rf-tk-sec">
@@ -241,6 +243,8 @@ const whoShown = computed(() => hasCode.value && !authed.value);
 // "Friend invitation", the V rank and "your inviter gets you started" belong to a friend (USER) code only.
 const friendShown = computed(() => whoShown.value && remotePreview.value?.kind === "USER");
 const ticketGift = computed(() => giftShown.value && !authed.value);
+// Codes longer than the approved 8-character sample do not fit beside the name at 360, so they move to their own row.
+const codeOwnRow = computed(() => codeUpper.value.length > 10);
 // Gift figures use full precision: whole numbers have no decimal point, others keep their real places (5, 1.5).
 const giftParts = computed(() => {
   const parts: { key: string; value: string; unit: string; label: string }[] = [];
@@ -377,6 +381,9 @@ function goTerms() {
 }
 .rf-tk-sec { position: relative; padding: 18px 20px 20px; }
 .rf-tk-sec--who { height: var(--rf-tear-y); box-sizing: border-box; }
+/* Own code row: 18 + 16 + 14 + 44 + 12 + 22 + 20. */
+.rf-ticket--code-row { --rf-tear-y: 146px; }
+.rf-code-row { margin-top: 12px; height: 22px; }
 .rf-tk-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--v5-ink-2); }
 .rf-tk-row--c { justify-content: center; }
 .rf-who { display: flex; align-items: center; gap: 12px; margin-top: 14px; min-height: 44px; }
