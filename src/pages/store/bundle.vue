@@ -68,18 +68,19 @@
       <view class="bundle-bar-space" aria-hidden="true">
         <text v-if="bundleTrayNote" class="bundle-bar-space__note">{{ bundleTrayNote }}</text>
         <view v-if="products.length > 0" class="bundle-bar-space__copy"><text class="bundle-bar-space__total">{{ totalText }}</text><text class="bundle-bar-space__meta">{{ trayMetaText }}</text></view>
-        <text class="bundle-bar-space__cta">{{ t.bundle.checkout }}</text>
+        <text class="bundle-bar-space__cta">{{ ctaText }}</text>
       </view>
       </template>
       </template>
     </view>
     </template>
-    <!-- Page main action in the shared bottom tray (04 §4.0, 03 §3.1): the total and 已省 in the price slot, one solid
-         「去结算」; under two models the reason sits above the button and the button is the tray's flat grey. -->
+    <!-- Page main action in the shared bottom tray (04 §4.0, 03 §3.1): the total and 已省 in the price slot, one shared primary
+         NxButton; when it cannot run the reason sits above it and the button is the tray's flat grey. -->
     <template #pageFixed>
-      <!-- Activity with one model on sale: its one action as a lone floating button (the bar's floating form). -->
+      <!-- Activity with one model on sale: its one action as a lone floating button (the bar's floating form), the shared
+           primary L button (03 §3.1); the arrow says it opens the next page. -->
       <view v-if="promotionActivityId && promotionBundle?.single" class="bundle-bar nx-glass-bar">
-        <view class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.single.open" @keydown="activate($event, promotionBundle.single.open)"><text>{{ promotionBundle.single.label }}</text><NxIcon name="arrow-right" :size="20" /></view>
+        <NxButton variant="primary" :label="promotionBundle.single.label" @click="promotionBundle.single.open"><text>{{ promotionBundle.single.label }}</text><NxIcon name="arrow-right" :size="20" /></NxButton>
       </view>
       <view v-if="promotionActivityId && promotionBundle?.footer" class="bundle-bar nx-glass-bar">
         <text v-if="promotionBundle.footer.note" class="nx-tray-note" role="status">{{ promotionBundle.footer.note }}</text>
@@ -88,9 +89,9 @@
             <CheckoutAmount class="bundle-bar__total" :value="promotionBundle.footer.total" currency="USD" />
             <text class="bundle-bar__meta"><template v-if="promotionBundle.footer.saved !== null">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(promotionBundle.footer.saved) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
           </view>
-          <view class="bundle-bar__cta" role="button" :tabindex="promotionBundle.footer.canContinue ? 0 : -1" :aria-disabled="!promotionBundle.footer.canContinue" :aria-label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" @click="promotionBundle.footer.continue" @keydown="activate($event, promotionBundle.footer.continue)"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></view>
+          <NxButton variant="primary" :disabled="!promotionBundle.footer.canContinue" :label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" @click="promotionBundle.footer.continue"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></NxButton>
         </template>
-        <view v-else class="bundle-bar__cta" role="button" tabindex="0" @click="promotionBundle.footer.signIn" @keydown="activate($event, promotionBundle.footer.signIn)"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></view>
+        <NxButton v-else variant="primary" :label="t.promotion.signIn" @click="promotionBundle.footer.signIn"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></NxButton>
       </view>
       <view v-if="!promotionActivityId && hasCatalog && !receiptWriteFailure" class="bundle-bar nx-glass-bar">
         <text v-if="bundleTrayNote" class="nx-tray-note" role="status">{{ bundleTrayNote }}</text>
@@ -98,10 +99,9 @@
           <CheckoutAmount class="bundle-bar__total" :value="total" currency="USD" />
           <text class="bundle-bar__meta"><template v-if="discountUSD > 0">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(discountUSD) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
         </view>
-        <view class="bundle-bar__cta" role="button" :tabindex="checkoutUnavailable ? -1 : 0" :aria-disabled="checkoutUnavailable" :aria-busy="checkoutBusy" :aria-label="ctaLabel" @click.stop="onCheckout" @keydown="activate($event, onCheckout)">
-          <view class="bundle-bar__label" :class="{ 'bundle-bar__label--busy': checkoutBusy }"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></view>
-          <view v-if="checkoutBusy" class="bundle-bar__spinner" aria-hidden="true" />
-        </view>
+        <!-- Enabled whenever tapping does something: a new bundle to review, or an unpaid original to resume (its label
+             says so); disabled only when nothing can run (03 §3.1, §3.4). -->
+        <NxButton variant="primary" :disabled="checkoutUnavailable" :busy="checkoutBusy" :label="ctaLabel" @click="onCheckout"><text>{{ ctaText }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></NxButton>
       </view>
     </template>
   </AppChassis>
@@ -364,8 +364,14 @@ const savedParts = computed(() => {
   return [before, after];
 });
 const trayMetaText = computed(() => (discountUSD.value > 0 ? fmt(t.value.bundle.saved, { amount: moneyText(discountUSD.value) }) : t.value.bundle.total));
-const ctaLabel = computed(() => (products.value.length > 0 && Number.isFinite(total.value)
-  ? fmt(t.value.bundle.checkoutAria, { amount: moneyText(total.value) }) : t.value.bundle.checkout));
+// An unpaid original of this selection (or an unresolved older command) is what the button resumes: say that, not 去结算.
+const ctaText = computed(() => {
+  const target = reviewTarget.value;
+  if (target === "orders") return t.value.store.coOpenOriginalOrder;
+  return target === "checkout-original" || target === "legacy-inline" ? t.value.promotion.resume : t.value.bundle.checkout;
+});
+const ctaLabel = computed(() => (!isRecoveryTarget(reviewTarget.value) && products.value.length > 0 && Number.isFinite(total.value)
+  ? fmt(t.value.bundle.checkoutAria, { amount: moneyText(total.value) }) : ctaText.value));
 const submitting = ref(false);
 const walletRefreshing = ref(false);
 let walletRefreshSequence = 0;
@@ -881,18 +887,9 @@ const catalogStateBodyStyle: CSSProperties = {
 .bundle-bar__total { display: block; color: var(--v5-ink); font: 500 20px/24px var(--font-amount); white-space: nowrap; }
 .bundle-bar__meta { display: block; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); white-space: nowrap; }
 .bundle-bar__saved { color: var(--v5-ink); font-weight: 500; font-variant-numeric: tabular-nums; }
-/* Primary L 48 (03 §3.1): solid brand while available; the shared tray rules restyle it while aria-disabled (flat grey in
-   the tray, grey glass when it floats alone). */
-.bundle-bar__cta { position: relative; flex: 0 0 auto; min-width: 150px; margin-left: auto; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; min-height: 48px; padding: 0 20px; border-radius: 999px; background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.bundle-bar__cta :deep(uni-text), .bundle-bar__cta :deep(text) { white-space: nowrap; }
-.bundle-bar__cta:not([aria-disabled="true"]):active { transform: scale(.98); }
-.bundle-bar__cta:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-.bundle-bar > .nx-tray-note + .bundle-bar__cta, .bundle-bar > .bundle-bar__cta:only-child { flex: 1 1 100%; }
-.bundle-bar__label { display: flex; align-items: center; justify-content: center; gap: 6px; }
-/* Busy: the label stays laid out but transparent (width and name hold), a spinner takes its place. */
-.bundle-bar__label--busy { opacity: 0; }
-.bundle-bar__spinner { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: bundle-spin 800ms linear infinite; }
-@keyframes bundle-spin { to { transform: rotate(360deg); } }
+/* The shared primary NxButton, L 48 (03 §3.1); the shared tray rules give its disabled grey and busy spinner. */
+.bundle-bar > .nx-button { flex: 0 0 auto; min-width: 150px; margin-left: auto; }
+.bundle-bar > .nx-tray-note + .nx-button, .bundle-bar > .nx-button:only-child { flex: 1 1 100%; }
 /* Room for the tray: a hidden copy of its rows (same widths: 12 sides, 8 padding and gap). The page already ends 64
    below the last row (pb-6 24 + chassis 40); the tray needs its height + 22 + 16, so the copy gives back 26. */
 .bundle-bar-space { visibility: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px -26px; padding: 8px; }
@@ -904,7 +901,6 @@ const catalogStateBodyStyle: CSSProperties = {
 .bundle-bar-space__note + .bundle-bar-space__cta { flex: 1 1 100%; }
 @keyframes bundle-bar-in { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .bundle-bar, .bundle-rise, .bundle-bar__spinner { animation: none; }
-  .bundle-bar__cta:active { transform: none; }
+  .bundle-bar, .bundle-rise { animation: none; }
 }
 </style>

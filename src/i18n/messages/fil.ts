@@ -1722,6 +1722,7 @@ export const fil: Messages = {
     tiersAria: "Mga antas ng bundle price",
     tileOutOfStock: "Ubos na",
     tileUnavailable: "Hindi mabibili",
+    tileGoneName: "Produktong hindi na ibinebenta",
   },
   tx: {
     navTitle: "Detalye ng transaksyon",
@@ -3771,7 +3772,7 @@ export const fil: Messages = {
     paymentInProgressContinue: "Ituloy ang bayad",
     cancelBlockedTitle: "Nagbabayad pa",
     cancelBlockedBody: "Binabayaran pa ang order na ito kaya hindi pa ito ma-cancel. Kung nakapagbayad ka na, hintayin ang kumpirmasyon; awtomatikong magsasara sa deadline ang hindi nabayarang order.",
-    cancelBlockedOk: "OK",
+    cancelBlockedOk: "Mamaya na",
     detailTitle: "Detalye ng order",
     placedAt: "Na-order",
     expiresAt: "Deadline ng bayad",

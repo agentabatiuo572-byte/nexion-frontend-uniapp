@@ -10,8 +10,10 @@
     </PromotionCheckout>
     <view v-else class="checkout-content" :class="{ 'checkout-content--result': checkoutResultVisible }">
 
-      <view v-if="(originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalOrderNavigationFailed || pendingCreateTerms }">
-        <NxResultHead tone="warning" :icon="originalOrderNavigationFailed ? 'alert' : 'clock'" :title="pendingCreateTitle" :description="pendingCreateDescription" />
+      <view v-if="(originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateUnresolved || pendingCreateTerms) && !paymentFlowBusy" class="checkout-original-open checkout-page-center nx-step-in" :class="{ 'checkout-original-open--action': originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateTerms }">
+        <!-- A closed original order (expired, cancelled, not found) is a closed state: neutral tone (03 §3.8, 已关闭), the status
+             as the result; its way on is the floating 查看原订单 / 我的订单 below (04 §4.0). -->
+        <NxResultHead :tone="originalCheckoutClosed ? 'neutral' : 'warning'" :icon="originalCheckoutClosed === 'expired' ? 'clock' : originalCheckoutClosed === 'cancelled' ? 'failed' : originalCheckoutClosed || originalOrderNavigationFailed ? 'alert' : 'clock'" :title="originalCheckoutClosedTitle || pendingCreateTitle" :description="originalCheckoutClosed ? undefined : pendingCreateDescription" />
         <view v-if="pendingCreateTerms" class="checkout-group checkout-fees">
           <CheckoutRow :label="t.store.coRowTotal" :value="reviewMoney(pendingCreateTerms.amount, false, true)" class="checkout-fee" />
           <CheckoutRow :label="t.headerTitles.storeProduct" :value="pendingCreateTerms.product" :code="pendingCreateTerms.productCode" class="checkout-fee" />
@@ -57,6 +59,9 @@
           </view>
         </view>
 
+        <!-- P4 on the plain checkout: the original order's external payment is under way (the activity host's card). The page
+             says so on the page floor and drops its pay tray (04 §4.0: no action, no tray). -->
+        <CheckoutPaying v-if="originalExternalPaying && createdCheckoutOrder && (step === 'select-payment' || step === 'confirm')" class="checkout-paying-card" :order-no="createdCheckoutOrder.orderNo" @view="navTo('/pages/store/order-detail?id=' + encodeURIComponent(createdCheckoutOrder.orderNo))" />
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
           <view class="checkout-product-copy"><text class="checkout-product-name">{{ (product.name) }}</text><text v-if="checkoutTagline" class="checkout-product-meta">{{ checkoutTagline }}</text><CheckoutAmount class="checkout-product-price" :value="purchaseSubtotal" currency="USD" /></view>
@@ -135,7 +140,9 @@
               <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
               <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" class="checkout-fee" />
               <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" class="checkout-fee" />
-              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ flowCopy.paymentTotal }}</text><CheckoutAmount :value="confirmationTotal" currency="USD" /></view>
+              <!-- While the original order's external payment is under way, this is the order's amount, not what that payment
+                   charges (its total, fees included, lives on the payment itself). -->
+              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><CheckoutAmount :value="confirmationTotal" currency="USD" /></view>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
               <text>{{ trialCopy.afterPurchaseLabel }}</text>
@@ -265,13 +272,16 @@
         <NxButton variant="secondary" :label="t.tradein.recoveryContactSupport" :busy="recoverySupportOpening" @click="openRecoverySupport" />
         <NxButton variant="primary" :label="t.tradein.recoveryViewOrders" @click="navTo('/pages/store/orders')" />
       </view>
-      <view v-if="!promotionRoute && (originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
-        <NxButton variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
+      <view v-if="!promotionRoute && (originalCheckoutClosed || originalOrderNavigationFailed || pendingCreateTerms) && !paymentFlowBusy" class="checkout-sticky checkout-sticky--single nx-glass-bar">
+        <NxButton v-if="originalCheckoutClosed" variant="primary" :label="originalCheckoutClosed === 'missing' ? t.orders.title : t.store.coOpenOriginalOrder" @click="openClosedOriginal" />
+        <NxButton v-else variant="primary" :label="originalOrderNavigationFailed ? t.store.coOpenOriginalOrder : t.store.coResubmitOrder" :busy="checkoutLeaving || serverOrderRecovery !== null" @click="retryOriginalCheckout" />
       </view>
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
-        <text v-if="originalExternalPaying || checkoutTrayBlock" class="nx-tray-note w-full" role="status">{{ originalExternalPaying ? flowCopy.payingTitle + ' ' + flowCopy.payingBody : checkoutTrayBlock }}</text>
+      <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
+           as the external payment's total (P4 card on the page instead). -->
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && product && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+        <text v-if="checkoutTrayBlock" class="nx-tray-note w-full" role="status">{{ checkoutTrayBlock }}</text>
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
-        <NxButton v-if="!originalExternalPaying" variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
+        <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
            the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
@@ -306,6 +316,7 @@ import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import CheckoutPaymentSheet from '@/components/checkout/CheckoutPaymentSheet.vue';
 import CheckoutResult from '@/components/checkout/CheckoutResult.vue';
 import CheckoutLegal from '@/components/checkout/CheckoutLegal.vue';
+import CheckoutPaying from '@/components/checkout/CheckoutPaying.vue';
 import { capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTargetKey, checkoutKeepResumeKey, describeCapacityOriginal, originalCapacityCheckoutHref, ownsCheckoutCapacityPaymentKey, showsCheckoutCapacityResumeKey, type CheckoutCapacityRecovery, type CheckoutKeepResume, type OwnsCheckoutCapacityPayment } from "@/components/checkout/checkout-keep-resume";
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
 import { advisorChatRoute, openOrderAdvisorChat } from '@/lib/advisor-chat-route';
@@ -425,6 +436,14 @@ type CheckoutLeaveIntent = 'resume-cancel' | 'cancel' | 'confirmed-leave';
 let checkoutLeaveRetry: CheckoutLeaveIntent = 'cancel';
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const originalCheckoutClosed = ref<'expired' | 'cancelled' | 'missing' | null>(null);
+const originalCheckoutClosedTitle = computed(() => {
+  switch (originalCheckoutClosed.value) {
+    case 'expired': return t.value.orders.statusExpired;
+    case 'cancelled': return t.value.orders.cancelStatus;
+    case 'missing': return t.value.orders.notFound;
+    default: return '';
+  }
+});
 const failedKnownOrderNo = ref<string | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
@@ -1655,15 +1674,8 @@ const checkoutCapacityBlocked = computed(() => !hasOriginalCheckout.value
 const checkoutCapacityMessage = computed(() => checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
   : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value] : "");
-const checkoutTrayBlock = computed(() => {
-  switch (originalCheckoutClosed.value) {
-    case 'expired': return t.value.orders.statusExpired;
-    case 'cancelled': return t.value.orders.cancelStatus;
-    case 'missing': return t.value.orders.notFound;
-  }
-  return checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
-    : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : "");
-});
+const checkoutTrayBlock = computed(() => checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
+  : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : ""));
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
 // counts the very slot this purchase frees (only warn when real actives cap).
@@ -1725,7 +1737,7 @@ const stepLabels = computed(() => [
 ]);
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
-  if (dialogsOpen > 0 || reAddingTradein.value || originalExternalPaying.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
+  if (dialogsOpen > 0 || reAddingTradein.value || originalCheckoutClosed.value || originalExternalPaying.value || checkoutTrayBlock.value || pendingCreateUnresolved.value
       || checkoutPurchaseChecking.value || originalOrderNavigationFailed.value) return;
   if (cancelBlockedPayment.value && cancelBlockedPayment.value.orderNo === createdCheckoutOrder.value?.orderNo) {
     await resumeBlockedPayment();
@@ -2263,6 +2275,11 @@ function requestCheckoutBack() {
     } catch { /* An unreadable command stays with the original order. */ }
   }
   leaveCheckout();
+}
+// A closed original: its detail (where 再买一台 starts a new purchase), or the order list when the order is not found.
+function openClosedOriginal() {
+  const orderNo = createdCheckoutOrder.value?.orderNo;
+  void navTo(originalCheckoutClosed.value === 'missing' || !orderNo ? '/pages/store/orders' : '/pages/store/order-detail?id=' + encodeURIComponent(orderNo));
 }
 async function retryOriginalCheckout() {
   if (serverOrderRecovery.value || checkoutLeaving.value) return;
@@ -4045,9 +4062,8 @@ button.checkout-policy-link::after { border:0; }
 .checkout-promotion .checkout-legal-group { margin-top:calc(var(--v5-space-6) - var(--ui-space-card-gap)); }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
 .checkout-sticky { position:absolute; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; }
-/* An open dialog raises the scrolling content to 785 (chassis lock), which would paint the page over the tray glass. While
-   D1 is open the tray rises with it, still under D1's mask (960), so the glass keeps covering the content (04 §4.0). */
-.checkout-sticky:has(~ .nx-notice-mask) { z-index:786; }
+/* P4 card: the first block of the review column, with the product card's margins (16 sides, 20 to the next block). */
+.checkout-paying-card { margin:var(--v5-space-5) var(--v5-space-4) 0; }
 .checkout-sticky-copy { min-width:0; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }

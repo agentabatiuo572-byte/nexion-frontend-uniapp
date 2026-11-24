@@ -5,6 +5,19 @@
     <!-- The result's exits (查看设备, and 再买一台 via resultBuyAgain) sit in the page's bottom bar (checkout.vue #pageFixed, 04 §4.0). -->
     <CheckoutResult ref="resultView" v-else-if="order?.paymentStatus==='PAID'" :order-no="order.orderNo" payment-confirmed :state="resultState" :delivery="orders.getById(order.orderNo)?.deviceDelivery" :product-name="items.map(selectedItemName).join(' · ')" :product-image="items[0] ? getProduct(items[0].productNo)?.imageUrl : undefined" :product-images="resultImages" :amount="resultExactAmount??resultAmount?.value" :currency="resultAmount?.currency" :amount-precision="resultExactAmount?'full':undefined" :saved="bundleDiscount" :error="resultError" @devices="viewDevices" @support="contactResultSupport" @order="viewOrder" />
     <template v-else>
+      <!-- Another order of this account is in progress, and the page shows it instead of the order this checkout was opened
+           for (the account's open payment comes first). The same page-floor hint as the original purchase state below: what
+           the page shows, what it means for the original order, and the way back to that order (03 §3.9 text link). -->
+      <view v-if="otherOrderShown" class="checkout-other-order" data-testid="checkout-other-order">
+        <view class="checkout-keep-recovery" role="status">
+          <svg class="checkout-keep-recovery__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          <view class="promotion-grow">
+            <text class="checkout-keep-recovery__title">{{ flowCopy.otherOrderTitle }}</text>
+            <text>{{ flowCopy.otherOrderBody }}</text>
+          </view>
+        </view>
+        <view class="checkout-order-link checkout-other-order__link" role="link" tabindex="0" @click="viewRoutedOrder" @keydown.enter.prevent="viewRoutedOrder"><text class="nx-after-chevron">{{ flowCopy.viewOriginalOrder }}</text></view>
+      </view>
       <!-- Original purchase state: a page-floor hint (icon + text, no card, no stripe) above the products: the result, which purchase it is, what not to do. -->
       <view v-if="keepRecoveryTarget" class="checkout-keep-recovery" role="status">
         <svg class="checkout-keep-recovery__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><template v-if="keepRecoveryReadError"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></template><template v-else><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></template></svg>
@@ -14,19 +27,8 @@
           <text>{{ keepRecoveryNotice.note }}</text>
         </view>
       </view>
-      <!-- P4: an external payment for this order is under way on this device. The page says so and what not to do; no
-           button, and no pointer to the floating bar (it may be closed or show another payment). -->
-      <view v-if="externalPaying" class="checkout-paying" role="status" data-testid="checkout-paying">
-        <view class="checkout-paying__icon" aria-hidden="true"><NxIcon name="clock" :size="18" /></view>
-        <view class="promotion-grow">
-          <text class="checkout-paying__title">{{ flowCopy.payingTitle }}</text>
-          <text class="checkout-paying__body">{{ flowCopy.payingBody }}</text>
-          <view class="checkout-paying__foot">
-            <view class="checkout-order-no"><text class="checkout-order-no__label">{{ p.orderNo }}</text><NxCodeValue class="checkout-order-no__code" :value="order!.orderNo" :label="p.orderNo" :copyable="false" /></view>
-            <view class="checkout-order-link" role="link" tabindex="0" @click="viewOrder" @keydown.enter.prevent="viewOrder"><text class="nx-after-chevron">{{ p.viewOrder }}</text></view>
-          </view>
-        </view>
-      </view>
+      <!-- P4: an external payment for this order is under way on this device (shared card; no button, no tray). -->
+      <CheckoutPaying v-if="externalPaying" :order-no="order!.orderNo" @view="viewOrder" />
       <view v-else-if="unknown" class="promotion-flat" role="status"><text class="promotion-title">{{ session.record.pending?.operation==='payOrder'?p.unknownTitle:p.orderUnknownTitle }}</text><text class="promotion-copy">{{ p.unknownBody }}</text></view>
       <!-- The original order's state line on the page floor, above the products (board CkPend): time left in the warning
            colour (or the state of a closed order), the way to the order, and its number. -->
@@ -160,6 +162,7 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import CheckoutPaying from "@/components/checkout/CheckoutPaying.vue";
 import { landingCopy } from '@/i18n/promotion-landing';
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
@@ -266,6 +269,10 @@ const quotePresentation=shallowRef<{key:string;quote:Quote}|null>(null);
 const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||(freshQuoteReady.value&&quotePresentation.value?.key===quotePresentationKey())?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
 const routedOrderNo = computed(() => props.orderNo ?? null);
 const presentedOrderNo = computed(() => order.value?.orderNo ?? null);
+// Only while the shown order is still open: once it is paid, cancelled or expired the hint's "in progress" no longer holds.
+const otherOrderShown = computed(() => !!routedOrderNo.value && !!presentedOrderNo.value && routedOrderNo.value !== presentedOrderNo.value
+  && order.value?.paymentStatus === 'PENDING');
+function viewRoutedOrder(){if(routedOrderNo.value)void navTo('/pages/store/order-detail?id='+encodeURIComponent(routedOrderNo.value));}
 // Display memory never enters the executable session; refresh still invalidates that quote.
 const displayQuote=computed(()=>current()&&visible.value&&auth.isAuthenticated ? quote.value??(quotePresentation.value?.key===quotePresentationKey()?quotePresentation.value.quote:null):null);
 function quotePresentationKey(){return JSON.stringify([app.accountKey,app.accountBindingEpoch,auth.isAuthenticated,props.activityId,selection.value,eventVoucherId,props.upgradeActivityId??'',manualVoucher()?['manual',voucherId.value]:['auto'],locale.code]);}
@@ -1208,7 +1215,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 /* Original purchase state: title in the main ink, order line and note in the description role (01 §1.1.1 pairing 2, 10.1); no query button (03 §3.5.2). */
 .checkout-keep-recovery { display:flex; align-items:flex-start; gap:var(--v5-space-2); }
 .checkout-keep-recovery__icon { flex:none; margin-top:1px; color:var(--v5-warning-ink); }
-.checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap:pretty; }
+.checkout-keep-recovery text { display:block; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .checkout-keep-recovery .checkout-keep-recovery__title { margin-bottom:var(--v5-space-1); color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 /* Rhythm (01 §1.3): cards 12 apart, a titled section 32 below what precedes it (24 at ≤374). */
 .promotion-main { gap:var(--ui-space-card-gap); }
@@ -1222,7 +1229,7 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .promotion-tray-space--measured { padding:0; }
 .promotion-tray-space__note { display:block; font:var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
-[data-theme="light"] .checkout-group, [data-theme="light"] .checkout-bundle, [data-theme="light"] .checkout-paying { box-shadow:var(--v5-glass-shadow); }
+[data-theme="light"] .checkout-group, [data-theme="light"] .checkout-bundle { box-shadow:var(--v5-glass-shadow); }
 .checkout-section { min-width:0; margin-top:calc(var(--ui-space-section-gap) - var(--ui-space-card-gap)); }
 .checkout-section-heading { display:block; margin-bottom:var(--v5-space-3); color:var(--v5-ink); font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); }
 /* Original order state line on the page floor (board CkPend): warning time or closed state, the order link, the number. */
@@ -1237,13 +1244,8 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-order-no { display:flex; align-items:baseline; gap:var(--v5-space-1); min-width:0; margin-top:6px; color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .checkout-order-no__label { flex:none; }
 .checkout-order-no .checkout-order-no__code { color:var(--v5-ink-2); font-size:var(--ui-type-meta); line-height:var(--ui-type-meta-lh); }
-/* P4 (board CkExt): a solid card, warning clock in a 14% circle, the result, what not to do, then the order and its link. */
-.checkout-paying { display:flex; align-items:flex-start; gap:var(--v5-space-3); padding:var(--ui-space-inset); border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
-.checkout-paying__icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
-.checkout-paying__title { display:block; color:var(--v5-ink); font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.checkout-paying__body { display:block; margin-top:var(--v5-space-1); color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap:pretty; }
-.checkout-paying__foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--v5-space-1) var(--v5-space-3); margin-top:10px; }
-.checkout-paying__foot .checkout-order-no { margin-top:0; }
+/* The other order's hint: the link sits under the hint's text, past the 18px icon and its 8px gap. */
+.checkout-other-order__link { margin:var(--v5-space-1) 0 0 26px; }
 /* Bundle card (board CkNew): solid card, 已选 N 款 + tier tag, two-column grid of model tiles on the inner surface. */
 .checkout-bundle { min-width:0; padding:var(--ui-space-inset); border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
 .checkout-bundle__head { display:flex; align-items:center; justify-content:space-between; gap:var(--v5-space-3); }

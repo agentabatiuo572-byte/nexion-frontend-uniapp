@@ -1722,6 +1722,7 @@ export const id: Messages = {
     tiersAria: "Tingkat harga paket",
     tileOutOfStock: "Stok habis",
     tileUnavailable: "Tidak tersedia",
+    tileGoneName: "Produk tidak dijual lagi",
   },
   tx: {
     navTitle: "Detail transaksi",
@@ -3771,7 +3772,7 @@ export const id: Messages = {
     paymentInProgressContinue: "Lanjut bayar",
     cancelBlockedTitle: "Pembayaran sedang berjalan",
     cancelBlockedBody: "Pesanan ini sedang dibayar, jadi belum bisa dibatalkan. Jika sudah membayar, tunggu konfirmasi; pesanan yang belum dibayar ditutup otomatis saat batas waktunya.",
-    cancelBlockedOk: "OK",
+    cancelBlockedOk: "Nanti saja",
     detailTitle: "Detail pesanan",
     placedAt: "Dipesan",
     expiresAt: "Batas pembayaran",

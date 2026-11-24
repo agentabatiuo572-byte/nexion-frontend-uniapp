@@ -28,7 +28,8 @@
         <text v-if="levelsFor(item.id)" class="promotion-bundle__tile-note">{{ levelsFor(item.id) }}</text>
         <NxTag v-if="tileTag(item.id)" class="promotion-bundle__tile-tag" tone="unavailable" :label="tileTag(item.id)" />
         <text v-for="(reward,index) in rewardsFor(item.id)" :key="index" class="promotion-bundle__tile-reward"><text class="promotion-bundle__reward-amount">+{{ reward.amount }}</text><text class="promotion-bundle__reward-unit" :class="{ 'is-uvt': reward.uvt }">{{ reward.unit }}</text></text>
-        <view class="promotion-bundle__stepper" role="group" :aria-label="item.name+' · '+t.promotion.quantity">
+        <!-- A model that cannot be bought here keeps only 移除: no quantity to change (03 §3.4). -->
+        <view v-if="tileTag(item.id) !== t.bundle.tileUnavailable" class="promotion-bundle__stepper" role="group" :aria-label="item.name+' · '+t.promotion.quantity">
           <view class="promotion-bundle__step" role="button" :tabindex="quantityOf(item.id)<=1?-1:0" :aria-disabled="quantityOf(item.id)<=1" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.id,-1)" @keydown.enter.prevent="changeQuantity(item.id,-1)" @keydown.space.prevent="changeQuantity(item.id,-1)"><NxIcon name="minus" :size="16" /></view>
           <text class="promotion-bundle__qty" aria-live="polite">{{ quantityOf(item.id) }}</text>
           <view class="promotion-bundle__step" role="button" :aria-label="t.uiChrome.increaseQty" :tabindex="totalUnits>=100?-1:0" :aria-disabled="totalUnits>=100" @click="changeQuantity(item.id,1)" @keydown.enter.prevent="changeQuantity(item.id,1)" @keydown.space.prevent="changeQuantity(item.id,1)"><NxIcon name="plus" :size="16" /></view>
@@ -127,7 +128,8 @@ useAutoRecovery({ ...repeatWithoutPull, failed: () => contextStatus.value === "e
 const catalog=computed(()=>productCatalogPresentation.value?.products??[]);
 const productFor=(id:string)=>catalog.value.find(product=>product.id===id);
 const levelsFor=(id:string)=>productTaskLevelsText(t.value,productFor(id)?.taskLevels??[]);
-const nameFor=(id:string)=>productFor(id)?.name??t.value.uiChrome.unavailable;
+// A draft model the catalogue does not list (still loading, or no longer sold) has no name to show: the unknown mark (03 §3.4).
+const nameFor=(id:string)=>productFor(id)?.name??'—';
 const imageFor=(id:string)=>catalogProductImageUrl(productFor(id)?.imageUrl,'')??'';
 const ruleTerms=computed(()=>activity.value?[
   localized(activity.value.terms,locale.code),
@@ -158,7 +160,7 @@ const suggestions = computed(() => purchasableHardware.value.filter(product =>
 const builder=computed(()=>!singleActivityProduct.value&&(!scopeId.value||!!activity.value));
 const limitReached=computed(()=>selection.value.length>=8||totalUnits.value>=100);
 function estimateText(id:string){const estimate=productFor(id)?productDailyEstimateRange(productFor(id)!):null;return estimate?`$${formatEstimateRange(estimate.low,estimate.high)}${t.value.store.cardPerDaySuffix}`:'—';}
-const tiles=computed<BundleTile[]>(()=>selection.value.map(item=>({id:item.productNo,name:nameFor(item.productNo),imageUrl:imageFor(item.productNo),price:productFor(item.productNo)?.price??null,estimate:estimateText(item.productNo)})));
+const tiles=computed<BundleTile[]>(()=>selection.value.map(item=>({id:item.productNo,name:nameFor(item.productNo),label:catalogStatus.value==='ready'&&!productFor(item.productNo)?t.value.bundle.tileGoneName:undefined,imageUrl:imageFor(item.productNo),price:productFor(item.productNo)?.price??null,estimate:estimateText(item.productNo)})));
 const quantityOf=(id:string)=>selection.value.find(item=>item.productNo===id)?.quantity??0;
 const suggestionRows=computed<BundleSuggestion[]>(()=>suggestions.value.map(product=>({
   id:product.id,name:product.name,imageUrl:imageFor(product.id),price:product.price,estimate:estimateText(product.id),
@@ -332,7 +334,7 @@ const footerNote = computed(() => {
   if (inventoryNote.value) return inventoryNote.value;
   if (quoteWarning.value) return quoteWarning.value;
   if (selection.value.length < 2) return t.value.promotion.selectTwo;
-  if (quoteStatus.value === 'error') return t.value.promotion.errorNote;
+  // A failed quote read is read again on its own (03 §3.5.2): the note stays the reading note, never a retry the page does not offer.
   return signedIn.value && !quote.value ? t.value.promotion.loading : '';
 });
 // The page renders these states and actions in its existing tray.
