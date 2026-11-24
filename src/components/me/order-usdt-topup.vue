@@ -60,9 +60,9 @@
             <view v-viz-inview class="nx-progress__fill nx-viz-grow" :style="{ width: fillPct + '%' }" />
           </view>
           <view class="out-gauge__legend">
-            <view class="out-leg"><view class="out-leg__dot is-fill" aria-hidden="true" /><text class="out-gauge__k">{{ debt ? copy.debtLabel : copy.balanceLabel }}</text><text class="out-num">{{ amt(balanceAbs) }}</text></view>
+            <view class="out-leg"><view class="out-leg__dot is-fill" aria-hidden="true" /><text class="out-gauge__k">{{ debt ? copy.debtLabel : copy.balanceLabel }}</text><text class="out-num">{{ amt(balanceAbs) }}<text class="out-unit">{{ USDT }}</text></text></view>
             <view v-if="covered" class="out-leg out-leg--end"><NxTag tone="success" :label="copy.enoughLabel" /></view>
-            <view v-else class="out-leg out-leg--end"><text class="out-gauge__k">{{ copy.leftLabel }}</text><text class="out-num">{{ amt(read.shortfallUsdt) }}</text><view class="out-leg__dot" aria-hidden="true" /></view>
+            <view v-else class="out-leg out-leg--end"><text class="out-gauge__k">{{ copy.leftLabel }}</text><text class="out-num">{{ amt(read.shortfallUsdt) }}<text class="out-unit">{{ USDT }}</text></text><view class="out-leg__dot" aria-hidden="true" /></view>
           </view>
           <text v-if="debt && !covered" class="out-gauge__note">{{ copy.debtIncluded }}</text>
         </view>
@@ -315,27 +315,31 @@ const minimumFloor = computed(() => {
   const [min, shortfall, fee] = usdtUnits(r.minDepositUsdt, r.shortfallUsdt, r.depositFeeUsdt);
   return min > shortfall + fee;
 });
-const resultTitle = computed(() => {
-  const c = t.value.orders;
+// The order's canonical status decides the title, tone and icon, in the tones order detail uses (03 §3.8: one status,
+// one colour app-wide). PAID or CLOSED only decide the actions: a refund, chargeback or failed setup after payment is
+// not a success (review F07).
+const resultHead = computed(() => {
+  const c = t.value.orders, p = copy.value;
   switch (read.value?.canonicalStatus) {
-    case "paid": return copy.value.paidTitle;
-    case "provisioning": return c.statusProvisioning;
-    case "activated": return c.statusActivated;
-    case "inventory": return c.statusInventory;
-    case "expired": return copy.value.expiredTitle;
-    case "payment_failed": return c.statusPaymentFailed;
-    case "provisioning_failed": return c.statusProvisioningFailed;
-    case "refunded": return c.statusRefunded;
-    case "chargeback": return c.statusChargeback;
-    default: return copy.value.closedTitle;
+    case "paid": return { tone: "brand" as const, icon: "check" as const, title: p.paidTitle };
+    case "provisioning": return { tone: "brand" as const, icon: "check" as const, title: c.statusProvisioning };
+    case "activated": return { tone: "success" as const, icon: "check" as const, title: c.statusActivated };
+    case "inventory": return { tone: "success" as const, icon: "check" as const, title: c.statusInventory };
+    case "expired": return { tone: "neutral" as const, icon: "clock" as const, title: p.expiredTitle };
+    case "payment_failed": return { tone: "danger" as const, icon: "failed" as const, title: c.statusPaymentFailed };
+    case "provisioning_failed": return { tone: "danger" as const, icon: "failed" as const, title: c.statusProvisioningFailed };
+    case "refunded": return { tone: "neutral" as const, icon: "return" as const, title: c.statusRefunded };
+    case "chargeback": return { tone: "danger" as const, icon: "alert" as const, title: c.statusChargeback };
+    default: return { tone: "neutral" as const, icon: "failed" as const, title: p.closedTitle };
   }
 });
 const head = computed(() => {
   const c = copy.value;
   switch (view.value) {
-    case "paid": return { tone: "success" as const, icon: undefined, title: resultTitle.value, body: "" };
-    // Only the order's own canonical status may say it timed out (contract canonicalStatus).
-    case "closed": return { tone: "neutral" as const, icon: read.value?.canonicalStatus === "expired" ? "clock" as const : undefined, title: resultTitle.value, body: c.expiredBody };
+    case "paid": return { ...resultHead.value, body: "" };
+    // Only the order's own canonical status may say it timed out (contract canonicalStatus); the balance line speaks
+    // only of credited USDT, never of transfers below the minimum or not yet credited (review F07).
+    case "closed": return { ...resultHead.value, body: c.expiredBody };
     case "missing": return { tone: "neutral" as const, icon: "alert" as const, title: c.orderMissingTitle, body: c.orderMissing };
     // Name the channel of the payment in progress (B84 openIntent.paymentMethod): the bank card, or USDT on the intent's own network, which can differ from this page's.
     case "open-intent": {
@@ -343,7 +347,8 @@ const head = computed(() => {
       const usdt = method === "CREGIS_USDT_BSC" ? c.bep20 : method === "CREGIS_USDT_ERC20" ? c.erc20 : method === "CREGIS_USDT_TRC20" ? c.trc20 : "";
       return { tone: "warning" as const, icon: "clock" as const, title: usdt ? fill(c.openIntentUsdtTitle, { network: usdt }) : c.openIntentTitle, body: c.openIntentBody };
     }
-    case "review": return { tone: "warning" as const, icon: "shield" as const, title: c.reviewHoldTitle, body: c.reviewHold };
+    // Both review reasons share one neutral line: it neither assumes a payment was made nor names the internal reason (review F05).
+    case "review": return { tone: "warning" as const, icon: "alert" as const, title: c.reviewHoldTitle, body: c.reviewHold };
     default: return null;
   }
 });

@@ -94,7 +94,8 @@
         <view class="pp-total" :class="{ 'is-ruled': s.step === 'methods' }">
           <text class="pp-total__k">{{ orderTopupNet ? copy.payable : copy.total }}</text>
           <!-- Bank card amounts use $; USDT only on the wallet and USDT paths. -->
-          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' || orderTopupNet ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" />
+          <!-- The order top-up network step shows the exact amount due, as the top-up and confirm pages do (review F08). -->
+          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' || orderTopupNet ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" :precision="orderTopupNet ? 'full' : 2" />
         </view>
         <!-- An ordinary order's USDT goes to the balance first: no quote, fees or confirmation here (plan C.4). -->
         <text v-if="orderTopupNet" class="pp-note">{{ copy.topupNetNote }}</text>
