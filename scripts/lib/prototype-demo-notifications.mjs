@@ -7,7 +7,7 @@ const earningSamples = [
   { id: 1001, sku: s1, taskClass: 'SP', minutesAgo: 90, actionMissing: true, read: true },
   { id: 1002, sku: s1, taskClass: 'IG', minutesAgo: 80, receiptStatus: 404 },
   { id: 1003, sku: s1, taskClass: 'FT', minutesAgo: 70, receiptFailures: 2 },
-  { id: 1004, sku: s1, taskClass: 'SP', minutesAgo: 53, hideMetadata: true, read: true },
+  { id: 1004, sku: s1, taskClass: 'SP', minutesAgo: 53, read: true },
   { id: 1005, sku: s1, taskClass: 'EM', minutesAgo: 48, modelRate: [0.0025, 0.002708], durationSec: 5, read: true },
   { id: 1006, sku: pro, taskClass: 'LL', minutesAgo: 29 },
   { id: 1007, sku: s1, taskClass: 'VG', minutesAgo: 16, modelRate: [1, 1.1], durationSec: 900 },
@@ -180,7 +180,7 @@ export function demoNotifications(locale, state, now, device, order) {
       readAt: sample.read ? sample.settledAt + 60_000 : null,
       earning: { receiptNo: sample.receiptNo, usdt: sample.rewardUsdt > 0 ? String(sample.rewardUsdt) : null,
         uvt: sample.rewardNex > 0 ? String(sample.rewardNex) : null,
-        deviceName: sample.hideMetadata ? null : sample.device.name, taskClass: sample.hideMetadata ? null : sample.taskClass },
+        deviceName: sample.device.name, taskClass: sample.taskClass },
     }));
     const summaries = [999].map((id, index) => ({
       id, kind: 'NOVA_DAILYSUMMARY', priority: 'low',
