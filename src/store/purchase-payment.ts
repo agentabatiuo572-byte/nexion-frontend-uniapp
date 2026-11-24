@@ -331,7 +331,14 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (!purchasePaymentTiming(intent, Date.now(), state.deadlineAt).canPay) state.cashier = false;
   else if (openCashierOnReady && intent.paymentUrl) { openCashierOnReady = false; state.cashier = true; }
   const conclusion = purchaseConclusion(intent);
-  if (conclusion) state.notice = conclusion;
+  const orderNo = known.kind === 'ORDER_PAY' ? purchaseRecordPayload(known).orderNo : undefined;
+  if (conclusion === 'refunded' && typeof orderNo === 'string') {
+    // The refund closes the order on the server; refresh it so an order page under this layer stops showing it unpaid.
+    const accountKey = state.accountKey;
+    void useOrders().reconcileRemoteOrder(orderNo, () => account() === accountKey && foregroundReadAllowed()).catch(() => undefined);
+  }
+  // A refund without an order has nothing to choose: the page itself states it and its close leaves (03 §3.5.1).
+  if (conclusion && !(conclusion === 'refunded' && typeof orderNo !== 'string')) state.notice = conclusion;
 }
 /** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
 function releaseMissingPayment(pending: PendingExternal, accountKey: string, orderNo: string) {
