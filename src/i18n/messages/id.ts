@@ -221,6 +221,7 @@ export const id: Messages = {
     locked: "Diskon dan hadiah dicadangkan untuk pesanan ini",
     rewardNote: "Diskon pesanan mengurangi total bayar. Hadiah lain mengikuti ketentuan promo.",
     orderReward: "Hadiah untuk pesanan ini",
+    quoteUpdating: "Penawaran kedaluwarsa, sedang diperbarui otomatis. Tidak perlu tindakan.",
     orderDiscount: "Diskon pesanan",
     orderDiscountNote: "Dipotong dari total bayar, tanpa dana terpisah yang masuk ke dompet. Pengembalian dana memakai jumlah yang dibayar.",
     settle: "Diberikan otomatis saat syarat yang diumumkan terpenuhi",

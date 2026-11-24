@@ -221,6 +221,7 @@ export const fil: Messages = {
     locked: "Nakareserba ang discount at reward para sa order na ito",
     rewardNote: "Binabawasan ng order discount ang babayaran. Ang ibang reward ay ayon sa terms ng promo.",
     orderReward: "Gantimpala sa order na ito",
+    quoteUpdating: "Nag-expire ang quote, awtomatiko itong ina-update. Walang kailangang gawin.",
     orderDiscount: "Diskwento sa order",
     orderDiscountNote: "Ibinabawas sa babayaran, walang hiwalay na credit sa wallet. Ang refund ay batay sa halagang ibinayad.",
     settle: "Awtomatikong ibibigay kapag natugunan ang inilathalang kondisyon",

@@ -221,6 +221,7 @@ export const ms: Messages = {
     locked: "Diskaun dan ganjaran ditempah untuk pesanan ini",
     rewardNote: "Diskaun pesanan mengurangkan jumlah perlu dibayar. Ganjaran lain mengikut terma promosi.",
     orderReward: "Ganjaran untuk pesanan ini",
+    quoteUpdating: "Sebut harga tamat dan dikemas kini secara automatik. Tiada tindakan diperlukan.",
     orderDiscount: "Diskaun pesanan",
     orderDiscountNote: "Ditolak daripada jumlah perlu dibayar, tanpa kredit dompet berasingan. Bayaran balik menggunakan jumlah yang dibayar.",
     settle: "Diberikan secara automatik apabila syarat yang diterbitkan dipenuhi",

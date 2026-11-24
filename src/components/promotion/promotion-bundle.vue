@@ -33,6 +33,9 @@
         </view>
       </template>
     </BundleHero>
+    <!-- Tiles show estimates, so the estimate note follows the focal card here too (copy-rules; same place and style as
+         the plain bundle). -->
+    <text v-if="selection.length > 0" class="promotion-bundle__estimate-note">{{ t.store.cardEstimateNote }}</text>
     <view v-if="catalogStatus!=='ready'" class="promotion-bundle__catalog" role="status"><text class="promotion-copy">{{ catalogStatus==='loading'?t.store.catalogLoadingBody:'—' }}</text></view>
     <BundleSuggestions v-if="suggestions.length" class="promotion-bundle__section" anchor="bundle-more" :title="t.bundle.addMore" :items="suggestionRows" @add="add" @open="openDetail" />
     </template>
@@ -275,7 +278,9 @@ const footerNote = computed(() => {
   if (scopeId.value && contextStatus.value === 'ready' && !available.value)
     return localized(activity.value?.eligibilityMessage,locale.code) || t.value.promotion.disabled;
   if (quoteIneligible.value || (quote.value && quote.value.eligibility !== 'ELIGIBLE')) return t.value.promotion.disabledNote;
-  if (quoteExpired.value) return t.value.promotion.quoteExpired;
+  // Expired quotes are read again on their own (03 §3.5.2), so the note only says it is updating; the checkout keeps
+  // its own quoteExpired copy.
+  if (quoteExpired.value) return t.value.promotion.quoteUpdating;
   const block = checkoutQuoteBlockCopy(quoteBlock.value, t.value);
   if (block) return block;
   if (termsMissing.value) return t.value.promotion.termsMissing;
@@ -354,6 +359,7 @@ onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryT
 .promotion-bundle__step:active:not([aria-disabled="true"]) { opacity: .6; }
 .promotion-bundle__step:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; border-radius: 999px; }
 .promotion-bundle__qty { min-width: 24px; text-align: center; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
+.promotion-bundle__estimate-note { display: block; margin: 8px 18px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); overflow-wrap: break-word; }
 .promotion-bundle__catalog { margin: 12px 16px 0; }
 .promotion-bundle__section { display: block; margin-top: var(--ui-space-section-gap); }
 .promotion-bundle__links { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; margin: var(--ui-space-section-gap) 16px 0; }

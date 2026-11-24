@@ -221,6 +221,7 @@ export const uz: Messages = {
     locked: "Bu buyurtma uchun chegirma va mukofotlar band qilindi",
     rewardNote: "Buyurtma chegirmasi toʻlanadigan summani kamaytiradi. Boshqa mukofotlar aksiya shartlariga koʻra beriladi.",
     orderReward: "Ushbu buyurtma mukofoti",
+    quoteUpdating: "Narx taklifi eskirdi va avtomatik yangilanmoqda. Hech narsa qilish shart emas.",
     orderDiscount: "Buyurtma chegirmasi",
     orderDiscountNote: "Toʻlanadigan summadan ayiriladi, hamyonga alohida tushmaydi. Pul qaytarilganda toʻlangan summa hisobga olinadi.",
     settle: "Eʼlon qilingan shartlar bajarilgach avtomatik beriladi",
