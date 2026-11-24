@@ -7,9 +7,32 @@
 <template>
   <AppChassis active="me">
     <view style="padding-bottom: 24px">
-      <SubPageHeader back="/pages/me/wallet-bills" />
+      <SubPageHeader back="/pages/me/wallet-bills" :title="deposit ? w.depositTitle : undefined" />
 
-      <view v-if="remoteApiEnabled" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
+      <!-- A USDT top-up opened from Bills (plan C.4): the original deposit's network, hash and amounts; without the original
+           record one line says the details are unavailable, never the ledger number in place of a hash. -->
+      <view v-if="deposit" class="tx-dep">
+        <NxResultHead tone="success" :title="t.topupChrome.depositCredited" :live="false">
+          <text class="tx-dep__amt">+{{ depositAmount(deposit.credited) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text>
+        </NxResultHead>
+        <view class="tx-dep__card">
+          <template v-if="deposit.network">
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.network }}</text><text class="tx-dep__v">{{ deposit.network === "ERC20" ? payCopy.erc20 : payCopy.bep20 }}</text></view>
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.grossAmount }}</text><text class="tx-dep__v tx-dep__num">{{ depositAmount(deposit.gross) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text></view>
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.depositFee }}</text><text class="tx-dep__v tx-dep__num">{{ depositAmount(deposit.fee) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text></view>
+            <view class="tx-dep__row"><text class="tx-dep__k">{{ w.creditedAmount }}</text><text class="tx-dep__v tx-dep__num">{{ depositAmount(deposit.credited) }}<text class="tx-dep__unit">{{ "\u00A0USDT" }}</text></text></view>
+          </template>
+          <text v-else class="tx-dep__na">{{ w.detailUnavailableTitle }}</text>
+          <view v-if="deposit.at" class="tx-dep__row"><text class="tx-dep__k">{{ t.bills.detailTime }}</text><text class="tx-dep__v tabular-nums">{{ depositTime }}</text></view>
+          <view v-if="deposit.network" class="tx-dep__hash">
+            <text class="tx-dep__k">{{ recoveryCopy.txHashLabel }}</text>
+            <NxCodeValue class="tx-dep__code" :value="hash" :label="recoveryCopy.txHashLabel" full :copyable="false" />
+            <view class="tx-hash-copy"><NxButton variant="text" size="small" :label="copyButtonText" @click="copyHash" /></view>
+          </view>
+        </view>
+      </view>
+
+      <view v-else-if="remoteApiEnabled" class="nx-glass-card mx-4" data-testid="tx-detail-hold" :style="holdStyle">
         <text class="block" :style="holdTitleStyle">{{ hash ? w.detailUnavailableTitle : hashProvided ? recoveryCopy.txInvalidTitle : recoveryCopy.txMissingTitle }}</text>
         <text class="block" :style="holdBodyStyle">{{ hash ? w.detailUnavailableBody : hashProvided ? recoveryCopy.txInvalidBody : recoveryCopy.txMissingBody }}</text>
         <view v-if="hash" style="margin-top: 16px">
@@ -84,6 +107,11 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { navTo } from "@/lib/route";
 import { validatedTransactionHash } from "@/lib/transaction-hash-input";
 import { useEntryRecoveryCopy } from "@/i18n/entry-recovery";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
+import { formatGroupedAmount } from "@/lib/amount-display";
+import { walletBillTimeLabel } from "@/lib/wallet-bill-date";
+import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
+import { useLocaleStore } from "@/store/locale";
 
 const t = useT();
 const recoveryCopy = useEntryRecoveryCopy();
@@ -107,6 +135,13 @@ const qConfs = ref<number | null>(null);
 const qNet = ref<string | null>(null);
 const qTo = ref<string | null>(null);
 const qAgeMin = ref<number | null>(null);
+// A top-up row from Bills (src=deposit). PLACEHOLDER(B84): Bills builds these from BE-07 `deposit`
+// ({network, txHash, grossAmountUsdt, feeUsdt, creditedUsdt}); with `deposit: null` it sends only the credited amount and time.
+const deposit = ref<{ network: "BEP20" | "ERC20" | null; gross: string; fee: string; credited: string; at: number | null } | null>(null);
+const locale = useLocaleStore();
+const payCopy = computed(() => purchasePaymentCopy(locale.code));
+const depositAmount = (value: string) => value ? formatGroupedAmount(value, "full") : "—";
+const depositTime = computed(() => deposit.value?.at ? walletBillTimeLabel(deposit.value.at, locale.code) : "");
 
 onLoad((options) => {
   copyVersion += 1;
@@ -123,6 +158,14 @@ onLoad((options) => {
   qTo.value = typeof options?.to === "string" && options.to.length >= 10 ? options.to : null;
   const age = parseInt(String(options?.age ?? ""), 10);
   qAgeMin.value = Number.isFinite(age) && age >= 0 ? Math.max(1, age) : null;
+  const exact = (value: unknown) => typeof value === "string" && /^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/.test(value) ? value : "";
+  const at = Number(options?.at);
+  const chain = options?.net === "BEP20" || options?.net === "ERC20" ? options.net : null;
+  const complete = !!chain && !!hash.value && !!exact(options?.gross) && !!exact(options?.fee) && !!exact(options?.credited);
+  deposit.value = options?.src === "deposit" ? {
+    network: complete ? chain : null, gross: exact(options?.gross), fee: exact(options?.fee), credited: exact(options?.credited),
+    at: Number.isFinite(at) && at > 0 ? at : null,
+  } : null;
 });
 
 function hashSeed(h: string): number {
@@ -288,6 +331,20 @@ const holdBodyStyle: CSSProperties = { marginTop: "6px", fontSize: "var(--ui-typ
 .tx-hash-copy { display: flex; justify-content: flex-end; margin-top: 4px; }
 /* The way on from this card is its footer action into the next page (03 §3.1 P-67), not a private chip. */
 .tx-bills-footer { margin-top: 12px; }
+/* Top-up detail: result head (03 §3.6.1) with the credited amount, then one solid facts card (1.1.2). */
+.tx-dep { padding: 8px 16px 0; }
+.tx-dep__amt { display: block; margin-top: 12px; color: var(--v5-success-ink); font: 500 28px/36px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tx-dep__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
+.tx-dep__card { margin-top: 24px; padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+[data-theme="light"] .tx-dep__card { box-shadow: var(--v5-glass-shadow); }
+.tx-dep__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 12px 0; }
+.tx-dep__row + .tx-dep__row, .tx-dep__na + .tx-dep__row, .tx-dep__row + .tx-dep__hash { border-top: 1px solid var(--v5-border); }
+.tx-dep__k { display: block; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight, 400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.tx-dep__v { margin-left: auto; color: var(--v5-ink); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); white-space: nowrap; }
+.tx-dep__num { font-family: var(--font-amount); font-variant-numeric: tabular-nums; }
+.tx-dep__na { display: block; padding: 12px 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.tx-dep__hash { padding: 12px 0 4px; }
+.tx-dep__code { margin-top: 6px; color: var(--v5-ink); font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); user-select: text; }
 [role="button"][aria-disabled="true"] { opacity: 0.5; }
 [tabindex="0"]:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>

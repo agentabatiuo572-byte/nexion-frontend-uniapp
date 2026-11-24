@@ -64,7 +64,7 @@
             <view v-if="usdtAvailable" class="pp-opt" role="radio" :tabindex="s.method !== 'WALLET' && s.method !== 'HDPAY_BANK' ? 0 : -1" aria-checked="false" @click="payment.choose('USDT')" @keydown.enter.prevent="payment.choose('USDT')">
               <view class="pp-opt__row">
                 <view class="pp-opt__ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 8h8" /><path d="M12 8v9" /><path d="M7.5 12c0 1 2 1.6 4.5 1.6s4.5-.6 4.5-1.6" /></svg></view>
-                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.usdt }}</text><text class="pp-opt__h">{{ copy.usdtHint }}</text></view>
+                <view class="pp-opt__tx"><text class="pp-opt__t">{{ copy.usdt }}</text><text class="pp-opt__h">{{ s.kind === 'ORDER_PAY' ? copy.usdtHintTopup : copy.usdtHint }}</text></view>
                 <view class="pp-radio" aria-hidden="true" />
               </view>
             </view>
@@ -82,7 +82,7 @@
         </template>
 
         <!-- Bank shows the same $ fee list as USDT, without a network fee; the ₫ amount stays on the payment page. -->
-        <view v-if="s.step !== 'methods'" class="pp-fees">
+        <view v-if="s.step !== 'methods' && !orderTopupNet" class="pp-fees">
           <!-- subtotalUsdt is the server's cent amount (business amount + rounding adjustment), so the rows add up to the total. -->
           <view class="pp-kv"><text class="pp-kv__k">{{ copy.subtotal }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.subtotalUsdt) : '—' }}</text></view>
           <view class="pp-kv"><text class="pp-kv__k">{{ copy.channelFee }}</text><text class="pp-kv__v">{{ s.quote ? amount(s.quote.channelFeeUsdt) : '—' }}</text></view>
@@ -92,15 +92,18 @@
 
       <view class="pp-foot">
         <view class="pp-total" :class="{ 'is-ruled': s.step === 'methods' }">
-          <text class="pp-total__k">{{ copy.total }}</text>
+          <text class="pp-total__k">{{ orderTopupNet ? copy.payable : copy.total }}</text>
           <!-- Bank card amounts use $; USDT only on the wallet and USDT paths. -->
-          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" />
+          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' || orderTopupNet ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" />
         </view>
-        <template v-if="s.step !== 'methods'">
+        <!-- An ordinary order's USDT goes to the balance first: no quote, fees or confirmation here (plan C.4). -->
+        <text v-if="orderTopupNet" class="pp-note">{{ copy.topupNetNote }}</text>
+        <template v-else-if="s.step !== 'methods'">
           <text class="pp-note">{{ s.step === 'bank' ? copy.bankNote : s.method === 'CREGIS_USDT_TRC20' ? copy.gasTrc20 : s.method === 'CREGIS_USDT_ERC20' ? copy.gasErc20 : copy.gasBep20 }}</text>
           <view v-if="s.originalRecovery || s.quote || s.loading || s.retrying" class="pp-auto" role="status"><view class="pp-auto__dot" :class="{ 'is-retry': s.retrying && !s.originalRecovery }" aria-hidden="true" /><text>{{ quoteStatus }}</text></view>
         </template>
-        <NxButton class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="!!s.originalRecovery || (s.step === 'methods' ? !walletEnough : !s.quote || s.loading)" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
+        <NxButton v-if="orderTopupNet" class="pp-cta" :label="copy.topup" variant="primary" @click="goOrderTopup" />
+        <NxButton v-else class="pp-cta" :label="s.step === 'methods' ? copy.confirm : copy.go" variant="primary" :busy="s.busy" :disabled="!!s.originalRecovery || (s.step === 'methods' ? !walletEnough : !s.quote || s.loading)" @click="s.step === 'methods' ? payment.confirm() : payment.proceed()" />
       </view>
     </view>
   </view>
@@ -402,6 +405,15 @@ const networks = computed(() => [
   { id: 'CREGIS_USDT_TRC20' as const, title: copy.value.trc20, chain: copy.value.trc20Chain },
 ].filter(tab => payment.available(tab.id)));
 const usdtAvailable = computed(() => networks.value.length > 0);
+// PLACEHOLDER(B84): BE-06 — an ordinary order takes the top-up path when the payment policy returns
+// orderPayUsdtRoute === 'WALLET_TOPUP', with its networks from GET /api/deposits/policy and no quote. Until that field is
+// read, every ordinary order shows it; trial conversion and trade-in keep the external payment.
+const orderTopupNet = computed(() => s.step === 'network' && s.kind === 'ORDER_PAY');
+function goOrderTopup() {
+  const href = `/pages/me/wallet-topup?orderNo=${encodeURIComponent(s.orderNo)}&network=${s.method === 'CREGIS_USDT_ERC20' ? 'ERC20' : 'BEP20'}&name=${encodeURIComponent(s.summary)}`;
+  payment.close();
+  void navTo(href);
+}
 // A concluded payment has nothing left to offer behind its notice.
 const sheetOpen = computed(() => active.value && s.open && !s.pending && !s.concluded);
 const pageOpen = computed(() => active.value && s.open && !!s.pending && !s.concluded);

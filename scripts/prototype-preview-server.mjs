@@ -22,6 +22,7 @@ import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.m
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
+import { demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -339,6 +340,8 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
+      const orderTopup=req.method==='GET'&&state.dataState!=='error'?demoOrderTopupResponse(url,state,locale,Date.now()):undefined;
+      if(orderTopup)return sendJson(res,orderTopup.body,orderTopup.status);
       if(req.method==='GET'){
         const accountId=url.pathname==='/api/genesis/state'
           ? previewSelectedAccountId(state) : previewAccountId(state,req.headers);
