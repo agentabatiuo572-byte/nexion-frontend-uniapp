@@ -66,7 +66,6 @@ import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecy
 
 const sheet = useTrialClaimSheet();
 const freeTrial = useFreeTrial();
-useAutoRecovery({ failed: () => remoteApiEnabled && sheet.open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
 const trialView = useTrialPresentation(() => sheet.open);
 const app = useApp();
 const t = useT();
@@ -89,6 +88,13 @@ const claiming = ref(false);
 const activated = ref(false);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
+useAutoRecovery({
+  active: () => sheet.open && !claiming.value,
+  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown),
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+});
 let claimSequence = 0;
 const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === 'capacity-full' ? copy.value.manageDevices
@@ -178,6 +184,13 @@ watch(() => sheet.open, open => {
   claimErrorReason.value = undefined;
   activated.value = !claiming.value && freeTrial.authorityStatus === 'ready'
     && (freeTrial.status === 'active' || freeTrial.status === 'grace');
+});
+watch(() => freeTrial.authorityStatus, status => {
+  if (!sheet.open || claiming.value || status !== "ready" || freeTrial.authorityResultUnknown
+      || claimErrorReason.value !== "unknown") return;
+  claimError.value = false;
+  claimErrorReason.value = undefined;
+  activated.value = freeTrial.status === "active" || freeTrial.status === "grace";
 });
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),

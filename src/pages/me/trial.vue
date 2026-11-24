@@ -257,6 +257,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { appDeviceOffline } from "@/lib/foreground-read";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDeadline } from "@/lib/trial-date";
@@ -278,18 +279,17 @@ import { useTrialDetailCopy } from "@/i18n/trial-detail";
 
 const t = useT();
 const freeTrial = useFreeTrial();
+const claimSheet = useTrialClaimSheet();
 onShow(() => { void freeTrial.refreshVisible(); });
 const trialConfig = useTrialConfig();
 const visibility = useDataVisibility();
 const lifecycle = useTrialLifecycleCopy();
 const purchase = useTrialPurchaseCopy();
 const detail = useTrialDetailCopy();
-const authorityIncomplete = computed(() => (freeTrial.status === "active" || freeTrial.status === "grace")
-  && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null));
-const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || authorityIncomplete.value));
+const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || freeTrial.authorityIncomplete));
 // Keep the confirmed page on screen during a trial read
 // meanwhile instead of swapping in the read state. Actions still wait on authorityUnavailable.
-const authorityScreenUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityServerState === null || authorityIncomplete.value));
+const authorityScreenUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityServerState === null || freeTrial.authorityIncomplete));
 // A read is under way or about to start: the cold open before the first read, or a read with no failure behind it.
 // A failed read keeps its result up while recovery re-reads; an observed disconnect, an unknown command result and
 // an incomplete answer have nothing to wait for on screen.
@@ -483,7 +483,7 @@ const rulesLines = computed(() => [
 
 function claim() {
   if (!canStartNow.value) return; // disabled CTA — reason line explains why
-  useTrialClaimSheet().show();
+  claimSheet.show();
 }
 
 // Conversion CTA → checkout. Trial pricing still derives from authoritative
@@ -495,7 +495,14 @@ function goCheckout() {
   if (!productId) return; // applyAuthoritative already rejects unknown policy ids
   navTo(`/pages/store/checkout?product=${productId}&source=trial`);
 }
-useAutoRecovery({ failed: () => remoteApiEnabled && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote(true) });
+useAutoRecovery({
+  active: () => !claimSheet.open,
+  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown || freeTrial.authorityIncomplete),
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+  repeatWhile: () => freeTrial.authorityResultUnknown || !hasVisiblePullRefresh(),
+});
 useAutoRecovery({ failed: () => productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 function retryCatalog() {
   if (productCatalogState.status !== "error") return;

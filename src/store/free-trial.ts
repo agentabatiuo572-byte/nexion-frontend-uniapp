@@ -190,12 +190,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     remoteApiEnabled ? "unknown" : "mock",
   );
   const authorityError = ref<string | null>(null);
+  const authorityResultUnknown = ref(false);
   const lastReadFailed = ref(false);
   const transientReadFailure = ref(false);
   const authoritativeShadowUSD = ref(0);
   const authoritativeShadowNEX = ref(0);
   const authoritativeOffsetUSD = ref<number | null>(null);
   const authoritativeRemainderUSD = ref<number | null>(null);
+  const authorityIncomplete = computed(() => (status.value === "active" || status.value === "grace")
+    && (authoritativeOffsetUSD.value === null || authoritativeRemainderUSD.value === null));
   const authoritativePriceUSD = ref<number | null>(null);
   /** FEAT-TRIAL05 server conversion quote; null on older servers or terminal claims. */
   const authoritativeQuote = ref<TrialConversionQuote | null>(null);
@@ -311,6 +314,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityVersion.value = 0;
     authorityStatus.value = nextStatus;
     authorityError.value = error;
+    // Keep a command readback pending across failed GETs. A cold account bind has no command to recover.
+    if (nextStatus === "unknown") authorityResultUnknown.value = error !== null;
   }
 
   function markAuthorityReadFailure(error: string, transient = false) {
@@ -409,6 +414,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityVersion.value = next.version;
     authorityStatus.value = "ready";
     authorityError.value = null;
+    if (!authorityIncomplete.value) authorityResultUnknown.value = false;
     lastReadFailed.value = false;
     transientReadFailure.value = false;
     return true;
@@ -930,7 +936,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   return {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
-    authorityStatus, authorityError, lastReadFailed, transientReadFailure, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
+    authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
+    confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
