@@ -10,10 +10,11 @@ export async function executeSelectedPurchase<T>(
   wallet: (authorization: PaymentPasswordAuthorization) => Promise<T>,
   current: () => boolean,
   purchase: PurchaseExecution<T>,
+  walletOnly = false,
 ): Promise<T | null> {
   if (!current()) return null;
   // Zero-value rights still use the approved wallet confirmation; never create a zero external collection.
-  if (!remoteApiEnabled || Number(context.amount) === 0) return executePaymentWithPassword(context, wallet, current);
+  if (walletOnly || !remoteApiEnabled || Number(context.amount) === 0) return executePaymentWithPassword(context, wallet, current);
   const { parseReceipt: _receipt, ...external } = purchase;
   const choice = await requestPurchasePayment({ ...external, amount: context.amount, summary: context.summary, current });
   if (!choice) return null;

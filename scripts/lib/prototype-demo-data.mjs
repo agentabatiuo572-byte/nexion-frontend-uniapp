@@ -111,7 +111,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
@@ -147,9 +147,11 @@ export const demoOptions = {
   stakingState:[['delisted','功能下架'],['error','质押读取失败（其他正常）']],
   stakingOpenState:[['readonly','只读预览'],['disclosure','开仓拒绝风险确认（HTTP 200 / code 409）'],['unknown','开仓结果未知 / 状态 NOT_FOUND']],
   topupState:[['form','银行卡充值 · 填写金额'],['paying','银行卡充值 · 付款中'],['credited','银行卡充值 · 已到账']],
+  // Order top-up page scenarios (scripts/lib/prototype-demo-order-topup.mjs).
+  orderTopupState:[['off','跟随其他场景'],['disabled','订单 USDT 开关关闭'],['policy-loading','充值策略读取中'],['policy-error','充值策略读取失败'],['erc20-only','只开放 ERC20'],['waiting','为订单充值 · 等待到账'],['partial','为订单充值 · 已到账一部分'],['min-floor','为订单充值 · 还差很少（按最低额建议）'],['covered','为订单充值 · 余额已够'],['zero-voucher','为订单充值 · 零元券'],['debt','为订单充值 · 余额为负（含欠款）'],['below-min','为订单充值 · 有一笔低于最低额'],['preparing','为订单充值 · 地址准备中'],['paused','为订单充值 · 充值暂停'],['address-error','为订单充值 · 地址读不到'],['order-error','为订单充值 · 订单读不到（503）'],['open-intent','为订单充值 · 有在途银行卡付款'],['open-intent-usdt','为订单充值 · 有在途 USDT（ERC20）付款'],['open-intent-readonly','为订单充值 · 只读原付款单'],['snapshot-error','为订单充值 · 付款单读不到'],['review','为订单充值 · 银行会话需要核对'],['finance-review','为订单充值 · 财务需要核对'],['expired','为订单充值 · 已超时取消'],['closed','为订单充值 · 已关闭（非超时）'],['deadline','为订单充值 · 已到截止、待读回结果'],['missing','为订单充值 · 订单不存在（404）'],['paid','为订单充值 · 已付款'],['paid-unverified','为订单充值 · 已付款无实付凭证'],['provisioning-failed','为订单充值 · 开通失败'],['chargeback','为订单充值 · 付款争议'],['refunded','为订单充值 · 已退款']],
   withdrawRecoveryState:withdrawRecoveryOptions,
   withdrawNetworksState:[['bep20-erc20','提现网络 · BEP20 和 ERC20'],['bep20','提现网络 · 仅 BEP20'],['erc20','提现网络 · 仅 ERC20'],['closed','提现网络 · 全部关闭']],
-  billRefsState:[['normal','账单 · 默认'],['long-refs','账单 · 真实长单号（订单、退款、学习奖励）']],
+  billRefsState:[['normal','账单 · 默认'],['long-refs','账单 · 真实长单号（订单、退款、学习奖励）'],['b84-deposit','账单 · 双网 USDT 精确入账及详情缺失']],
   contentState:contentOptions,
   bankState:[['pending','银行提现 · 处理中'],['review','银行提现 · 等待处理'],['held','银行提现 · 核对中'],['settled','银行提现 · 已到账'],['rejected','银行提现 · 已退回']],
   riskState:[['accepted','风险说明 · 已确认'],['unread','风险说明 · 首次阅读']],
@@ -431,7 +433,9 @@ const samplePlacedAgo={urgent:paymentWindow-(4*60000+50000),late:paymentWindow-6
 // payment intent: that order stays open until its payment concludes. Until the task runs, paying is refused as expired.
 const deadlineTaskDelay=60000;
 export const demoTimedOutOrder={canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'};
-export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'&&order.expiresAt+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
+export const demoOrderPaymentDeadline=order=>order.payBy?Math.min(order.expiresAt,Date.parse(order.payBy)):order.expiresAt;
+export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'
+  &&demoOrderPaymentDeadline(order)+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo]&&!order.retiredBankPaymentSession;
 const repurchaseSampleDays={inside:12,boundary:30,outside:12};
 const longBillOrderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
 function demoOrders(products,state,now,device41) {
@@ -483,12 +487,11 @@ const demoTrialSlots=(url,locale,state)=>['ACTIVE','GRACE','EXTENDED'].includes(
 // closed reads as expired, as that task (modelled for session orders by the checkout fixture) leaves it.
 function demoScenarioOrders(products,state,now,device41) {
   const own=state.createdOrders||[];
-  if(state.promotionBuyer==='sponsored-new')return own;
   const ids=new Set(own.map(order=>order.orderNo));
-  return [...own,...demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
+  const seeded=state.promotionBuyer==='sponsored-new'?[]:demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
-    &&(device41||order.orderNo!=='DEMO-ORDER-004'))
-    .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
+    &&(device41||order.orderNo!=='DEMO-ORDER-004'));
+  return [...own,...seeded].map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order);
 }
 const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
 function demoOrderDeviceId(state, instanceNo) {
@@ -504,7 +507,7 @@ export function demoAccountOrders(url,locale,state,now=Date.now()) {
     .map(({replacementDevice,...order})=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
       targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
-    }:order);
+    }:order.canonicalStatus==='placed'?{...order,expiresAt:demoOrderPaymentDeadline(order)}:order);
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
 const demoOrderSlots=orders=>orders
@@ -1351,7 +1354,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(request.tracksOrderCreate&&!quote)return response;
     return remember(lines.length>1?'createBundle':'createOrder',quote?.quoteId||order.orderNo,response,order);
   }
-  const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+)\/(pay|cancel)$/);
+  const orderAction=pathname.match(/^\/api\/orders\/(DEMO-ORDER-\d+|DEMO-B84-[A-Z0-9-]+)\/(pay|cancel)$/);
   if(orderAction){
     const [,orderNo,action]=orderAction;
     let order=demoAccountOrders(url,locale,state,now).find(o=>o.orderNo===orderNo);
@@ -1382,7 +1385,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(amount>0&&amount>demoWalletUsdt(state))refuse('ORDER_WALLET_INSUFFICIENT');
       if(amount>0){
         postDemoWalletEntries(state,{bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',
-          amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
+          amount,amountExact:String(order.amountUsdt),at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
       const delivery=demoOrderDelivery(state,order,now,demoAssignablePurchaseSlots(url,locale,state));
       (state.orderStatuses??={})[orderNo]=delivery.canonicalStatus;

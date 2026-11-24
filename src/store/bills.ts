@@ -6,7 +6,7 @@ import { mockServerNow } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { fundsServerEnabled, walletBillsApi } from "@/api/runtime";
-import type { WalletBillRow, WalletBillFilters, WalletBillsSummary } from "@/api/wallet-bills-api";
+import type { WalletBillRow, WalletBillFilters, WalletBillsSummary, WalletBillDeposit } from "@/api/wallet-bills-api";
 import { createWalletLedgerPager, type LedgerLoadStatus, type WalletLedgerPager } from "./wallet-ledger-pager";
 
 // Ported from Nexion-prototype/lib/store/bills.ts (zustand → Pinia).
@@ -43,6 +43,8 @@ export interface Bill {
    *  memo 正迁 memoKey(语言码位),网络不能永远靠 memo 文案正则反解 —— 这个字段就是网络的码位;
    *  非链上条目(奖励/兑换/NEX 等)不填。 */
   network?: "TRC20" | "ERC20" | "BEP20";
+  chainTopup?: boolean;
+  deposit?: WalletBillDeposit | null;
   hiddenNetwork?: boolean;
   balanceAfter?: number;
   balanceAfterExact?: string;
@@ -200,6 +202,13 @@ export const useBills = defineStore("bills", () => {
     return pager;
   }
   const defaultLedger = getLedger();
+  function findChainTopup(accountKey: string, id: string): Bill | undefined {
+    if (!id || accountKey !== boundKey || !fundsServerEnabled) return;
+    for (const pager of ledgers.values()) {
+      const bill = pager.rows.find(row => row.id === id && row.chainTopup && !row.hiddenNetwork);
+      if (bill) return bill;
+    }
+  }
   const bills = computed<Bill[]>({
     get: () => fundsServerEnabled ? defaultLedger.rows : localBills.value,
     set: rows => { if (fundsServerEnabled) defaultLedger.rows = rows; else localBills.value = rows; },
@@ -254,6 +263,8 @@ export const useBills = defineStore("bills", () => {
       memoKey,
       ref: orderRefund ? validOrderNo(publicReference) : publicReference,
       ledgerBizNo: row.bizNo,
+      chainTopup: row.bizType === "CHAIN_TOPUP" && row.asset === "USDT" && row.direction === "IN",
+      ...(Object.hasOwn(row, "deposit") ? { deposit: row.deposit } : {}),
       hiddenNetwork: !visibleServerBill(row),
       balanceAfter: row.balanceAfter,
       balanceAfterExact: row.balanceAfterExact,
@@ -619,7 +630,7 @@ export const useBills = defineStore("bills", () => {
 
   return {
     bills, serverStatus, serverError,
-    summary, summaryStatus, summaryError, refreshSummary, getLedger,
+    summary, summaryStatus, summaryError, refreshSummary, getLedger, findChainTopup,
     add, addMany, addManyForAccountOnce, addOnce, seed, settleByRef, bindAccount,
     refreshServerLedger,
   };

@@ -176,7 +176,7 @@ import { capacityOrderLine, capacityRecoveryNotice, checkoutCapacityUnreadableTa
 // #ifdef H5
 import { onBeforeRouteLeave } from 'vue-router';
 // #endif
-import { promotionApi,deviceE3Api,purchaseEligibilityApi,sessionVault } from '@/api/runtime';
+import { promotionApi,deviceE3Api,purchaseEligibilityApi,purchasePaymentApi,sessionVault } from '@/api/runtime';
 import { captureRuntimeRevision,isCurrentRuntimeRevision } from '@/api/order-api';
 import type { PublicPromotion,ExpectedReward } from '@/api/promotion-api';
 import type { PromotionItem, PromotionOrder } from '@/api/promotion-api';
@@ -202,6 +202,8 @@ import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '
 import { promotionBundleHref, promotionCheckoutHref, promotionStoreHref, type PromotionDisclosure } from '@/lib/promotion-entry';
 import { firstPurchaseTermsRules, litePromotion, quoteIncludesPhoneGift } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
+import type { OrderTopupNetwork, OrderUsdtTopupRead } from '@/api/purchase-payment-api';
+import { confirmOrderTopupPayment, hasUsdt, orderTopupHref, orderTopupPayable, orderTopupPaymentChanged } from '@/lib/order-usdt-topup';
 import { onPurchaseRecordReleased, unfinishedOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { attributedBundleDiscount } from '@/api/bundle-quote';
 import { orderPaymentRejection } from '@/lib/order-payment-rejection';
@@ -211,7 +213,7 @@ import { commerceOrderIsPaid, commercePaidOrderAmount } from '@/lib/commerce-rev
 import { useConversations } from '@/store/conversations';
 import RewardRows from './reward-rows.vue';import PromotionTerms from './promotion-terms.vue';
 // trayHeight: the host's bottom tray as rendered (the host reads it); until it is read the tray spacer estimates from the footer.
-const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number;externalOrderNo?:string;leaveConfirmationOpen?:boolean}>();
+const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string;voucherId?:string;upgradeActivityId?:string;fromBundle?:boolean;trayHeight?:number;externalOrderNo?:string;leaveConfirmationOpen?:boolean;topupNetwork?:OrderTopupNetwork}>();
 const emit=defineEmits<{
   (event:'cancel-blocked',orderNo:string,summary:string):void;
   (event:'resume-external'):void;
@@ -695,7 +697,9 @@ async function pay(){
     emit('resume-external');return;
   }
   updateClock();if(paymentEntryChecking.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
+  const network=props.topupNetwork;
   if(session.externalPaymentRefused){
+    if(network)return;
     paymentSheetOpen.value=true;
     void confirmPayment();
     return;
@@ -715,9 +719,24 @@ async function pay(){
     const originalCurrent=paymentEntryFence(expectedOrder);
     const entryCurrent=()=>stillChecking()&&originalCurrent();
     error.value='';activityConflict.value=false;
+    let facts:OrderUsdtTopupRead|undefined;
+    if(network){
+      if(expectedOrder.orderNo!==props.orderNo||!expectedOrder.promotionQuoteId)return;
+      try{facts=await purchasePaymentApi.orderTopup(expectedOrder.orderNo,network);}
+      catch{if(entryCurrent())error.value=flowCopy.value.queryFailed;return;}
+      if(!entryCurrent())return;
+      if(!orderTopupPayable(facts)||hasUsdt(facts.shortfallUsdt)){
+        if(facts.state==='PAID')await recover();
+        else await navTo(orderTopupHref(expectedOrder.orderNo,network,expectedOrder.items?.map(item=>item.productName).join(', ')??''));
+        return;
+      }
+    }
     const result=await checkPaymentEligibility(expectedOrder,entryCurrent);
     if(!entryCurrent())return;
-    if(result?.ready&&canPay.value){paymentSheetOpen.value=true;void confirmPayment();}
+    if(result?.ready&&canPay.value){
+      if(facts&&(!await confirmOrderTopupPayment(facts.amountDueUsdt,paymentDialogOwner)||!entryCurrent()))return;
+      paymentSheetOpen.value=true;void confirmPayment(facts);
+    }
     else if(result?.blocked&&canCancel.value){
       const cancel=await confirm({title:flowCopy.value.cannotPay,message:result.blocked,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,owner:paymentDialogOwner});
       if(cancel&&entryCurrent())await cancelOrder();
@@ -725,7 +744,7 @@ async function pay(){
   }catch(cause){if(stillChecking())showOperationError(cause);}
   finally{paymentEntryChecking.value=false;}
 }
-async function confirmPayment(){
+async function confirmPayment(topup?:OrderUsdtTopupRead){
   updateClock();if(!paymentSheetOpen.value||paymentConfirming.value||leaving.value||!visible.value||!current()||!canPay.value)return;
   const expectedOrder=order.value,generation=readGeneration,runtime=captureRuntimeRevision(),sessionRevision=sessionVault.revision();
   if(!expectedOrder)return;
@@ -735,12 +754,12 @@ async function confirmPayment(){
   const paymentCurrent=()=>readCurrent(generation)&&auth.isAuthenticated&&isCurrentRuntimeRevision(runtime)
     &&(sessionVault.revision()===sessionRevision||sessionVault.isRefreshContinuation(sessionRevision))
     &&order.value?.orderNo===orderNo&&order.value?.amountUsdt===amountUsdt&&orderItemSignature(order.value?.items)===lines&&order.value?.payBy===payBy
-    &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown;
+    &&order.value?.paymentStatus==='PENDING'&&payWindow.value===true&&!session.unknown&&(!topup||orderTopupPayable(topup));
   paymentConfirming.value=true;paymentSheetOpen.value=false;
-  let rejection='',paymentDestination='',paymentReplace=false;paymentLeaveApproved=false;
+  let rejection='',paymentDestination='',paymentReplace=false,topupChanged=false;paymentLeaveApproved=false;
   try{
     await run(async()=>{
-      await executeSelectedPurchase({amount:amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
+      await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,
         details:expectedOrder.items?.map(item=>({name:item.productName,quantity:item.quantity}))},
         async authorization=>{
           try{
@@ -752,6 +771,7 @@ async function confirmPayment(){
             // The server answers a refusal with its code as the HTTP status; only a recorded outcome then decides the page.
             const refused=failure.kind==='business'||failure.kind==='http'&&failure.status===failure.code&&failure.status!<500;
             if(refused&&!failure.message.startsWith('PAYMENT_PASSWORD_'))rejection=failure.message;
+            topupChanged=!!topup&&orderTopupPaymentChanged(cause);
             throw cause;
           }
         },
@@ -764,7 +784,7 @@ async function confirmPayment(){
             paymentLeaveApproved=!!fromOrdinaryBundle;
             paymentReplace=false;
           },
-          commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}});
+          commandKey:()=>session.externalPaymentKey(),parseReceipt:async raw=>{await session.acceptExternalPayment(raw);}}, !!topup);
     });
     if(!readCurrent(generation)||paymentDestination)return;
     if(order.value?.paymentStatus==='PAID')await readActivation();
@@ -774,7 +794,12 @@ async function confirmPayment(){
       await walletRefresh;
       const reason=error.value;
       const recovered=await recover();
-      if(!recovered||!readCurrent(generation)||unknown.value||!canCancel.value)return;
+      if(!recovered||!readCurrent(generation)||unknown.value)return;
+      if(topupChanged&&props.topupNetwork){
+        paymentDestination=orderTopupHref(orderNo,props.topupNetwork,expectedOrder.items?.map(item=>item.productName).join(', ')??'');
+        return;
+      }
+      if(!canCancel.value)return;
       const cancel=await confirm({title:flowCopy.value.cannotPay,message:reason||p.value.disabledNote,confirmLabel:p.value.cancelOrder,cancelLabel:p.value.keep,owner:paymentDialogOwner});
       if(cancel&&readCurrent(generation))await cancelOrder();
     }
@@ -1135,6 +1160,12 @@ onMounted(async()=>{
       if(session.record.pending||session.record.order)await recover();else await Promise.all([loadQuote(),refreshWallet(true)]);
     }
   }catch{if(current())error.value=p.value.error;}finally{if(current())loading.value=false;}
+});
+let topupPayRequested=false;
+watch([canPay, loading], ([ready, pending])=>{
+  if(!ready||pending||!props.topupNetwork||topupPayRequested)return;
+  topupPayRequested=true;
+  void pay();
 });
 onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterval(timer);if(walletTimer)clearInterval(walletTimer);});
 </script>

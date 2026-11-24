@@ -1,7 +1,7 @@
 // Local frontend acceptance only. Never imported by src or deployed as a payment service.
 import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
-import {demoFixture,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoOrderPaymentDeadline,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 
@@ -12,6 +12,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   const orderCreates = new Map();
   const hiddenOrders = new Set();
   const hideCommands = new Map();
+  const ordersWithWalletCommands = new Set();
   let orderListScene;
   let nextHideFailure;
   const commandKeys = new Intl.Collator("en", {sensitivity:"base"});
@@ -36,6 +37,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       orderCreates.clear();
       hiddenOrders.clear();
       hideCommands.clear();
+      ordersWithWalletCommands.clear();
       orderListScene = undefined;
       nextHideFailure = undefined;
       omitCancelReceipt = omitWalletReceipt = failOrderRead = undefined;
@@ -258,13 +260,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     const action = path.match(/^\/api\/orders\/([^/]+)\/(pay|cancel)$/);
     if (action && method === 'POST') {
       const orderNo = decodeURIComponent(action[1]);
-      let order = state.createdOrders?.find(item => item.orderNo === orderNo);
-      if (!order) {
-        order = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=> 'GET'}).orders.find(item=>item.orderNo===orderNo);
-        if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
-      }
+      const order = demoAccountOrders(url,locale(),state).find(item=>item.orderNo===orderNo);
+      if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
       if (external.openOrderPayment(orderNo)) return {status:409,message:'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS',data:null};
       if (action[2] === 'cancel') {
+        if (order.retiredBankPaymentSession) return {status:409,message:'HDPAY_ORDER_NOT_CANCELLABLE',data:null};
         const result = ok(demoFixture(url,locale(),state,request));
         if (omitCancelReceipt) { omitCancelReceipt = undefined; return unavailableReceipt; }
         return result;
@@ -275,25 +275,39 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       // Like AppOrderCommandService.pay: once the deadline task has closed the order it is not payable; until then an
       // order past its deadline is refused as expired.
       if (!['PENDING','PAID'].includes(order.paymentStatus)) return {status:409,message:'ORDER_NOT_PAYABLE',data:null};
-      if (order.paymentStatus === 'PENDING' && order.expiresAt <= Date.now()) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
+      if (order.paymentStatus === 'PENDING' && demoOrderPaymentDeadline(order) <= Date.now()) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
       // The PIN fixture only verifies the password. The commerce fixture authorizes the funds against the account's
       // one wallet balance and settles stock, capacity, receipt and fleet; the command is recorded only after it.
       const authorization = pin.authorize(request.postDataJSON());
       if (authorization.status !== 200) return authorization;
       const firstPayment=order.paymentStatus==='PENDING';
       let settled;
-      try { settled = demoFixture(url,locale(),state,request); }
+      try {
+        if (firstPayment && order.retiredBankPaymentSession)
+          throw Object.assign(new Error('HDPAY_COMMERCE_PAYMENT_REVIEW_REQUIRED'), {status:409});
+        settled = demoFixture(url,locale(),state,request);
+      }
       catch (error) {
         const refusal = {status:error.status??409,message:error.message,data:null};
-        if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
+        if (key) {
+          pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
+          ordersWithWalletCommands.add(orderNo);
+        }
         return refusal;
       }
       if(firstPayment)pin.state.payWrites++;
-      if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
+      if (key) {
+        pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
+        ordersWithWalletCommands.add(orderNo);
+      }
       if (omitWalletReceipt) { omitWalletReceipt = undefined; return unavailableReceipt; }
       return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
+  }
+  function hasOrderCommands(orderNo) {
+    syncScenario();
+    return ordersWithWalletCommands.has(orderNo) || [...hideCommands.values()].some(command => command.orderNo === orderNo);
   }
   function configureCheckoutReadback(update) {
     if (update.omitNextCancelReceipt === true) omitCancelReceipt = true;
@@ -310,7 +324,9 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   }
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
-    confirmLateOrderPayment:external.confirmLateOrderPayment,
+    confirmLateOrderPayment:external.confirmLateOrderPayment, topupIntent:external.topupIntent,
+    seedOrderTopupOriginal:external.seedOrderTopupOriginal, deliveredOrderPayment:external.deliveredOrderPayment,
+    orderPaymentRecords:external.orderPaymentRecords, hasOrderCommands,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode,configureCheckoutReadback};

@@ -6,7 +6,7 @@ import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRe
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
-import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { disabledLongOptions, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
@@ -23,6 +23,7 @@ import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.m
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createPaymentPinFlowFixture } from './lib/payment-pin-flow-fixture.mjs';
+import { applyDemoOrderTopupScene, demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -173,7 +174,7 @@ function scenarioSeed(url) {
 const mime={'.ico':'image/x-icon','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.woff':'font/woff','.mp4':'video/mp4'};
 const sendJson=(res,value,status=200)=>{res.writeHead(status,{'Content-Type':mime['.json'],'X-Preview-Scenario':scenarioId()});res.end(JSON.stringify(value));};
 const recoveryReads = new Set(['/api/me/notification-preferences', '/api/vouchers', '/api/app/wallet/bills/summary']);
-const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|device\/\d+\/deactivate|orders(?:\/(quote|bundle|DEMO-ORDER-\d+\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/account-deletion(?:\/cancel)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
+const modeledWrite=/^\/(auth\/users\/(refresh|logout|login)|api\/(me\/notification-preferences|goals(?:\/\d+(?:\/status)?)?|devices\/activate|device\/\d+\/deactivate|orders(?:\/(quote|bundle|(?:DEMO-ORDER-\d+|DEMO-B84-[A-Z0-9-]+)\/(pay|cancel)))?|withdrawals\/eligibility|points\/sign-in|points\/streak-saver\/use|earnings\/milestones\/evaluate|points\/milestones\/\d+\/claim|points\/power-ups\/\d+\/activate|quests\/[^/]+\/claim|trial\/start|growth\/day-one\/page-observations\/(earn|store|s1-roi)|vouchers\/V-DESIGN\/claim|events\/demo-[^/]+\/(join|claim|spin|reminder)|events\/genesis-raffle\/demo-draw-0\/enter|content\/trust\/sections\/[^/]+\/view|content\/learning\/courses\/review-course-\d\/(start|complete|quiz)|notifications\/(read|read-all|\d+\/(read|actions))|app\/support\/conversations(?:\/DEMO-SUPPORT-\d+\/(read|replies|dismiss))?|app\/team\/ambassador-applications(?:\/\d+\/materials(?:\/files)?)?|app\/security\/account-deletion(?:\/cancel)?|app\/profile(?:\/language)?|app\/compute-share\/enrollments|app\/trade-in\/(eligibility|quote|capacity-quote|submit)))$/;
 const server=http.createServer(async(req,res)=>{
   // A write belongs to the scenario it started in: one whose body arrives after a scenario change is refused, and so
   // is any request from a page of another scenario (checked below).
@@ -194,7 +195,8 @@ const server=http.createServer(async(req,res)=>{
         let raw='';for await(const chunk of req)raw+=chunk;const update=JSON.parse(raw||'{}');
         if(update.resetPin){checkoutFlow.pin.state.password=null;checkoutFlow.pin.state.version=0;checkoutFlow.pin.state.attempts=5;checkoutFlow.pin.state.lockedUntil=null;}
         if(typeof update.dropNextPayment==='boolean')checkoutFlow.pin.state.dropNextPayment=update.dropNextPayment;
-        if(update.observePayments===true)checkoutFlow.observePayments();
+        if(update.observePayments===true)
+          checkoutFlow.observePayments(Number.isSafeInteger(update.observedAt) ? update.observedAt : undefined);
         if(update.delayNextCreate===true)checkoutFlow.delayCreate();
         if('orderListScene' in update)checkoutFlow.selectOrderListScene(update.orderListScene);
         if('failNextHide' in update)checkoutFlow.failNextHide(update.failNextHide);
@@ -217,7 +219,7 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
-      let withdrawalRecoverySeed, longContentUnavailable;
+      let withdrawalRecoverySeed, longContentUnavailable, orderTopupFailure;
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
@@ -245,7 +247,7 @@ const server=http.createServer(async(req,res)=>{
           state.outOfStockProductNo=update.outOfStockProductNo;
         }
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
         const paymentMode=demoPaymentScenario(state);
         if(state.dataState==='empty')state.withdrawLimitState='open';
@@ -262,7 +264,8 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
+        if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -335,6 +338,16 @@ const server=http.createServer(async(req,res)=>{
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }
+        const topupSelection=demoOptions.orderTopupState.find(([value])=>value===update.orderTopupState);
+        if(topupSelection||update.reset||scenarioChange){
+          const scene=topupSelection?.[0]??state.orderTopupState;
+          const result=applyDemoOrderTopupScene(url,state,Date.now(),checkoutFlow,scene);
+          if(result&&result.status!==200)orderTopupFailure={status:result.status,message:result.body.message};
+          else {
+            state.orderTopupState=scene;
+            state.orderTopupPreview=result?.body.data??null;
+          }
+        }
       }
       const options=state.dataState==='empty'
         ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
@@ -342,7 +355,7 @@ const server=http.createServer(async(req,res)=>{
       const supportReadbackState=selectedSupportAccount(url)?.supportReadbackState??'missing';
       return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,supportReadbackState,
         disabledLongOptions:disabledLongOptions(state),
-        ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
+        ...(orderTopupFailure?{message:orderTopupFailure.message}:longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})},orderTopupFailure?.status??200);
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
@@ -367,6 +380,10 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
+      if(req.method==='GET'&&url.pathname==='/api/deposits/policy'&&state.orderTopupState==='policy-loading')
+        await new Promise(resolve=>setTimeout(resolve,2500));
+      const orderTopup=req.method==='GET'?demoOrderTopupResponse(url,state,locale,Date.now(),req.headers,checkoutFlow):undefined;
+      if(orderTopup)return sendJson(res,orderTopup.body,orderTopup.status);
       if(req.method==='GET'){
         const accountId=url.pathname==='/api/genesis/state'
           ? previewSelectedAccountId(state) : previewAccountId(state,req.headers);
