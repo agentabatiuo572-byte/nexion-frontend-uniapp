@@ -768,8 +768,9 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
         async authorization=>{
           try{
             updateClock();if(!paymentCurrent())return;
-            await session.pay(authorization);
+            // Set before the command: a lost response confirmed later through the original key shows the same exact amount.
             topupPaid.value=topup?{orderNo,amount:topup.amountDueUsdt}:null;
+            await session.pay(authorization);
           }
           catch(cause){
             const failure=asApiError(cause);
