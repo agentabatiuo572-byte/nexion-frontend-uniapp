@@ -18,7 +18,7 @@
 
       <view class="tcs-device">
         <CatalogMachineImage class="tcs-device-art" :sku="trialView.productId.value" :image-url="trialView.imageUrl.value" scope-key="trial-claim" />
-        <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '-' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
+        <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '—' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
       </view>
 
       <view v-if="activated" class="tcs-success" role="status" aria-live="polite">
@@ -35,7 +35,12 @@
       </template>
 
       <view v-if="claimError" class="tcs-error" role="alert"><text class="tcs-error-t">{{ claimErrorText }}</text></view>
-      <view v-else-if="!activated && freeTrial.authorityStatus === 'error'" class="tcs-error" role="status"><text class="tcs-error-t">{{ copy.unavailable }}</text></view>
+      <!-- A failed read recovers on its own (03 §3.5.2, 04.5): warning icon, the result and the retry line, no button. -->
+      <view v-else-if="!activated && !claiming && stateReadFailed" class="tcs-read-state" role="status">
+        <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
+        <text class="tcs-read-state__title">{{ copy.pageUnavailable }}</text>
+        <text class="tcs-read-state__hint">{{ copy.autoRetrying }}</text>
+      </view>
 
       <view class="tcs-ctas">
         <template v-if="activated">
@@ -71,14 +76,16 @@ const app = useApp();
 const t = useT();
 const copy = useTrialLifecycleCopy();
 
-const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '-');
-const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
+// The result stays up while recovery re-reads, so a retry does not blink it away.
+const stateReadFailed = computed(() => freeTrial.authorityStatus === 'error' || (freeTrial.authorityStatus === 'loading' && freeTrial.lastReadFailed));
+const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
+const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '—' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
 const estimateNote = computed(() => trialView.config.value
   ? trialView.config.value.shadowDailyUSD === null ? '' : fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
-}) : freeTrial.authorityStatus === 'error' ? copy.value.unavailable : copy.value.loading);
+}) : stateReadFailed.value ? '' : copy.value.loading);
 const remainingText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
 
 // Claim submission — loading guard against double taps (异常3; the store's
@@ -103,7 +110,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === 'used' ? copy.value.buyDevice
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
-  : claimError.value || freeTrial.authorityStatus === 'error' ? t.value.trial.claimRetryCta : copy.value.activateCta);
+  : claimError.value ? t.value.trial.claimRetryCta : copy.value.activateCta);
 const claimErrorText = computed(() => claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : claimErrorReason.value === 'capacity-full' ? copy.value.capacityFull
@@ -234,6 +241,11 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-success-time > text:last-child { font-size:22px;font-weight:500;color:var(--v5-brand); }
 .tcs-error { margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--v5-warning) 10%,transparent); }
 .tcs-error-t { display:block;font:400 12px/1.65 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+/* Read failure in the sheet: the receipt sheet's result block (03 §3.5.2, 04.5), centred, no button. */
+.tcs-read-state { display:flex;flex-direction:column;align-items:center;padding:20px 24px 0;text-align:center; }
+.tcs-read-state__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-warning-ink);background:var(--v5-warning-soft); }
+.tcs-read-state__title { display:block;margin-top:12px;color:var(--v5-ink);font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:break-word; }
+.tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);overflow-wrap:break-word; }
 .tcs-ctas { margin-top:20px;display:flex;flex-direction:column;gap:8px; }
 .tcs-claim { box-sizing:border-box;width:100%;min-height:48px;padding:12px 16px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--v5-brand);box-shadow:0 0 24px color-mix(in srgb,var(--v5-brand) 18%,transparent);transition:transform .12s ease; }
 .tcs-claim:active { transform:scale(.98); }

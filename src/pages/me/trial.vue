@@ -18,9 +18,12 @@
     <view class="trial-page">
       <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="trialDeviceName || undefined" />
 
-      <!-- Before the first answer the page keeps its shape (03 §3.4). Only a read that came back without a usable
-           state is the whole-page result with its one 重新加载 (03 §3.5.2). -->
-      <view v-if="authorityScreenUnavailable && authorityReadPending" class="trial-read-skeleton" role="status" aria-busy="true">
+      <!-- Before the first answer the page keeps its shape (03 §3.4). An unknown command result is confirmed by automatic
+           reads: a pending status, no query button. Only a read failure is the whole-page result with its one 重新加载 (03 §3.5.2). -->
+      <view v-if="authorityScreenUnavailable && freeTrial.authorityResultUnknown" class="trial-confirming nx-empty--page">
+        <NxResultHead tone="warning" icon="clock" :title="lifecycle.resultConfirming" :description="lifecycle.resultConfirmingNote" />
+      </view>
+      <view v-else-if="authorityScreenUnavailable && authorityReadPending" class="trial-read-skeleton" role="status" aria-busy="true">
         <view class="trial-read-skeleton__ring" aria-hidden="true" />
         <view class="trial-read-skeleton__title" aria-hidden="true" />
         <view class="trial-read-skeleton__body" aria-hidden="true" />
@@ -256,6 +259,7 @@ import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import EmptyState from "@/components/empty-state.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
 import { appDeviceOffline } from "@/lib/foreground-read";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useT } from "@/i18n/use-t";
@@ -291,10 +295,9 @@ const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.autho
 // meanwhile instead of swapping in the read state. Actions still wait on authorityUnavailable.
 const authorityScreenUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityServerState === null || freeTrial.authorityIncomplete));
 // A read is under way or about to start: the cold open before the first read, or a read with no failure behind it.
-// A failed read keeps its result up while recovery re-reads; an observed disconnect, an unknown command result and
-// an incomplete answer have nothing to wait for on screen.
+// A failed or incomplete read keeps its result up while recovery re-reads; an observed disconnect has nothing to wait for.
 const authorityReadPending = computed(() => freeTrial.authorityStatus === "loading"
-  ? !freeTrial.lastReadFailed
+  ? !freeTrial.lastReadFailed && !freeTrial.authorityIncomplete
   : freeTrial.authorityStatus === "unknown" && freeTrial.authorityError === null && !appDeviceOffline.value);
 
 const cfg = computed(() => trialConfig.config);
@@ -530,6 +533,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 </script>
 
 <style scoped>
+/* Unknown command result: the shared pending result head in the page's free height (03 §3.5.2, 3.6.1). */
+.trial-confirming { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px; }
 /* Loading keeps the states' shape, still: the 208 ring track where every state's ring sits, then title and body lines (03 §3.4). */
 .trial-read-skeleton { display:flex;flex-direction:column;align-items:center;padding-top:48px; }
 .trial-read-skeleton__ring { width:198px;height:198px;margin:5px;box-sizing:border-box;border-radius:50%;border:6px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
