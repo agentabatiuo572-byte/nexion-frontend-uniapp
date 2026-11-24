@@ -155,6 +155,12 @@ type DeviceSpawnApp = {
   devices: { id: string; activatedAt?: number | null }[];
 };
 
+export interface RemoteOrderFirstPage {
+  visible: Order[];
+  filteredEmpty: boolean;
+  isCurrent: () => boolean;
+}
+
 export const useOrders = defineStore("orders", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
@@ -269,9 +275,9 @@ export const useOrders = defineStore("orders", () => {
     };
   }
 
-  async function refreshRemote(): Promise<void> {
+  async function refreshRemote(): Promise<RemoteOrderFirstPage | null> {
     invalidateBeforePassiveTabRead("orders");
-    if (!remoteApiEnabled) return;
+    if (!remoteApiEnabled) return null;
     const requestBoundKey = boundKey;
     const requestEpoch = boundEpoch;
     const requestGeneration = ++refreshGeneration;
@@ -282,12 +288,15 @@ export const useOrders = defineStore("orders", () => {
       && isCurrentRuntimeRevision(requestRunScope);
     try {
       const canonical = await orderApi.list(null, 20);
-      if (!isCurrent()) return;
-      orders.value = canonical.orders.map(fromCanonical);
+      if (!isCurrent()) return null;
+      const firstPage = canonical.orders.map(fromCanonical);
+      const visible = firstPage.filter(order => isVisibleUsdtNetwork(order.paymentMethod));
+      orders.value = firstPage;
       nextCursor.value = canonical.nextCursor ?? null;
       failedOrderReadbacks.value.clear();
+      return { visible, filteredEmpty: firstPage.length > 0 && visible.length === 0, isCurrent };
     } catch (error) {
-      if (!isCurrent()) return;
+      if (!isCurrent()) return null;
       throw error;
     }
   }

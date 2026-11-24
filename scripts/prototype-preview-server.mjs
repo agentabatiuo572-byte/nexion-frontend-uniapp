@@ -21,6 +21,7 @@ import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
+import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createPaymentPinFlowFixture } from './lib/payment-pin-flow-fixture.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
@@ -38,6 +39,7 @@ if(process.env.DEMO_STATE_FILE){
   delete state.cancelledReplacementAssignments;
 }
 const authDemo=createAuthDemo(state);
+const meEntryDots=createMeEntryDotsFixture(state);
 const startedAt=Date.now();
 normalizeDemoLongContent(state);
 const unreservedBankQuote=removeUnreservedLongBankOrder(state);
@@ -197,6 +199,12 @@ const server=http.createServer(async(req,res)=>{
       }
       return sendJson(res,{simulation:true,payWrites:checkoutFlow.pin.state.payWrites,setupWrites:checkoutFlow.pin.state.setupWrites,configured:checkoutFlow.pin.state.password!==null,orders:state.createdOrders??[]});
     }
+    if(req.method==='POST'&&url.pathname==='/__demo/me-entry-dots'){
+      let raw='';for await(const chunk of req)raw+=chunk;
+      const update=JSON.parse(raw||'{}'),accountId=String(update.accountId??previewSelectedAccountId(state)??'');
+      if(!/^\d+$/.test(accountId))return sendJson(res,{code:422,message:'ME_DOTS_ACCOUNT_REQUIRED',data:null},422);
+      return sendJson(res,{accountId,...meEntryDots.configure(accountId,update)});
+    }
     if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
@@ -350,6 +358,11 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
+      if(req.method==='GET'){
+        const data=await meEntryDots.read(url,previewAccountId(state,req.headers),path=>
+          fixtureFor(new URL(path,url.origin),{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>({})}));
+        if(data!==undefined)return sendJson(res,{code:0,message:'OK',data});
+      }
       // B12 handoff: this rejection precedes command recording and all money writes.
       if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState!=='readonly') {
         let raw='';for await(const chunk of req)raw+=chunk;
@@ -413,6 +426,10 @@ const server=http.createServer(async(req,res)=>{
       }
       let body='';for await(const chunk of req)body+=chunk;
       if(staleWrite())return refuseStale();
+      if(req.method==='POST'&&meEntryDots.handlesClaim(url.pathname)){
+        const data=meEntryDots.claim(previewAccountId(state,req.headers),JSON.parse(body||'{}'),req.headers['idempotency-key']);
+        return sendJson(res,{code:0,message:'OK',data});
+      }
       const delayedEvent=beginDelayedDemoH4EventCommand(url,req.method,state,req.headers,Date.now());
       if(delayedEvent){
         await new Promise(resolve=>setTimeout(resolve,5000));

@@ -203,7 +203,10 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { isShownInventoryDevice } from "@/lib/me-entry-facts";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
 import AppChassis from "@/components/app-chassis.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -252,12 +255,29 @@ function closeReplacementDialogs() {
 }
 watch([() => app.accountKey, () => app.accountBindingEpoch], closeReplacementDialogs);
 const trial = useFreeTrial();
+const inventoryPageVisible = ref(false);
+const inventoryRead = useMeEntryRead(() => inventoryPageVisible.value);
+const entrySeen = useMeEntrySeen();
+
+async function readShownInventory(load: () => Promise<boolean>) {
+  const read = inventoryRead.capture("inventory");
+  if (!await load()) return;
+  await nextTick();
+  if (!read.current() || !app.remoteFleetHasSnapshot) return;
+  const ids = app.visibleDevices.filter(isShownInventoryDevice).map(device => device.id);
+  entrySeen.record("inventory", ids, read.scope, true);
+}
+
+watch([inventoryRead.visible, inventoryRead.ready, () => app.accountBindingEpoch], ([visible, ready]) => {
+  if (remoteApiEnabled && visible && ready) void readShownInventory(() => app.ensureRemoteFleet());
+});
 onShow(() => {
+  inventoryPageVisible.value = true;
   app.setDeviceInventoryVisible(true);
   void trial.refreshVisible(false, true);
-  if (remoteApiEnabled) void app.ensureRemoteFleet();
 });
 onHide(() => {
+  inventoryPageVisible.value = false;
   app.setDeviceInventoryVisible(false);
   closeReplacementDialogs();
 });
@@ -274,7 +294,7 @@ const inventoryError = computed(() => !inventoryReady.value && (app.remoteFleetS
   || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")));
 const inventoryLoading = computed(() => !inventoryReady.value && !inventoryError.value);
 async function retryInventory(retryTransientAssignments = false) {
-  await Promise.all([refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments), trial.poll(Date.now())]);
+  await Promise.all([readShownInventory(() => refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments)), trial.poll(Date.now())]);
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"
@@ -366,6 +386,7 @@ function openBay(target: string) {
 const { sheetDevice, handleDeactivate, onSheetWait, onSheetForce, runRemoteDeviceCommand } = useDeviceDeactivation();
 let deactivateRequest = 0;
 onUnload(() => {
+  inventoryPageVisible.value = false;
   app.setDeviceInventoryVisible(false);
   closeReplacementDialogs();
   deactivateRequest += 1;

@@ -741,6 +741,7 @@ export const useApp = defineStore("app", () => {
       baseRate: fullDailyUsdt,
       baseRateNEX: fullDailyNex,
       purchasedAt: device.purchasedAt ?? serverNow,
+      serverPurchasedAt: device.purchasedAt,
       activatedAt: active ? device.activatedAt : null,
       activationUnconfirmed,
       pendingDeactivate: device.pendingDeactivate,

@@ -9,7 +9,7 @@ import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoS
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 
-function demoReceiptSummary({
+export function demoReceiptSummary({
   receiptNo, taskNo, taskClass, model, client, rewardUsdt, rewardNex, earningStatus, completedAt,
   taskName = null, executionMode = 'MODEL', proofKind = 'MODEL_EXECUTION', modelExecuted = true,
   displayReceiptNo = null, settledAt = null,

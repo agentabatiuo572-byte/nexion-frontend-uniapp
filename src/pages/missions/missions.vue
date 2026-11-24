@@ -27,7 +27,7 @@
 </template>
 <script setup lang="ts">
 import { navTo } from "@/lib/route";
-import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -48,6 +48,12 @@ import { EVENTS } from "@/mock/events";
 import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { useApp } from "@/store/app";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useMeEntryRead } from "@/composables/use-me-entry-read";
+import { meMissionFacts } from "@/lib/me-entry-facts";
+import { useConfig } from "@/store/config";
+import { useMeEntrySeen } from "@/store/me-entry-seen";
+import { WEEKLY_QUEST_PAGE_READ_SETTLED } from "@/lib/weekly-quest-page-read";
 import { useQuest } from "@/store/quest";
 import { useLocaleStore } from "@/store/locale";
 import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
@@ -71,13 +77,45 @@ const language = computed(() => locale.code);
 const remoteEvents = ref<CanonicalEvent[]>([]);
 const remoteEventsReadState = ref<MissionRemoteEventsReadState>("initial");
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
-let mounted = false;
-const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted);
+const mounted = ref(false);
+const remoteRequestFence = createRemotePageRequestFence(remoteAccountEpoch, () => mounted.value);
+const missionRead = useMeEntryRead(() => mounted.value);
+const missionReadFailed = ref(false);
+const missionReadSettled = ref(!remoteApiEnabled);
+provide(WEEKLY_QUEST_PAGE_READ_SETTLED, missionReadSettled);
+const entrySeen = useMeEntrySeen();
+const config = useConfig();
+async function refreshMissionTasks(force = false) {
+  const read = missionRead.capture("missions");
+  if (!read.current()) return;
+  const success = await (force ? quest.refreshRemote() : quest.ensureRemote());
+  const snapshot = quest.remoteSnapshot;
+  await nextTick();
+  if (!read.current()) return;
+  missionReadSettled.value = true;
+  missionReadFailed.value = !success;
+  if (success && snapshot && quest.remoteSnapshot === snapshot) {
+    const facts = meMissionFacts(snapshot, Date.now(), config.isEnabled("stakingVisible"));
+    entrySeen.record("missions", facts, read.scope, true);
+  }
+}
+watch([missionRead.visible, missionRead.ready, () => app.accountBindingEpoch], ([visible, ready, epoch], previous) => {
+  if (epoch !== previous[2]) {
+    missionReadSettled.value = false;
+    missionReadFailed.value = false;
+  }
+  if (remoteApiEnabled && visible && ready) void refreshMissionTasks();
+});
+useAutoRecovery({
+  active: () => missionRead.ready.value,
+  failed: () => missionReadFailed.value,
+  retry: () => refreshMissionTasks(true),
+});
 let releaseActiveRefresh = () => {};
 function activatePageRefresh() {
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(async () => {
-    await Promise.all([refreshRemoteEvents(), quest.refreshRemote()]);
+    await Promise.all([refreshRemoteEvents(), missionReadFailed.value ? undefined : refreshMissionTasks(true)]);
   });
 }
 async function refreshRemoteEvents(): Promise<void> {
@@ -108,28 +146,27 @@ const missionVisibility = createPageVisibilityRefresh((reason) => {
     remoteEventsReadState.value = "initial";
   }
   void refreshRemoteEvents();
-  void quest.refreshRemote();
 });
 bindPageVisibilityRefresh(missionVisibility, {
   mounted: (callback) => onMounted(() => {
-    mounted = true;
+    mounted.value = true;
     activatePageRefresh();
     callback();
   }),
   shown: (callback) => onShow(() => {
-    mounted = true;
+    mounted.value = true;
     activatePageRefresh();
     callback();
   }),
   hidden: (callback) => onHide(() => {
-    mounted = false;
+    mounted.value = false;
     releaseActiveRefresh();
     remoteRequestFence.invalidate();
     callback();
   }),
 });
 onUnmounted(() => {
-  mounted = false;
+  mounted.value = false;
   releaseActiveRefresh();
   remoteRequestFence.invalidate();
 });
