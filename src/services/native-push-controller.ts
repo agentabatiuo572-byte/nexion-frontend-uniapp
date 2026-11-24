@@ -73,7 +73,16 @@ export function safePushRoute(value: unknown): value is string {
 
 const PUSH_CAPABILITIES = ["earning_push_v1"] as const;
 
-function deviceTimeZone(): string | undefined {
+function deviceTimeZone(platform: NativePushPort["platform"]): string | undefined {
+  // #ifdef APP-PLUS
+  if (platform === "android" && typeof plus !== "undefined") {
+    try {
+      const zone = plus.android.invoke("java.util.TimeZone", "getDefault");
+      const id = plus.android.invoke(zone, "getID");
+      if (typeof id === "string" && id && !/^GMT[+-]/.test(id)) return id;
+    } catch { /* Fall back to the JavaScript runtime's time zone. */ }
+  }
+  // #endif
   try {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // Intl also accepts fixed offsets, but the server needs a named zone.
@@ -165,7 +174,7 @@ export function createNativePushController(client: ApiClient, vault: SessionVaul
       const native = await port.token();
       if (!validNativePushToken(native, port.platform) || !current(snapshot, captured)) return;
       const clientId = native.token, provider = native.provider;
-      const timeZone = deviceTimeZone();
+      const timeZone = deviceTimeZone(port.platform);
       const capabilities = PUSH_CAPABILITIES;
       const key = JSON.stringify([snapshot.user.userId, snapshot.sessionChainId, id, provider, clientId, permission, timeZone, capabilities]);
       if (key === registered) { port.registrationUnavailable?.(false); return; }
