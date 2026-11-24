@@ -66,6 +66,7 @@
           :open="swipeOpenId === item.id" @update:open="swipeOpenId = $event ? item.id : ''" @delete="deleteTarget = item">
         <view
           class="order-card"
+          :data-order-id="item.kind === 'commerce' ? item.id : undefined"
           :class="{ 'order-card--pending': item.kind === 'commerce' && item.status === 'placed', 'nx-tint': item.id === tintedPendingId }"
           :role="item.kind === 'genesis' ? undefined : 'button'"
           :tabindex="item.kind === 'genesis' ? undefined : 0"
@@ -290,14 +291,21 @@ async function confirmDeleteExpired() {
   const order = orderList.value.find((item): item is CommerceOrderListItem => item.kind === "commerce" && item.id === id);
   if (!order || !swipeable(order) || hidingOrderId.value) return;
   const epoch = app.accountBindingEpoch;
+  const commerceIds = filteredCards.value.flatMap(card => card.kind === "commerce" ? [card.id] : []);
+  const at = commerceIds.indexOf(order.id);
   hidingOrderId.value = order.id;
   rememberOrderPaymentBeforeHide(app.accountKey, order);
   const hidden = await orders.hideExpiredOrder(order.id);
   if (epoch !== app.accountBindingEpoch) return;
   hidingOrderId.value = "";
   if (!hidden) toast.error(t.value.security.opFailed);
-  // The swipe action that opened the dialog is gone either way; focus lands on the page title instead of the page root (03 §3.5).
-  landFocusOnPage();
+  // The swipe action that opened the dialog is gone either way (03 §3.5): focus the card now in its place (the next one,
+  // or the one before when it was last), or the same card when it stays; the page title when no card is left.
+  const target = hidden ? commerceIds[at + 1] ?? commerceIds[at - 1] : order.id;
+  await nextTick();
+  const card = target && typeof document !== "undefined"
+    ? document.querySelector<HTMLElement>(`.order-card[data-order-id="${CSS.escape(target)}"]`) : null;
+  if (card) card.focus({ preventScroll: true }); else landFocusOnPage();
 }
 // One tinted card per screen region (01 §1.1.2): only the first awaiting-payment card in the list carries the warning tint; the rest stay solid.
 const tintedPendingId = computed(() => filteredCards.value.find((order): order is CommerceOrderListItem =>
@@ -343,8 +351,9 @@ const entrySeen = useMeEntrySeen();
 // acceptance cutoff. Limit the client's expired-intent snapshot reads to a day.
 const latePaymentReadWindow = 24 * 60 * 60_000;
 const orderPaymentReadKeys = computed(() => new Set(paymentRecords.value.filter(row => {
-  if (!isOrdersPurchaseRecord(row)) return false;
-  if (isUnfinishedPurchaseRecord(row)) return true;
+  if (isUnfinishedPurchaseRecord(row)) return isOrdersPurchaseRecord(row);
+  // An expired order payment is read again for a late transfer even when it was only discovered (not opened) here:
+  // a confirmation then shows the floating bar and keeps the expired order from being deleted.
   if (row.kind !== "ORDER_PAY" || row.lastStatus !== "EXPIRED" || !row.intentNo || row.businessDelivered || row.validated) return false;
   const { orderNo } = purchaseRecordPayload(row);
   if (typeof orderNo !== "string") return false;
