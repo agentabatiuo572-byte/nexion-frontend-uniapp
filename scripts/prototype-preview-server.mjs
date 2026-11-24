@@ -6,7 +6,7 @@ import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRe
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
-import { demoChainDepositAddress, initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, demoChainDepositFee, initializeDemoWalletHistory, initializeLegacyStreakSavers, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
@@ -78,7 +78,7 @@ const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
-const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-purchase-preselection-accounts-v1','nexgrid-trial-convert-accounts-v1','nexgrid-trial-checkout-accounts-v1','uvel-event-pending-accounts-v1'];
+const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-purchase-preselection-accounts-v1','nexgrid-trial-convert-accounts-v1','nexgrid-trial-checkout-accounts-v1','nexgrid-trial-topup-return-accounts-v1','uvel-event-pending-accounts-v1'];
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
 const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
@@ -311,6 +311,12 @@ const server=http.createServer(async(req,res)=>{
         if(update.eventState)delete state.raffleEntries;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         const now=Date.now();
+        // Preview-only provider callback for trial checkout funding without a store order.
+        if(Number.isSafeInteger(update.trialTopupDepositUsdt)&&update.trialTopupDepositUsdt>0&&update.trialTopupDepositUsdt<=1000000){
+          recordDemoChainDeposit(state,{network:'BEP20',
+            grossAmountUsdt:(update.trialTopupDepositUsdt+Number(demoChainDepositFee)).toFixed(6),
+            creditedUsdt:update.trialTopupDepositUsdt.toFixed(6),createdAt:now});
+        }
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);

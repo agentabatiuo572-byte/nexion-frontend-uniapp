@@ -12,7 +12,7 @@ import { navTo, navReplace, navBack } from '@/lib/route';
 import { formatAmount } from '@/lib/amount-display';
 import { validatePurchasePaymentReceipt } from '@/lib/purchase-payment-receipt';
 import { releasePurchaseCallerRecord } from '@/lib/purchase-caller-record';
-import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { purchasePaymentTiming, trialLateCanReselect } from '@/lib/purchase-payment-timing';
 import { orderTopupHref } from '@/lib/order-usdt-topup';
 import { appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
@@ -29,13 +29,14 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   walletOnly?: boolean;
   /** Recheck order facts after any read already in flight. */
   checkCurrent?: () => Promise<PurchaseContextCheck>;
+  topupHref?: (shortfall: number) => string | undefined;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
 export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; useOrderTopup?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
   orderDeadlineAt?: number; hiddenOrder?: { sku: string; imageUrl?: string; total: Order['total']; placedAt?: number };
-  lastStatus?: string; validated?: boolean; businessDelivered?: boolean };
+  lastStatus?: string; validated?: boolean; businessDelivered?: boolean; trialLateReleased?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
@@ -204,7 +205,7 @@ function pendingPayments() {
   try {
     const records = displayRecords();
     state.pendingReadError = false;
-    return records.filter(row => row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'REFUNDED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+    return records.filter(row => !row.trialLateReleased && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'REFUNDED' && !(row.lastStatus === 'DELIVERED' && row.validated));
   } catch {
     state.pendingReadError = true;
     return [];
@@ -268,14 +269,17 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   const businessDelivered = intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED';
   // A manual refund ends the payment, though user clients still receive MANUAL_REVIEW for it.
   const status = intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status;
-  if (!businessDelivered && (status === pending.lastStatus || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
+  const trialLateReleased = trialLateCanReselect(intent, Date.now());
+  if (!businessDelivered && ((status === pending.lastStatus && trialLateReleased === !!pending.trialLateReleased)
+      || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
   const orderDeadlineAt = pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined;
   if (intent.status === 'EXPIRED') {
     saveExpiry(accountKey, pending.commandKey, pending.kind, { ...pending, intentNo: intent.intentNo,
       paymentMethod: intent.paymentMethod, network: intent.network, orderDeadlineAt });
   } else {
     if (businessDelivered) validatePurchasePaymentReceipt(pending.kind, JSON.parse(pending.fingerprint)[1], intent.receipt, intent);
-    save({ ...pending, intentNo: intent.intentNo, lastStatus: status, businessDelivered }, accountKey);
+    if (trialLateReleased) releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+    save({ ...pending, intentNo: intent.intentNo, lastStatus: status, businessDelivered, trialLateReleased }, accountKey);
   }
   if (pending.kind === 'ORDER_PAY') return JSON.parse(pending.fingerprint)[1].orderNo;
 }
@@ -333,6 +337,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   // Legacy recovery rows have only the quote identity; bind their first validated original intent for subsequent reads.
   const known = { ...pending, paymentMethod: intent.paymentMethod, network: intent.network,
     orderDeadlineAt: pending.kind === 'ORDER_PAY' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined,
+    trialLateReleased: trialLateCanReselect(intent, Date.now()),
     intentNo: intent.intentNo, lastStatus: intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status, businessDelivered: intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED' };
   if (isOrderPaymentDiscoveryOnly(pending)) known.resumedOnThisDevice = true;
   delete known.quotaRefusal;
@@ -343,7 +348,10 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   }
   if (intent.status === 'EXPIRED') saveExpiry(state.accountKey, known.commandKey, known.kind, known);
   else {
-    try { save(known); }
+    try {
+      if (known.trialLateReleased) releasePurchaseCallerRecord(state.accountKey, known.kind, known.commandKey);
+      save(known);
+    }
     catch (error) {
       if (!settled(intent)) throw error;
       if (pending.lastStatus !== known.lastStatus || (pending.businessDelivered ?? false) !== known.businessDelivered) {
@@ -977,7 +985,7 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
   const refused = value.refusedPaymentKey ? records[value.refusedPaymentKey] : undefined;
   if (refused && !isVisiblePayment(refused)) return Promise.resolve(null);
   const existing = value.refusedPaymentKey ? refused
-    : Object.values(records).find(row => isVisiblePayment(row) && row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'REFUNDED' && !(row.lastStatus === 'DELIVERED' && row.validated));
+    : Object.values(records).find(row => !row.trialLateReleased && isVisiblePayment(row) && row.fingerprint === scope && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'REFUNDED' && !(row.lastStatus === 'DELIVERED' && row.validated));
   if (value.refusedPaymentKey && (!existing?.quotaRefusal || existing.fingerprint !== scope)) throw new Error('ORIGINAL_PAYMENT_MISMATCH');
   context = value;
   open(value, existing ?? null);
@@ -1062,6 +1070,11 @@ export function usePurchasePayment() {
     pause: () => { paused = true; clearTimeout(pollTimer); pollTimer = undefined; },
     wake: () => { paused = false; if (state.open) void query(); },
     topup: (shortfall: number) => {
+      if (state.kind === 'TRIAL_CONVERT' && context?.topupHref) {
+        const href = context.topupHref(shortfall);
+        if (href) closeAndNavigate(href);
+        return;
+      }
       const { orderNo, amount, deadlineAt, summary } = state;
       const query = `amount=${Number(amount)}&shortfall=${shortfall.toFixed(6)}&name=${encodeURIComponent(summary)}`
         + (orderNo ? `&orderNo=${encodeURIComponent(orderNo)}` : '')
@@ -1070,6 +1083,7 @@ export function usePurchasePayment() {
     },
     // Every close at the top of a payment page ends on the store home (user 2026-11-22); records and the bar stay.
     leaveToStore: () => closeAndNavigate('/pages/store/store'),
+    returnToTrial: () => closeAndNavigate('/pages/me/trial', true),
     openOrders: () => closeAndNavigate('/pages/store/orders'),
     openOrder: () => { const orderNo = state.orderNo; if (orderNo && !onOrderPage(orderNo)) closeAndNavigate(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`, true); else finish(null); },
     support: () => closeAndNavigate('/pages/me/support'),
@@ -1100,8 +1114,12 @@ export function purchaseRecordPayload(row: PendingExternal): Record<string, unkn
 }
 
 export function isUnfinishedPurchaseRecord(row: PendingExternal): boolean {
-  return !row.validated && !row.businessDelivered && !row.quotaRefusal
+  return !row.validated && !row.businessDelivered && !row.quotaRefusal && !row.trialLateReleased
     && row.lastStatus !== 'EXPIRED' && row.lastStatus !== 'DELIVERED' && row.lastStatus !== 'REFUNDED';
+}
+
+export function isReleasedLateTrialPayment(row: PendingExternal): boolean {
+  return row.kind === 'TRIAL_CONVERT' && row.trialLateReleased === true && row.lastStatus === 'MANUAL_REVIEW';
 }
 
 function isOrderPaymentDiscoveryOnly(row: PendingExternal): boolean {

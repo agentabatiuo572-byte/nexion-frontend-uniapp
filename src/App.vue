@@ -11,6 +11,10 @@ import { installNativePush, refreshNativePush, flushNativePushClick, showJPushPr
 import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
 // #endif
 import { navReset } from "@/lib/route";
+// #ifdef APP-PLUS
+import { navReplace } from "@/lib/route";
+import { pendingTrialTopupHref } from "@/lib/trial-topup-return";
+// #endif
 import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
 import { reportNativeSessionStage, reportNativeSessionTiming } from "@/api/native-session-storage";
@@ -373,6 +377,9 @@ let lastIdleSlot = 0;
 let trialExpiryAttempt = "";
 let lastTrialNoticeEpoch = -1;
 let lastTrialNoticeStatus: ReturnType<typeof useFreeTrial>["status"] = "none";
+// #ifdef APP-PLUS
+let nativeTrialTopupRestored = false;
+// #endif
 
 function refreshVisibleResource(route: string) {
   if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible(false, route === "pages/me/devices");
@@ -388,6 +395,13 @@ function runScheduledReads(route: string, reconnected = false) {
   const app = useApp();
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth) || app.accountKey !== auth.accountId) return;
+  // #ifdef APP-PLUS
+  if (!nativeTrialTopupRestored) {
+    nativeTrialTopupRestored = true;
+    const restartHref = route === "pages/index/index" ? pendingTrialTopupHref(app.accountKey) : null;
+    if (restartHref) { void navReplace(restartHref); return; }
+  }
+  // #endif
   const binding = `${app.accountKey}:${app.accountBindingEpoch}`;
   const resumed = binding !== scheduledReadBinding;
   const now = Date.now();

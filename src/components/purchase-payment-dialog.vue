@@ -271,10 +271,11 @@ import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
-import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { purchasePaymentTiming, trialLateCanReselect } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
+import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
 import { toast } from '@/store/ui';
 import { navTo } from '@/lib/route';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
@@ -458,6 +459,8 @@ watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment
 
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
 const dismiss = () => payment.notify('');
+const trialCopy = useTrialPurchaseCopy();
+const trialLateReleased = computed(() => trialLateCanReselect(s.intent, now.value));
 function noticeFor(kind: PurchaseNotice): Notice | null {
   const c = copy.value, order = s.kind === 'ORDER_PAY' && !!s.orderNo;
   // A reloaded payment has no way to order again (PRD §6).
@@ -481,7 +484,10 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: order ? c.continuePay : c.ok, secondary: order ? c.viewOrder : c.close, onPrimary: order ? () => payment.restart('methods') : payment.close, onSecondary: order ? payment.openOrder : payment.close }
       : { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
-    case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
+    case 'late': return trialLateReleased.value
+      ? { icon: 'info', tone: 'warning', title: c.lateTitle, body: trialCopy.value.coLatePayment,
+        primary: trialCopy.value.coChangeDevice, onPrimary: payment.returnToTrial, ...toOrder }
+      : { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     // Refunded to the original payment method (user 2026-11-24): the payment has ended, nothing is left to do here.
     case 'refunded': return { icon: 'info', tone: 'neutral', title: c.refundedTitle, body: c.refunded,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,

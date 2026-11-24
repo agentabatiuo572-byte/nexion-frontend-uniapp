@@ -25,6 +25,9 @@ export const trialPurchaseCopy = {
     resultPaid: '实付', resultSaved: '共节省', resultDevices: '查看我的设备', resultOrder: '查看订单',
     orderPaid: '实付', orderTrialReward: '试用奖励到账', orderRewardsReversed: '试用奖励已随退款收回',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "该设备已不可选，请重新选择",
+    coPurchaseUnavailable: "暂时无法购买，请稍后再试",
+    coLatePayment: "付款晚于截止时间，设备不会交付。款项将原路退回。",
     coChangeDevice: '更换设备',
     coTrialNotice: '本单使用试用抵扣金，购买后试用结束',
     coBalanceOnly: '本单仅支持余额支付',
@@ -62,6 +65,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Paid', resultSaved: 'You saved', resultDevices: 'View my devices', resultOrder: 'View order',
     orderPaid: 'Paid', orderTrialReward: 'Trial rewards credited', orderRewardsReversed: 'Trial rewards were taken back with the refund',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "This device is no longer available. Choose another device.",
+    coPurchaseUnavailable: "This purchase is temporarily unavailable. Please try again later.",
+    coLatePayment: "The payment was sent after the deadline. The device won’t be delivered. The funds will be returned to the original payment method.",
     coChangeDevice: 'Change device',
     coTrialNotice: 'Paid with trial credit; the trial ends after purchase',
     coBalanceOnly: 'wallet balance only',
@@ -99,6 +105,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Đã trả', resultSaved: 'Tiết kiệm', resultDevices: 'Xem thiết bị', resultOrder: 'Xem đơn hàng',
     orderPaid: 'Đã trả', orderTrialReward: 'Thưởng dùng thử đã nhận', orderRewardsReversed: 'Thưởng dùng thử đã được thu hồi cùng khoản hoàn',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Thiết bị này không còn được chọn. Vui lòng chọn thiết bị khác.",
+    coPurchaseUnavailable: "Hiện chưa thể mua. Vui lòng thử lại sau.",
+    coLatePayment: "Bạn đã thanh toán sau thời hạn nên thiết bị sẽ không được giao. Tiền sẽ được hoàn qua phương thức thanh toán ban đầu.",
     coChangeDevice: 'Đổi thiết bị',
     coTrialNotice: 'Dùng tiền khấu trừ dùng thử; mua xong, dùng thử kết thúc',
     coBalanceOnly: 'đơn này chỉ thanh toán bằng số dư',
@@ -136,6 +145,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Dibayar', resultSaved: 'Anda hemat', resultDevices: 'Lihat perangkat saya', resultOrder: 'Lihat pesanan',
     orderPaid: 'Dibayar', orderTrialReward: 'Hadiah uji coba masuk', orderRewardsReversed: 'Hadiah uji coba ditarik kembali bersama pengembalian dana',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Perangkat ini tidak lagi bisa dipilih. Pilih perangkat lain.",
+    coPurchaseUnavailable: "Pembelian belum bisa dilakukan. Coba lagi nanti.",
+    coLatePayment: "Pembayaran dikirim setelah batas waktu. Perangkat tidak akan dikirim. Dana akan dikembalikan melalui metode pembayaran semula.",
     coChangeDevice: 'Ganti perangkat',
     coTrialNotice: 'Dibayar dengan kredit uji coba; uji coba berakhir setelah beli',
     coBalanceOnly: 'hanya bisa bayar dengan saldo',
@@ -173,6 +185,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Dibayar', resultSaved: 'Jimat', resultDevices: 'Lihat peranti saya', resultOrder: 'Lihat pesanan',
     orderPaid: 'Dibayar', orderTrialReward: 'Ganjaran percubaan diterima', orderRewardsReversed: 'Ganjaran percubaan ditarik balik bersama bayaran balik',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Peranti ini tidak lagi boleh dipilih. Sila pilih peranti lain.",
+    coPurchaseUnavailable: "Pembelian tidak tersedia buat sementara waktu. Sila cuba lagi nanti.",
+    coLatePayment: "Bayaran dibuat selepas tarikh akhir. Peranti tidak akan dihantar. Wang akan dipulangkan melalui kaedah bayaran asal.",
     coChangeDevice: 'Tukar peranti',
     coTrialNotice: 'Dibayar dengan kredit percubaan; percubaan tamat selepas beli',
     coBalanceOnly: 'hanya boleh bayar dengan baki',
@@ -210,6 +225,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Bayad', resultSaved: 'Natipid mo', resultDevices: 'Tingnan ang device', resultOrder: 'Tingnan ang order',
     orderPaid: 'Bayad', orderTrialReward: 'Pumasok ang reward sa trial', orderRewardsReversed: 'Binawi ang reward sa trial kasama ng refund',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Hindi na mapipili ang device na ito. Pumili ng ibang device.",
+    coPurchaseUnavailable: "Pansamantalang hindi makabili. Subukan ulit mamaya.",
+    coLatePayment: "Naipadala ang bayad lagpas sa deadline. Hindi ihahatid ang device. Ibabalik ang bayad sa orihinal na paraan ng pagbabayad.",
     coChangeDevice: 'Palitan ang device',
     coTrialNotice: 'Bayad gamit ang credit sa trial; tapos ang trial pagkabili',
     coBalanceOnly: 'balance lang ang pambayad',
@@ -247,6 +265,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Оплачено', resultSaved: 'Экономия', resultDevices: 'Мои устройства', resultOrder: 'Открыть заказ',
     orderPaid: 'Оплачено', orderTrialReward: 'Награды зачислены', orderRewardsReversed: 'Награды пробного периода отозваны с возвратом',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Это устройство больше недоступно. Выберите другое устройство.",
+    coPurchaseUnavailable: "Покупка временно недоступна. Повторите попытку позже.",
+    coLatePayment: "Платёж отправлен после окончания срока оплаты. Устройство не будет доставлено. Деньги вернутся тем же способом, которым вы платили.",
     coChangeDevice: 'Сменить устройство',
     coTrialNotice: 'Оплата пробным бонусом; пробный период завершится',
     coBalanceOnly: 'оплата только с баланса',
@@ -284,6 +305,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Төленді', resultSaved: 'Үнемдедіңіз', resultDevices: 'Құрылғыларымды қарау', resultOrder: 'Тапсырысты қарау',
     orderPaid: 'Төленді', orderTrialReward: 'Сынақ сыйақылары түсті', orderRewardsReversed: 'Сынақ сыйақылары қайтарыммен бірге кері алынды',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Бұл құрылғы енді қолжетімсіз. Басқа құрылғыны таңдаңыз.",
+    coPurchaseUnavailable: "Қазір сатып алу мүмкін емес. Кейінірек қайталап көріңіз.",
+    coLatePayment: "Төлем мерзімі өткеннен кейін жіберілген. Құрылғы жеткізілмейді. Қаражат бастапқы төлем әдісімен қайтарылады.",
     coChangeDevice: 'Құрылғыны ауыстыру',
     coTrialNotice: 'Сынақ бонусымен төленеді; сынақ аяқталады',
     coBalanceOnly: 'тек баланстан төленеді',
@@ -321,6 +345,9 @@ export const trialPurchaseCopy = {
     resultPaid: 'Toʻlandi', resultSaved: 'Tejaldi', resultDevices: 'Qurilmalarim', resultOrder: 'Buyurtma',
     orderPaid: 'Toʻlandi', orderTrialReward: 'Sinov mukofotlari tushdi', orderRewardsReversed: 'Pul qaytarilgani sababli sinov mukofotlari qaytarib olindi',
     // Trial checkout (checkout.vue, trial purchase only).
+    coDeviceRemoved: "Bu qurilmani endi tanlab boʻlmaydi. Boshqa qurilmani tanlang.",
+    coPurchaseUnavailable: "Hozir xarid qilib boʻlmaydi. Keyinroq qayta urinib koʻring.",
+    coLatePayment: "Toʻlov muddat tugagandan keyin yuborilgan. Qurilma yetkazilmaydi. Mablagʻ dastlabki toʻlov usuli orqali qaytariladi.",
     coChangeDevice: 'Qurilmani almashtirish',
     coTrialNotice: 'Sinov mablagʻi bilan toʻlanadi; sinov tugaydi',
     coBalanceOnly: 'faqat balansdan toʻlanadi',

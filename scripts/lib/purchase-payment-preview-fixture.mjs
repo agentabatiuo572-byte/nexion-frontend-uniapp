@@ -118,10 +118,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (payload.productNo !== trial.config.trialProductId)
       reject(trialPurchaseOptionsEnabled(state)?'TRIAL_BALANCE_ONLY':'TRIAL_PRODUCT_NOT_ELIGIBLE');
     if (payload.quoteVersion !== trial.quote.quoteVersion) reject('TRIAL_QUOTE_CHANGED');
-    if (trialPurchaseOptionsEnabled(state)) {
-      const product=demoProducts(state,url.origin).find(row=>row.id===payload.productNo);
-      if (!product?.available || product.status!=='active') reject('TRIAL_PRODUCT_REMOVED');
-    }
+    // The claim's own SKU bypasses product purchase conditions. Release, stock and hardware quota still apply.
+    requireDemoPurchase(state,demoProducts(state,url.origin),[{productNo:payload.productNo,quantity:1}],Date.now(),true,null,true);
     return trial;
   }
   const quotaItems = (subject, payload, order) => subject.kind === 'ORDER_PAY'
@@ -496,12 +494,29 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
   }
-  function setTrialExternalSample(origin, enabled) {
+  function setTrialExternalSample(origin, enabled, late = false) {
     sync();
     const current=originalTrialPurchase();
     if (!enabled) {
       const intent=intents.get(current?.paymentNo);
       if (intent?.trialSample) expire(intent,'PAYMENT_TIMEOUT');
+      return {status:200};
+    }
+    if (late) {
+      const subject={kind:'TRIAL_CONVERT',identity:state.trialRow?.startedAt};
+      const previous=[...intents.values()].findLast(row=>sameSubject(row,subject)&&row.reason==='PAYMENT_LATE_REVIEW');
+      if (previous && !current) return {status:200};
+      if (!current) {
+        const seeded=setTrialExternalSample(origin,true);
+        if (seeded.status!==200) return seeded;
+      }
+      const intent=intents.get(originalTrialPurchase()?.paymentNo);
+      if (intent?.status!=='AWAITING_PAYMENT') return refused(409,'TRIAL_PREVIEW_AWAITING_PAYMENT_REQUIRED');
+      const now=Date.now(), deadline=now-graceEnd(intent.paymentMethod,0)-60000;
+      Object.assign(intent,{deadline,expiresAt:new Date(deadline).toISOString(),deadlineAt:new Date(deadline).toISOString(),
+        confirmationGraceEndsAt:new Date(graceEnd(intent.paymentMethod,deadline)).toISOString()});
+      expire(intent,'PAYMENT_TIMEOUT');
+      lateArrival(intent,now);
       return {status:200};
     }
     if (current) return {status:200};

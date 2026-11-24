@@ -188,6 +188,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       state.trialOriginalPurchaseState=mode;
       return {status:200};
     }
+    if (mode==='external-late'&&!state.trialBalancePurchase) {
+      const result=external.setTrialExternalSample(origin,true,true);
+      if (result.status===200) state.trialOriginalPurchaseState=mode;
+      return result;
+    }
     if (originalTrialPurchase()) return {status:409,message:'TRIAL_EXISTING_PURCHASE'};
     if (mode==='external') {
       const result=external.setTrialExternalSample(origin,true);

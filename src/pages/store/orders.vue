@@ -158,7 +158,7 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import { landFocusOnPage } from "@/composables/use-dialog-a11y";
 import ConversationSwipeRow from "@/components/support/conversation-swipe-row.vue";
-import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isUnfinishedPurchaseRecord, orderPaymentDeadline, purchaseRecordPayload, refreshPendingPayments, rememberOrderPaymentBeforeHide, usePurchasePayment } from "@/store/purchase-payment";
+import { hasUnfinishedOrderPayment, isOrdersPurchaseRecord, isReleasedLateTrialPayment, isUnfinishedPurchaseRecord, orderPaymentDeadline, purchaseRecordPayload, refreshPendingPayments, rememberOrderPaymentBeforeHide, usePurchasePayment } from "@/store/purchase-payment";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { GENESIS_MEDIA, getProductMedia } from "@/lib/product-media";
@@ -233,10 +233,11 @@ type PaymentRow = ReturnType<typeof payment.records>[number];
 type PaymentCard = { kind: "payment"; key: string; row: PaymentRow; title: string; tag: string; tone: "success" | "warning"; sku?: string; imageUrl?: string; orderNo?: string; kindLabel: string; method: string; startedAt?: number; amount: { value: string | number | null; currency: "USD" | "USDT" } };
 const paymentRecords = computed(() => payment.records());
 const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap((row): PaymentCard[] => {
-  if (!isUnfinishedPurchaseRecord(row) || !isOrdersPurchaseRecord(row)) return [];
+  const releasedLateTrial = isReleasedLateTrialPayment(row);
+  if (!isOrdersPurchaseRecord(row) || (!releasedLateTrial && !isUnfinishedPurchaseRecord(row))) return [];
   const payload = purchaseRecordPayload(row), c = paymentCopy.value;
   const base = { kind: "payment" as const, key: row.commandKey, row, title: row.summary,
-    tag: row.lastStatus === "MANUAL_REVIEW" ? c.confirming : row.lastStatus === "FUNDS_CONFIRMED" ? c.received : c.waiting,
+    tag: releasedLateTrial ? c.lateTitle : row.lastStatus === "MANUAL_REVIEW" ? c.confirming : row.lastStatus === "FUNDS_CONFIRMED" ? c.received : c.waiting,
     // Money received (03 §3.8) reads as success; waiting and confirmation stay warning.
     tone: row.lastStatus === "FUNDS_CONFIRMED" ? "success" as const : "warning" as const,
     startedAt: Number.isFinite(row.startedAt) ? row.startedAt : undefined };
@@ -265,7 +266,8 @@ const paymentCards = computed<PaymentCard[]>(() => paymentRecords.value.flatMap(
 }));
 type ListCard = OrderListItem | PaymentCard;
 function cardCategory(card: ListCard) {
-  return card.kind === "payment" ? "pending" : orderCategory(card);
+  if (card.kind !== "payment") return orderCategory(card);
+  return isReleasedLateTrialPayment(card.row) ? "closed" : "pending";
 }
 function cardTime(card: ListCard) {
   return card.kind === "payment" ? card.startedAt ?? 0 : card.placedAt;
@@ -278,7 +280,8 @@ const hasMoreOrders = computed(() => remoteApiEnabled && Boolean(orders.nextCurs
 const listShown = computed(() => orderPanels.value.mainPresentation === "list"
   || orderPanels.value.mainPresentation !== "loading" && (paymentCards.value.length > 0 || hasMoreOrders.value));
 function openPaymentCard(card: PaymentCard) { void payment.resume(card.row); }
-const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length + paymentCards.value.length);
+const pendingCount = computed(() => orderList.value.filter(order => orderCategory(order) === "pending").length
+  + paymentCards.value.filter(card => cardCategory(card) === "pending").length);
 const swipeOpenId = ref("");
 const deleteTarget = ref<OrderListItem | null>(null);
 const hidingOrderId = ref("");
