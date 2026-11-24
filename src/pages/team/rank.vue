@@ -330,7 +330,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-dock { position:fixed;display:flex; }
 .rank-dock > .nx-button { flex:1; }
 /* 焦点卡（DESIGN 第 4 节、7.5）：.nx-tint 取等级色相（rankTierVars 的 --nx-tint），圆角 22、内边距 20；身份区竖排，徽章居中。 */
-.rank-focus { position:relative;isolation:isolate;overflow:hidden;padding:0 20px 20px;border-radius:var(--ui-radius-surface); }
+.rank-focus { position:relative;isolation:isolate;overflow:hidden;padding:20px;border-radius:var(--ui-radius-surface); }
 .rank-identity { display:flex;flex-direction:column;align-items:center;text-align:center; }
 .rank-plate { position:relative;isolation:isolate;display:grid;place-items:center;flex:none;margin-bottom:12px; }
 /* 光晕：等级色相按 --halo 占比的径向渐变，直径为画布的 1.6 倍；纹样为画布的 1.7 倍。都以徽章为中心，静态，不用模糊滤镜。 */
@@ -348,7 +348,7 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !!vState.remoteError, retry:
 .rank-section__title:lang(zh) { letter-spacing:0; }
 /* 纯色卡（01 §1.1.2）：surface 实底，浅色加轻阴影。 */
 .rank-card { padding:4px 16px;border-radius:var(--ui-radius-surface);background:var(--v5-surface);box-shadow:inset 0 0 0 1px var(--v5-border); }
-:global([data-theme="light"]) .rank-card { box-shadow:inset 0 0 0 1px var(--v5-border),var(--v5-glass-shadow); }
+[data-theme="light"] .rank-card { box-shadow:inset 0 0 0 1px var(--v5-border),var(--v5-glass-shadow); }
 .rank-gain { display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:12px;min-height:56px;padding:8px 0;box-sizing:border-box;border-bottom:1px solid color-mix(in srgb,var(--v5-ink) 6%,transparent); }
 .rank-gain:last-child { border-bottom:0; }
 .rank-gain__name { display:flex;align-items:center;gap:4px;min-width:0;font:400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);color:var(--v5-ink); }
