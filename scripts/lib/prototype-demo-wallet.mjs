@@ -95,17 +95,54 @@ export function demoTeamWeek(at) {
 export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
   ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
-export function demoCreditedDeposits(state) {
+export const demoChainDepositFee = '0.123456';
+export const demoChainDepositMinimum = '50';
+export const demoChainDepositAddress = network => '0x' + (network === 'ERC20' ? '2' : '1').repeat(40);
+
+function demoCreditedDeposits(state) {
   const original = demoCreditedDeposit(state);
   if (!original) return [];
   const deposit = (network, marker, grossAmountUsdt, creditedUsdt) => ({ network, txHash: '0x' + marker.repeat(64),
-    grossAmountUsdt, feeUsdt: '0.123456', creditedUsdt });
-  if (state.billRefsState !== 'b84-deposit') return [{ ...original, deposit: deposit('BEP20', 'a', '50.123456', '50') }];
+    grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt });
+  const history = [{ ...original, deposit: deposit('BEP20', 'a', '50.123456', '50') }];
+  if (state.billRefsState !== 'b84-deposit') return history;
   return [
-    { ...original, deposit: deposit('BEP20', 'a', '50.234567', '50.111111'), creditedUsdt: 50.111111 },
+    ...history,
+    { depositId: 'CR-80', createdAt: original.createdAt - 500, deposit: deposit('BEP20', 'c', '50.234567', '50.111111'), creditedUsdt: 50.111111 },
     { depositId: 'CR-78', createdAt: original.createdAt - 1000, deposit: deposit('ERC20', 'b', '62.345678', '62.222222'), creditedUsdt: 62.222222 },
     { depositId: 'CR-79', createdAt: original.createdAt - 2000, deposit: null, creditedUsdt: 73.333333 },
+    { depositId: 'CR-81', createdAt: original.createdAt - 3000, creditedUsdt: 84.444444 },
   ];
+}
+
+export function demoChainDeposits(state) {
+  const history = demoCreditedDeposits(state).filter(row => row.deposit).map(({ depositId, createdAt, deposit }) => ({
+    depositId, createdAt, creditedAt: createdAt, network: deposit.network, txHash: deposit.txHash,
+    address: demoChainDepositAddress(deposit.network), confirmations: 15, requiredConfirmations: 15, status: 'CREDITED',
+    grossAmountUsdt: Number(deposit.grossAmountUsdt), grossAmountUsdtExact: deposit.grossAmountUsdt,
+    creditedUsdt: Number(deposit.creditedUsdt), creditedUsdtExact: deposit.creditedUsdt,
+  }));
+  return [...(state.chainDepositEvents ?? [])].reverse().concat(history);
+}
+
+export function recordDemoChainDeposit(state, { network, grossAmountUsdt, creditedUsdt, createdAt }) {
+  const events = state.chainDepositEvents ??= [];
+  const sequence = events.length + 1, depositId = 'CR-' + (1000 + sequence);
+  const txHash = '0x' + sequence.toString(16).padStart(64, '0');
+  const credited = Number(creditedUsdt) > 0;
+  events.push({
+    depositId, network, txHash, address: demoChainDepositAddress(network), createdAt,
+    grossAmountUsdt: Number(grossAmountUsdt), grossAmountUsdtExact: grossAmountUsdt,
+    creditedUsdt: Number(creditedUsdt), creditedUsdtExact: creditedUsdt,
+    confirmations: 15, requiredConfirmations: 15, status: credited ? 'CREDITED' : 'DUST_HOLD',
+    creditedAt: credited ? createdAt : null,
+  });
+  if (!credited) return;
+  postDemoWalletEntries(state, {
+    bizNo: depositId, bizType: 'CHAIN_TOPUP', asset: 'USDT', direction: 'IN', category: 'topup', at: createdAt,
+    amount: Number(creditedUsdt), amountExact: creditedUsdt, network,
+    deposit: { network, txHash, grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt },
+  });
 }
 
 export function demoTeamPeriod(period,now,snapshotAt) {

@@ -379,8 +379,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
           && parsed.expiresAt > parsed.placedAt;
       case "paid":
         return paymentStatus === "PAID" && orderStatus === "PAID"
-          && activationStatus === "WAITING_PROVISIONING" && parsed.paidAt !== null
-          && parsed.activatedAt === null;
+          && activationStatus === "WAITING_PROVISIONING" && parsed.activatedAt === null;
       case "provisioning":
         return paymentStatus === "PAID" && (orderStatus === "PROCESSING" || orderStatus === "PROVISIONING")
           && activationStatus === "PROVISIONING" && parsed.paidAt !== null

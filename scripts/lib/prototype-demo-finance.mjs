@@ -3,7 +3,7 @@ import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-acc
 import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawalUser } from './prototype-demo-secondary.mjs';
-import { demoCreditedDeposits, demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, demoChainDepositFee, demoChainDepositMinimum, demoChainDeposits, demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const day=86400000;
 const money = amount => Number(amount.toFixed(6));
 const exchangeDay = new Intl.DateTimeFormat('en-CA', {
@@ -288,24 +288,17 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const paymentMode = demoPaymentScenario(state);
     const networks = ['BEP20', 'ERC20'].map(network => {
       const enabled = paymentMode !== 'usdt-off' && !(paymentMode === 'erc20-off' && network === 'ERC20');
-      const feeUsdt = .123456;
       return { network, enabled, disabledReason: enabled ? null : 'NETWORK_SWITCH_OFF', confirmations: 15,
-        feeUsdt, feeUsdtExact: String(feeUsdt), minDepositUsdt: 50, minDepositUsdtExact: '50' };
+        feeUsdt: Number(demoChainDepositFee), feeUsdtExact: demoChainDepositFee,
+        minDepositUsdt: Number(demoChainDepositMinimum), minDepositUsdtExact: demoChainDepositMinimum };
     });
     if (p === "/api/deposits/policy") return { networks };
     const network = url.searchParams.get('network') || 'BEP20';
     const policy = networks.find(row => row.network === network);
     if (!policy?.enabled) return { enabled: false, creditEnabled: false, network, reason: 'CREGIS_DEPOSIT_PAUSED' };
-    return { enabled: true, creditEnabled: true, network, address: `0x${(network === 'ERC20' ? '2' : '1').repeat(40)}`,
+    return { enabled: true, creditEnabled: true, network, address: demoChainDepositAddress(network),
       feeUsdt: policy.feeUsdt, feeUsdtExact: policy.feeUsdtExact, minDepositUsdt: policy.minDepositUsdt,
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
-  if(p==='/api/deposits'){
-    return demoCreditedDeposits(state).filter(row=>row.deposit).map(({ depositId, createdAt, deposit })=>({
-      depositId, createdAt, creditedAt: createdAt, network: deposit.network, txHash: deposit.txHash,
-      address: `0x${(deposit.network === 'ERC20' ? '2' : '1').repeat(40)}`,
-      grossAmountUsdt: Number(deposit.grossAmountUsdt), grossAmountUsdtExact: deposit.grossAmountUsdt,
-      creditedUsdt: Number(deposit.creditedUsdt), creditedUsdtExact: deposit.creditedUsdt, confirmations: 15, status: 'CREDITED',
-    }));
-  }
+  if(p==='/api/deposits') return demoChainDeposits(state);
 };

@@ -1,10 +1,9 @@
 // Local frontend acceptance only. Never imported by src or deployed as a payment service.
 import {createHash} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
-import {demoFixture,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoFixture,demoOrderPaymentDeadline,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
-import {demoOrderTopupPayRefusal} from './prototype-demo-order-topup.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeOrders) {
   const pin = createPaymentPinFlowFixture();
@@ -259,11 +258,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     const action = path.match(/^\/api\/orders\/([^/]+)\/(pay|cancel)$/);
     if (action && method === 'POST') {
       const orderNo = decodeURIComponent(action[1]);
-      let order = state.createdOrders?.find(item => item.orderNo === orderNo);
-      if (!order) {
-        order = demoFixture(new URL('/api/orders',url.origin),locale(),state,{...request,method:()=> 'GET'}).orders.find(item=>item.orderNo===orderNo);
-        if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
-      }
+      const order = demoAccountOrders(url,locale(),state).find(item=>item.orderNo===orderNo);
+      if (!order) return {status:404,message:'ORDER_NOT_FOUND',data:null};
       if (external.openOrderPayment(orderNo)) return {status:409,message:'ORDER_EXTERNAL_PAYMENT_IN_PROGRESS',data:null};
       if (action[2] === 'cancel') {
         const result = ok(demoFixture(url,locale(),state,request));
@@ -276,7 +272,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       // Like AppOrderCommandService.pay: once the deadline task has closed the order it is not payable; until then an
       // order past its deadline is refused as expired.
       if (!['PENDING','PAID'].includes(order.paymentStatus)) return {status:409,message:'ORDER_NOT_PAYABLE',data:null};
-      if (order.paymentStatus === 'PENDING' && order.expiresAt <= Date.now()) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
+      if (order.paymentStatus === 'PENDING' && demoOrderPaymentDeadline(order) <= Date.now()) return {status:409,message:'ORDER_PAYMENT_EXPIRED',data:null};
       // The PIN fixture only verifies the password. The commerce fixture authorizes the funds against the account's
       // one wallet balance and settles stock, capacity, receipt and fleet; the command is recorded only after it.
       const authorization = pin.authorize(request.postDataJSON());
@@ -284,8 +280,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       const firstPayment=order.paymentStatus==='PENDING';
       let settled;
       try {
-        const blocked = firstPayment && demoOrderTopupPayRefusal(state, orderNo);
-        if (blocked) throw Object.assign(new Error(blocked), {status:409});
+        if (firstPayment && state.orderTopupBankReviewOrderNo === orderNo)
+          throw Object.assign(new Error('HDPAY_COMMERCE_PAYMENT_REVIEW_REQUIRED'), {status:409});
         settled = demoFixture(url,locale(),state,request);
       }
       catch (error) {
@@ -316,6 +312,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
     confirmLateOrderPayment:external.confirmLateOrderPayment, topupIntent:external.topupIntent,
+    seedOrderTopupOriginal:external.seedOrderTopupOriginal,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode,configureCheckoutReadback};

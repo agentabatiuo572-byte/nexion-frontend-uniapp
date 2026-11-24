@@ -95,8 +95,10 @@ function exactMoney(value: unknown, legacy: unknown, parsed: number, signed = fa
 function depositDetail(value: unknown, rowNetwork: string | undefined): WalletBillDeposit | null {
   if (value === null) return null;
   const row = object(value);
-  const network = orderTopupNetwork(row?.network);
-  if (!row || !network || rowNetwork !== undefined && network !== rowNetwork
+  if (!row) return invalid();
+  if (["network", "txHash", "grossAmountUsdt", "feeUsdt", "creditedUsdt"].some(key => row[key] == null)) return null;
+  const network = orderTopupNetwork(row.network);
+  if (!network || rowNetwork !== undefined && network !== rowNetwork
       || typeof row.txHash !== "string" || !/^0x[0-9a-f]{64}$/i.test(row.txHash)) return invalid();
   const decimal = (amount: unknown) => typeof amount === "string" && /^\d+(?:\.\d+)?$/.test(amount) ? amount : invalid();
   return { network, txHash: row.txHash, grossAmountUsdt: decimal(row.grossAmountUsdt), feeUsdt: decimal(row.feeUsdt), creditedUsdt: decimal(row.creditedUsdt) };

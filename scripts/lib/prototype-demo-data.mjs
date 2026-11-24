@@ -432,7 +432,9 @@ const samplePlacedAgo={urgent:paymentWindow-(4*60000+50000),late:paymentWindow-6
 // payment intent: that order stays open until its payment concludes. Until the task runs, paying is refused as expired.
 const deadlineTaskDelay=60000;
 export const demoTimedOutOrder={canonicalStatus:'expired',paymentStatus:'EXPIRED',orderStatus:'EXPIRED',activationStatus:'WAITING_PAYMENT',closeReasonCode:'PAYMENT_TIMEOUT'};
-export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'&&order.expiresAt+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
+export const demoOrderPaymentDeadline=order=>order.payBy?Math.min(order.expiresAt,Date.parse(order.payBy)):order.expiresAt;
+export const demoOrderTimedOut=(order,state,now)=>order.canonicalStatus==='placed'
+  &&demoOrderPaymentDeadline(order)+deadlineTaskDelay<=now&&!state.intentOrders?.[order.orderNo];
 const repurchaseSampleDays={inside:12,boundary:30,outside:12};
 const longBillOrderNo='ORD-7F3A9C2E5B8D41F6A0C3E9B27D5F1A84';
 function demoOrders(products,state,now,device41) {
@@ -484,12 +486,12 @@ const demoTrialSlots=(url,locale,state)=>['ACTIVE','GRACE','EXTENDED'].includes(
 // closed reads as expired, as that task (modelled for session orders by the checkout fixture) leaves it.
 function demoScenarioOrders(products,state,now,device41) {
   const own=state.createdOrders||[];
-  if(state.promotionBuyer==='sponsored-new')return own;
   const ids=new Set(own.map(order=>order.orderNo));
-  return [...own,...demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
+  const seeded=state.promotionBuyer==='sponsored-new'?[]:demoOrders(products,state,now,device41).filter(order=>state.dataState!=='empty'&&!ids.has(order.orderNo)
     &&(state.fleetState==='reserved'||!['DEMO-ORDER-002','DEMO-ORDER-003'].includes(order.orderNo))
-    &&(device41||order.orderNo!=='DEMO-ORDER-004'))
-    .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order)];
+    &&(device41||order.orderNo!=='DEMO-ORDER-004'));
+  return [...own,...seeded].filter(order=>order.orderNo!==state.orderTopupMissingOrderNo)
+    .map(order=>demoOrderTimedOut(order,state,now)?{...order,...demoTimedOutOrder}:order);
 }
 const demoOrderDeviceInstance=(orderNo,line=0,unit=0)=>`${orderNo}-${line}-${unit}`;
 function demoOrderDeviceId(state, instanceNo) {
@@ -505,7 +507,7 @@ export function demoAccountOrders(url,locale,state,now=Date.now()) {
     .map(({replacementDevice,...order})=>['activated','inventory'].includes(order.canonicalStatus)?{...order,
       targetDeviceId:['TRADE_IN','CAPACITY_KEEP'].includes(order.orderType)?order.targetDeviceId:null,
       targetDeviceInstanceNo:order.orderNo==='DEMO-ORDER-004'?order.targetDeviceInstanceNo:demoOrderDeviceInstance(order.orderNo),
-    }:order);
+    }:order.canonicalStatus==='placed'?{...order,expiresAt:demoOrderPaymentDeadline(order)}:order);
 }
 // Like AppOrderCommandService, only paid orders awaiting their device hold slots; an unpaid ("placed") order owns none.
 const demoOrderSlots=orders=>orders
@@ -1354,7 +1356,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       (state.orderStatuses??={})[orderNo]=delivery.canonicalStatus;
       if(!writable)(state.createdOrders??=[]).push(order);
       order=Object.assign(writable??order,delivery,{paymentStatus:'PAID',orderStatus:'COMPLETED',
-        inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,paymentNo,paymentMethod,paidTotalUsdt});
+        inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,paymentNo,paymentMethod,paidTotalUsdt,
+        paidAmountUsdt:String(order.amountUsdt)});
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,

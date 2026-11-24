@@ -22,7 +22,7 @@ import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.m
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
-import { demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
+import { applyDemoOrderTopupScene, demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -212,7 +212,8 @@ const server=http.createServer(async(req,res)=>{
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,
           wasPaymentMode=demoPaymentScenario(state),wasMissing=demoPaymentIntentMissing(state),
-          wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState,wasPromotionBuyer=state.promotionBuyer;
+          wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState,wasPromotionBuyer=state.promotionBuyer,
+          wasOrderTopup=state.orderTopupState;
         if(update.reset){
           const {accountCreatedAt,supportConversationSequence}=state;
           for(const key of Object.keys(state))delete state[key];
@@ -250,7 +251,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','orderTopupMissingOrderNo','orderTopupBankReviewOrderNo'])delete state[key];
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -260,14 +261,6 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange&&state.dataState==='empty')state.walletBalance=0;
         else if(scenarioChange&&paymentMode==='low-balance')state.walletBalance=820.64;
         else if((update.reset||scenarioChange)&&state.dataState!=='empty'&&paymentMode==='reward-clawback-debt')seedDemoRewardClawback(state,Date.now());
-        if (update.orderTopupState) {
-          const balance = { waiting: 120.5, partial: 620.5, debt: -12.123456, 'below-min': 120.5, covered: 52800.64 }[state.orderTopupState];
-          if (balance !== undefined) {
-            state.walletBalance = balance;
-            state.walletUsdtCheckpoint = balance;
-          }
-          state.orderTopupTransferAt = Date.now();
-        }
         const recoverySelection = demoOptions.withdrawRecoveryState.find(([value]) => value === update.withdrawRecoveryState);
         if (recoverySelection || update.reset || scenarioChange) {
           state.withdrawRecoveryState = recoverySelection?.[0] ?? 'off';
@@ -327,6 +320,10 @@ const server=http.createServer(async(req,res)=>{
         checkoutFlow?.selectPaymentMode(wasMissing);
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
+          if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
+        }
+        if(update.reset||scenarioChange||state.orderTopupState!==wasOrderTopup){
+          const payment=applyDemoOrderTopupScene(url,state,locale,Date.now(),checkoutFlow,update.reset||scenarioChange);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }
       }

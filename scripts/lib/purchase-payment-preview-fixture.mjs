@@ -2,13 +2,14 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoAssignablePurchaseSlots,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoAssignablePurchaseSlots,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoOrderPaymentDeadline,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 
 export const previewPurchaseCashier = new URL('/__demo/purchase-cashier/', 'https://api.hdpayadmin.com');
 
 const base = '/api/app/purchase-payment';
+const sampleOrderNo = 'DEMO-ORDER-001';
 const cents = value => Math.round(Number(value) * 100);
 const money = value => (value / 100).toFixed(2);
 // Seconds after the intent is created when the scenario moves on.
@@ -376,7 +377,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const subtotal = trial ? Number((micros + 5000n) / 10000n) : cents(amount);
       if (trial && subtotal > cents(payload.expectedAmountUsdt)) return refused(409, 'TRIAL_AMOUNT_MISMATCH');
       if (!configured(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
-      const now = Date.now(), deadline = order ? Number(order.expiresAt) : now + paymentWindow;
+      const now = Date.now(), deadline = order ? demoOrderPaymentDeadline(order) : now + paymentWindow;
       if (deadline <= now) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       requireDemoExternalPaymentQuota(state, products, items, now);
       if (order) requireDemoExternalOrderGate(state, products, items, now);
@@ -449,7 +450,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const snapshot = path.match(/^\/api\/app\/purchase-payment-intents\/snapshots\/([^/]+)$/);
     if (snapshot && method === 'GET') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
-      return readIntent(intents.get(decodeURIComponent(snapshot[1])));
+      const intent = intents.get(decodeURIComponent(snapshot[1]));
+      if (intent?.orderNo === sampleOrderNo && state.orderTopupState === 'snapshot-error')
+        return refused(503, 'PURCHASE_PAYMENT_INTENT_READ_UNAVAILABLE');
+      return readIntent(intent);
     }
     const one = path.match(/^\/api\/app\/purchase-payment-intents\/([^/]+)$/);
     if (one && method === 'GET') {
@@ -458,15 +462,24 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     return {status: 404, message: 'PURCHASE_PAYMENT_NOT_MODELED', data: null};
   }
-  function seedRemoteOrderPayment(origin) {
-    const orderNo = 'DEMO-ORDER-001';
+  function seedHistoricalOrderPayment(origin, orderNo, paymentMethod) {
     if (openOrderPayment(orderNo)) return {status: 200};
     const request = (body, headers = {}) => ({method: () => 'POST', postDataJSON: () => body, headers: () => headers});
     // Import the fixture's historical direct-payment sample under its original quote and key.
-    const quote = handlePayment(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod: 'CREGIS_USDT_BSC', payload: {orderNo}}), true, true);
+    const quote = handlePayment(new URL(`${base}-quotes`, origin), request({kind: 'ORDER_PAY', paymentMethod, payload: {orderNo}}), true, true);
     if (quote.status !== 200) return quote;
     return handlePayment(new URL(`${base}-intents`, origin), request({paymentQuoteId: quote.data.paymentQuoteId},
       {'idempotency-key': `wallet-pay:${orderNo}:other-device`}), true, true);
+  }
+  const seedRemoteOrderPayment = origin => seedHistoricalOrderPayment(origin, sampleOrderNo, 'CREGIS_USDT_BSC');
+  function seedOrderTopupOriginal(origin, orderNo, scene) {
+    const paymentMethod = scene === 'open-intent-usdt' ? 'CREGIS_USDT_ERC20' : 'HDPAY_BANK';
+    const result = seedHistoricalOrderPayment(origin, orderNo, paymentMethod);
+    if (!result.data) return result;
+    const intent = intents.get(result.data.intentNo);
+    if (scene === 'open-intent-readonly') Object.assign(intent, {status: 'FUNDS_CONFIRMED', paidAt: Date.now()});
+    if (scene === 'finance-review') Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_AMOUNT_MISMATCH'});
+    return result;
   }
   // Compress the deadline and grace so the App can observe expiry before a separate late receipt.
   function expireOrderPayment(orderNo) {
@@ -503,11 +516,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return true;
   }
   const topupIntent = orderNo => {
-    const originals = [...intents.values()].filter(row => row.kind === 'ORDER_PAY' && row.orderNo === orderNo);
-    const open = originals.findLast(row => !['DELIVERED', 'EXPIRED', 'MANUAL_REVIEW'].includes(row.status));
-    const row = open ?? originals.findLast(row => row.status === 'MANUAL_REVIEW');
-    return row ? view(row) : null;
+    const intent = openOrderPayment(orderNo);
+    return intent ? view(intent) : null;
   };
   return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, topupIntent, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
-    expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
+    seedOrderTopupOriginal, expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
 }

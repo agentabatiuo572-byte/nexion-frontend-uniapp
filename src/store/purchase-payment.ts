@@ -689,6 +689,12 @@ async function query() {
       if (!intent || intent.intentNo !== topupIntent.intentNo || intent.kind !== 'ORDER_PAY' || intent.paymentMethod !== topupIntent.paymentMethod) {
         throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
       }
+      if (intent.status === 'DELIVERED' || intent.fulfilmentStatus === 'DELIVERED') {
+        const orderNo = state.orderNo;
+        finish(null);
+        if (orderNo) void replaceWithOrder(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
+        return;
+      }
       state.intent = topupIntent.paymentAllowed ? intent : { ...intent, paymentAllowed: false };
       state.pending = { ...pending, intentNo: intent.intentNo, paymentMethod: intent.paymentMethod, network: intent.network };
       if (intent.deadlineAt) state.deadlineAt = Date.parse(intent.deadlineAt);
