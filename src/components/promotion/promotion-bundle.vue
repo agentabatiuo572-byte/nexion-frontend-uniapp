@@ -90,7 +90,8 @@ import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { productCatalogPresentation,productCatalogState,refreshProductCatalog } from '@/store/product-catalog';
 import { useProductPhase } from '@/composables/use-product-phase';
-import { isProductAvailable, productOutOfStock } from '@/store/product-availability';
+import { isProductAvailable, productHasStock, productOutOfStock } from '@/store/product-availability';
+import { isBundleHardwareAvailable } from '@/store/bundle-catalog-guard';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { productTaskLevelsText } from '@/lib/product-copy';
@@ -139,9 +140,19 @@ const ruleTerms=computed(()=>activity.value?[
 ].join('\n\n'):'');
 const totalUnits=computed(()=>selection.value.reduce((total,item)=>total+item.quantity,0));
 const signedIn=computed(()=>{void app.accountBindingEpoch;void app.accountKey;return !!sessionVault.read();});
-const singleActivityProduct=computed(()=>{if(!scopeId.value||!available.value||catalogStatus.value!=='ready'||selectionBlock.value)return null;const products=catalog.value.filter(p=>p.productType!=='SHARE'&&isProductAvailable(p,phase.value)&&activity.value?.productNos.includes(p.id));return products.length===1?products[0]:null;});
+const scopedHardware = computed(() => catalog.value.filter(product => !scopeId.value || activity.value?.productNos.includes(product.id)));
+const purchasableHardware = computed(() => scopedHardware.value.filter(product => isBundleHardwareAvailable(product, phase.value)));
+const activityProductsBlock = computed(() => {
+  if (!scopeId.value || !activity.value || catalogStatus.value !== 'ready' || purchasableHardware.value.length) return '';
+  return scopedHardware.value.some(product =>
+    product.productType !== 'SHARE' && isProductAvailable(product, phase.value) && productOutOfStock(product))
+    ? t.value.store.temporarilyOutOfStock : t.value.promotion.noMatchingProducts;
+});
+const singleActivityProduct = computed(() => scopeId.value && available.value && catalogStatus.value === 'ready'
+  && !selectionBlock.value && purchasableHardware.value.length === 1 ? purchasableHardware.value[0] : null);
 function openSingleProduct(){if(singleActivityProduct.value)void navTo(promotionDetailHref(singleActivityProduct.value.id,scopeId.value));}
-const suggestions=computed(()=>catalog.value.filter(product=>!selection.value.some(item=>item.productNo===product.id)&&product.productType!=='SHARE'&&isProductAvailable(product,phase.value)&&(!scopeId.value||activity.value?.productNos.includes(product.id))));
+const suggestions = computed(() => purchasableHardware.value.filter(product =>
+  !selection.value.some(item => item.productNo === product.id)));
 // Display rows for the shared bundle layout (board B). Tiles and the list read the same catalogue and quote as before.
 const builder=computed(()=>!singleActivityProduct.value&&(!scopeId.value||!!activity.value));
 const limitReached=computed(()=>selection.value.length>=8||totalUnits.value>=100);
@@ -236,7 +247,7 @@ const productsReady = computed(() => catalogStatus.value === 'ready' && !selecti
 const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
   &&validEntryItems(selection.value,2)&&productsReady.value&&(!scopeId.value||available.value));
 const canContinue=computed(()=>canReadQuote.value&&quoteStatus.value==='ready'&&quote.value?.eligibility==='ELIGIBLE'&&!termsMissing.value);
-const canOpenDevices=computed(()=>visible.value&&signedIn.value&&!selectionBlock.value&&quoteBlock.value==='capacity');
+const canOpenDevices=computed(()=>visible.value&&signedIn.value&&!selectionBlock.value&&!activityProductsBlock.value&&quoteBlock.value==='capacity');
 useAutoRecovery({
   active:()=>visible.value,
   failed:()=>canReadQuote.value&&(quoteStatus.value==='error'||quoteBlock.value==='unavailable'),
@@ -253,6 +264,10 @@ function invalidate(preserveBlock=false){
 }
 watch(selection,()=>{invalidate();writeAccountRow(storageKey,app.accountKey,{items:selection.value,entryItems:props.initialItems});},{deep:true,flush:'sync'});
 watch([()=>activity.value?.version,()=>locale.code],()=>{invalidate();termsOpen.value=false;},{flush:'sync'});
+watch(productCatalogPresentation, snapshot => {
+  if (quoteBlock.value === 'outOfStock' && selection.value.every(item =>
+    productHasStock(snapshot?.products.find(product => product.id === item.productNo)))) invalidate();
+});
 watch([()=>app.accountKey,()=>app.accountBindingEpoch],()=>{invalidate();termsOpen.value=false;restore();});
 watch(canReadQuote, ready => {
   if (!ready && (quote.value || quoteStatus.value === 'loading')) invalidate(true);
@@ -296,6 +311,7 @@ const footerNote = computed(() => {
   if (scopeId.value && contextStatus.value === 'ready' && !available.value)
     return localized(activity.value?.eligibilityMessage,locale.code) || t.value.promotion.disabled;
   if (selectionBlock.value) return selectionBlock.value;
+  if (activityProductsBlock.value) return activityProductsBlock.value;
   if (quoteIneligible.value || (quote.value && quote.value.eligibility !== 'ELIGIBLE')) return t.value.promotion.disabledNote;
   // Expired quotes are read again on their own (03 §3.5.2), so the note only says it is updating; the checkout keeps
   // its own quoteExpired copy.

@@ -142,7 +142,8 @@ import { purchaseEligibilityStore } from "@/store/purchase-eligibility";
 import { useLocaleStore } from "@/store/locale";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
-import { bundleCatalogReady, isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
+import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
+import { isProductAvailable, productHasStock, productOutOfStock } from "@/store/product-availability";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { confirm, toast } from "@/store/ui";
 import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
@@ -206,7 +207,7 @@ useSetPageHeader(() => ({
 }));
 
 const hardware = computed(() => (remoteApiEnabled ? productCatalogPresentation.value?.products ?? [] : PRODUCTS)
-  .filter(p => isBundleHardwareAvailable(p, phase.value)));
+  .filter(p => p.productType !== "SHARE" && isProductAvailable(p, phase.value)));
 const products = computed(() => cart.items
   .map(id => hardware.value.find(p => p.id === id))
   .filter((p): p is Product => !!p));
@@ -285,9 +286,19 @@ watch([eligibilityProductIds, () => app.accountKey], ([ids, account], [previousI
     if (account !== previousAccount || !previousIds?.includes(id)) void purchaseEligibilityStore.ensure(id, true);
   }
 }, { immediate: true });
+watch(productCatalogPresentation, snapshot => {
+  if (!remoteApiEnabled || promotionActivityId.value) return;
+  for (const product of snapshot?.products ?? []) {
+    if (eligibilityProductIds.value.includes(product.id) && productHasStock(product)
+      && purchaseEligibilityStore.state(product.id).error === "PRODUCT_OUT_OF_STOCK") {
+      void purchaseEligibilityStore.ensure(product.id, true);
+    }
+  }
+});
 
 function eligibilityUnavailable(productNo: string): boolean {
-  return purchaseEligibilityStore.state(productNo).status === "unavailable";
+  return productOutOfStock(hardware.value.find(product => product.id === productNo))
+    || purchaseEligibilityStore.state(productNo).status === "unavailable";
 }
 
 const failedEligibilityIds = computed(() => remoteApiEnabled
@@ -393,7 +404,7 @@ function checkoutBlock(list: Product[], target: BundleReviewTarget): string {
   if (list.length > 8) return t.value.promotion.quantityLimit;
   if (!remoteApiEnabled) return bundleQuote.value ? "" : t.value.store.coTotalQuoteChanged;
   const entries = list.map(p => purchaseEligibilityStore.state(p.id));
-  if (entries.some((entry) => entry.status === "unavailable")) return t.value.store.temporarilyOutOfStock;
+  if (list.some(product => eligibilityUnavailable(product.id))) return t.value.store.temporarilyOutOfStock;
   if (entries.some((entry) => entry.status === "error")) return t.value.store.purchaseEligibilityError;
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
@@ -454,7 +465,7 @@ function clear() {
 async function onAddSuggestion(p: Product) {
   if (remoteApiEnabled) {
     const entry = purchaseEligibilityStore.state(p.id);
-    if (entry.status === "unavailable") return;
+    if (eligibilityUnavailable(p.id)) return;
     if (entry.status === "ready" && !entry.eligible) {
       openDetail(p.id);
       return;

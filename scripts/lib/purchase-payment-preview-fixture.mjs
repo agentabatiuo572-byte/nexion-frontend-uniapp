@@ -2,7 +2,7 @@
 // design walkthrough. Never imported by src. The bank page URL points at the real
 // provider host (the App only frames trusted hosts), so that frame shows the provider's
 // reply for an unknown order; no payment is created anywhere.
-import {demoAccountOrders,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoOrderFitsCapacity,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
+import {demoAccountOrders,demoAssignablePurchaseSlots,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
 
@@ -169,7 +169,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (status === 'paid') {
       const now = Date.now();
-      const delivery = demoOrderDelivery(new URL(intent.origin), locale(), state, order, now);
+      const slots = demoAssignablePurchaseSlots(new URL(intent.origin), locale(), state);
+      const delivery = demoOrderDelivery(state, order, now, slots);
       Object.assign(order, delivery, {paymentStatus: 'PAID', orderStatus: 'COMPLETED', paymentMethod: intent.paymentMethod,
         paidTotalUsdt: intent.totalUsdt, paymentNo: intent.intentNo, paidAt: intent.paidAt, inventoryUsedAt: now, hardwareQuotaUsedAt});
     } else Object.assign(order, demoTimedOutOrder);
@@ -270,10 +271,6 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
     // Delivery needs the order; funds for an order that cannot be found never become a success.
     if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
-    // The older single-device scenario requires its slot; a bundle places any overflow into inventory.
-    if (order.orderType !== 'BUNDLE' && !demoOrderFitsCapacity(new URL(intent.origin), locale(), state, null,
-      order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity})), intent.orderNo))
-      return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'CAPACITY_REPLACEMENT_REQUIRED'});
     let hardwareQuotaUsedAt;
     try {
       hardwareQuotaUsedAt=requireDemoPurchase(state,demoProducts(state,intent.origin),

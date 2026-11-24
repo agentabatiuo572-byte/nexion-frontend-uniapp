@@ -381,7 +381,7 @@ import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope"
 import { productCatalogLanguageReadFailed, productCatalogPresentation, productCatalogState, refreshProductCatalog, settleProductCatalogRefresh } from "@/store/product-catalog";
 import { serverTagline } from "@/lib/product-copy";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
-import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
+import { isProductAvailable, productHasStock, productOutOfStock } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
 import { uiLocale } from "@/i18n";
@@ -621,19 +621,19 @@ const checkoutPurchaseChecking = computed(() => remoteApiEnabled && !createdChec
   && (serverOrderRecovery.value !== null || (!ordinaryCheckoutInitialized.value && !originalOrderNavigationFailed.value)));
 type PurchaseEligibilityResult = "eligible" | "ineligible" | "outOfStock" | "productUnavailable" | "unavailable" | "stale";
 type CheckoutLoadMode = "entry" | "read-only";
-const checkoutStockRefused = ref(false);
+const checkoutStockRefused = ref<boolean | null>(null);
 const eligibilityCatalogUnconfirmed = ref(false);
 const recoveredCreateRefusal = ref(false);
 const foregroundEligibilityBlocked = ref(false);
 watch(productId, () => {
-  checkoutStockRefused.value = false;
+  checkoutStockRefused.value = null;
   eligibilityCatalogUnconfirmed.value = false;
   recoveredCreateRefusal.value = false;
   foregroundEligibilityBlocked.value = false;
 });
 let trialCheckoutSource = false;
 const remotePurchaseEligibility = ref<PurchaseEligibilitySnapshot | null>(null);
-const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error">("idle");
+const remotePurchaseEligibilityStatus = ref<"idle" | "loading" | "ready" | "error" | "unavailable">("idle");
 const checkoutWalletRefreshing = ref(false);
 let checkoutWalletRefreshSequence = 0;
 // The wallet payment row must state the server-confirmed available USDT before
@@ -721,6 +721,7 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refres
     remotePurchaseEligibility.value = snapshot;
     remotePurchaseEligibilityStatus.value = "ready";
     eligibilityCatalogUnconfirmed.value = false;
+    if (snapshot.eligible) checkoutStockRefused.value = false;
     return snapshot.eligible ? "eligible" : "ineligible";
   } catch (error) {
     if (!current()) return "stale";
@@ -728,6 +729,7 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refres
     remotePurchaseEligibilityStatus.value = "error";
     if (isApiRefusal(error, 409, "PRODUCT_OUT_OF_STOCK")) {
       eligibilityCatalogUnconfirmed.value = false;
+      remotePurchaseEligibilityStatus.value = "unavailable";
       checkoutStockRefused.value = true;
       return "outOfStock";
     }
@@ -742,6 +744,7 @@ async function refreshPurchaseEligibility(scope = captureCheckoutRoute(), refres
         }
         if (productOutOfStock(listing)) {
           eligibilityCatalogUnconfirmed.value = false;
+          remotePurchaseEligibilityStatus.value = "unavailable";
           checkoutStockRefused.value = true;
           return "outOfStock";
         }
@@ -894,7 +897,7 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
       return;
     }
     const trialConversion = trialQuoteAt(mockServerNow()).applied;
-    if (!trialConversion && pp.purchaseBlocked && pp.purchaseBlockedReason !== "PRODUCT_OUT_OF_STOCK") {
+    if (!trialConversion && pp.purchaseBlocked && !productOutOfStock(pp)) {
       dropResumeInvoice(routeScope);
       toast.info(t.value.store.specUnavailable);
       navTo("/store");
@@ -969,9 +972,15 @@ const checkoutTagline = computed(() => {
   if (!listing) return "";
   return remoteApiEnabled ? serverTagline(t.value, listing, locale.code) : listing.tagline;
 });
-const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
+const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
+  && !productOutOfStock(product.value));
+watch(productCatalogPresentation, snapshot => {
+  const listing = snapshot?.products.find(entry => entry.id === productId.value);
+  if (productOutOfStock(listing)) checkoutStockRefused.value = true;
+  else if (productHasStock(listing)) checkoutStockRefused.value = false;
+}, { flush: "sync" });
 const checkoutOutOfStock = computed(() => !hasOriginalCheckout.value && !activeSession.value
-  && (checkoutStockRefused.value || productOutOfStock(product.value)));
+  && (checkoutStockRefused.value ?? productOutOfStock(product.value)));
 const checkoutEligibilityBlock = computed(() => {
   if (hasOriginalCheckout.value || activeSession.value) return "";
   if (eligibilityCatalogUnconfirmed.value) return t.value.store.purchaseEligibilityError;
@@ -1325,7 +1334,7 @@ let checkoutSetupReturn = false;
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   interceptFired = false;
   tradeinAvailable.value = false;
-  checkoutStockRefused.value = false;
+  checkoutStockRefused.value = null;
   checkoutCapacityReadFailed.value = false;
   remoteCapacityGate.reset();
   quotedAssignableSlots.value = null;
@@ -3241,7 +3250,7 @@ async function refreshForegroundOrdinaryCheckout() {
   if (!ordinaryCheckoutInitialized.value || !product.value || activeSession.value) return;
   const eligibility = await refreshPurchaseEligibility(scope, false);
   if (!isCurrentCheckoutRoute(scope) || eligibility === "stale") return;
-  foregroundEligibilityBlocked.value = eligibility !== "eligible";
+  foregroundEligibilityBlocked.value = eligibility !== "eligible" && eligibility !== "outOfStock";
   if (checkoutCapacityRequired.value && eligibility === "eligible") {
     interceptFired = false;
     await fireTradeinIntercept("foreground");

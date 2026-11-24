@@ -3,6 +3,8 @@ import { isApiRefusal } from "@/api/errors";
 import { purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
 import { remoteAccountScope, type RemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { productCatalogPresentation } from "./product-catalog";
+import { productHasStock } from "./product-availability";
 
 export type PurchaseEligibilityStatus = "idle" | "loading" | "ready" | "unavailable" | "error";
 
@@ -156,6 +158,10 @@ export function bindPurchaseEligibility(
   watch([product, () => eligibility.value.status, readActive], ([value, status, visible]) => {
     if (enabled && visible && value && status === "idle") void store.ensure(value);
   }, { immediate: true });
+  watch(productCatalogPresentation, snapshot => {
+    if (enabled && readActive.value && eligibility.value.outOfStock
+      && productHasStock(snapshot?.products.find(item => item.id === product.value))) void retry();
+  });
 
   function retry(): Promise<boolean> {
     return enabled ? store.ensure(product.value, true) : Promise.resolve(false);

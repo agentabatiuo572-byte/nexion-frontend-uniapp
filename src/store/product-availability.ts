@@ -14,3 +14,8 @@ export function productOutOfStock(product: Product | undefined): boolean {
   return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
     || product?.inventoryMode === "FINITE" && product.stock === 0;
 }
+
+export function productHasStock(product: Product | undefined): boolean {
+  return !!product && !productOutOfStock(product) && (product.inventoryMode === "UNLIMITED"
+    || typeof product.stock === "number" && product.stock > 0);
+}

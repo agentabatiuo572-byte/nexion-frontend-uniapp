@@ -112,7 +112,7 @@ import { PRODUCTS, type Product } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable } from "@/store/product-availability";
+import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import StoreHero from "@/components/store/store-hero.vue";
@@ -320,7 +320,8 @@ const bundleSelectedProducts = computed(() => cart.items
   .map((id) => bundleHardware.value.find((p) => p.id === id))
   .filter((p): p is Product => !!p));
 
-const upgrade = computed(() => storeUpgrade(unlockedProducts.value, ownedDevices.value));
+const purchasableProducts = computed(() => unlockedProducts.value.filter(product => !productOutOfStock(product)));
+const upgrade = computed(() => storeUpgrade(purchasableProducts.value, ownedDevices.value));
 const upgradeBaseImageUrl = computed(() => {
   const base = upgrade.value?.base;
   return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
@@ -360,7 +361,7 @@ const goalFocus = computed(() => resolveStoreGoalFocus(
   focusProductId.value,
   focusProductName.value,
   displayProducts.value,
-  unlockedProducts.value,
+  purchasableProducts.value,
   catalogHasProducts.value,
 ));
 const focusFeatured = computed(() => goalFocus.value.featured);

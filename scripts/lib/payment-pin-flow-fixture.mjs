@@ -1,9 +1,9 @@
 // Frontend acceptance fixture only. Never imported by src or shipped in the production bundle.
 import { fixture as reviewFixture } from './design-review-fixture.mjs';
+import { applyDemoQuotePricing, demoBundlePricing, demoOrderDelivery, demoPaymentDeadline, demoQuoteDeadline, validateDemoOrderItems } from './prototype-demo-data.mjs';
 
 // Synthetic SMS code for the local harness only; it is never included in an API response or product UI.
 export const paymentPinFixtureOtp = '012345';
-const paymentWindow = 30 * 60_000;
 
 export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
   const orders = new Map(), quotes = new Map(), commands = new Map(), challenges = new Map(), proofs = new Map();
@@ -89,7 +89,11 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     if(path.startsWith(pin+'/commands/'))return ok(commands.get('security:'+decodeURIComponent(path.split('/').at(-1)))??{commandKey:decodeURIComponent(path.split('/').at(-1)),status:'NOT_SEEN',canResumeSameKey:false});
     if(path==='/api/orders/quote'){
       const quotedAt=now();
+      try { validateDemoOrderItems(body.items); }
+      catch (error) { if (error.status !== 422) throw error; return fail(error.status,error.message); }
       const quote=reviewFixture(url,'zh',{},request);
+      const pricing=demoBundlePricing(quote.items.map(line=>Number(line.subtotalUsdt)));
+      applyDemoQuotePricing(quote,pricing.discountUsdt);
       let activityEndsAt=Infinity;
       if(body.activityId){
         const {items:offers}=reviewFixture(new URL('/api/promotions',url.origin),'zh',{promotions:true},request);
@@ -110,14 +114,15 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       }
       quote.quoteId='pin-quote-'+(quotes.size+1);quote.quoteHash=quote.quoteId;
       quote.serverTime=new Date(quotedAt).toISOString();
-      quote.expiresAt=new Date(Math.min(quotedAt+300000,activityEndsAt)).toISOString();
+      quote.expiresAt=new Date(demoQuoteDeadline(quotedAt,activityEndsAt)).toISOString();
       quotes.set(quote.quoteId,{quote,activityEndsAt});return ok(quote);
     }
     if((path==='/api/orders'||path==='/api/orders/bundle')&&method==='POST'){
       const entry=quotes.get(body.promotionQuoteId);if(!entry)return fail(422,'QUOTE_REQUIRED');
       const {quote,activityEndsAt}=entry,placedAt=now();
-      if(placedAt>=Date.parse(quote.expiresAt))return fail(409,'QUOTE_EXPIRED');
-      const expiresAt=Math.min(placedAt+paymentWindow,activityEndsAt);
+      if(placedAt>=Date.parse(quote.expiresAt))return fail(409,'PROMOTION_QUOTE_EXPIRED');
+      if((path==='/api/orders/bundle')!==(quote.items.length>1))return fail(409,'PROMOTION_QUOTE_INPUT_CHANGED');
+      const expiresAt=demoPaymentDeadline(placedAt,activityEndsAt);
       const {products}=reviewFixture(new URL('/api/store/catalog',url.origin),'zh',{},request);
       const items=quote.items.map(item=>({...item,productName:products.find(product=>product.id===item.productNo).name}));
       const lineItems=items.map(({productNo,productName,quantity,unitPriceUsdt,subtotalUsdt})=>({
@@ -143,9 +148,15 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       const authorization=authorize(body);
       if(authorization.status!==200)return authorization;
       const amount=Number(order.amountUsdt);
-      state.payWrites++;state.balance-=amount;
+      if(amount>state.balance)return fail(409,'ORDER_WALLET_INSUFFICIENT');
+      const fleet=reviewFixture(new URL('/api/devices/earnings',url.origin),'zh',{},request);
+      const purchasedActive=[...orders.values()].reduce((sum,row)=>sum+(row.activatedQuantity??0),0);
+      const assignableSlots=Math.max(0,fleet.slotCap-fleet.devices.filter(device=>device.activatedAt!==null).length-purchasedActive);
       const paidAt=now();
-      Object.assign(order,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',activationStatus:'ACTIVATED',canonicalStatus:'activated',paidAt,activatedAt:paidAt,targetDeviceId:90301,targetDeviceInstanceNo:'PIN-FLOW-DEVICE',paymentNo:'PIN-FLOW-PAYMENT'});
+      const delivery=demoOrderDelivery(state,order,paidAt,assignableSlots);
+      state.payWrites++;state.balance-=amount;
+      Object.assign(order,delivery,{paymentMethod:amount===0?'VOUCHER':'UVEL_WALLET',paidTotalUsdt:amount.toFixed(2),paymentStatus:'PAID',orderStatus:'COMPLETED',paidAt,paymentNo:'PAY-'+order.orderNo});
+      if(order.quantity===1)Object.assign(order,{targetDeviceId:delivery.activatedDeviceIds[0]??delivery.inventoryDeviceIds[0],targetDeviceInstanceNo:order.orderNo+'-0-0'});
       commands.set('order-pay:'+key,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,receipt:order});
       return {...ok(order),drop:state.dropNextPayment?(state.dropNextPayment=false,true):false};
     }
