@@ -272,6 +272,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (age < DELIVER_AFTER) return intent;
     if (scenario === 'delivery-failed') return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
     if (intent.kind !== 'ORDER_PAY') return deliverPurchase(intent);
+    return deliverOrderPayment(intent, now);
+  }
+  function deliverOrderPayment(intent, now) {
     const order = ordersOf(intent.origin).find(row => row.orderNo === intent.orderNo);
     // Delivery needs the order; funds for an order that cannot be found never become a success.
     if (!order) return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PURCHASE_PAYMENT_DELIVERY_BLOCKED'});
@@ -474,12 +477,32 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const seedRemoteOrderPayment = origin => seedHistoricalOrderPayment(origin, sampleOrderNo, 'CREGIS_USDT_BSC');
   function seedOrderTopupOriginal(origin, orderNo, scene) {
     const paymentMethod = scene === 'open-intent-usdt' ? 'CREGIS_USDT_ERC20' : 'HDPAY_BANK';
+    const status = { 'open-intent-readonly': 'FUNDS_CONFIRMED', 'finance-review': 'MANUAL_REVIEW', paid: 'DELIVERED' }[scene]
+      ?? 'AWAITING_PAYMENT';
+    const original = openOrderPayment(orderNo);
+    if (original) {
+      const matches = original.status === status && (scene === 'finance-review' || original.paymentMethod === paymentMethod);
+      return scene === 'snapshot-error' || matches ? {status: 200} : refused(409, 'PREVIEW_ORDER_TOPUP_RESET_REQUIRED');
+    }
     const result = seedHistoricalOrderPayment(origin, orderNo, paymentMethod);
     if (!result.data) return result;
     const intent = intents.get(result.data.intentNo);
     if (scene === 'open-intent-readonly') Object.assign(intent, {status: 'FUNDS_CONFIRMED', paidAt: Date.now()});
     if (scene === 'finance-review') Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_AMOUNT_MISMATCH'});
-    return result;
+    if (scene === 'paid') {
+      // The preset supplies a successful provider observation for this new original.
+      const now = Date.now();
+      Object.assign(intent, {status: 'FUNDS_CONFIRMED', paidAt: now});
+      deliverOrderPayment(intent, now);
+      if (intent.status !== 'DELIVERED') return refused(409, intent.reason);
+    }
+    return { ...result, data: view(intent) };
+  }
+  function deliveredOrderPayment(order) {
+    sync();
+    const intent = intents.get(order.paymentNo);
+    if (intent?.status !== 'DELIVERED' || intent.kind !== 'ORDER_PAY' || intent.orderNo !== order.orderNo) return null;
+    return { amount: intent.totalUsdt, at: intent.paidAt };
   }
   // Compress the deadline and grace so the App can observe expiry before a separate late receipt.
   function expireOrderPayment(orderNo) {
@@ -520,5 +543,5 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return intent ? view(intent) : null;
   };
   return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, topupIntent, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
-    seedOrderTopupOriginal, expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
+    seedOrderTopupOriginal, deliveredOrderPayment, expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
 }

@@ -6,7 +6,7 @@ import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRe
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
-import { initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
@@ -206,7 +206,7 @@ const server=http.createServer(async(req,res)=>{
     }
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
-      let withdrawalRecoverySeed, longContentUnavailable;
+      let withdrawalRecoverySeed, longContentUnavailable, orderTopupFailure;
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
         const accountPayment=value=>['low-balance','reward-clawback-debt','urgent','late'].includes(value)?value:'';
@@ -237,7 +237,7 @@ const server=http.createServer(async(req,res)=>{
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
         if(['normal','device-limit'].includes(update.registrationState))state.registrationState=update.registrationState;
         if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         const promotionBuyerChanged=state.promotionBuyer!==wasPromotionBuyer;
         if(update.reset||update.savedAttemptState||promotionBuyerChanged)authDemo.reset();
         if(update.savedAttemptState&&state.savedAttemptState!=='none')state.sessionState='signed-out';
@@ -251,7 +251,8 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','orderTopupMissingOrderNo','orderTopupBankReviewOrderNo'])delete state[key];
+        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupMissingOrderNo','orderTopupBankReviewOrderNo'])delete state[key];
+        if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
@@ -322,15 +323,22 @@ const server=http.createServer(async(req,res)=>{
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }
-        if(update.reset||scenarioChange||state.orderTopupState!==wasOrderTopup){
-          const payment=applyDemoOrderTopupScene(url,state,locale,Date.now(),checkoutFlow,update.reset||scenarioChange);
-          if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
+        const nextOrderTopup=demoOptions.orderTopupState.find(([value])=>value===update.orderTopupState)?.[0]??state.orderTopupState;
+        if(update.reset||scenarioChange||nextOrderTopup!==wasOrderTopup){
+          const payment=applyDemoOrderTopupScene(url,state,locale,Date.now(),checkoutFlow,update.reset||scenarioChange,nextOrderTopup);
+          if(payment?.message==='PREVIEW_ORDER_TOPUP_RESET_REQUIRED')orderTopupFailure=payment;
+          else if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
+          else {
+            state.orderTopupState=nextOrderTopup;
+            if(nextOrderTopup!=='review')delete state.orderTopupBankReviewOrderNo;
+          }
         }
       }
       const supportReadbackState=selectedSupportAccount(url)?.supportReadbackState??'missing';
       return sendJson(res,{state,options:demoOptions,simulation:true,withdrawalRecoverySeed,supportReadbackState,
         ...(demoLongContentAvailable(state)?{}:{longContentAvailable:false}),
-        ...(longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})});
+        ...(orderTopupFailure?{message:orderTopupFailure.message}:longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})},
+      orderTopupFailure?.status??200);
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}
@@ -348,7 +356,7 @@ const server=http.createServer(async(req,res)=>{
       if(page&&page!==scenarioId())return refuseStale();
       if(req.method==='GET'&&url.pathname==='/api/deposits/policy'&&state.orderTopupState==='policy-loading')
         await new Promise(resolve=>setTimeout(resolve,2500));
-      const orderTopup=req.method==='GET'?demoOrderTopupResponse(url,state,locale,Date.now(),req.headers,checkoutFlow?.topupIntent):undefined;
+      const orderTopup=req.method==='GET'?demoOrderTopupResponse(url,state,locale,Date.now(),req.headers,checkoutFlow):undefined;
       if(orderTopup)return sendJson(res,orderTopup.body,orderTopup.status);
       if(req.method==='GET'){
         const accountId=url.pathname==='/api/genesis/state'

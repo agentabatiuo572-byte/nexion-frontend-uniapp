@@ -49,14 +49,16 @@ function applyWalletScene(state, scene, order, now, freshAccount) {
   }
 }
 
-export function applyDemoOrderTopupScene(url, state, locale, now, checkoutFlow, freshAccount) {
-  const scene = state.orderTopupState;
-  if (scene !== 'review') delete state.orderTopupBankReviewOrderNo;
+export function applyDemoOrderTopupScene(url, state, locale, now, checkoutFlow, freshAccount, scene) {
   if (![...walletScenes, ...originalScenes, ...orderScenes, 'review'].includes(scene)) return;
   const sample = demoAccountOrders(url, locale, state, now).find(row => row.orderNo === sampleOrderNo);
+  if (originalScenes.includes(scene) || scene === 'paid' || scene === 'paid-unverified') {
+    if (sample?.canonicalStatus !== 'placed' || scene === 'paid-unverified' && checkoutFlow?.topupIntent(sampleOrderNo))
+      return {status: 409, message: 'PREVIEW_ORDER_TOPUP_RESET_REQUIRED'};
+    if (scene !== 'paid-unverified') return checkoutFlow?.seedOrderTopupOriginal(url.origin, sampleOrderNo, scene);
+  }
   if (sample?.canonicalStatus !== 'placed') return;
   if (walletScenes.includes(scene)) return applyWalletScene(state, scene, sample, now, freshAccount);
-  if (originalScenes.includes(scene)) return checkoutFlow?.seedOrderTopupOriginal(url.origin, sampleOrderNo, scene);
   if (checkoutFlow?.topupIntent(sampleOrderNo)) return;
   if (scene === 'review') {
     state.orderTopupBankReviewOrderNo = sampleOrderNo;
@@ -76,16 +78,27 @@ export function applyDemoOrderTopupScene(url, state, locale, now, checkoutFlow, 
     if (scene === 'expired') Object.assign(order, demoTimedOutOrder);
   } else {
     if (order.quantity > demoAssignablePurchaseSlots(url, locale, state)) return;
-    const verified = scene === 'paid';
     Object.assign(order, { canonicalStatus: 'paid', paymentStatus: 'PAID', orderStatus: 'PAID',
-      activationStatus: 'WAITING_PROVISIONING', expiresAt: null, paymentMethod: verified ? 'HDPAY_BANK' : null,
-      paidAt: verified ? now : null, paidTotalUsdt: verified ? Number(order.amountUsdt).toFixed(2) : null,
-      paidAmountUsdt: verified ? decimal(micro(order.amountUsdt)) : null });
+      activationStatus: 'WAITING_PROVISIONING', expiresAt: null, paymentMethod: null, paidAt: null, paidTotalUsdt: null });
   }
   if (order === sample) (state.createdOrders ??= []).push(order);
 }
 
-export function demoOrderTopupResponse(url, state, locale, now, headers, findIntent) {
+function walletOrderPayment(state, order) {
+  if (order.paymentMethod === 'UVEL_WALLET') {
+    const debit = state.walletMovements?.find(row => row.bizNo === order.orderNo && row.bizType === 'ORDER_PURCHASE'
+      && row.asset === 'USDT' && row.direction === 'OUT' && row.status === 'SUCCESS');
+    return debit ? { amount: debit.amountExact ?? String(debit.amount), at: debit.at } : null;
+  }
+  if (order.paymentMethod === 'VOUCHER' && order.paymentNo) {
+    const payment = Object.values(state.commands ?? {}).find(row => row.operation === 'payOrder' && row.status === 'SUCCEEDED'
+      && row.order?.orderNo === order.orderNo && row.response?.paymentNo === order.paymentNo);
+    if (payment) return { amount: '0', at: payment.order.paidAt };
+  }
+  return null;
+}
+
+export function demoOrderTopupResponse(url, state, locale, now, headers, checkoutFlow) {
   const scenario = state.orderTopupState ?? 'off';
   const path = url.pathname;
   const owner = previewAccountId(state, headers);
@@ -99,9 +112,13 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, findInt
   }
   if (path === '/api/deposits/address' && networks.includes(network) && owns) {
     if (scenario === 'address-error') return refuse(503, 'CREGIS_ADDRESS_UNAVAILABLE');
-    if (scenario === 'preparing') return ok({ enabled: false, creditEnabled: false, network, reason: 'CREGIS_ADDRESS_PREPARING' });
-    if (scenario === 'paused') return ok({ enabled: true, creditEnabled: false, network, address: demoChainDepositAddress(network), reason: 'CREGIS_DEPOSIT_PAUSED',
-      confirmations: 15, feeUsdt: Number(FEE), feeUsdtExact: FEE, minDepositUsdt: Number(MIN), minDepositUsdtExact: MIN });
+    if (scenario === 'preparing' && !demoChainDepositAddress(state, network))
+      return ok({ enabled: false, creditEnabled: false, network, reason: 'CREGIS_ADDRESS_PREPARING' });
+    if (scenario === 'paused') {
+      const address = demoChainDepositAddress(state, network);
+      return ok({ enabled: !!address, creditEnabled: false, network, ...(address && { address }), reason: 'CREGIS_DEPOSIT_PAUSED',
+        confirmations: 15, feeUsdt: Number(FEE), feeUsdtExact: FEE, minDepositUsdt: Number(MIN), minDepositUsdtExact: MIN });
+    }
     if (scenario === 'erc20-only' && network === 'BEP20')
       return ok({ enabled: false, creditEnabled: false, network, reason: 'CREGIS_DEPOSIT_PAUSED' });
   }
@@ -118,7 +135,8 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, findInt
   const paid = order.paidAt != null || ['PAID', 'REFUNDED', 'CHARGEBACK'].includes(order.paymentStatus);
   const pending = !paid && order.canonicalStatus === 'placed';
   const deadline = pending ? order.expiresAt : null;
-  const intent = pending ? findIntent?.(orderNo) : null;
+  const intent = pending ? checkoutFlow?.topupIntent(orderNo) : null;
+  const payment = paid ? checkoutFlow?.deliveredOrderPayment(order) ?? walletOrderPayment(state, order) : null;
   const openIntent = intent && intent.status !== 'MANUAL_REVIEW'
     ? { intentNo: intent.intentNo, paymentMethod: intent.paymentMethod, paymentAllowed: intent.paymentAllowed }
     : null;
@@ -137,7 +155,7 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, findInt
     amountDueUsdt: decimal(due), walletAvailableUsdt: decimal(balance), shortfallUsdt: decimal(shortfall),
     minDepositUsdt: MIN, depositFeeUsdt: FEE, suggestedTransferUsdt: decimal(suggested),
     blocker, openIntent, reviewReason,
-    paidAt: paid && order.paidAt != null ? new Date(order.paidAt).toISOString() : null,
-    paidAmountUsdt: paid ? order.paidAmountUsdt ?? order.paidTotalUsdt ?? null : null,
+    paidAt: payment?.at != null ? new Date(payment.at).toISOString() : null,
+    paidAmountUsdt: payment?.amount ?? null,
   });
 }

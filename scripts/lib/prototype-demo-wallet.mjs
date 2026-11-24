@@ -97,7 +97,15 @@ export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
 
 export const demoChainDepositFee = '0.123456';
 export const demoChainDepositMinimum = '50';
-export const demoChainDepositAddress = network => '0x' + (network === 'ERC20' ? '2' : '1').repeat(40);
+
+export function demoChainDepositAddress(state, network, allocate = false) {
+  const existing = state.chainDepositAddresses?.[network]
+    ?? state.chainDepositEvents?.find(row => row.network === network)?.address;
+  if (existing) return existing;
+  if (!allocate && !demoCreditedDeposits(state).some(row => row.deposit?.network === network)) return null;
+  const addresses = state.chainDepositAddresses ??= {};
+  return addresses[network] = '0x' + (network === 'ERC20' ? '2' : '1').repeat(40);
+}
 
 function demoCreditedDeposits(state) {
   const original = demoCreditedDeposit(state);
@@ -118,7 +126,7 @@ function demoCreditedDeposits(state) {
 export function demoChainDeposits(state) {
   const history = demoCreditedDeposits(state).filter(row => row.deposit).map(({ depositId, createdAt, deposit }) => ({
     depositId, createdAt, creditedAt: createdAt, network: deposit.network, txHash: deposit.txHash,
-    address: demoChainDepositAddress(deposit.network), confirmations: 15, requiredConfirmations: 15, status: 'CREDITED',
+    address: demoChainDepositAddress(state, deposit.network, true), confirmations: 15, requiredConfirmations: 15, status: 'CREDITED',
     grossAmountUsdt: Number(deposit.grossAmountUsdt), grossAmountUsdtExact: deposit.grossAmountUsdt,
     creditedUsdt: Number(deposit.creditedUsdt), creditedUsdtExact: deposit.creditedUsdt,
   }));
@@ -131,7 +139,7 @@ export function recordDemoChainDeposit(state, { network, grossAmountUsdt, credit
   const txHash = '0x' + sequence.toString(16).padStart(64, '0');
   const credited = Number(creditedUsdt) > 0;
   events.push({
-    depositId, network, txHash, address: demoChainDepositAddress(network), createdAt,
+    depositId, network, txHash, address: demoChainDepositAddress(state, network, true), createdAt,
     grossAmountUsdt: Number(grossAmountUsdt), grossAmountUsdtExact: grossAmountUsdt,
     creditedUsdt: Number(creditedUsdt), creditedUsdtExact: creditedUsdt,
     confirmations: 15, requiredConfirmations: 15, status: credited ? 'CREDITED' : 'DUST_HOLD',

@@ -1350,14 +1350,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(amount>0&&amount>demoWalletUsdt(state))refuse('ORDER_WALLET_INSUFFICIENT');
       if(amount>0){
         postDemoWalletEntries(state,{bizNo:orderNo,bizType:'ORDER_PURCHASE',asset:'USDT',direction:'OUT',
-          amount,at:now,category:'purchase',remark:'UVEL wallet order settlement'});
+          amount,amountExact:String(order.amountUsdt),at:now,category:'purchase',remark:'UVEL wallet order settlement'});
       }
       const delivery=demoOrderDelivery(state,order,now,demoAssignablePurchaseSlots(url,locale,state));
       (state.orderStatuses??={})[orderNo]=delivery.canonicalStatus;
       if(!writable)(state.createdOrders??=[]).push(order);
       order=Object.assign(writable??order,delivery,{paymentStatus:'PAID',orderStatus:'COMPLETED',
-        inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,paymentNo,paymentMethod,paidTotalUsdt,
-        paidAmountUsdt:String(order.amountUsdt)});
+        inventoryUsedAt:now,hardwareQuotaUsedAt,paidAt:now,paymentNo,paymentMethod,paidTotalUsdt});
     }
     const balanceAfter=demoWalletUsdt(state);
     const response={...(order.promotionQuoteId?order:{}),...authority,source:'server',orderNo,paymentNo,

@@ -296,7 +296,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const network = url.searchParams.get('network') || 'BEP20';
     const policy = networks.find(row => row.network === network);
     if (!policy?.enabled) return { enabled: false, creditEnabled: false, network, reason: 'CREGIS_DEPOSIT_PAUSED' };
-    return { enabled: true, creditEnabled: true, network, address: demoChainDepositAddress(network),
+    return { enabled: true, creditEnabled: true, network, address: demoChainDepositAddress(state, network, true),
       feeUsdt: policy.feeUsdt, feeUsdtExact: policy.feeUsdtExact, minDepositUsdt: policy.minDepositUsdt,
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
