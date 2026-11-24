@@ -41,7 +41,13 @@ export interface DirectReferralPolicy {
   purchaseSplitConfigured?: boolean;
   settlementMode?: TeamSettlementMode;
   purchaseSplit?: { enabled: boolean; usdtSharePct: number };
-  sevenLayerReference?: { revision: number; baseRatePct: number | null; coolingDays: number | null; legacyNexPerUsd: number | null };
+  sevenLayerReference?: {
+    revision: number;
+    baseRatePct: number | null;
+    coolingDays: number | null;
+    legacyNexPerUsd: number | null;
+    purchaseBaseRateSource?: "F2" | "BENEFICIARY_RANK";
+  };
   configured: boolean;
   policyVersion: number;
   effectiveAt: string | null;
@@ -152,12 +158,15 @@ export function createDirectReferralApi(client: ApiClient, mode: ApiEnvironment 
       if (policySchemaVersion !== undefined && purchaseSplitConfigured !== undefined && purchaseSplitConfigured !== (policySchemaVersion === 2)) return invalid();
       if (v2) {
         const rawSplit = row(source.purchaseSplit), reference = row(source.sevenLayerReference);
+        const purchaseBaseRateSource = reference.purchaseBaseRateSource;
+        if (purchaseBaseRateSource !== undefined && purchaseBaseRateSource !== "F2" && purchaseBaseRateSource !== "BENEFICIARY_RANK") return invalid();
         if (typeof rawSplit.enabled !== "boolean") return invalid();
         const usdtSharePct = number(rawSplit.usdtSharePct, 0, 100);
         if (rawSplit.enabled && (usdtSharePct <= 0 || usdtSharePct >= 100)) return invalid();
         purchaseSplit = { enabled: rawSplit.enabled, usdtSharePct };
         sevenLayerReference = { revision: integer(reference.revision), baseRatePct: reference.baseRatePct === null ? null : number(reference.baseRatePct, 0, 100),
-          coolingDays: reference.coolingDays === null ? null : integer(reference.coolingDays), legacyNexPerUsd: reference.legacyNexPerUsd === null ? null : number(reference.legacyNexPerUsd) };
+          coolingDays: reference.coolingDays === null ? null : integer(reference.coolingDays), legacyNexPerUsd: reference.legacyNexPerUsd === null ? null : number(reference.legacyNexPerUsd),
+          ...(purchaseBaseRateSource === undefined ? {} : { purchaseBaseRateSource }) };
         if (sevenLayerReference.coolingDays !== null && sevenLayerReference.coolingDays > 365) return invalid();
         const ready = purchaseSplitConfigured !== false && sevenLayerReference.baseRatePct !== null && sevenLayerReference.coolingDays !== null;
         purchase ??= { ...purchaseSplit, enabled: purchaseSplit.enabled && ready, totalRatePct: sevenLayerReference.baseRatePct ?? 0, coolingDays: sevenLayerReference.coolingDays ?? 0 };

@@ -8,24 +8,17 @@ import { formatHowNumber } from '@/lib/rank-how-content';
 // retains the publication's wording/order/items and resolves only its declared
 // value slots, using the same accepted rule snapshot as that summary.
 export function commissionPublishedBlocks(snapshot: CommissionsHowSnapshot, locale: string): HowContentBlock[] | null {
-  const { copy } = buildCommissionsHowContent(snapshot, locale);
+  const { copy, directPurchaseRules } = buildCommissionsHowContent(snapshot, locale);
   const { directPolicy: policy, guide } = snapshot;
   const number = (value: number) => formatHowNumber(value, locale);
   const money = (value: number) => `${formatGroupedAmount(value)} USDT`;
   const describe = (rule: DirectReferralRule) => !policy.configured ? copy.notConfigured : !rule.enabled ? copy.paused
     : `${copy.totalRate} ${number(rule.totalRatePct)}% · ${copy.split}: USDT ${number(rule.usdtSharePct)}% / UVT ${number(100 - rule.usdtSharePct)}% · ${number(rule.coolingDays)} ${copy.days}`;
-  let purchaseRules = describe(policy.purchase);
-  if (policy.settlementMode === 'SEVEN_V2') {
-    const split = policy.purchaseSplit, reference = policy.sevenLayerReference;
-    purchaseRules = !policy.configured || !split || !reference || policy.purchaseSplitConfigured === false
-      || reference.baseRatePct === null || reference.coolingDays === null ? copy.notConfigured
-      : split.enabled ? `${copy.purchaseBudget} ${number(reference.baseRatePct)}% · ${copy.split}: USDT ${number(split.usdtSharePct)}% / UVT ${number(100 - split.usdtSharePct)}% · ${copy.purchaseReplacement}` : copy.purchaseOriginal;
-  }
   const binary = guide.binary, leadership = guide.leadership;
   const ranks = snapshot.ranks.filter(row => row.visible).sort((a, b) => a.v - b.v);
   const cultivation = ranks.find(row => row.cultivationBonus > 0);
   const tokens: Record<string, string> = {
-    directPurchaseRules: purchaseRules,
+    directPurchaseRules,
     networkPurchaseRules: copy.networkPurchase,
     directDeviceRules: describe(policy.deviceEarning),
     directScope: policy.settlementMode === 'SEVEN_V2' ? copy.deviceScope : copy.directOnly,
