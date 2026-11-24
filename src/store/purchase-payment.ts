@@ -339,6 +339,8 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   }
   // A refund without an order has nothing to choose: the page itself states it and its close leaves (03 §3.5.1).
   if (conclusion && !(conclusion === 'refunded' && typeof orderNo !== 'string')) state.notice = conclusion;
+  // An open "payment still in progress" question no longer applies once the payment is refunded.
+  else if (conclusion === 'refunded' && state.notice === 'leave') state.notice = '';
 }
 /** The server holds no payment for this command: release it and its fences. Only the user may start another one, from the order. */
 function releaseMissingPayment(pending: PendingExternal, accountKey: string, orderNo: string) {
