@@ -1767,10 +1767,12 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
   }
   if(pathname==='/api/devices/earnings') {
-    const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}),computeFacts?.postedTasks);
+    const accountId=previewAccountId(state,request.headers?.()??{});
+    const ownsWallet=accountId===demoPurchasingAccountId(state);
+    const facts=demoFleetFacts(url,locale,state,accountId,computeFacts?.postedTasks);
     const active=facts.devices.filter(device=>device.activatedAt!==null);
     if(state.accountDeletionState==='read-error')throw Object.assign(new Error('DEMO_BALANCE_READ_UNAVAILABLE'),{status:503});
-    const data=base();data.walletUsdt=demoWalletUsdt(state);data.walletNex=demoWalletNex(state,now);data.userJoinedAt=demoH4Account(state).createdAt;
+    const data=base();data.walletUsdt=ownsWallet?demoWalletUsdt(state):0;data.walletNex=ownsWallet?demoWalletNex(state,now):0;data.userJoinedAt=demoH4Account(state).createdAt;
     data.dailyUsdt=active.reduce((sum,device)=>sum+device.dailyUsdt,0);data.dailyNex=active.reduce((sum,device)=>sum+device.dailyNex,0);
     if(state.fleetState==='earning-credit')data.timezone='Asia/Shanghai';
     data.realizedTodayUsdt=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsUsdt??0),0).toFixed(6));
@@ -1779,7 +1781,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
-    const bills=walletBills();
+    const accountId=previewAccountId(state,request.headers?.()??{});
+    if(!accountId)throw Object.assign(new Error('AUTH_REQUIRED'),{status:401});
+    const bills=accountId===demoPurchasingAccountId(state)?walletBills():[];
     return pathname.endsWith('/summary')?demoWalletBillSummary(bills,now):demoWalletBillList(bills,url.searchParams);
   }
   if(pathname==='/api/vouchers') {

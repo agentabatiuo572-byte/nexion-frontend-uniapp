@@ -1,6 +1,7 @@
 // B84 scenarios seed independent order stories against the preview account's shared wallet.
 import { isDeepStrictEqual } from 'node:util';
-import { demoAccountOrders, demoOrderTimedOut, demoProducts, demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
+import { demoAccountOrders, demoAssignablePurchaseSlots, demoOrderTimedOut, demoProducts, demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
+import { demoChainDepositDisabledReason } from './prototype-demo-deposit-network.mjs';
 import { demoPurchasingAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoChainDepositAddress, demoChainDepositFee as FEE, demoChainDepositMinimum as MIN, demoWalletUsdt,
   postDemoWalletEntries, recordDemoChainDeposit } from './prototype-demo-wallet.mjs';
@@ -48,8 +49,11 @@ const decimal = units => {
   return (negative ? '-' : '') + (abs / MICRO) + (fraction ? '.' + fraction : '');
 };
 const max = (a, b) => a > b ? a : b;
+const min = (a, b) => a < b ? a : b;
+const minCredit = micro(MIN) - micro(FEE);
 const ok = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
 const refuse = (status, message) => ({ status, body: { code: status, message, data: null } });
+export const orderTopupResetRequired = 'PREVIEW_ORDER_TOPUP_RESET_REQUIRED';
 
 function postWalletMovement(state, bizNo, bizType, category, direction, amount, at) {
   postDemoWalletEntries(state, { bizNo, bizType, asset: 'USDT', direction, category, at,
@@ -63,7 +67,7 @@ function creditDeposit(state, net, createdAt) {
 
 function fundWallet(state, target, orderNo, now) {
   const gap = target - micro(demoWalletUsdt(state));
-  if (gap > 0n) creditDeposit(state, max(gap, micro(MIN) - micro(FEE)), now);
+  if (gap > 0n) creditDeposit(state, max(gap, minCredit), now);
   const surplus = micro(demoWalletUsdt(state)) - target;
   if (surplus > 0n) {
     postWalletMovement(state, `DEMO-ADJ-${orderNo}-${now}`, 'ADJUSTMENT', 'other', 'OUT', surplus, now);
@@ -82,14 +86,17 @@ function applyWalletStory(state, scene, order, sample, now) {
       asset: 'USDT', category: 'clawback', direction: 'OUT', amount: Number(decimal(reward)), amountExact: decimal(reward),
       presentationCode: 'rewardClawback', publicReference: null, at: now });
   }
-  if (scene === 'min-floor') fundWallet(state, due - micro('10'), order.orderNo, now);
-  if (scene === 'covered' && balance < due) creditDeposit(state, max(due - balance, micro(MIN) - micro(FEE)), now);
-  if (scene === 'partial' && sample.depositId && balance === micro('370.5')) return;
+  if (scene === 'min-floor') fundWallet(state, max(0n, due - micro('10')), order.orderNo, now);
+  if (scene === 'covered' && balance < due) creditDeposit(state, max(due - balance, minCredit), now);
   if (scene === 'partial') {
-    fundWallet(state, micro('120.5'), order.orderNo, now);
-    sample.depositId = creditDeposit(state, micro('250'), now).depositId;
-  } else if (waitingScenes.has(scene) && (balance > due - micro(MIN) || balance < 0n)) {
-    fundWallet(state, micro('120.5'), order.orderNo, now);
+    const credit = min(micro('250'), max(minCredit, due / 2n));
+    const opening = min(micro('120.5'), due - credit - 1n);
+    if (sample.depositId && balance === opening + credit) return;
+    fundWallet(state, opening, order.orderNo, now);
+    sample.depositId = creditDeposit(state, credit, now).depositId;
+  } else if (waitingScenes.has(scene)) {
+    const ceiling = max(0n, due - micro(MIN));
+    if (balance > ceiling || balance < 0n) fundWallet(state, min(micro('120.5'), ceiling), order.orderNo, now);
   }
   if (scene === 'below-min' && !sample.depositId) {
     sample.depositId = recordDemoChainDeposit(state,
@@ -100,6 +107,7 @@ function applyWalletStory(state, scene, order, sample, now) {
 function newOrder(url, state, scene, orderNo, now) {
   const products = demoProducts(state, url.origin);
   const product = products.find(row => row.id === (scene === 'zero-voucher' ? 'cloud-share' : 'stellarbox-s1'));
+  if (!product || !Number.isFinite(product.price) || product.price <= 0) return null;
   const subtotal = product.price, voucher = scene === 'zero-voucher';
   const deadline = scene === 'deadline' ? now - 1000 : scene === 'expired' ? now - 61000 : now + paymentWindow - 1;
   return { ...pendingOrder, orderNo, orderType: 'SINGLE', itemCount: 1, productId: products.indexOf(product) + 1,
@@ -122,22 +130,39 @@ function canReuseSample(order, sample, scene, state, checkoutFlow, now) {
   return isDeepStrictEqual(checkoutFlow?.orderPaymentRecords(orderNo) ?? [], sample.initialPayments);
 }
 
-// Reuse the sample only while its seeded facts still hold. Keep earlier orders and their records intact.
-export function applyDemoOrderTopupScene(url, state, now, checkoutFlow, scene) {
-  if (!orderScenes.has(scene)) return null;
-  const defaultOrderNo = `DEMO-B84-${scene.toUpperCase()}`;
-  const network = scene === 'preparing' ? ['ERC20', 'BEP20'].find(net => !demoChainDepositAddress(state, net))
+// Plan the story against the requested preview before assigning an address, order or wallet entry.
+export function planDemoOrderTopupScene(url, locale, state, now, checkoutFlow, scene, accountId) {
+  const rejected = () => ({ failure: orderTopupResetRequired });
+  const open = network => !demoChainDepositDisabledReason(state, network, scene);
+  if (scene === 'erc20-only') return open('ERC20') ? {} : rejected();
+  if (!orderScenes.has(scene)) return {};
+  if (accountId !== demoPurchasingAccountId(state) || state.dataState === 'empty' || state.accountDeletionState !== 'follow') return rejected();
+  const network = scene === 'preparing' ? ['ERC20', 'BEP20'].find(net => open(net) && !demoChainDepositAddress(state, net))
     : scene === 'open-intent-usdt' ? 'ERC20' : 'BEP20';
-  if (!network) return refuse(409, 'PREVIEW_NO_UNASSIGNED_DEPOSIT_NETWORK');
-  if (scene === 'missing') return ok({ orderNo: defaultOrderNo, network });
+  if (!network || !open(network)) return rejected();
+  const defaultOrderNo = `DEMO-B84-${scene.toUpperCase()}`;
+  if (scene === 'missing') return { network, orderNo: defaultOrderNo };
+
+  const sample = state.orderTopupSamples?.[scene];
+  const existing = state.createdOrders?.find(row => row.orderNo === sample?.orderNo);
+  const reuse = canReuseSample(existing, sample, scene, state, checkoutFlow, now);
+  const generation = !sample ? 1 : sample.generation + (reuse ? 0 : 1);
+  const orderNo = generation === 1 ? defaultOrderNo : `${defaultOrderNo}-${generation}`;
+  const order = reuse ? existing : newOrder(url, state, scene, orderNo, now);
+  if (!order || scene === 'partial' && micro(order.amountUsdt) <= minCredit) return rejected();
+  if (!reuse && scene === 'paid-unverified' && !demoAssignablePurchaseSlots(url, locale, structuredClone(state))) return rejected();
+  return { network, orderNo, order, reuse, generation };
+}
+
+// Reuse the sample only while its seeded facts still hold. Keep earlier orders and their records intact.
+export function applyDemoOrderTopupScene(url, state, now, checkoutFlow, scene, plan) {
+  const { network, orderNo, order, reuse, generation } = plan;
+  if (!network) return null;
+  if (!order) return ok({ orderNo, network });
 
   const samples = state.orderTopupSamples ??= {};
   let sample = samples[scene];
-  let order = state.createdOrders?.find(row => row.orderNo === sample?.orderNo);
-  if (!canReuseSample(order, sample, scene, state, checkoutFlow, now)) {
-    const generation = sample ? sample.generation + 1 : 1;
-    const orderNo = generation === 1 ? defaultOrderNo : `${defaultOrderNo}-${generation}`;
-    order = newOrder(url, state, scene, orderNo, now);
+  if (!reuse) {
     (state.createdOrders ??= []).unshift(order);
     const original = originals[scene];
     if (original) {
@@ -152,7 +177,7 @@ export function applyDemoOrderTopupScene(url, state, now, checkoutFlow, scene) {
     if (scene === 'provisioning-failed' || scene === 'refunded') {
       // A historical wallet settlement has an actual debit. The refund is a separate credit.
       if (micro(demoWalletUsdt(state)) < micro(order.amountUsdt))
-        creditDeposit(state, max(micro(order.amountUsdt) - micro(demoWalletUsdt(state)), micro(MIN) - micro(FEE)), now);
+        creditDeposit(state, max(micro(order.amountUsdt) - micro(demoWalletUsdt(state)), minCredit), now);
       postWalletMovement(state, orderNo, 'ORDER_PURCHASE', 'purchase', 'OUT', micro(order.amountUsdt), now);
       Object.assign(order, { paymentMethod: 'UVEL_WALLET', paymentNo: `DEMO-PAY-${orderNo}`, paidAt: now,
         paidTotalUsdt: order.amountUsdt.toFixed(2) });
@@ -196,11 +221,8 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, checkou
   const network = url.searchParams.get('network');
   if (path === '/api/deposits/policy') {
     if (scenario === 'policy-error') return refuse(503, 'CREGIS_DEPOSIT_POLICY_UNAVAILABLE');
-    if (scenario === 'erc20-only') return ok({ networks: networks.map(net => ({ network: net, enabled: net === 'ERC20',
-      disabledReason: net === 'ERC20' ? null : 'NETWORK_SWITCH_OFF', confirmations: 15,
-      feeUsdt: Number(FEE), feeUsdtExact: FEE, minDepositUsdt: Number(MIN), minDepositUsdtExact: MIN })) });
   }
-  if (path === '/api/deposits/address' && networks.includes(network) && owns) {
+  if (path === '/api/deposits/address' && networks.includes(network) && owns && !demoChainDepositDisabledReason(state, network)) {
     if (scenario === 'address-error' && network === state.orderTopupPreview?.network) return refuse(503, 'CREGIS_ADDRESS_UNAVAILABLE');
     if (scenario === 'preparing' && network === state.orderTopupPreview?.network && !demoChainDepositAddress(state, network))
       return ok({ enabled: false, creditEnabled: false, network, reason: 'CREGIS_ADDRESS_PREPARING' });
@@ -209,8 +231,6 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, checkou
       return ok({ enabled: !!address, creditEnabled: false, network, ...(address && { address }), reason: 'CREGIS_DEPOSIT_PAUSED',
         confirmations: 15, feeUsdt: Number(FEE), feeUsdtExact: FEE, minDepositUsdt: Number(MIN), minDepositUsdtExact: MIN });
     }
-    if (scenario === 'erc20-only' && network === 'BEP20')
-      return ok({ enabled: false, creditEnabled: false, network, reason: 'CREGIS_DEPOSIT_PAUSED' });
   }
   const match = path.match(/^\/api\/app\/orders\/([^/]+)\/usdt-topup$/);
   if (!match) return undefined;

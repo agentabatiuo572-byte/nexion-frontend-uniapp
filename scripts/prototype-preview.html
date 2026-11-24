@@ -36,9 +36,10 @@ function applyWithdrawalRecoverySeed({ accountKey, attempt }) {
 async function update(changes,reload=true) {
   status.textContent='正在切换…';
   const result=await fetch('/__demo/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(changes)}).then(response=>response.json());
-  if(changes.orderTopupState&&result.message&&result.message!=='LONG_CONTENT_UNAVAILABLE'){
+  const resetRequired=result.message==='PREVIEW_ORDER_TOPUP_RESET_REQUIRED';
+  if(resetRequired||changes.orderTopupState&&result.message&&result.message!=='LONG_CONTENT_UNAVAILABLE'){
     render(result);
-    status.textContent=result.message;
+    status.textContent=resetRequired?'当前场景需要先重置':result.message;
     return;
   }
   if(result.withdrawalRecoverySeed)applyWithdrawalRecoverySeed(result.withdrawalRecoverySeed);

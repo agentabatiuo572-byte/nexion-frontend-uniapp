@@ -1,8 +1,10 @@
 // The loopback account's visible ledger and wallet summaries.
+import { createHash } from 'node:crypto';
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoDeletionStake } from './prototype-demo-staking.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
+import { demoPurchasingAccountId } from './prototype-demo-identity.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -98,13 +100,18 @@ export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
 export const demoChainDepositFee = '0.123456';
 export const demoChainDepositMinimum = '50';
 
-export function demoChainDepositAddress(state, network, allocate = false) {
+export function demoChainDepositAddress(state, network, allocate = false, accountId = demoPurchasingAccountId(state)) {
+  if (accountId !== demoPurchasingAccountId(state)) {
+    return allocate && accountId ? '0x' + createHash('sha256').update(`preview-deposit:${accountId}:${network}`).digest('hex').slice(0,40) : null;
+  }
   const existing = state.chainDepositAddresses?.[network]
     ?? state.chainDepositEvents?.find(row => row.network === network)?.address;
   if (existing) return existing;
   if (!allocate && !demoCreditedDeposits(state).some(row => row.deposit?.network === network)) return null;
+  const address = '0x' + (network === 'ERC20' ? '2' : '1').repeat(40);
+  if (!allocate) return address;
   const addresses = state.chainDepositAddresses ??= {};
-  return addresses[network] = '0x' + (network === 'ERC20' ? '2' : '1').repeat(40);
+  return addresses[network] = address;
 }
 
 function demoCreditedDeposits(state) {
@@ -123,7 +130,8 @@ function demoCreditedDeposits(state) {
   ];
 }
 
-export function demoChainDeposits(state) {
+export function demoChainDeposits(state, accountId) {
+  if (accountId !== demoPurchasingAccountId(state)) return [];
   const history = demoCreditedDeposits(state).filter(row => row.deposit).map(({ depositId, createdAt, deposit }) => ({
     depositId, createdAt, creditedAt: createdAt, network: deposit.network, txHash: deposit.txHash,
     address: demoChainDepositAddress(state, deposit.network, true), confirmations: 15, requiredConfirmations: 15, status: 'CREDITED',

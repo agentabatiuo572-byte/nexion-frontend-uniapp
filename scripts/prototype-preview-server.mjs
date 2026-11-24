@@ -23,7 +23,7 @@ import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.m
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createPaymentPinFlowFixture } from './lib/payment-pin-flow-fixture.mjs';
-import { applyDemoOrderTopupScene, demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
+import { applyDemoOrderTopupScene, demoOrderTopupResponse, planDemoOrderTopupScene } from './lib/prototype-demo-order-topup.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -219,6 +219,14 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==='/__demo/auth-requests')return sendJson(res,{simulation:true,requests:authDemo.trace});
     if(url.pathname==='/preview'){res.setHeader('Content-Type',mime['.html']);return res.end(await readFile(path.join(import.meta.dirname,'prototype-preview.html')));}
     if(url.pathname==='/__demo/state') {
+      const reply=(status=200,message,withdrawalRecoverySeed)=>{
+        const options=state.dataState==='empty'
+          ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
+          : demoOptions;
+        const supportReadbackState=selectedSupportAccount(url)?.supportReadbackState??'missing';
+        return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,supportReadbackState,
+          disabledLongOptions:disabledLongOptions(state),...(message?{message}:{})},status);
+      };
       let withdrawalRecoverySeed, longContentUnavailable, orderTopupFailure;
       if(req.method==='POST') {
         let body='';for await(const chunk of req)body+=chunk;
@@ -226,6 +234,32 @@ const server=http.createServer(async(req,res)=>{
         const update=JSON.parse(body||'{}'),wasEmpty=state.dataState==='empty',wasContent=state.contentState,
           wasPaymentMode=demoPaymentScenario(state),wasMissing=demoPaymentIntentMissing(state),
           wasTrialQuote=state.trialQuoteState,wasStreak=state.streakState,wasPromotionBuyer=state.promotionBuyer;
+        const now=Date.now();
+        const optionChanges=Object.fromEntries(Object.entries(demoOptions)
+          .filter(([key,options])=>!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState'].includes(key)
+            &&options.some(([value])=>value===update[key]))
+          .map(([key])=>[key,update[key]]));
+        const projected={...(update.reset?demoDefaults:state),...optionChanges};
+        selectDemoPaymentState(projected,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
+        const paymentMode=demoPaymentScenario(projected);
+        const promotionBuyerChanged=projected.promotionBuyer!==wasPromotionBuyer;
+        const resetAuth=update.reset||update.authState||update.savedAttemptState||promotionBuyerChanged;
+        normalizeDemoLongContent(projected);
+        // A scenario change reseeds account facts; check B84 against the same prospective scenario before any mutation.
+        const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(projected.trialQuoteState);
+        const scenarioChange=promotionBuyerChanged||projected.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(projected.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
+        const scenarioFields=['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'];
+        if(scenarioChange)for(const key of scenarioFields)delete projected[key];
+        const topupSelection=demoOptions.orderTopupState.find(([value])=>value===update.orderTopupState);
+        const scene=topupSelection?.[0]??projected.orderTopupState;
+        const selectTopup=topupSelection||update.reset||scenarioChange;
+        const chainPolicyChanged='topupChannels' in optionChanges||'paymentState' in optionChanges;
+        const owner=projected.sessionState==='signed-out'||projected.authState==='signed-out' ? null
+          : resetAuth?previewSelectedAccountId({...projected,authUser:null}):previewSelectedAccountId(state);
+        const topupPlan=selectTopup||scene==='erc20-only'&&chainPolicyChanged
+          ? planDemoOrderTopupScene(url,locale,projected,now,checkoutFlow,scene,owner)
+          : null;
+        if(topupPlan?.failure)return reply(409,topupPlan.failure);
         if(update.reset){
           const {accountCreatedAt,supportConversationSequence}=state;
           for(const key of Object.keys(state))delete state[key];
@@ -247,24 +281,15 @@ const server=http.createServer(async(req,res)=>{
           state.outOfStockProductNo=update.outOfStockProductNo;
         }
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        Object.assign(state,optionChanges);
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
-        const paymentMode=demoPaymentScenario(state);
         if(state.dataState==='empty')state.withdrawLimitState='open';
-        const promotionBuyerChanged=state.promotionBuyer!==wasPromotionBuyer;
-        if(update.reset||update.authState||update.savedAttemptState||promotionBuyerChanged)authDemo.reset();
+        if(resetAuth)authDemo.reset();
         if(update.registrationState)delete state.captchaInvalidReturned;
         if(update.authState)delete state.scopeCalls;
         if(update.stakingOpenState){delete state.stakingAttempts;delete state.stakingStatusReads;}
         longContentUnavailable=normalizeDemoLongContent(state);
-        // Scenario knobs start a fresh scenario (design rule at demoSeedFleet): the old scenario's purchases, orders,
-        // trade-ins, trial and payment intents go, and the scene seeds the new fleet. Entering or leaving the empty
-        // account (dataState=empty), the low-balance account or a near-deadline sample (paymentState=low-balance, urgent,
-        // late) is one too. Presentation knobs keep them.
-        // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
-        const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
-        const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
-        if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
+        if(scenarioChange)for(const key of scenarioFields)delete state[key];
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -304,7 +329,6 @@ const server=http.createServer(async(req,res)=>{
         if(update.ambassadorState)delete state.ambassadorDemo;
         if(update.eventState)delete state.raffleEntries;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
-        const now=Date.now();
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
@@ -338,10 +362,8 @@ const server=http.createServer(async(req,res)=>{
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
         }
-        const topupSelection=demoOptions.orderTopupState.find(([value])=>value===update.orderTopupState);
-        if(topupSelection||update.reset||scenarioChange){
-          const scene=topupSelection?.[0]??state.orderTopupState;
-          const result=applyDemoOrderTopupScene(url,state,Date.now(),checkoutFlow,scene);
+        if(selectTopup){
+          const result=applyDemoOrderTopupScene(url,state,now,checkoutFlow,scene,topupPlan);
           if(result&&result.status!==200)orderTopupFailure={status:result.status,message:result.body.message};
           else {
             state.orderTopupState=scene;
@@ -349,13 +371,8 @@ const server=http.createServer(async(req,res)=>{
           }
         }
       }
-      const options=state.dataState==='empty'
-        ? {...demoOptions,withdrawLimitState:demoOptions.withdrawLimitState.filter(([value])=>value==='open')}
-        : demoOptions;
-      const supportReadbackState=selectedSupportAccount(url)?.supportReadbackState??'missing';
-      return sendJson(res,{state,options,simulation:true,withdrawalRecoverySeed,supportReadbackState,
-        disabledLongOptions:disabledLongOptions(state),
-        ...(orderTopupFailure?{message:orderTopupFailure.message}:longContentUnavailable?{message:'LONG_CONTENT_UNAVAILABLE'}:{})},orderTopupFailure?.status??200);
+      return reply(orderTopupFailure?.status,orderTopupFailure?.message
+        ?? (longContentUnavailable?'LONG_CONTENT_UNAVAILABLE':undefined),withdrawalRecoverySeed);
     }
     if(url.pathname==='/preview-language'){locale=previewInterfaceLanguages().includes(url.searchParams.get('code'))?url.searchParams.get('code'):'en';if(state.profile)state.profile.language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(locale)?locale:'en';return res.end('OK');}
     if(req.method==='GET'&&/^\/api\/promotions\/demo-promo-\d+\/banner\/[1-9][0-9]*$/.test(url.pathname)){res.setHeader('Content-Type','image/png');return res.end(await readFile(path.join(root,'static/promotion/purchase-gift-reference.png')));}

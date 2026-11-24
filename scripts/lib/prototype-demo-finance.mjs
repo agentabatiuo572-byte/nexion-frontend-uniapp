@@ -2,7 +2,8 @@
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { demoBankWithdrawalIntent, demoWithdrawalFacts, demoWithdrawalUser } from './prototype-demo-secondary.mjs';
-import {demoDepositNetworkDisabledReason} from './prototype-demo-deposit-network.mjs';
+import { demoChainDepositDisabledReason } from './prototype-demo-deposit-network.mjs';
+import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoChainDepositAddress, demoChainDepositFee, demoChainDepositMinimum, demoChainDeposits, demoWalletNex, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const day=86400000;
 const money = amount => Number(amount.toFixed(6));
@@ -288,18 +289,24 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/deposits/policy" || p === "/api/deposits/address") {
     // Policy and address share the same terms and existing payment availability switches.
     const networks = ['BEP20', 'ERC20'].map(network => {
-      const disabledReason = demoDepositNetworkDisabledReason(state, network);
+      const disabledReason = demoChainDepositDisabledReason(state, network);
       return { network, enabled: disabledReason === null, disabledReason, confirmations: 15,
         feeUsdt: Number(demoChainDepositFee), feeUsdtExact: demoChainDepositFee,
         minDepositUsdt: Number(demoChainDepositMinimum), minDepositUsdtExact: demoChainDepositMinimum };
     });
     if (p === "/api/deposits/policy") return { networks };
+    const accountId = previewAccountId(state, request.headers?.() ?? {});
+    if (!accountId) refuse(401, 'AUTH_REQUIRED');
     const network = url.searchParams.get('network') || 'BEP20';
     const policy = networks.find(row => row.network === network);
     if (!policy?.enabled) return { enabled: false, creditEnabled: false, network, reason: 'CREGIS_DEPOSIT_PAUSED' };
-    return { enabled: true, creditEnabled: true, network, address: demoChainDepositAddress(state, network, true),
+    return { enabled: true, creditEnabled: true, network, address: demoChainDepositAddress(state, network, true, accountId),
       feeUsdt: policy.feeUsdt, feeUsdtExact: policy.feeUsdtExact, minDepositUsdt: policy.minDepositUsdt,
       minDepositUsdtExact: policy.minDepositUsdtExact, confirmations: policy.confirmations };
   }
-  if(p==='/api/deposits') return demoChainDeposits(state);
+  if(p==='/api/deposits') {
+    const accountId = previewAccountId(state, request.headers?.() ?? {});
+    if (!accountId) refuse(401, 'AUTH_REQUIRED');
+    return demoChainDeposits(state, accountId);
+  }
 };
