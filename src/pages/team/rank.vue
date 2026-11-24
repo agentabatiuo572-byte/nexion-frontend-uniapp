@@ -165,11 +165,11 @@ import { CHASSIS_QUERY_SCOPE, useLoopsInView } from "@/composables/use-loops-in-
 import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryDates, salaryView } from "@/lib/rank-salary-view";
+import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryAmountExpiresAt, salaryDates, salaryView } from "@/lib/rank-salary-view";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
-import { teamRankProgress } from "@/lib/team-rank-progress";
+import { rankRequirementStatus, teamRankProgress } from "@/lib/team-rank-progress";
 import { navTo } from "@/lib/route";
 import { isEntitlementVRankReward } from "@/lib/rank-entitlement-label";
 import { RANK_ASSETS, rankAsset, rankTierStyle, rankTierVars, type RankPerk } from "@/lib/rank-tier-style";
@@ -223,10 +223,12 @@ const previewData = computed(() => ({
 const prog = computed(() => teamRankProgress(previewData.value, rankDefs.value));
 const expandedRank = ref<VRank | null>(null);
 let expandedAccount = auth.accountId;
+let expandedHidden = visibility.hidden;
 let expansionInitialized = false;
-watch(() => [auth.accountId, rankAvailable.value, myRank.value, rankDefs.value.map(rank => rank.v).join(',')] as const, ([account, ready]) => {
-  if (account !== expandedAccount) {
+watch(() => [auth.accountId, rankAvailable.value, visibility.hidden, myRank.value, rankDefs.value.map(rank => rank.v).join(',')] as const, ([account, ready, hidden]) => {
+  if (account !== expandedAccount || hidden !== expandedHidden) {
     expandedAccount = account;
+    expandedHidden = hidden;
     expansionInitialized = false;
     expandedRank.value = null;
   }
@@ -235,7 +237,7 @@ watch(() => [auth.accountId, rankAvailable.value, myRank.value, rankDefs.value.m
   if (!ready) return;
   if (!expansionInitialized || (expandedRank.value !== null && !rankDefs.value.some(rank => rank.v === expandedRank.value))) {
     // 阶梯默认展开当前等级；V8 会员默认不展开，横条滚到 V8，下面一句「点开查看条件与权益」（11.2 第 6 条）。
-    const preferred = myRank.value === 8 ? null : myRank.value;
+    const preferred = hidden || myRank.value === 8 ? null : myRank.value;
     expandedRank.value = preferred !== null && rankDefs.value.some(rank => rank.v === preferred) ? preferred : null;
     expansionInitialized = true;
   }
@@ -288,9 +290,9 @@ const conditionRows = computed(() => prog.value.rows
 const nextConditions = computed(() => conditionRows.value.filter(row => row.tier === prog.value.next?.v));
 const priorConditions = computed(() => conditionRows.value.filter(row => row.tier !== prog.value.next?.v));
 const priorMissing = computed(() => prog.value.unmet.filter(row => row.tier !== prog.value.next?.v).length);
-const reviewPending = computed(() => prog.value.reviewPending);
+const reviewPending = computed(() => !visibility.hidden && prog.value.reviewPending);
 const gapTag = computed(() => {
-  if (reviewPending.value) return visibility.mask(t.value.myRank.reviewTag);
+  if (prog.value.reviewPending) return visibility.mask(t.value.myRank.reviewTag);
   if (!prog.value.unmetCount) return '';
   return fmt(t.value.myRank.leftTag, { n: visibility.mask(prog.value.unmetCount) });
 });
@@ -352,7 +354,7 @@ const { phase: salaryPhase, pending: salaryAttempt, submit: submitClaim, resend:
     }
     const code = result.status === "REJECTED" ? result.rejectionCode : "";
     if (code === "COVERAGE_BELOW_REDLINE" || code === "COVERAGE_UNAVAILABLE") {
-      const deadline = lastClaimDay(item.expiresAt);
+      const deadline = lastClaimDay(attempt.amountExpiresAt ?? item.expiresAt);
       const today = vState.salary?.businessDate ?? attempt.businessDate;
       const desc = today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
       toast.warn(copy.toastFailTitle, desc);
@@ -382,7 +384,7 @@ function openAmountChange() {
   // fresh rank, and its amount if the qualification changed again since the receipt.
   const amountUsdt = compareSalaryAmounts(current.amountUsdt, change.amountUsdt) === 0
     ? change.amountUsdt : current.amountUsdt;
-  amountChange.value = { item: { ...current, amountUsdt }, businessDate: vState.salary.businessDate };
+  amountChange.value = salaryAttemptFor(vState.salary, { ...current, amountUsdt });
   salaryDialog.value = "amount";
 }
 watch(() => vState.salary, openAmountChange);
@@ -429,10 +431,13 @@ function submitSalary(attempt: RankSalaryAttempt) {
   salarySwap.value = true;
   submitClaim(attempt);
 }
+function salaryAttemptFor(source: RankSalary, item: RankSalaryAttempt['item']): RankSalaryAttempt {
+  return { item, businessDate: source.businessDate, amountExpiresAt: salaryAmountExpiresAt(source, item) };
+}
 function claimSalary() {
   const source = vState.salary;
   const item = displayedSalaryMonth(source);
-  if (salaryDock.value?.kind === "claim" && source && item) submitSalary({ item, businessDate: source.businessDate });
+  if (salaryDock.value?.kind === "claim" && source && item) submitSalary(salaryAttemptFor(source, item));
 }
 function openSalaryPromo() {
   if (salaryDock.value?.kind !== "tray" || !vState.salary) return;
@@ -444,7 +449,7 @@ function confirmSalaryDialog() {
   salaryDialog.value = null;
   if (which === "promo" && source) {
     const item = displayedSalaryMonth(source);
-    if (item) submitSalary({ item, businessDate: source.businessDate });
+    if (item) submitSalary(salaryAttemptFor(source, item));
   }
   if (which === "amount" && change) submitSalary(change);
 }
@@ -455,9 +460,8 @@ function resendSalaryClaim() {
 // ── 底部操作栏（2.1 非领取状态）与「加快晋级」（2.4：同三个目的地，底部按钮已覆盖的不重复）──
 const missingKinds = computed(() => new Set(prog.value.missing.map(row => row.kind)));
 const dockAction = computed(() => {
-  // 月薪项：有可领月薪时这里先返回领取（悬浮按钮或托盘），再落到下面补差距的一步。
   const kinds = missingKinds.value;
-  if (!prog.value.next || !kinds.size) return null;
+  if (salaryDock.value || !prog.value.next || !kinds.size) return null;
   return [...kinds].every(kind => kind === 'selfComputePoints')
     ? { kind: 'store' as const, label: t.value.earn.selectDevice, href: '/pages/store/store' }
     : { kind: 'invite' as const, label: t.value.myRank.inviteBtn, href: '/pages/team/team?intent=share' };
@@ -555,13 +559,20 @@ onUnmounted(() => { if (popTimer) clearTimeout(popTimer); flipTimers.forEach(cle
 const queryScope = inject(CHASSIS_QUERY_SCOPE, null) ?? getCurrentInstance()?.proxy ?? null;
 const railInd = reactive({ x: 0, w: 0, h: 0, on: false });
 const railScroll = ref(0);
+const railRank = computed(() => expandedRank.value ?? (!visibility.hidden && myRank.value === 8 ? 8 : null));
 function measureRail() {
-  const v = expandedRank.value ?? (myRank.value === 8 ? 8 : null);
+  const v = railRank.value;
+  if (v === null) {
+    railInd.on = false;
+    railScroll.value = 0;
+    return;
+  }
   const query = queryScope ? uni.createSelectorQuery().in(queryScope) : uni.createSelectorQuery();
   query.select('.rank-rail__track').boundingClientRect();
   query.select('.rank-rail').boundingClientRect();
-  if (v !== null) query.select(`#rank-tab-${v}`).boundingClientRect();
+  query.select(`#rank-tab-${v}`).boundingClientRect();
   query.exec((res: (UniApp.NodeInfo | null)[]) => {
+    if (railRank.value !== v) return;
     const [track, rail, item] = res;
     if (!track || !rail || !item || item.left === undefined || track.left === undefined || rail.width === undefined) return;
     const x = item.left - track.left;
@@ -570,27 +581,27 @@ function measureRail() {
     railScroll.value = Math.max(0, Math.round(x - (rail.width - (item.width ?? 0)) / 2));
   });
 }
-watch(() => [expandedRank.value, rankDefs.value.length, locale.code, visibility.hidden, rankAvailable.value] as const, () => { void nextTick(measureRail); }, { immediate: true });
+watch(() => [railRank.value, expandedRank.value, rankDefs.value.length, locale.code, rankAvailable.value] as const, () => { void nextTick(measureRail); }, { immediate: true });
 
 // ── 等级详情卡（E、E2；Ch 只遮当前值和状态标签）──
 const VRANK_TEXT_ICONS = { letter: 'rank-letter', review: 'rank-review' } as const;
 const textConditionsFor = (v: number) => v === 8 && rankDefs.value.find(rank => rank.v === 8)?.reviewRequired === true
   ? [{ key: 'letter', icon: VRANK_TEXT_ICONS.letter as NxIconName, name: fmt(t.value.myRank.condLetter, { r: 'V8' }) }, { key: 'review', icon: VRANK_TEXT_ICONS.review as NxIconName, name: t.value.myRank.condReview }]
   : [];
-const textConditions = computed(() => prog.value.next ? textConditionsFor(prog.value.next.v) : []);
+const textConditions = computed(() => !visibility.hidden && prog.value.next ? textConditionsFor(prog.value.next.v) : []);
 const atLeast = (level: number) => Object.entries(vState.vDownlineCounts).reduce((sum, [rank, count]) => Number(rank) >= level ? sum + count : sum, 0);
 type DetailRow = { key: string; name: string; current: string | null; target: string; unit: string; state: 'met' | 'missing' | 'unknown' | 'hidden' };
 const detail = computed(() => {
   const def = rankDefs.value.find(rank => rank.v === expandedRank.value);
   if (!def) return null;
-  // 已达成和当前等级只写门槛加达成勾；更高的等级写「当前 / 门槛」（画板 E、E2、H6）。
-  const reached = !visibility.hidden && def.v <= myRank.value;
+  // Earlier tiers show their attained thresholds. The current tier can have gaps while being retained.
   const c = def.conditions, rows: DetailRow[] = [];
   const add = (key: string, name: string, current: number | undefined, required: number, people: boolean) => {
     if (!(required > 0)) return; // 门槛为 0 的条件不列（rank-rules）
-    const known = typeof current === 'number' && Number.isFinite(current);
-    rows.push({ key, name, current: reached ? null : visibility.mask(number(known ? current : undefined)), target: number(required), unit: people ? t.value.myRank.people : '',
-      state: visibility.hidden ? 'hidden' : reached || (known && current! >= required) ? 'met' : !known ? 'unknown' : 'missing' });
+    const actual = rankRequirementStatus(current, required);
+    const state = visibility.hidden ? 'hidden' : def.v < myRank.value ? 'met' : actual;
+    const compact = def.v <= myRank.value && state === 'met';
+    rows.push({ key, name, current: compact ? null : visibility.mask(number(actual === 'unknown' ? undefined : current)), target: number(required), unit: people ? t.value.myRank.people : '', state });
   };
   add('self', t.value.myRank.self, vState.selfComputePoints, c.selfComputePoints ?? 0, false);
   add('team', t.value.myRank.team, vState.teamComputePoints, c.teamComputePoints ?? 0, false);

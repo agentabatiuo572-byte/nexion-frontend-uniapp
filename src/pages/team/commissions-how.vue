@@ -27,10 +27,12 @@
             </view>
           </HowSection>
 
-          <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
-            <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
-            <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
-            <HowItem :n="3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays ?? '—' })" />
+          <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="devicePaused ? t.directReferral.disabled : deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
+            <template v-if="!devicePaused">
+              <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
+              <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
+              <HowItem :n="3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays ?? '—' })" />
+            </template>
           </HowSection>
         </template>
 
@@ -193,6 +195,7 @@ const pct = (value: number | null) => value === null || !Number.isFinite(value) 
 const myRankCode = computed(() => vrank.remoteReady ? visibility.mask(`V${vrank.myRank}`) : "");
 const purchaseDays = computed(() => purchaseCoolingDays(policy.value));
 const deviceL2On = computed(() => deviceLevel2On(policy.value));
+const devicePaused = computed(() => policy.value?.deviceEarning.enabled === false);
 const rateRows = computed(() => {
   const snapshot = state.value.snapshot;
   const legacy = snapshot?.rates?.unilevelUsdt;

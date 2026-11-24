@@ -226,13 +226,15 @@ function salaryMonth(value: unknown): RankSalaryMonth {
 export interface RankSalaryAttempt {
   item: RankSalaryMonth;
   businessDate: string;
+  amountExpiresAt?: string;
 }
 
 export function readRankSalaryAttempt(value: unknown): RankSalaryAttempt {
   const source = record(value);
   const item = salaryMonth(source.item);
   if (item.status !== "CLAIMABLE") return invalid();
-  return { item, businessDate: salaryBusinessDate(source.businessDate) };
+  return { item, businessDate: salaryBusinessDate(source.businessDate),
+    amountExpiresAt: source.amountExpiresAt === undefined ? undefined : salaryInstant(source.amountExpiresAt) };
 }
 
 function readSalary(value: unknown): RankSalary {

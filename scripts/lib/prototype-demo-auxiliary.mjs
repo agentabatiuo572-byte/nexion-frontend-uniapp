@@ -4,6 +4,7 @@ import { demoCommissionGroups, demoCommissionTotals, demoLifetimeEarningsUsdt, d
 
 import { demoBatchPage } from './prototype-demo-secondary.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
+import { rankDevicePolicies } from './prototype-demo-rank-presets.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
@@ -56,10 +57,11 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   if(p==='/api/config/commission/direct-referral'){
     const coolingDays=state.rankCoolingState==='zero'?0:7;
     const purchase={enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays};
-    const deviceEarning={enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,
-      coolingDays:state.rankPreset==='follow'?0:coolingDays,level2RatePct:state.rankDeviceLevel2State==='on'?2:0};
+    const {current}=rankDevicePolicies(state,state.previewFactsAt??now);
+    const {effectiveAt,policyVersion,...deviceEarning}=current;
     const v2=url.searchParams.get('schemaVersion')==='2';
-    return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',
+    return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:policyVersion,
+      effectiveAt:empty?null:state.rankPreset==='follow'?'2026-10-01T00:00:00Z':new Date(effectiveAt).toISOString(),
       nexUsdtPrice:empty?null:.128,purchase,deviceEarning,
       ...(v2&&{schemaVersion:2,settlementMode:'SEVEN_V2',purchaseSplitConfigured:!empty,
         purchaseSplit:{enabled:!empty,usdtSharePct:60},
@@ -81,7 +83,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
     const kind=filter==='purchase'?'direct_purchase':'direct_device_earning';
     const selected=filter==='all'?all:all.filter(event=>event.kind===kind);
     const events=selected.slice((page-1)*pageSize,page*pageSize).map(event=>({...event,settlementNo:event.id,
-      sourceDeviceId:event.sourceDeviceId??null,basisUsdt:event.orderAmountUSD,policyVersion:3,nexUsdtPrice:.128,
+      sourceDeviceId:event.sourceDeviceId??null,basisUsdt:event.orderAmountUSD,policyVersion:event.policyVersion??3,nexUsdtPrice:.128,
       recoveryPendingUSDT:0,recoveryPendingNEX:0,cancelledUSDT:0,cancelledNEX:0,
       creditedUSDTAt:event.status==='unlocked'?new Date(event.unlockAt).toISOString():null,
       creditedNEXAt:event.status==='unlocked'?new Date(event.unlockAt).toISOString():null,

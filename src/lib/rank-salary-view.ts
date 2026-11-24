@@ -71,6 +71,14 @@ export function salaryDates(localeCode: string) {
 /** 窗口结束（不含）的前一天，即最后可领的那天。 */
 export const lastClaimDay = (expiresAt: string) => shiftDate(salaryDay(expiresAt), -1);
 
+/** The month's window can outlast the amount currently open for that month. */
+export function salaryAmountExpiresAt(salary: RankSalary, item: RankSalaryMonth): string {
+  const next = salary.upcoming;
+  return item.status === "CLAIMABLE" && next?.month === item.month
+    && compareSalaryAmounts(next.amountUsdt, item.amountUsdt) !== 0
+    && Date.parse(next.claimableFrom) < Date.parse(item.expiresAt) ? next.claimableFrom : item.expiresAt;
+}
+
 const STATUS_ORDER = { CLAIMABLE: 0, PENDING: 1, CLAIMED: 2 };
 export function displayedSalaryMonth(salary: RankSalary | null | undefined) {
   if (!salary) return undefined;
@@ -108,8 +116,10 @@ export function salaryView(input: {
   if (!item) return { card: null, dock: null, promo: null };
   const other = salary.months.find(month => month.month !== item.month && month.status !== "CLAIMED");
   const caption = hidden ? input.mask("") : say(copy.monthRank, { m: d.month(item.month), r: item.rankCode });
-  const lastDay = lastClaimDay(item.expiresAt);
-  const expiresOn = salaryDay(item.expiresAt);
+  const expiresAt = pending?.amountExpiresAt ?? salaryAmountExpiresAt(salary, item);
+  const lastDay = lastClaimDay(expiresAt);
+  const expiresOn = salaryDay(expiresAt);
+  const amountEndsToday = expiresAt !== item.expiresAt && lastDay === salary.businessDate;
   const claimBy = say(copy.claimBy, { d: d.day(lastDay) });
   const amount = hidden ? "••••" : num(item.amountUsdt);
   const businessMonth = salary.businessDate.slice(0, 7);
@@ -138,12 +148,11 @@ export function salaryView(input: {
     if (carry) {
       card.tag = { label: copy.todayTag, tone: "warning" };
       card.tip = { tone: "warning", lines: splitSentences(say(copy.carryNote, { m: d.monthWord(item.month) })) };
-      if (other) card.note = say(copy.nextMonthNote, { pm: d.month(item.month), m: d.month(other.month), a: usdt(other.amountUsdt), d: d.day(lastClaimDay(other.expiresAt)) });
+      if (other) card.note = say(copy.nextMonthNote, { pm: d.month(item.month), m: d.month(other.month), a: usdt(other.amountUsdt), d: d.day(lastClaimDay(salaryAmountExpiresAt(salary, other))) });
       dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimMonthBtn, { m: d.month(item.month), a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
     } else if (up) {
       const opensOn = salaryDay(up.claimableFrom);
       const end = opensOn.slice(0, 7) !== item.month; // 月末最后一天晋升：下月 1 日（D4c）
-      if (end) card.note = say(copy.claimBy, { d: d.day(lastClaimDay(up.claimableFrom)) });
       card.tag = { label: copy.claimable, tone: "brand" };
       card.tip = { tone: "warning", lines: splitSentences(end
         ? say(copy.promoEndNote, { d: d.day(opensOn), r: input.mask(up.rankCode), m: d.month(item.month), a: usdt(up.amountUsdt), b: usdt(item.amountUsdt) })
@@ -157,6 +166,7 @@ export function salaryView(input: {
       card.tag = { label: copy.claimable, tone: "brand" };
       card.tip = { tone: "neutral", lines: splitSentences(copy.claimRules) };
     }
+    if (amountEndsToday) card.tag = { label: copy.todayTag, tone: "warning" };
     if (!dock) dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimBtn, { a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
   }
 

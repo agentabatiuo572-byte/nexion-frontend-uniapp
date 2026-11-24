@@ -23,6 +23,7 @@ import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { applyDemoOrderTopupScene, demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
+import { demoRankSalaryCommand, isRankSalaryCommand } from './lib/prototype-demo-rank-salary.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -76,6 +77,7 @@ const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
 const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1','uvel-event-pending-accounts-v1'];
+scenarioStorageKeys.push('nexgrid-rank-salary-command-v1');
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
 const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
@@ -251,6 +253,7 @@ const server=http.createServer(async(req,res)=>{
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const scenarioChange=promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
+        if(scenarioChange)for(const key of ['rankSalaryClaims','rankSalaryCommands','rankSalaryTransitions','rankSalaryExpirations'])delete state[key];
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -382,6 +385,17 @@ const server=http.createServer(async(req,res)=>{
         let raw='';for await(const chunk of req)raw+=chunk;
         if(staleWrite())return refuseStale();
         const response=authDemo.handle(url.pathname,req.headers,raw?JSON.parse(raw):{});
+        return sendJson(res,response.body,response.status);
+      }
+      if(isRankSalaryCommand(url.pathname,req.method)){
+        let request=null;
+        if(req.method==='POST'){
+          let raw='';for await(const chunk of req)raw+=chunk;
+          request=raw?JSON.parse(raw):null;
+          await new Promise(resolve=>setTimeout(resolve,350));
+          if(staleWrite())return refuseStale();
+        }
+        const response=demoRankSalaryCommand(state,url.pathname,req.method,previewAccountId(state,req.headers),req.headers['idempotency-key'],request);
         return sendJson(res,response.body,response.status);
       }
       const withdrawalRequest = handlesWithdrawalRequest(url.pathname, req.method);

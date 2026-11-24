@@ -55,12 +55,12 @@
         <view v-else-if="policyState !== 'ready' && !policy" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
         <view v-else-if="policy" style="display: flex; flex-direction: column; gap: 8px">
           <text v-if="!policy.configured" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.directReferral.unconfigured }}</text>
-          <text v-else-if="policy.nexUsdtPrice === null" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.priceUnavailable }}</text>
+          <text v-else-if="!devicePaused && policy.nexUsdtPrice === null" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.priceUnavailable }}</text>
         </view>
         <!-- Settlement fold (DESIGN F2): the closed title states the conclusion; the three sentences open on tap. -->
         <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ detailsSummary }}</text><NxIcon :name="showSettlementDetails ? 'minus' : 'plus'" /></view>
         <view v-if="showSettlementDetails" class="nx-unilevel-details">
-          <text class="block">{{ filter !== 'device_earning' ? rankCopy.f2Pays : deviceL2On ? rankCopy.f2DevPays : guideCopy.deviceBody }}</text>
+          <text v-if="!devicePaused" class="block">{{ filter !== 'device_earning' ? rankCopy.f2Pays : deviceL2On ? rankCopy.f2DevPays : guideCopy.deviceBody }}</text>
           <template v-if="(policyState === 'ready' || policyState === 'loading') && policy">
             <text class="block">{{ ruleDescription }}</text>
           </template>
@@ -214,13 +214,14 @@ watch(currentRank, rank => {
   if (remoteApiEnabled && rank && (rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined)) void commission.ensureCanonicalConfig();
 }, { immediate: true });
 const deviceL2On = computed(() => deviceLevel2On(policy.value));
+const devicePaused = computed(() => filter.value === "device_earning" && policy.value?.deviceEarning.enabled === false);
 const guideCopy = computed(() => teamRuleGuideCopy(locale.code));
 const pctText = (value: number | null | undefined) => value === null || value === undefined || !Number.isFinite(value) ? "—" : `${formatHowNumber(value, dateLocale())}%`;
 const purchaseDays = computed(() => purchaseCoolingDays(policy.value));
 const detailsSummary = computed(() => {
   const days = filter.value === "device_earning" ? policy.value?.deviceEarning.coolingDays ?? null : purchaseDays.value;
   const device = filter.value === "device_earning", copy = rankCopy.value;
-  if (days === null) return copy.f2Details;
+  if (devicePaused.value || days === null) return copy.f2Details;
   if (creditsAtOnce(days)) return device ? copy.f2DevDetailsSumNow : copy.f2DetailsSumNow;
   return fmt(device ? copy.f2DevDetailsSum : copy.f2DetailsSum, { d: days });
 });

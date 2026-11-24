@@ -13,6 +13,10 @@ export interface RankRequirement {
 }
 const known = (value: number | undefined): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
+export function rankRequirementStatus(current: number | undefined, required: number): RankRequirement['status'] {
+  return !known(current) || !known(required) ? 'unknown' : current >= required ? 'met' : 'missing';
+}
+
 /** Display projection only. Never recalculates or writes the protected current rank. */
 export function teamRankRequirements(state: VRankData, ladder: readonly VRankDef[]) {
   const next = ladder.find(rank => rank.v > state.myRank);
@@ -20,7 +24,7 @@ export function teamRankRequirements(state: VRankData, ladder: readonly VRankDef
   if (next) for (const rank of ladder.filter(rank => rank.v > 0 && rank.v <= next.v)) {
     const c = rank.conditions;
     const add = (kind: RankGap['kind'], current: number | undefined, required: number, conditions: VRankConditions, vLevel?: number) => {
-      const status = !known(current) || !known(required) ? 'unknown' : current >= required ? 'met' : 'missing';
+      const status = rankRequirementStatus(current, required);
       const remaining = status === 'missing' ? required - current! : 0;
       const gap: RankGap | null = status !== 'missing' ? null
         : kind === 'directRefs' ? { kind, n: remaining }

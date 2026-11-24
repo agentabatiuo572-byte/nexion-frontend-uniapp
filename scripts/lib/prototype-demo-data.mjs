@@ -12,7 +12,7 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
-import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryOptions } from './prototype-demo-rank-presets.mjs';
+import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -153,6 +153,7 @@ export const demoOptions = {
   ambassadorRank:[['follow','跟随“最高等级 V8”开关'],['v5','V5（刚满足资格）']],
   rankPreset:rankPresetOptions,
   rankSalaryState:rankSalaryOptions,
+  rankSalaryClaimState:rankSalaryClaimOptions,
   rankReviewState:rankReviewOptions,
   rankPriorState:rankPriorOptions,
   rankCoolingState:rankCoolingOptions,
@@ -960,7 +961,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const secondary=secondaryDemo(url,state,request,walletBills);
   if(secondary!==undefined)return secondary;
   if(pathname==='/api/config/v-ranks'||pathname==='/api/team/rank'){
-    const preset=rankPresetResponse(pathname,structuredClone(base()),state,demoTeamBusinessDate(now));
+    const preset=rankPresetResponse(pathname,structuredClone(base()),state,now);
     if(preset!==undefined)return preset;
   }
   if(pathname==='/api/config/v-ranks') {
