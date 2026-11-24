@@ -697,6 +697,8 @@ useAutoRecovery({
 .team-bento__avatars { display: flex; }
 .team-bento__avatar { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: -6px; padding: 0 var(--v5-space-1); box-sizing: border-box; border-radius: 999px; background: var(--v5-brand); box-shadow: 0 0 0 2px var(--v5-surface); font: 600 10px/1 var(--font-v5); color: var(--v5-on-brand); }
 .team-bento__avatar:first-child { margin-left: 0; }
+/* Lobster capitals are 0.75em tall: about 45% of the 22px chip. The +N chip keeps its own size. */
+.team-bento__avatar .nx-avatar-letter { font-size: 13px; }
 .team-bento__avatar:nth-child(2) { background: var(--ui-device-ink); }
 .team-bento__avatar:nth-child(3) { background: var(--v5-warning); }
 .team-bento__avatar:nth-child(4) { background: var(--v5-ink-2); }

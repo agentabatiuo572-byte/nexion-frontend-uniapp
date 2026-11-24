@@ -1021,6 +1021,9 @@ watch(() => [app.accountKey, app.accountBindingEpoch], clearCheckInSuccess);
 .dly-pc { grid-row: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .dly-av { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--t) 22%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--t) 55%, transparent); font: 600 15px/20px var(--font-v5); color: var(--v5-ink); }
 .dly-av--big { width: 48px; height: 48px; }
+/* Lobster capitals are 0.75em tall: about 45% of the 40px and 48px podium circles. */
+.dly-av .nx-avatar-letter { font-size: 24px; }
+.dly-av--big .nx-avatar-letter { font-size: 29px; }
 .dly-crown { position: absolute; top: -15px; left: 50%; margin-left: -9px; color: var(--v5-warning-ink); }
 .dly-pn { max-width: 100%; margin-top: 6px; font: 500 13px/18px var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dly-pd { display: flex; align-items: center; gap: 3px; margin-top: 1px; font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); }

@@ -613,7 +613,7 @@ const avatarStyle: CSSProperties = {
   background: "var(--v5-brand)",
 };
 const avatarTextStyle: CSSProperties = {
-  fontSize: "26px",
+  fontSize: "38px",
   color: "var(--v5-on-brand)",
 };
 const regenBtnStyle: CSSProperties = {
