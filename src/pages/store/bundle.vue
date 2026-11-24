@@ -88,9 +88,9 @@
             <CheckoutAmount class="bundle-bar__total" :value="promotionBundle.footer.total" currency="USD" />
             <text class="bundle-bar__meta"><template v-if="promotionBundle.footer.saved !== null">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(promotionBundle.footer.saved) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
           </view>
-          <NxButton class="bundle-bar__cta" variant="primary" :label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" :disabled="!promotionBundle.footer.canContinue" :icon="promotionBundle.footer.canContinue ? 'arrow-right' : undefined" @click="promotionBundle.footer.continue"><text>{{ promotionBundle.footer.continueLabel }}</text></NxButton>
+          <NxButton class="bundle-bar__cta" variant="primary" :label="promotionBundle.footer.total !== null && !promotionBundle.footer.devices ? fmt(t.bundle.checkoutAria, { amount: moneyText(promotionBundle.footer.total) }) : promotionBundle.footer.continueLabel" :disabled="!promotionBundle.footer.canContinue" @click="promotionBundle.footer.continue"><text>{{ promotionBundle.footer.continueLabel }}</text><NxIcon v-if="promotionBundle.footer.canContinue" name="arrow-right" :size="20" /></NxButton>
         </template>
-        <NxButton v-else class="bundle-bar__cta" variant="primary" :label="t.promotion.signIn" icon="arrow-right" @click="promotionBundle.footer.signIn" />
+        <NxButton v-else class="bundle-bar__cta" variant="primary" :label="t.promotion.signIn" @click="promotionBundle.footer.signIn"><text>{{ t.promotion.signIn }}</text><NxIcon name="arrow-right" :size="20" /></NxButton>
       </view>
       <view v-if="!promotionActivityId && catalogStatus !== 'loading' && policyStatus !== 'loading' && catalogStatus !== 'error' && policyStatus !== 'error' && !receiptWriteFailure" class="bundle-bar nx-glass-bar">
         <text v-if="bundleTrayNote" class="nx-tray-note" role="status">{{ bundleTrayNote }}</text>
@@ -98,7 +98,7 @@
           <CheckoutAmount class="bundle-bar__total" :value="total" currency="USD" />
           <text class="bundle-bar__meta"><template v-if="discountUSD > 0">{{ savedParts[0] }}<text class="bundle-bar__saved">{{ moneyText(discountUSD) }}</text>{{ savedParts[1] }}</template><template v-else>{{ t.bundle.total }}</template></text>
         </view>
-        <NxButton class="bundle-bar__cta" variant="primary" :label="ctaLabel" :disabled="checkoutUnavailable" :busy="submitting || walletRefreshing" :icon="checkoutUnavailable ? undefined : 'arrow-right'" @click="onCheckout"><text>{{ t.bundle.checkout }}</text></NxButton>
+        <NxButton class="bundle-bar__cta" variant="primary" :label="ctaLabel" :disabled="checkoutUnavailable" :busy="submitting || walletRefreshing" @click="onCheckout"><text>{{ t.bundle.checkout }}</text><NxIcon v-if="!checkoutUnavailable" name="arrow-right" :size="20" /></NxButton>
       </view>
     </template>
   </AppChassis>
@@ -122,6 +122,7 @@ import { parseEntryItems,type EntryItem } from '@/lib/promotion-entry';
 import EmptyState from "@/components/empty-state.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import CheckoutAmount from "@/components/checkout/CheckoutAmount.vue";
 import BundleHero, { type BundleTile } from "@/components/store/bundle-hero.vue";
 import BundleSuggestions, { type BundleSuggestion } from "@/components/store/bundle-suggestions.vue";

@@ -142,10 +142,15 @@ function open() {
   background: linear-gradient(180deg, color-mix(in srgb, var(--v5-ink) 14%, transparent), color-mix(in srgb, var(--v5-ink) 6%, transparent)); }
 .bundle-entry__step.is-top .bundle-entry__bar { background: linear-gradient(180deg, color-mix(in srgb, var(--v5-tech-cyan) 60%, transparent), color-mix(in srgb, var(--v5-aura-sky) 12%, transparent)); }
 .bundle-entry__step.is-current .bundle-entry__bar { background: linear-gradient(180deg, color-mix(in srgb, var(--v5-brand) 60%, transparent), color-mix(in srgb, var(--v5-brand) 12%, transparent)); }
-.bundle-entry__label { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
+/* A label is never wider than its bar: a long-language label (「4+ моделей」) breaks at its space, number on top, instead
+   of running into the machines or the next step; it never breaks inside a word. */
+.bundle-entry__label { max-width: 48px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: normal; word-break: keep-all; }
 .bundle-entry__step.is-current .bundle-entry__value, .bundle-entry__step.is-current .bundle-entry__label { color: var(--v5-brand); }
 .bundle-entry__step.is-current .bundle-entry__label { font-weight: 500; }
 .bundle-entry__footer { margin: 16px 20px 0; padding-bottom: 16px; }
+/* The note keeps at least 12em beside the action; a longer action moves to its own line, right-aligned, instead of
+   squeezing the note to three lines (03 §3.6.1). */
+.bundle-entry__footer .nx-card-footer__note { flex-basis: 12em; }
 /* The draft's next step is the one sentence that asks for action, so it reads in the main ink. */
 .nx-card-footer__note.bundle-entry__hint { color: var(--v5-ink); }
 .bundle-entry .nx-card-action text { white-space: nowrap; }

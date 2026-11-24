@@ -22,7 +22,7 @@
         <text class="bundle-hero__meta">{{ t.bundle.estimateShort }} <text class="bundle-hero__estimate">{{ item.estimate }}</text></text>
         <slot name="tile" :item="item" />
       </view>
-      <view v-if="addable" class="bundle-hero__add" role="button" :tabindex="addDisabled ? -1 : 0" :aria-disabled="addDisabled" :aria-label="t.bundle.add"
+      <view v-for="slot in addSlots" :key="'add' + slot" class="bundle-hero__add" role="button" :tabindex="addDisabled ? -1 : 0" :aria-disabled="addDisabled" :aria-label="t.bundle.add"
         @click="addDisabled || emit('add')" @keydown.enter.prevent="addDisabled || emit('add')" @keydown.space.prevent="addDisabled || emit('add')">
         <NxIcon name="plus" :size="20" /><text>{{ t.bundle.add }}</text>
       </view>
@@ -79,6 +79,9 @@ function priceText(price: number | null): string {
   return text === "-" ? "—" : `$${text}`;
 }
 
+/** Dashed 「添加」 tiles: two while nothing is chosen (the smallest bundle), then one after the chosen models. */
+const addSlots = computed(() => (props.addable ? Math.max(1, 2 - props.items.length) : 0));
+
 /** A model added after the first render pops in once (07: one-time feedback; reduced motion shows it still). */
 const popped = ref(new Set<string>());
 watch(() => props.items.map((item) => item.id), (ids, previous) => {
@@ -107,7 +110,8 @@ watch(() => props.items.map((item) => item.id), (ids, previous) => {
 .bundle-hero__name { display: block; margin-top: 56px; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .bundle-hero__meta { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); font-variant-numeric: tabular-nums; }
 .bundle-hero__price { color: var(--v5-ink); font-weight: 500; white-space: nowrap; }
-.bundle-hero__estimate { color: var(--v5-brand); white-space: nowrap; }
+/* Tile estimates stay in the secondary ink: the card's one key number is the current rate (01 §1.1.1 #4). */
+.bundle-hero__estimate { white-space: nowrap; }
 .bundle-hero__add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 128px; box-sizing: border-box; border-radius: 16px; border: 1.5px dashed color-mix(in srgb, var(--v5-ink) 20%, transparent); color: var(--v5-ink-3); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .bundle-hero__add:active { opacity: .6; }
 .bundle-hero__add[aria-disabled="true"] { opacity: .5; cursor: default; }
