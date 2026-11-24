@@ -200,7 +200,7 @@ import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
 import { readTrustedMonotonicNowMs,projectServerNow } from '@/lib/server-deadline-clock';
 import { checkoutQuoteBlockCopy,displayDeadline,localized,rewardSummary } from '@/lib/promotion-display';
 import { promotionBundleHref, promotionCheckoutHref, promotionStoreHref, type PromotionDisclosure } from '@/lib/promotion-entry';
-import { firstPurchaseTermsRules, litePromotion } from '@/lib/promotion-landing';
+import { firstPurchaseTermsRules, litePromotion, quoteIncludesPhoneGift } from '@/lib/promotion-landing';
 import { executeSelectedPurchase } from '@/lib/selected-purchase-payment';
 import { onPurchaseRecordReleased, unfinishedOrderPayment, refusedPurchasePayment, replaceWithOrder } from '@/store/purchase-payment';
 import { attributedBundleDiscount } from '@/api/bundle-quote';
@@ -583,8 +583,7 @@ async function loadQuote(recheckCapacity=false,foreground=false){
       // Lite never gives a phone. A campaign the server chose by itself gives way to an ordinary quote
       // (same items) for the user to confirm; an explicitly chosen phone-gift campaign is
       // refused like a phone SKU selection. Rewards are never edited out of a server quote.
-      const givesPhone=(q:typeof result)=>q.expectedRewards.some(row=>row.reward.type==='DEVICE'&&!isLiteProduct(getProduct(row.reward.giftProductNo)??{id:row.reward.giftProductNo}));
-      if(!foreground&&givesPhone(result)&&!eventVoucherId&&!props.activityId){
+      if(!foreground&&quoteIncludesPhoneGift(result)&&!eventVoucherId&&!props.activityId){
         // A chosen voucher stays; otherwise the vouchers are weighed again, since one that lost to the campaign may now be best.
         const autoVoucher=!manualVoucher()&&requestedItems.length===1;
         result=await promotionApi.quote(requestedItems,null,autoVoucher?null:selectedId,false);
@@ -595,7 +594,7 @@ async function loadQuote(recheckCapacity=false,foreground=false){
         }
       }
       if(result.items.length!==requestedItems.length||requestedItems.some(item=>!result.items.some(line=>line.productNo===item.productNo&&line.quantity===item.quantity)))throw new Error('QUOTE_INPUT_CHANGED');
-      if(givesPhone(result))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
+      if(quoteIncludesPhoneGift(result))throw new ApiError({kind:'business',message:'PROMOTION_NOT_ELIGIBLE_OR_UNAVAILABLE'});
       voucherId.value=selectedId;
       quoteBlock.value=null;
       session.setQuote(result,selectedId);quotePresentation.value={key:quotePresentationKey(),quote:result};freshQuoteReady.value=true;receivedAt=sampledAt;revision.value++;updateClock();

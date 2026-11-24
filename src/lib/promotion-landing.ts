@@ -1,4 +1,4 @@
-import type { PublicPromotion, PublicRewardSpec } from '@/api/promotion-contracts';
+import type { PublicPromotion, PublicRewardSpec, Quote } from '@/api/promotion-contracts';
 import { parseServerTimestamp } from '@/api/server-time';
 import type { Messages } from '@/i18n/messages/en';
 import { fmt } from '@/i18n/format';
@@ -38,6 +38,11 @@ export function landingProduct(sku: string) {
 /** Lite never offers a phone for a new purchase; identity is the catalog product or, without a session, the SKU. */
 export function landingProductNos(activity: Pick<PublicPromotion, 'productNos'>): string[] {
   return activity.productNos.filter(sku => isLiteProduct(landingProduct(sku) ?? { id: sku }));
+}
+/** A fresh Lite quote must be rejected whole when it includes a phone gift. */
+export function quoteIncludesPhoneGift(quote: Pick<Quote, 'expectedRewards'>): boolean {
+  return quote.expectedRewards.some(({ reward }) => reward.type === 'DEVICE'
+    && !isLiteProduct(getProduct(reward.giftProductNo) ?? { id: reward.giftProductNo }));
 }
 /** Lite presentation of a campaign: phone products and rules that sell or give a phone are dropped (explicit identity). A campaign
  *  whose products or rules were all phones returns null and is not shown on the web. */

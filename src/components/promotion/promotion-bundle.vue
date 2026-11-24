@@ -63,7 +63,7 @@
   </view>
 </template>
 <script setup lang="ts">
-import { firstPurchaseTermsRules,promotionRemaining } from '@/lib/promotion-landing';
+import { firstPurchaseTermsRules,promotionRemaining,quoteIncludesPhoneGift } from '@/lib/promotion-landing';
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import BundleHero,{ type BundleTile } from '@/components/store/bundle-hero.vue';
@@ -287,6 +287,13 @@ async function refreshQuote(recheckCapacity=false){
   try{
     const result=await promotionApi.quote(chosen,scopeId.value||null);
     if(!visible.value||!fence.current(ticket)||identity!==`${app.accountKey}:${app.accountBindingEpoch}`)return;
+    if(quoteIncludesPhoneGift(result)){
+      quoteBlock.value='unavailable';
+      quoteStatus.value='idle';
+      // Re-read the filtered campaign. Quote recovery only runs if the selection still qualifies.
+      if(scopeId.value)await refreshContext();
+      return;
+    }
     quoteBlock.value=null;
     const lifetime = Date.parse(result.expiresAt) - Date.parse(result.serverTime);
     if (!isEntryQuoteFresh(result.expiresAt, result.serverTime, 0)) {
