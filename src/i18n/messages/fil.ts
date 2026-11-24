@@ -2112,7 +2112,7 @@ export const fil: Messages = {
     sheetCloseAria: "Isara",
     sheetProp3Title: "Tipid hanggang ${amount}",
     sheetDismissCta: "Mamaya na",
-    claimUnknownInline: "Hindi makumpirma ang pag-activate ng trial. Subukan ulit.",
+    claimUnknownInline: "Kinukumpirma ang pag-activate ng trial. Kusang mag-a-update kapag nakumpirma.",
     claimOnboardingRequired: "Hindi pa nagsisimula ang trial. Tapusin ang unang setup, saka bumalik para i-claim ito.",
     claimOnboardingCta: "Tapusin ang unang setup",
     claimTermsRequired: "Hindi pa nagsisimula ang trial. Kumpirmahin ang tuntunin ng serbisyo, saka bumalik para i-claim ito.",

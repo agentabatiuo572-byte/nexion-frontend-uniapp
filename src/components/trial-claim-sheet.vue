@@ -86,7 +86,7 @@ const estimateNote = computed(() => trialView.config.value
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
 }) : stateReadFailed.value ? '' : copy.value.loading);
-const remainingText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
+const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
 
 // Claim submission — loading guard against double taps (异常3; the store's
 // start() is idempotent underneath, this just keeps the UI honest) + inline

@@ -2112,7 +2112,7 @@ export const ms: Messages = {
     sheetCloseAria: "Tutup",
     sheetProp3Title: "Jimat sehingga ${amount}",
     sheetDismissCta: "Mungkin nanti",
-    claimUnknownInline: "Pengaktifan percubaan tidak dapat disahkan. Sila cuba lagi.",
+    claimUnknownInline: "Pengaktifan percubaan sedang disahkan. Dikemas kini automatik selepas disahkan.",
     claimOnboardingRequired: "Percubaan belum bermula. Selesaikan tetapan awal, kemudian kembali untuk menuntutnya.",
     claimOnboardingCta: "Selesaikan tetapan awal",
     claimTermsRequired: "Percubaan belum bermula. Sahkan terma perkhidmatan, kemudian kembali untuk menuntutnya.",
