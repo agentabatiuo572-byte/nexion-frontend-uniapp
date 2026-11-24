@@ -20,6 +20,8 @@ const PUBLIC_ROUTES: Record<string, true> = {
   // 与 terms/privacy 同类,必须能在未登录时打开 —— 否则登录守卫把用户送回引导页,
   // 等于要求先登录才能读一份强制阅读的风险披露。后端已同步放行其 GET 读取。
   "pages/me/risk-disclosure": true,
+  // 信任中心展示公开信任资料，与风险披露同类，访客可直接访问。
+  "pages/trust/trust": true,
 };
 
 /** Only routes that can safely render without an authenticated account. */

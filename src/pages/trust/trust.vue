@@ -193,6 +193,7 @@ import NxButton from '@/components/ui/nx-button.vue';
 import { trustResources } from "./trust-resources";
 import { trustCategoryMaterial } from "./trust-category-material";
 import { useT } from "@/i18n/use-t";
+import { useAuth } from "@/store/auth";
 import { useLocaleStore } from "@/store/locale";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
@@ -209,6 +210,7 @@ import { serverLanguage } from "@/i18n";
 const t = useT();
 const openCategory = ref('');
 const tr = computed(() => t.value.trust);
+const auth = useAuth();
 const locale = useLocaleStore();
 const language = computed<TrustLocale>(() => serverLanguage(locale.code));
 const auditCopy = computed(() => networkReauditCopy(locale.code));
@@ -299,7 +301,7 @@ async function loadTrustSections(): Promise<boolean> {
   // The shared Trust reader drops stale runtime generations. The local page
   // fence additionally prevents a hidden/stale visible cycle from counting a
   // late response as a real page view, and records a coalesced read once.
-  if (trustPageVisible && visibleEpoch === trustVisibleEpoch && request === trustReadRequest && loaded) {
+  if (trustPageVisible && visibleEpoch === trustVisibleEpoch && request === trustReadRequest && loaded && auth.isAuthenticated) {
     recordPublishedTrustViews(sections.value.map((item) => item.sectionKey), language.value);
   }
   return loaded;
