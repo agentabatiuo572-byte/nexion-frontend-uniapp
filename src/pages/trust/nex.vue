@@ -46,7 +46,7 @@
           <view class="nex-copy-row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4zM8 8h8v8H8z"/></svg><view><text class="block nex-copy-label">{{ w.src1Label }}</text><text class="block" :style="paraStyle">{{ w.src1Body }}</text></view></view>
           <view class="nex-copy-row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8"/></svg><view><text class="block nex-copy-label">{{ w.src2Label }}</text><text class="block" :style="paraStyle">{{ w.src2Body }}</text></view></view>
           <view class="nex-copy-row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-10M15 5h6v6"/></svg><view><text class="block nex-copy-label">{{ w.src3Label }}</text><text class="block" :style="paraStyle">{{ w.src3Body }}</text></view></view>
-          <view class="nex-copy-row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18v13H3zM12 8v13M2 8h20V5H2z"/></svg><view><text class="block nex-copy-label">{{ w.src4Label }}</text><text class="block" :style="paraStyle">{{ src4Body }}</text></view></view>
+          <view v-if="welcomeGiftNex > 0" class="nex-copy-row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18v13H3zM12 8v13M2 8h20V5H2z"/></svg><view><text class="block nex-copy-label">{{ w.src4Label }}</text><text class="block" :style="paraStyle">{{ src4Body }}</text></view></view>
         </view>
       </HowSection>
 
@@ -92,7 +92,7 @@
       </HowSection>
 
       <view class="mx-4" style="margin-top: 24px; display: flex; flex-direction: column; gap: 10px">
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaExchangeStyle" role="button" tabindex="0" @click="goExchange"  @keydown.enter.prevent="goExchange" @keydown.space.prevent="goExchange">
+        <view v-if="auth.isAuthenticated" class="flex items-center justify-center active:scale-[0.98]" :style="ctaExchangeStyle" role="button" tabindex="0" @click="goExchange"  @keydown.enter.prevent="goExchange" @keydown.space.prevent="goExchange">
           <text>{{ w.ctaExchange }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
@@ -109,6 +109,7 @@
 import EmptyState from "@/components/empty-state.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { visibleReferralGift } from "@/lib/referral-reward-gate";
 import { navBack, navReplace, navTo } from "@/lib/route";
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
@@ -182,8 +183,8 @@ const cfg = useConfig();
 const market = useMarket();
 onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
 
-// 礼包 NEX 数量单源派生自 platform config。
-const src4Body = computed(() => fmt(w.value.src4Body, { nex: formatAmount(cfg.config.rewards.welcomeGift.nexAmount) }));
+const welcomeGiftNex = computed(() => visibleReferralGift(cfg.config.rewards).nexAmount);
+const src4Body = computed(() => fmt(w.value.src4Body, { nex: formatAmount(welcomeGiftNex.value) }));
 
 const tableRows = computed(() => [
   { k: w.value.rowType, usdt: w.value.usdtType, nex: w.value.nexType },

@@ -459,7 +459,7 @@ Lite 手机号注册完成（含保存的手机号注册尝试恢复），或第
 - 礼包金额由平台配置 `rewards.welcomeGift.{usdtAmount,nexAmount}` 决定(默认 $5 + 20 NEX,后台可调),前端展示与入账同源派生
 - **首次绑定生效,后续 URL ?ref 不可覆盖**
 - 每个账号 welcome gift **仅一次**
-- 绑定成功即清除 pendingRefCode(§4.3.1),注册 / 登录两路共用同一清除点
+- 只有从邀请落地页点击注册或登录时才按 §4.3.1 携带邀请码；从其它入口注册时，邀请码需手动输入。
 
 #### 4.3.3 登录时绑定
 
@@ -1943,8 +1943,9 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 ```mermaid
 flowchart LR
   A[邀请卡三入口<br/>海报 / 码 / 链接] -->|扫码 · 点链| R[落地页 /ref/CODE<br/>§4.3.1]
-  R -->|领取 CTA 自动带码| G[注册 ?ref 锁定<br/>§4.1]
-  R -.中途离开.-> P[pendingRefCode 暂存] -.此后任意入口注册.-> G
+  R -->|点击注册 · 按 §4.3.1 带码| G[注册 ?ref 锁定<br/>§4.1]
+  R -->|点击登录 · 按 §4.3.1 带码| L[登录 ?ref<br/>§4.3.3]
+  P[其它注册入口] --> M[注册 · 邀请码手动输入<br/>§4.1]
   G -->|bind first-wins + 礼包分桶 §4.3.2/4.3.5| S[注册成功页 · 仅 H5<br/>§4.1.1]
   S -->|下载 APP 后登录| O[APP 首页 · 可主动管理手机算力]
   S -->|继续网页版| H[H5 首页]
@@ -4681,7 +4682,7 @@ MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
   sponsor: { name, vRank, title, city, downlines } | null;
   giftClaimed: boolean;
   boundAt: number | null;
-  pendingCode: string | null;   // 落地页归因暂存码(§4.3.1):注册前 last-touch 覆盖,绑定即清,已绑定忽略
+  pendingCode: string | null;   // 仅旧版模拟逻辑使用。当前只在邀请落地页点击注册或登录时携带邀请码；从其它入口注册时需手动输入（§4.3.1）。
   pendingAt: number | null;
 }
 ```
