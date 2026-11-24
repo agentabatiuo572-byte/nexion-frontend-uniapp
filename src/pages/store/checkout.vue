@@ -272,12 +272,13 @@
         <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="confirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
         <NxButton variant="primary" :disabled="!!checkoutTrayBlock || checkoutPurchaseChecking || checkoutWalletRefreshing || (remoteApiEnabled && !checkoutWalletReadable) || purchaseUnavailable || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="checkoutPurchaseChecking || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click="submitReview" />
       </view>
+      <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
+           the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
+           focus opens on the title so Enter does not cancel (03 §3.5). It sits with the tray, outside the scrolling content,
+           as order detail's dialogs do, so the tray can stay over the content under its mask. -->
+      <NxNoticeDialog :open="leaveKeepOpen" icon="clock" tone="warning" :title="flowCopy.leaveKeepTitle" :body="purchasePaymentCopy(locale.code).keepOrderBody"
+        :primary="flowCopy.cancelOrder" primary-tone="danger" :secondary="flowCopy.keepAndBack" focus-title @primary="leaveKeepCancel" @secondary="leaveKeepBack" />
     </template>
-    <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
-         the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
-         focus opens on the title so Enter does not cancel (03 §3.5). -->
-    <NxNoticeDialog :open="leaveKeepOpen" icon="clock" tone="warning" :title="flowCopy.leaveKeepTitle" :body="purchasePaymentCopy(locale.code).keepOrderBody"
-      :primary="flowCopy.cancelOrder" primary-tone="danger" :secondary="flowCopy.keepAndBack" focus-title @primary="leaveKeepCancel" @secondary="leaveKeepBack" />
     <NxSheet :open="checkoutLeaveError !== ''" :title="flowCopy.cancelFailed" @close="!checkoutLeaving && (checkoutLeaveError = '')"><view class="checkout-exit-error"><text>{{ checkoutLeaveError }}</text><NxButton :label="t.ui.retry" :busy="checkoutLeaving" @click="cancelCheckout(leaveCancelNeedsReadback)" /></view></NxSheet>
     <NxSheet :open="paymentBlocked !== ''" :title="flowCopy.cannotPay" @close="!checkoutLeaving && (paymentBlocked = '')"><view class="checkout-exit-error"><text>{{ paymentBlocked }}</text><NxButton :label="flowCopy.cancelOrder" :busy="checkoutLeaving" @click="cancelCheckout()" /></view></NxSheet>
   </AppChassis>
@@ -3921,8 +3922,13 @@ button.checkout-policy-link::after { border:0; }
 .checkout-policy-section { display:block; margin-bottom:var(--v5-space-5); }
 .checkout-policy-title { display:block; margin-bottom:6px; color:var(--v5-ink); font-weight:600; }
 .checkout-policy-links { border-top:1px solid var(--v5-border); }
+/* Bundle / activity review: the legal block sits 24 below the wallet card (board CkNew), the column's gap included. */
+.checkout-promotion .checkout-legal-group { margin-top:calc(var(--v5-space-6) - var(--ui-space-card-gap)); }
 .checkout-cancel { display:grid; place-items:center; min-height:44px; margin-top:var(--v5-space-1); font:400 var(--ui-type-list-subtitle)/18px var(--font-v5); color:var(--v5-ink-3); cursor:pointer; }
 .checkout-sticky { position:absolute; z-index:36; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+/* An open dialog raises the scrolling content to 785 (chassis lock), which would paint the page over the tray glass. While
+   D1 is open the tray rises with it, still under D1's mask (960), so the glass keeps covering the content (04 §4.0). */
+.checkout-sticky:has(~ .nx-notice-mask) { z-index:786; }
 .checkout-sticky-copy { min-width:0; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }

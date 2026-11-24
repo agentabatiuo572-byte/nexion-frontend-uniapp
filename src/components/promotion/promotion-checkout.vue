@@ -138,6 +138,10 @@
       <view v-if="!footer&&displayQuote?.warnings.length" class="promotion-notice"><text v-for="(warning,index) in displayQuote.warnings" :key="index" class="promotion-copy">{{ localized(warning,locale.code) }}</text></view>
     </template>
     <slot v-if="order?.paymentStatus!=='PAID'" name="review-footer" />
+    <!-- In-flow clearance for the host's bottom tray (04 §4.0), so the last line scrolls to 16 above it: a lone button
+         48 + 22 + 16, a one-row tray 64 + 22 + 16, a note tray its own height + 38. An invisible copy of the note at the
+         note's width and type reserves the lines the note really takes. -->
+    <view v-if="footer&&order?.paymentStatus!=='PAID'" class="promotion-tray-space" :class="{ 'promotion-tray-space--note': footer.note||trayNotice, 'promotion-tray-space--float': footer.amountless&&!(footer.note||trayNotice) }" aria-hidden="true"><text v-if="footer.note||trayNotice" class="promotion-tray-space__note">{{ footer.note||trayNotice }}</text></view>
     <NxSheet :open="voucherOpen" :title="p.voucher" @close="voucherOpen=false">
       <view class="checkout-voucher-options" role="group" :aria-label="p.voucher">
         <PromotionAction class="promotion-action" role="button" tabindex="0" :aria-pressed="voucherId===null" @click="selectVoucher(null)" @keydown.enter.prevent="selectVoucher(null)" @keydown.space.prevent="selectVoucher(null)"><text>{{ p.noVoucher }}</text></PromotionAction>
@@ -1097,6 +1101,14 @@ onBeforeUnmount(()=>{hide();alive=false;stopReleaseWatch();if(timer)clearInterva
 .checkout-keep-recovery .checkout-keep-recovery__title { margin-bottom:var(--v5-space-1); color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 /* Rhythm (01 §1.3): cards 12 apart, a titled section 32 below what precedes it (24 at ≤374). */
 .promotion-main { gap:var(--ui-space-card-gap); }
+/* The tray spacer replaces the page's foot. The chassis already pads tray bottom + 18 below the content, so the spacer
+   adds the rest: tray height − 2 (a one-row tray 62; a lone button 46). With a note: tray padding 8 + note 4 + note +
+   gap 8 + button 48 + padding 8, less 2; the note copy sits 16 in from the content (tray 12 + 8 + note 12 = 32 in all). */
+.promotion-main:has(> .promotion-tray-space) { padding-bottom:0; }
+.promotion-tray-space { flex:none; margin-top:calc(-1 * var(--ui-space-card-gap)); height:calc(var(--nx-tray-clearance) - var(--nx-tray-bottom) - 18px); visibility:hidden; pointer-events:none; }
+.promotion-tray-space--float { height:calc(48px + 16px - 18px); }
+.promotion-tray-space--note { height:auto; padding:12px 16px calc(8px + 48px + 8px - 2px); }
+.promotion-tray-space__note { display:block; font:var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align:center; overflow-wrap:break-word; text-wrap:pretty; }
 .checkout-group { overflow:hidden; min-width:0; border:1px solid color-mix(in srgb,var(--v5-border) 40%,transparent); border-radius:var(--ui-radius-surface); background:var(--ui-content-surface); }
 [data-theme="light"] .checkout-group, [data-theme="light"] .checkout-bundle, [data-theme="light"] .checkout-paying { box-shadow:var(--v5-glass-shadow); }
 .checkout-section { min-width:0; margin-top:calc(var(--ui-space-section-gap) - var(--ui-space-card-gap)); }

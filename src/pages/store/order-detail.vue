@@ -90,10 +90,9 @@
         <!-- Pending remote orders can retry only the idempotent UVEL wallet debit. -->
         <view v-if="(orderAction || orderCommandUnavailable) && !externalPayment && !refusedPayment" class="order-block" role="status">
           <text class="block">{{ orderAction?.kind==='cancel' ? recoveryCopy.cancelPending : recoveryCopy.paymentPending }}</text>
-          <view class="flex flex-wrap gap-2 mt-3">
-            <NxButton v-if="orderAction?.kind==='cancel'" variant="secondary" size="small" :label="recoveryCopy.retryCancel" :disabled="orderCommandQuerying || cancellingOrder" @click="recoverOrderAction(true)" />
-            <!-- // LOGIC: The tray now handles this same-key recovery. The visual pass can remove this button and keep the status text. -->
-            <NxButton v-if="canResumeWalletPayment" size="small" :label="recoveryCopy.resume" :disabled="orderCommandQuerying || payingFromWallet" @click="handleWalletPayment" />
+          <!-- The same-key wallet recovery is the tray's 继续付款 (04 §4.0: the card keeps only the state). -->
+          <view v-if="orderAction?.kind==='cancel'" class="flex flex-wrap gap-2 mt-3">
+            <NxButton variant="secondary" size="small" :label="recoveryCopy.retryCancel" :disabled="orderCommandQuerying || cancellingOrder" @click="recoverOrderAction(true)" />
           </view>
         </view>
 
@@ -149,7 +148,7 @@
         </view>
 
         <OrderRewards v-if="remoteApiEnabled && id" :order-no="id" />
-        <view :style="{ height: stickyActionsVisible ? '120px' : '24px' }" />
+        <view :class="stickyActionsVisible ? 'order-tray-space' : 'order-end-space'" />
       </template>
     </view>
     <template #pageFixed>
@@ -1282,6 +1281,12 @@ const sectionLabelStyle: CSSProperties = {
 /* 40px basis = the L button's side padding, so a 1:2 pair splits the remaining width like the design. */
 .order-hero__pay { flex-grow: 2; }
 .order-sticky { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
+/* Content clearance under the bottom actions (04 §4.0), so the last card scrolls to 16 above them, less what the chassis
+   already pads below the content (tray bottom + 18): a lone button 48 + 22 + 16; two buttons share a one-row tray,
+   64 + 22 + 16 (the same two-child test as the shared tray form). */
+.order-tray-space { height: calc(48px + 16px - 18px); }
+.nx-chassis:has(> .order-sticky > :nth-child(2)) .order-tray-space { height: calc(var(--nx-tray-clearance) - var(--nx-tray-bottom) - 18px); }
+.order-end-space { height: 24px; }
 .order-sticky > * { flex: 1 1 40px; min-width: fit-content; }
 .order-sticky:not(.order-sticky--result) :deep(.nx-button__surface) { padding-inline: 16px; }
 /* Purchase result bar (board A): the one primary takes the free width, a secondary beside it keeps its label's width
