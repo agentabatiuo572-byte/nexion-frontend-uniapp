@@ -3674,7 +3674,6 @@ export const ru: Messages = {
     tabAll: "Все",
     tabIn: "Приход",
     tabOut: "Расход",
-    tabReward: "Награды",
     assetGroupLabel: "Актив",
     overviewMonth: "Доход за месяц ({asset})",
     overviewToday: "Сегодня",

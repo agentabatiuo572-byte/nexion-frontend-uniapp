@@ -3674,7 +3674,6 @@ export const kk: Messages = {
     tabAll: "Барлығы",
     tabIn: "Кіріс",
     tabOut: "Шығыс",
-    tabReward: "Сыйақылар",
     assetGroupLabel: "Актив",
     overviewMonth: "Осы айдағы табыс ({asset})",
     overviewToday: "Бүгін",

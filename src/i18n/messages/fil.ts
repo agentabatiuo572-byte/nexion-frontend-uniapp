@@ -3674,7 +3674,6 @@ export const fil: Messages = {
     tabAll: "Lahat",
     tabIn: "Pasok",
     tabOut: "Labas",
-    tabReward: "Reward",
     assetGroupLabel: "Asset",
     overviewMonth: "Kita ngayong buwan ({asset})",
     overviewToday: "Ngayon",
