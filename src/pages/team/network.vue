@@ -21,7 +21,7 @@
             </view>
             <template v-if="!visibility.hidden && !metricsUnavailable">
               <view v-for="(dot, index) in orbitDots" :key="dot.id" class="network-orbit__dot nx-viz-pop" :class="{ 'network-orbit__dot--inner': dot.inner }" aria-hidden="true"
-                :style="{ left: `${dot.x}%`, top: `${dot.y}%`, background: dot.color, animation: orbitInView === false ? 'none' : undefined, opacity: orbitInView === false ? 0 : undefined, animationDelay: `${Math.min(index * 60, 900)}ms` }"><text>{{ dot.initial }}</text></view>
+                :style="{ left: `${dot.x}%`, top: `${dot.y}%`, background: dot.color, animation: orbitInView === false ? 'none' : undefined, opacity: orbitInView === false ? 0 : undefined, animationDelay: `${Math.min(index * 60, 900)}ms` }"><text class="nx-avatar-letter">{{ dot.initial }}</text></view>
             </template>
           </view>
           <view class="network-legend">
