@@ -72,7 +72,7 @@
        polls + fires via store.show()) -->
   <MilestoneCelebration v-if="showBusinessOverlays" />
   <PaymentPasswordDialog v-if="showBusinessOverlays" />
-  <PurchasePaymentDialog v-if="showBusinessOverlays" :show-resume="!route.includes('store/order-detail') && !route.includes('store/orders')" />
+  <PurchasePaymentDialog v-if="showBusinessOverlays" :show-resume="showPaymentResume" />
 </template>
 
 <script setup lang="ts">
@@ -96,8 +96,22 @@ function amountAnatomy(value: string): [string, string, string] {
   return match ? [match[1], match[2], match[3] ?? ""] : ["", value, ""];
 }
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
+const PAYMENT_RESUME_ENTRY_ROUTES: Record<string, true> = {
+  "pages/login/login": true,
+  "pages/register/register": true,
+  "pages/register/success": true,
+  "pages/ref/code": true,
+  "pages/session/kicked": true,
+};
 const { route } = useVisiblePageRoute();
 const showBusinessOverlays = computed(() => !!route.value && !isStaticReviewRoute(route.value));
+const showPaymentResume = computed(() => {
+  const current = route.value;
+  return PAYMENT_RESUME_ENTRY_ROUTES[current] !== true
+    && !current.startsWith("pages/onboarding/")
+    && !current.includes("store/order-detail")
+    && !current.includes("store/orders");
+});
 
 function onRetry() {
   const cb = ui.netError.onRetry;
