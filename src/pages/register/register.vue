@@ -17,7 +17,7 @@
 
       <!-- Sponsor card (arrived via ?ref) -->
       <view v-if="sponsorPreview" class="rg-sponsor nx-tint">
-        <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ displayNickname(sponsorPreview.displayName)[0] }}</text></view>
+        <view class="rg-sponsor__av"><text class="rg-sponsor__av-t nx-avatar-letter">{{ displayNickname(sponsorPreview.displayName)[0] }}</text></view>
         <view class="rg-sponsor__body">
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ displayNickname(sponsorPreview.displayName) }}</text> {{ t.ref.invitedYou }}</text>
           <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} UVT</text>
@@ -1070,7 +1070,7 @@ onUnmounted(() => cleanup());
 .rg-top__sp { }
 .rg-sponsor { --nx-tint: var(--v5-brand); margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; }
 .rg-sponsor__av { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: linear-gradient(135deg, var(--v5-brand), var(--v5-tech-cyan)); }
-.rg-sponsor__av-t { color: var(--v5-on-brand); font-family: var(--font-v5); font-weight: 600; font-size: 20px; }
+.rg-sponsor__av-t { color: var(--v5-on-brand); font-size: 20px; }
 .rg-sponsor__body { flex: 1; min-width: 0; }
 .rg-sponsor__name { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rg-sponsor__name-b { font-weight: 600; }

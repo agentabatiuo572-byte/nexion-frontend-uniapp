@@ -152,7 +152,7 @@
               <view v-for="p in podium" :key="p.name" class="dly-pc" :style="{ gridColumn: p.rank === 1 ? 2 : p.rank === 2 ? 1 : 3, '--t': p.rank === 1 ? 'var(--v5-warning)' : p.rank === 2 ? 'var(--v5-aura-sky)' : 'var(--v5-brand-2)' }">
                 <view class="dly-av" :class="{ 'dly-av--big': p.rank === 1 }">
                   <svg v-if="p.rank === 1" class="dly-crown" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /></svg>
-                  <text>{{ p.initial }}</text>
+                  <text class="nx-avatar-letter">{{ p.initial }}</text>
                 </view>
                 <text class="dly-pn">{{ p.name }}</text>
                 <view class="dly-pd"><text>{{ p.countryCode }}</text><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg><text class="dly-pd__b">{{ p.streak }}</text></view>

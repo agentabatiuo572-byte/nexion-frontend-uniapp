@@ -63,7 +63,7 @@
             <view class="nx-team-royalty-network-link team-bento__card team-bento__card--brand" role="button" tabindex="0" :aria-label="t.teamV3.sevenLayerNetwork" @click="openReferralNetwork" @keydown.enter.prevent="openReferralNetwork">
               <view class="team-bento__head"><NxIconTile tone="sky" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="memberInitials.length" class="team-bento__avatars" aria-hidden="true">
-                <text v-for="(initial, index) in memberInitials" :key="index" class="team-bento__avatar">{{ initial }}</text>
+                <text v-for="(initial, index) in memberInitials" :key="index" class="team-bento__avatar"><text :class="{ 'nx-avatar-letter': index < 3 }">{{ initial }}</text></text>
               </view>
               <view class="team-bento__foot">
                 <text class="team-bento__value team-bento__value--count">{{ visibility.mask(totalMembersCountText) }}<text v-if="locale.code === 'zh' && !visibility.hidden" class="team-bento__unit">人</text></text>
