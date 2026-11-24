@@ -13,7 +13,7 @@ import { parseTrialConvertReceipt, type TrialConvertReceipt } from "@/api/trial-
 import { readPaymentCommand } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote } from "@/api/trial-api";
-import { asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
+import { asApiError, isAmbiguousEnvelopeOutcome, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
 import {
   resolveTrialAt,
   accruedShadow,
@@ -60,7 +60,7 @@ export type { TrialStatus } from "./trial-boundary";
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
-export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required";
+export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "read-failed" | "rejected" | "confirming";
 type TrialConversionFailure = TrialIneligibleReason | "insufficient-funds" | "quote-changed" | "rejected" | "storage-unavailable" | "payment-required";
 const CONVERT_COMMANDS_KEY = TRIAL_CONVERT_COMMANDS_TABLE;
 type ConversionCommands = { commands: Record<string, string> };
@@ -191,6 +191,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   );
   const authorityError = ref<string | null>(null);
   const authorityResultUnknown = ref(false);
+  // Display only. A transient GET failure still clears the live command authority.
+  const displayState = shallowRef<TrialAuthorityState | null>(null);
+  const pendingStart = shallowRef<{ claimNo: string | null } | null>(null);
+  const confirmedStartClaimNo = ref<string | null>(null);
   const lastReadFailed = ref(false);
   const transientReadFailure = ref(false);
   const authoritativeShadowUSD = ref(0);
@@ -298,7 +302,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     legacyCardMigrated.value = next.legacyCardMigrated;
   }
 
-  function clearRemoteFacts(nextStatus: "unknown" | "error" = "unknown", error: string | null = null) {
+  function clearRemoteFacts(nextStatus: "unknown" | "error" = "unknown", error: string | null = null, retainDisplay = false) {
+    if (!retainDisplay) displayState.value = null;
     load({ ...INITIAL });
     authoritativeShadowUSD.value = 0;
     authoritativeShadowNEX.value = 0;
@@ -327,7 +332,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       authorityStatus.value = "error";
       authorityError.value = error;
     } else {
-      clearRemoteFacts("error", error);
+      clearRemoteFacts("error", error, transient);
     }
   }
 
@@ -412,9 +417,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityClaimNo.value = next.claimNo;
     authorityServerState.value = next.serverState;
     authorityVersion.value = next.version;
+    displayState.value = authorityIncomplete.value ? null : next;
     authorityStatus.value = "ready";
     authorityError.value = null;
-    if (!authorityIncomplete.value) authorityResultUnknown.value = false;
+    if (pendingStart.value && next.claimNo && (next.status === "active" || next.status === "grace")
+        && (!pendingStart.value.claimNo || pendingStart.value.claimNo === next.claimNo)) {
+      confirmStart(next.claimNo);
+    } else if (!pendingStart.value && !authorityIncomplete.value) {
+      authorityResultUnknown.value = false;
+    }
     lastReadFailed.value = false;
     transientReadFailure.value = false;
     return true;
@@ -510,6 +521,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedHomeOffer.value = null;
       lastReadFailed.value = false;
       transientReadFailure.value = false;
+      pendingStart.value = null;
+      pendingStartKey = null;
+      confirmedStartClaimNo.value = null;
       confirmedLifecycle = null;
       pendingExpiryClaim = null;
       announcedExpiryClaims.clear();
@@ -591,40 +605,52 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return "checking";
   }
 
+  function confirmStart(claimNo: string) {
+    pendingStartKey = null;
+    pendingStart.value = null;
+    authorityResultUnknown.value = false;
+    confirmedStartClaimNo.value = claimNo;
+    return { ok: true };
+  }
+
+  function awaitStartConfirmation(claimNo: string | null) {
+    pendingStart.value = { claimNo };
+    clearRemoteFacts("unknown", "TRIAL_START_RESULT_UNKNOWN");
+    return { ok: false, reason: "confirming" } as const;
+  }
+
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
   // Idempotent: a second call while ineligible is a no-op (spec 异常3 — one
   // trial per account, concurrent taps produce exactly one).
   async function start(): Promise<{ ok: boolean; reason?: TrialStartFailure }> {
     if (remoteApiEnabled) {
+      if (pendingStart.value) return { ok: false, reason: "confirming" };
       const requestedEpoch = accountBindingEpoch;
-      if (!await refreshEligibilityRemote() || requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
+      if (!await refreshEligibilityRemote() || requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
       const remoteEligibility = eligibility();
       if (!remoteEligibility.ok) return { ok: false, reason: remoteEligibility.reason };
       const trialConfig = useTrialConfig().config;
       const deviceName = resolveTrialDeviceName(trialConfig.trialProductId, trialConfig.trialProductName);
       if (!deviceName) {
-        clearRemoteFacts("error", "TRIAL_CONFIG_RESPONSE_INVALID");
-        return { ok: false, reason: "unknown" };
+        markAuthorityReadFailure("TRIAL_CONFIG_RESPONSE_INVALID");
+        return { ok: false, reason: "read-failed" };
       }
       pendingStartKey ??= commandKey("start");
-      const previousClaimNo = authorityClaimNo.value;
       try {
         const sequence = ++authorityRequestSequence;
         const receipt = await trialApi.start(pendingStartKey, deviceName);
-        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
+        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         applyAuthority(receipt, sequence, requestedEpoch);
         const expectedClaimNo = receipt.claimNo;
         const confirmed = await refreshRemote(true);
-        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
+        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         if (!confirmed || !expectedClaimNo || authorityClaimNo.value !== expectedClaimNo
             || (status.value !== "active" && status.value !== "grace")) {
-          clearRemoteFacts("unknown", "TRIAL_START_RESULT_UNKNOWN");
-          return { ok: false, reason: "unknown" };
+          return awaitStartConfirmation(expectedClaimNo);
         }
-        pendingStartKey = null;
-        return { ok: true };
+        return confirmStart(expectedClaimNo);
       } catch (error) {
-        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
+        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         const failure = asApiError(error);
         // The shared write gate refuses before the trial command executes.
         // Preserve the original key, but do not reconcile this refusal as success.
@@ -633,20 +659,18 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           if (failure.message === "LEGAL_TERMS_ACK_REQUIRED") return { ok: false, reason: "terms-required" };
         }
         const reason = commandFailureReason(error);
-        authorityError.value = asApiError(error).message;
-        const reconciled = await refreshRemote();
-        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
-        if (reconciled && authorityClaimNo.value
-            && (status.value === "active" || status.value === "grace")) {
+        // These trial business refusals are definitive even when delivered as HTTP 409.
+        const trialRefusal = isApiRefusal(failure, 409, failure.message) && failure.message.startsWith("TRIAL_");
+        if (trialRefusal || !isAmbiguousEnvelopeOutcome(error)) {
           pendingStartKey = null;
-          return { ok: true };
+          return { ok: false, reason: reason === "unknown" ? "rejected" : reason };
         }
-        // A known rejected command may be cached by the idempotency boundary.
-        // Retire it only after a read confirms that no claim was created.
-        if (reconciled && authorityClaimNo.value === previousClaimNo && reason !== "unknown"
-            && isApiRefusal(failure, 409, failure.message)
-            && status.value !== "active" && status.value !== "grace") pendingStartKey = null;
-        return { ok: false, reason };
+        const reconciled = await refreshRemote();
+        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
+        if (reconciled && authorityClaimNo.value && (status.value === "active" || status.value === "grace")) {
+          return confirmStart(authorityClaimNo.value);
+        }
+        return awaitStartConfirmation(null);
       }
     }
     const elig = eligibility();
@@ -937,7 +961,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
-    confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
+    displayState, pendingStart, confirmedStartClaimNo, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,

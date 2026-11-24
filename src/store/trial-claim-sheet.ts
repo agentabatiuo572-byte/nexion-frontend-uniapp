@@ -1,5 +1,9 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { useFreeTrial } from "./free-trial";
+import { useApp } from "./app";
+import { toast } from "./ui";
+import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { mockServerNow } from "./server-time";
 
 /**
@@ -24,6 +28,17 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
   }
 
   const open = ref(false);
+  const activated = ref(false);
+  const trial = useFreeTrial();
+  const copy = useTrialLifecycleCopy();
+  // Both the immediate and the delayed state read confirm the same claim here,
+  // even if its original page or sheet has since been closed.
+  watch(() => trial.confirmedStartClaimNo, claimNo => {
+    if (!claimNo) return;
+    void useApp().refreshRemoteFleet();
+    if (open.value) activated.value = true;
+    else toast.success(copy.value.activationSuccessTitle);
+  });
   const lastClosedAt = ref(hydrateLastClosedAt());
   const sessionShownCount = ref(0);
 
@@ -67,5 +82,5 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     persist();
   }
 
-  return { open, lastClosedAt, sessionShownCount, show, tryAutoPush, hide, closeTransient, resetCooldown };
+  return { open, activated, lastClosedAt, sessionShownCount, show, tryAutoPush, hide, closeTransient, resetCooldown };
 });
