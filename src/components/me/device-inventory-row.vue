@@ -145,6 +145,10 @@ import { useComputeV2Copy } from "@/i18n/compute-v2";
 import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
+import type { CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
+
+type TradeinLadder = Pick<CanonicalTradeinConfig, "creditRatesPct" | "outputRatioCutsPct">
+  & Pick<CanonicalTradeinQuote, "outputRatioPct" | "creditRatePct">;
 
 const t = useT();
 const computeCopy = useComputeV2Copy();
@@ -174,8 +178,7 @@ const props = withDefaults(
     quoteInfoOpen?: boolean;
     tradeinCtaLabel?: string;
     tradeinDisabledText?: string;
-    /** The explainer's tier table from the server config and this device's quote; absent until wired, so every cell reads 「—」. */
-    tradeinLadder?: { creditRatesPct: number[]; outputRatioCutsPct: number[]; outputRatioPct: number | null };
+    tradeinLadder?: TradeinLadder;
   }>(),
   { disabled: false, actionDisabled: false, showAction: true, runtimeConfirmed: true, tasksConfirmed: true, quoteInfoOpen: false },
 );
@@ -219,32 +222,31 @@ const ladderCredit = computed(() => {
 });
 const ladder = computed(() => ladderView(props.tradeinLadder, visibility.hidden));
 /** Cells, current tier, marker position and the screen-reader sentence of the tier table, built from the data (PRD §7.5.4). */
-function ladderView(data: { creditRatesPct: number[]; outputRatioCutsPct: number[]; outputRatioPct: number | null } | undefined, hidden: boolean) {
+function ladderView(data: TradeinLadder | undefined, hidden: boolean) {
   const c = t.value.tradein;
   const pct = (value: number) => `${Number(value.toFixed(1))}%`;
   const rates = data?.creditRatesPct ?? [];
   const cuts = data?.outputRatioCutsPct ?? [];
   // Rates step down from the first tier; cuts are the boundaries between tiers, so there is one fewer of them.
-  const known = rates.length > 1 && cuts.length === rates.length - 1;
-  const count = known ? rates.length : 5;
-  const ranges = known ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${Number(cuts[i - 1].toFixed(1))}–${pct(cuts[i])}`)
+  const count = data ? rates.length : 5;
+  const ranges = data ? rates.map((_, i) => i === 0 ? `<${pct(cuts[0])}` : i === count - 1 ? `≥${pct(cuts[i - 1])}` : `${Number(cuts[i - 1].toFixed(1))}–${pct(cuts[i])}`)
     : Array.from({ length: count }, () => "—");
-  const output = known && !hidden && data?.outputRatioPct != null ? data.outputRatioPct : null;
-  const current = output == null ? -1 : cuts.filter((cut) => output >= cut).length;
+  const output = data && !hidden ? data.outputRatioPct : null;
+  const current = data && !hidden ? rates.indexOf(data.creditRatePct) : -1;
   // The dot sits inside the current tier in proportion; the open-ended last tier has no upper bound, so it sits at its middle.
   let marker: number | null = null;
-  if (output != null) {
+  if (output != null && current >= 0) {
     const lo = current === 0 ? 0 : cuts[current - 1];
     const hi = current < cuts.length ? cuts[current] : null;
     const within = hi == null ? 0.5 : Math.min(1, Math.max(0, (output - lo) / (hi - lo)));
     marker = Number(((current + within) / count * 100).toFixed(1));
   }
   const produced = fmt(c.ladderProduced, { pct: hidden ? visibility.mask("—") : output == null ? "—" : pct(output) });
-  const aria = known
+  const aria = data
     ? [`${c.ladderRateCaption}: ${rates.map((rate, i) => fmt(c.ladderAriaBand, { range: ranges[i], rate: pct(rate) })).join("; ")}.`,
-      output == null ? produced : fmt(c.ladderAriaYou, { pct: pct(output), n: current + 1 })].join(" ")
+      output == null || current < 0 ? produced : fmt(c.ladderAriaYou, { pct: pct(output), n: current + 1 })].join(" ")
     : `${c.ladderRateCaption}: —. ${produced}`;
-  return { rates: known ? rates.map(pct) : ranges, ranges, current, marker, produced, aria };
+  return { rates: data ? rates.map(pct) : ranges, ranges, current, marker, produced, aria };
 }
 function onAction() {
   if (!props.showAction || actionDisabled.value) return;

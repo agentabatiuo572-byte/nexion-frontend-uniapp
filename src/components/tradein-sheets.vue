@@ -788,28 +788,74 @@ function goDevices() {
 
 // ───────────────────────── 1. choice ─────────────────────────
 
-// Checkout old-device choice (boards B-5a, B-5b): each paid source with its credit and what is left to pay.
-// The remote branch reads no quote when this sheet opens, so both figures are 「—」 until the wiring item supplies a per-source
-// server quote (discountUsdt → credit, payableUsdt → net) through `choiceQuote`; nothing is estimated here (01 §1.2).
-function choiceQuote(_deviceId: string): { credit: number; payable: number } | null {
-  return null; // WIRING: per-source quote for the checkout target, read by the wiring item.
+const choiceSources = computed(() => {
+  const current = state.value;
+  return current.kind === "choice" ? current.tradeInSources
+    .map(id => app.devices.find(device => device.id === id))
+    .filter((device): device is Device => !!device && (!remoteApiEnabled || device.paidPriceUsdt > 0)) : [];
+});
+const choiceReadKey = computed(() => {
+  const current = state.value;
+  if (!remoteApiEnabled || !props.active || current.kind !== "choice") return null;
+  return JSON.stringify([app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl,
+    current.targetKind, choiceSources.value.map(device => [device.id, device.rowVersion])]);
+});
+const choiceQuotes = ref(new Map<string, Pick<CanonicalTradeinQuote, "discountUsdt" | "payableUsdt"> | null>());
+let choiceReadGeneration = 0;
+
+async function loadChoiceQuotes(sources: Device[]) {
+  const openingState = state.value;
+  const key = choiceReadKey.value;
+  if (key === null || openingState.kind !== "choice") return;
+  const generation = choiceReadGeneration;
+  const scope = captureAccountScope();
+  const target = openingState.targetKind;
+  const current = () => purchaseMounted && generation === choiceReadGeneration && choiceReadKey.value === key
+    && state.value === openingState && isCurrentAccountScope(scope);
+  await Promise.all(sources.map(async device => {
+    const id = Number(device.id);
+    const version = device.rowVersion;
+    choiceQuotes.value.delete(device.id);
+    try {
+      const quote = await deviceE3Api.quote(id, target);
+      if (!current()) return;
+      const matches = quote.sourceDeviceId === id && quote.sourceRowVersion === version && quote.targetProductNo === target;
+      choiceQuotes.value.set(device.id, matches ? { discountUsdt: quote.discountUsdt, payableUsdt: quote.payableUsdt } : null);
+    } catch {
+      if (current()) choiceQuotes.value.set(device.id, null);
+    }
+  }));
 }
+
+watch([choiceReadKey, state], () => {
+  const generation = ++choiceReadGeneration;
+  choiceQuotes.value.clear();
+  if (choiceReadKey.value === null) return;
+  void nextTick(() => {
+    if (purchaseMounted && generation === choiceReadGeneration) return loadChoiceQuotes(choiceSources.value);
+  });
+}, { immediate: true, flush: "sync" });
+
+useAutoRecovery({
+  active: () => choiceReadKey.value !== null,
+  failed: () => [...choiceQuotes.value.values()].includes(null),
+  retry: () => loadChoiceQuotes(choiceSources.value.filter(device => choiceQuotes.value.get(device.id) === null)),
+  repeatMs: 30_000,
+});
+
 const choiceView = computed(() => {
   const s = state.value;
   if (s.kind !== "choice") return null;
-  const rows = s.tradeInSources
-    .map((id) => app.devices.find((d) => d.id === id))
-    .filter((d): d is Device => !!d && (!remoteApiEnabled || d.paidPriceUsdt > 0))
-    .map((d) => {
-      const quote = remoteApiEnabled ? choiceQuote(d.id) : null;
-      const credit = remoteApiEnabled ? quote?.credit ?? null : previewCredit(d, s.newPrice);
-      const net = remoteApiEnabled ? quote?.payable ?? null : Math.max(0, +(s.newPrice - (credit ?? 0)).toFixed(2));
-      const name = deviceName(t.value, d);
-      const creditText = credit == null ? "—" : `$${formatGroupedAmount(credit)}`;
-      const netText = net == null ? "—" : `$${formatGroupedAmount(net)}`;
-      return { id: d.id, device: d, name, credit: creditText, net: net == null ? null : amountParts(net),
-        label: `${name} · ${t.value.tradein.inventoryCreditLabel} ${creditText} · ${t.value.tradein.sheetNetCostLabel} ${netText}` };
-    });
+  const rows = choiceSources.value.map((d) => {
+    const quote = choiceQuotes.value.get(d.id);
+    const credit = remoteApiEnabled ? quote?.discountUsdt ?? null : previewCredit(d, s.newPrice);
+    const net = remoteApiEnabled ? quote?.payableUsdt ?? null : Math.max(0, +(s.newPrice - (credit ?? 0)).toFixed(2));
+    const name = deviceName(t.value, d);
+    const creditText = credit == null ? "—" : `$${formatGroupedAmount(credit)}`;
+    const netText = net == null ? "—" : `$${formatGroupedAmount(net)}`;
+    return { id: d.id, device: d, name, credit: creditText, net: net == null ? null : amountParts(net),
+      label: `${name} · ${t.value.tradein.inventoryCreditLabel} ${creditText} · ${t.value.tradein.sheetNetCostLabel} ${netText}` };
+  });
   return { rows, single: rows.length === 1 ? rows[0] : null };
 });
 
