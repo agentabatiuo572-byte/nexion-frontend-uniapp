@@ -672,9 +672,6 @@ const pendingOrderActionsVisible = computed(() => order.value?.status === "place
 // Any state with a next action gets the bottom action bar.
 const stickyActionsVisible = computed(() => !!order.value && (pendingOrderActionsVisible.value || needsRecovery.value
   || order.value.status === 'activated' || order.value.status === 'inventory' || canBuyAgain.value));
-// The actions tray as rendered: two buttons wrap to two rows in a long language, and the content clears that (04 §4.0).
-const orderTray = ref<unknown>(null);
-const orderTrayHeight = useTrayHeight(orderTray, '.order-actions-tray');
 const cancellable = computed(() => canCancelCurrentOrder()
   && !cancellingOrder.value);
 const paymentExpired = computed(() => order.value?.expiresAt != null
@@ -698,6 +695,11 @@ const bundleDiscountOnly = computed(() => !!order.value && Number(order.value.pr
   && attributedBundleDiscount(distinctOrderProducts.value, order.value.discount, order.value.promotionDiscountUsdt) !== undefined);
 const buyAgainLabel = computed(() => order.value && commerceOrderIsPaid(order.value) && distinctOrderProducts.value > 1
   ? pendingCopy.value.buyBundleAgain : t.value.promotion.buyAgain);
+// The actions tray as rendered: two buttons wrap to two rows in a long language, and the content clears that (04 §4.0).
+// What sets its buttons and labels is the App's cue to read it again.
+const orderTray = ref<unknown>(null);
+const orderTrayHeight = useTrayHeight(orderTray, '.order-actions-tray', () => [locale.code, order.value?.status,
+  pendingOrderActionsVisible.value, needsRecovery.value, canBuyAgain.value, buyAgainLabel.value]);
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ',');
 }

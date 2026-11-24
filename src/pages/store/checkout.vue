@@ -515,7 +515,8 @@ defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, op
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
 // The bundle / activity tray as rendered, which the review content clears (04 §4.0).
 const promotionTray=ref<unknown>(null);
-const promotionTrayHeight=useTrayHeight(promotionTray, '.checkout-promotion-tray');
+const promotionTrayHeight=useTrayHeight(promotionTray, '.checkout-promotion-tray', () => [locale.code, promotionCheckout.value?.footer?.label,
+  promotionCheckout.value?.footer?.note, promotionCheckout.value?.trayNotice, promotionCheckout.value?.footer?.amount, promotionCheckout.value?.footer?.amountless]);
 const storeResult=ref<InstanceType<typeof CheckoutResult>|null>(null);
 const resultBar=computed(()=>promotionRoute.value?promotionCheckout.value?.resultView:storeResult.value);
 const promotionBuyAgain=computed(()=>!!promotionRoute.value&&promotionCheckout.value?.resultBuyAgain===true);
