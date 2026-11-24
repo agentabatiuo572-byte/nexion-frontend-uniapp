@@ -211,7 +211,7 @@
         <template v-else-if="claimVisible">
           <!-- Ineligible → concrete reason above the disabled CTA (异常2) -->
           <text v-if="barNote" class="trial-bar__note nx-tray-note">{{ barNote }}</text>
-          <NxButton class="trial-bar__main" variant="primary" :label="t.trial.idleCta" :disabled="!canStartNow" @click="claim" />
+          <NxButton class="trial-bar__main" variant="primary" :label="freeTrial.pendingStart ? t.trial.claimRetryCta : t.trial.idleCta" :disabled="!canStartNow" @click="claim" />
         </template>
         <template v-else-if="conversionRefunded">
           <NxButton v-if="displayState?.conversion?.orderNo" class="trial-bar__side" variant="secondary" :label="purchase.refundOrderCta" @click="goRefundedOrder" />
@@ -294,7 +294,7 @@ const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.autho
 // The last complete snapshot belongs to this account and only supplies display values.
 const displayState = computed(() => freeTrial.displayState);
 const staleDisplay = computed(() => freeTrial.transientReadFailure && displayState.value !== null);
-const authorityScreenUnavailable = computed(() => remoteApiEnabled && (!displayState.value || !!freeTrial.pendingStart));
+const authorityScreenUnavailable = computed(() => remoteApiEnabled && (!displayState.value || (!!freeTrial.pendingStart && !displayState.value.canStart)));
 // A read is under way or about to start: the cold open before the first read, or a read with no failure behind it.
 // A failed or incomplete read keeps its result up while recovery re-reads; an observed disconnect has nothing to wait for.
 const authorityReadPending = computed(() => freeTrial.authorityStatus === "loading"
@@ -467,6 +467,7 @@ const ineligibleReasonText = computed(() => {
 const barRetry = computed(() => (isActiveCycle.value || status.value === "ended") && !claimVisible.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
+  if (freeTrial.pendingStart) return t.value.trial.claimUnknownInline;
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;

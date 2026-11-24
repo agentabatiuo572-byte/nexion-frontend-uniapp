@@ -99,8 +99,9 @@ const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
 const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
   "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
-const claimRetryable = computed(() => claimError.value && !claimOpensAnotherPage.value);
-const claimDisabled = computed(() => claiming.value || !!freeTrial.pendingStart
+const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.displayState?.canStart === true
+  : claimError.value && !claimOpensAnotherPage.value);
+const claimDisabled = computed(() => claiming.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
   || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
@@ -183,6 +184,11 @@ async function onClaim() {
   if (!remoteApiEnabled) activated.value = true; // Local claims have no server claim number.
 }
 
+watch(() => freeTrial.confirmedStartDenial, reason => {
+  if (!sheet.open || !reason) return;
+  claimErrorReason.value = reason;
+  claimError.value = true;
+});
 watch(() => app.accountBindingEpoch, () => {
   claimSequence++;
   claiming.value = false;

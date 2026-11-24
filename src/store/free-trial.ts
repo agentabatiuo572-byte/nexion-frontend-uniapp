@@ -194,6 +194,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // Display only. A transient GET failure still clears the live command authority.
   const displayState = shallowRef<TrialAuthorityState | null>(null);
   const pendingStart = shallowRef<{ claimNo: string | null } | null>(null);
+  const confirmedStartDenial = ref<TrialIneligibleReason>();
   const confirmedStartClaimNo = ref<string | null>(null);
   const lastReadFailed = ref(false);
   const transientReadFailure = ref(false);
@@ -238,7 +239,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   let sampledServerTime = 0;
   let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightAccount: string | null = null;
-  let pendingStartKey: string | null = null;
+  let startIntent: { key: string; deviceName: string } | null = null;
   let authorityRequestSequence = 0;
   let lastAppliedSequence = 0;
   let accountBindingEpoch = 0;
@@ -420,11 +421,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     displayState.value = authorityIncomplete.value ? null : next;
     authorityStatus.value = "ready";
     authorityError.value = null;
-    if (pendingStart.value && next.claimNo && (next.status === "active" || next.status === "grace")
-        && (!pendingStart.value.claimNo || pendingStart.value.claimNo === next.claimNo)) {
-      confirmStart(next.claimNo);
-    } else if (!pendingStart.value && !authorityIncomplete.value) {
-      authorityResultUnknown.value = false;
+    if (pendingStart.value) {
+      settleStartRead(pendingStart.value.claimNo);
+    } else {
+      if (!next.canStart && next.eligibilityReason !== "unknown") startIntent = null;
+      if (!authorityIncomplete.value) authorityResultUnknown.value = false;
     }
     lastReadFailed.value = false;
     transientReadFailure.value = false;
@@ -522,7 +523,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       lastReadFailed.value = false;
       transientReadFailure.value = false;
       pendingStart.value = null;
-      pendingStartKey = null;
+      startIntent = null;
+      confirmedStartDenial.value = undefined;
       confirmedStartClaimNo.value = null;
       confirmedLifecycle = null;
       pendingExpiryClaim = null;
@@ -605,18 +607,21 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return "checking";
   }
 
-  function confirmStart(claimNo: string) {
-    pendingStartKey = null;
+  // An eligible snapshot permits replay of the same intent, but cannot settle its outcome.
+  function settleStartRead(expectedClaimNo: string | null) {
+    const claimNo = authorityClaimNo.value;
+    const liveClaim = status.value === "active" || status.value === "grace";
+    if (liveClaim) {
+      if (!claimNo || (expectedClaimNo && expectedClaimNo !== claimNo)) return;
+      confirmedStartClaimNo.value = claimNo;
+    } else {
+      if (remoteCanStart.value || remoteEligibilityReason.value === "unknown") return;
+      confirmedStartDenial.value = remoteEligibilityReason.value;
+    }
+    startIntent = null;
     pendingStart.value = null;
     authorityResultUnknown.value = false;
-    confirmedStartClaimNo.value = claimNo;
-    return { ok: true };
-  }
-
-  function awaitStartConfirmation(claimNo: string | null) {
-    pendingStart.value = { claimNo };
-    clearRemoteFacts("unknown", "TRIAL_START_RESULT_UNKNOWN");
-    return { ok: false, reason: "confirming" } as const;
+    return liveClaim ? { ok: true } : { ok: false, reason: remoteEligibilityReason.value };
   }
 
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
@@ -624,9 +629,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // trial per account, concurrent taps produce exactly one).
   async function start(): Promise<{ ok: boolean; reason?: TrialStartFailure }> {
     if (remoteApiEnabled) {
-      if (pendingStart.value) return { ok: false, reason: "confirming" };
+      const recovering = !!pendingStart.value;
+      if (recovering && !canStart()) return { ok: false, reason: "confirming" };
       const requestedEpoch = accountBindingEpoch;
       if (!await refreshEligibilityRemote() || requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
+      if (recovering && !pendingStart.value && !confirmedStartDenial.value) return { ok: true };
       const remoteEligibility = eligibility();
       if (!remoteEligibility.ok) return { ok: false, reason: remoteEligibility.reason };
       const trialConfig = useTrialConfig().config;
@@ -635,20 +642,19 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         markAuthorityReadFailure("TRIAL_CONFIG_RESPONSE_INVALID");
         return { ok: false, reason: "read-failed" };
       }
-      pendingStartKey ??= commandKey("start");
+      const intent = startIntent ??= { key: commandKey("start"), deviceName };
+      let expectedClaimNo = pendingStart.value?.claimNo ?? null;
+      confirmedStartDenial.value = undefined;
+      if (recovering) {
+        pendingStart.value = null;
+        authorityResultUnknown.value = false;
+      }
       try {
         const sequence = ++authorityRequestSequence;
-        const receipt = await trialApi.start(pendingStartKey, deviceName);
+        const receipt = await trialApi.start(intent.key, intent.deviceName);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         applyAuthority(receipt, sequence, requestedEpoch);
-        const expectedClaimNo = receipt.claimNo;
-        const confirmed = await refreshRemote(true);
-        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
-        if (!confirmed || !expectedClaimNo || authorityClaimNo.value !== expectedClaimNo
-            || (status.value !== "active" && status.value !== "grace")) {
-          return awaitStartConfirmation(expectedClaimNo);
-        }
-        return confirmStart(expectedClaimNo);
+        expectedClaimNo = receipt.claimNo;
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         const failure = asApiError(error);
@@ -662,16 +668,19 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         // These trial business refusals are definitive even when delivered as HTTP 409.
         const trialRefusal = isApiRefusal(failure, 409, failure.message) && failure.message.startsWith("TRIAL_");
         if (trialRefusal || !isAmbiguousEnvelopeOutcome(error)) {
-          pendingStartKey = null;
+          if (!isApiRefusal(failure, 409, "TRIAL_SERVICE_UNAVAILABLE")) startIntent = null;
           return { ok: false, reason: reason === "unknown" ? "rejected" : reason };
         }
-        const reconciled = await refreshRemote();
-        if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
-        if (reconciled && authorityClaimNo.value && (status.value === "active" || status.value === "grace")) {
-          return confirmStart(authorityClaimNo.value);
-        }
-        return awaitStartConfirmation(null);
       }
+      // Both a receipt and a lost response require a fresh read after this POST.
+      const read = await refreshRemote(true);
+      if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
+      const result = read && settleStartRead(expectedClaimNo);
+      if (result) return result;
+      startIntent = intent;
+      pendingStart.value = { claimNo: expectedClaimNo };
+      authorityResultUnknown.value = true;
+      return { ok: false, reason: "confirming" };
     }
     const elig = eligibility();
     if (!elig.ok) return { ok: false, reason: elig.reason };
@@ -961,7 +970,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
-    displayState, pendingStart, confirmedStartClaimNo, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
+    displayState, pendingStart, confirmedStartClaimNo, confirmedStartDenial, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,

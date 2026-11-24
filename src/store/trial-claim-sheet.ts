@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { useFreeTrial } from "./free-trial";
 import { useApp } from "./app";
 import { toast } from "./ui";
+import { getT } from "@/i18n/use-t";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { mockServerNow } from "./server-time";
 
@@ -38,6 +39,9 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     void useApp().refreshRemoteFleet();
     if (open.value) activated.value = true;
     else toast.success(copy.value.activationSuccessTitle);
+  });
+  watch(() => trial.confirmedStartDenial, reason => {
+    if (reason && !open.value) toast.error(getT().weeklyQuest.claimFailed);
   });
   const lastClosedAt = ref(hydrateLastClosedAt());
   const sessionShownCount = ref(0);
