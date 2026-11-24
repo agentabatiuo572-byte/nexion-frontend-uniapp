@@ -6,6 +6,7 @@ import type { PublicPromotion } from '@/api/promotion-contracts';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { canPreviewPromotion, createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';
+import { isTransientReadFailure } from '@/lib/remote-read-failure';
 
 /** Shared by the existing catalog/detail/bundle surfaces; no qualification calculation. */
 export function usePromotionContext(activityId: Ref<string>, retainPresentation = false) {
@@ -34,8 +35,10 @@ export function usePromotionContext(activityId: Ref<string>, retainPresentation 
       if (!visible || !fence.current(ticket) || id !== activityId.value || identity !== passiveTabReadScope()) return;
       activity.value = isPromotionActive(result) ? result : null;
       status.value = 'ready';
-    } catch {
-      if (visible && fence.current(ticket) && identity === passiveTabReadScope()) { activity.value = null; status.value = 'error'; }
+    } catch (cause) {
+      if (!visible || !fence.current(ticket) || id !== activityId.value || identity !== passiveTabReadScope()) return;
+      if (!isTransientReadFailure(cause)) activity.value = null;
+      status.value = 'error';
     }
   }
   watch(activityId, () => { activity.value = null; void refresh(true); });

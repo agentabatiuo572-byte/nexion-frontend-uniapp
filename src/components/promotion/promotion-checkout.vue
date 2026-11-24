@@ -261,6 +261,8 @@ const session=new PromotionCheckoutSession({api:promotionApi,isExternalPaymentRe
 const stopReleaseWatch=onPurchaseRecordReleased((accountKey,key)=>{if(accountKey===account&&current()&&session.releaseExternalPayment(key))revision.value++;});
 const quotePresentation=shallowRef<{key:string;quote:Quote}|null>(null);
 const freshQuoteReady=ref(false),revision=ref(0),quote=computed(()=>{revision.value;return session.record.pending||session.record.order||(freshQuoteReady.value&&quotePresentation.value?.key===quotePresentationKey())?session.record.quote:null;}),order=computed(()=>{revision.value;return session.record.order;}),unknown=computed(()=>{revision.value;return session.unknown;});
+const routedOrderNo = computed(() => props.orderNo ?? null);
+const presentedOrderNo = computed(() => order.value?.orderNo ?? null);
 // Display memory never enters the executable session; refresh still invalidates that quote.
 const displayQuote=computed(()=>current()&&visible.value&&auth.isAuthenticated ? quote.value??(quotePresentation.value?.key===quotePresentationKey()?quotePresentation.value.quote:null):null);
 function quotePresentationKey(){return JSON.stringify([app.accountKey,app.accountBindingEpoch,auth.isAuthenticated,props.activityId,selection.value,eventVoucherId,props.upgradeActivityId??'',manualVoucher()?['manual',voucherId.value]:['auto'],locale.code]);}
@@ -736,6 +738,8 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
   let rejection='',paymentDestination='',paymentReplace=false,topupChanged=false;paymentLeaveApproved=false;
   try{
     await run(async()=>{
+      const pending = session.record.pending;
+      const walletOnly = session.retryOriginal && pending?.operation === 'payOrder' && pending.paymentMethod !== 'EXTERNAL';
       await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,precision:topup?'full':undefined,
         details:expectedOrder.items?.map(item=>({name:item.productName,quantity:item.quantity}))},
         async authorization=>{
@@ -754,7 +758,7 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
             throw cause;
           }
         },
-        paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},orderNo,deadlineAt:Date.parse(payBy!),
+        paymentCurrent,{refusedPaymentKey:session.externalPaymentRefused?session.record.pending?.key:undefined,kind:'ORDER_PAY',payload:{orderNo},walletOnly,orderNo,deadlineAt:Date.parse(payBy!),
           navigate:(href,replace)=>{paymentDestination=href;paymentReplace=!!replace;paymentLeaveApproved=routeLeavesPurchase(href);},
           reorder:()=>{
             const fromOrdinaryBundle=props.fromBundle&&!openedOriginal&&!props.orderNo&&!props.activityId
@@ -1113,7 +1117,7 @@ const resultView=ref<InstanceType<typeof CheckoutResult>|null>(null);
 // 再买一台 waits for a settled result (PRD purchase payment, line 49); the page puts it in the bar beside 查看设备. A failure
 // offers support instead, and a delivery to inventory has only its own two exits (替换一台在线设备, 稍后再说).
 const resultBuyAgain=computed(()=>!openedOriginal&&!props.orderNo&&props.items.length>0&&canStartNew.value&&resultState.value==='activated');
-defineExpose({back,approveBack,canConfirmLeave,cancelForLeave,hide,show,footer,trayNotice,orderPending,resultView,resultBuyAgain,startNewPurchase,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
+defineExpose({back,approveBack,canConfirmLeave,cancelForLeave,hide,show,footer,trayNotice,orderPending,routedOrderNo,presentedOrderNo,resultView,resultBuyAgain,startNewPurchase,hasDevicePolicy,hasRewardTerms,backDisabled,resultVisible,pauseBrowserTab,resumeBrowserTab,refreshForegroundReview,keepRecoveryTarget,keepRecovery,keepRecoveryOperation,keepRecoveryProduct,keepRecoveryReadError,resolvingOriginalCapacity,resumeAfterCapacityRecovery,keepResumeAllowed,openKeepResume});
 function startWalletTimer(){
   if(walletTimer)return;
   walletTimer=setInterval(()=>{

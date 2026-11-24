@@ -291,6 +291,7 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
@@ -424,6 +425,7 @@ type CheckoutLeaveIntent = 'resume-cancel' | 'cancel' | 'confirmed-leave';
 let checkoutLeaveRetry: CheckoutLeaveIntent = 'cancel';
 const createdCheckoutOrder = ref<CreatedOrder | null>(null);
 const originalOrderReadUnavailable = ref(false);
+const failedKnownOrderNo = ref<string | null>(null);
 const pendingCheckoutCreate = ref<PendingCheckoutCreate | null>(null);
 const pendingCreatePointer = ref<ReturnType<typeof readCheckoutOrderPointer>>(null);
 const confirmedMissingCreateKey = ref<string | null>(null);
@@ -1364,6 +1366,7 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   pendingCreatePointer.value = null;
   foregroundTradeinSignature = null;
   originalOrderReadUnavailable.value = false;
+  failedKnownOrderNo.value = null;
   confirmedMissingCreateKey.value = null;
   pendingCreateFound.value = false;
   pendingCreateReplayBusy.value = false;
@@ -3098,6 +3101,16 @@ useAutoRecovery({
   repeatMs: 15_000,
 });
 useAutoRecovery({
+  failed: () => remoteApiEnabled && failedKnownOrderNo.value !== null
+    && createdCheckoutOrder.value?.orderNo === failedKnownOrderNo.value && isTopCheckoutPage()
+    && !settledResultReplay.value && !paymentFlowBusy.value && !checkoutLeaving.value,
+  retry: async () => {
+    const orderNo = failedKnownOrderNo.value;
+    if (orderNo) await refreshKnownCheckoutOrder(captureCheckoutRoute(), orderNo);
+  },
+  repeatMs: 30_000,
+});
+useAutoRecovery({
   // The recovery show hook runs before checkout sets pageVisible for this visit.
   // Saved external payments the user can go back to; the payment layer covers the tray while it is open.
   failed: () => remoteApiEnabled && pageAlive && auth.isAuthenticated
@@ -3166,13 +3179,17 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
 }
 
 async function refreshKnownCheckoutOrder(scope: CheckoutRouteScope, orderNo: string) {
+  const current = () => isCurrentCheckoutRoute(scope) && createdCheckoutOrder.value?.orderNo === orderNo;
   let order;
   try {
     order = await orders.ensureRemoteOrder(orderNo);
-  } catch {
-    return; // A failed read leaves the last known order in effect.
+  } catch (cause) {
+    // A failed read leaves the last known order in effect.
+    if (current()) failedKnownOrderNo.value = isTransientReadFailure(cause) ? orderNo : null;
+    return;
   }
-  if (!isCurrentCheckoutRoute(scope) || createdCheckoutOrder.value?.orderNo !== orderNo) return;
+  if (!current()) return;
+  failedKnownOrderNo.value = null;
   originalOrderReadUnavailable.value = !order;
   if (order && ['paid', 'provisioning', 'activated', 'inventory', 'provisioning_failed'].includes(order.status)) {
     orderId.value = orderNo;
