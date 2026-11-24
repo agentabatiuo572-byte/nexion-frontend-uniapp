@@ -450,7 +450,7 @@ const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryRea
     confirmPassword: { selector: "#rg-confirm-password", seed: 88 },
   },
   layout: () => [step.value, error.value, reviewNotice.value && reviewNoticeBody.value, inviteInvalid.value, devBackendDown.value,
-    lockedRef.value, phoneFormatMessage.value, developmentOtpEnabled.value],
+    lockedRef.value, !!sponsorPreview.value, phoneFormatMessage.value, developmentOtpEnabled.value],
 });
 
 function invalidateOtpFlow() {
