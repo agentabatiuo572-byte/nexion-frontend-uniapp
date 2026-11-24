@@ -96,7 +96,7 @@ function demoRankPresetRewardRows(state,at) {
     row('d2','direct_device_earning','Minh Anh',2,2,0.1,2,'cooling',{sourceDeviceId:'DEMO-MINH-S1'}),
     row('d3','direct_device_earning','Kai',1,4,1.25,25,'unlocked',{sourceDeviceId:'DEMO-KAI-S1'}),
     row('d4','direct_device_earning','Rustam Abdullayev',2,7,0.05,1,'unlocked',{sourceDeviceId:'DEMO-RUSTAM-S1'}),
-    ...(salary>0?[row('s1','vrank_salary','V'+v,0,3,salary,0,'unlocked')]:[]),
+    ...(salary>0?[row('s1','vrank_salary','V'+v,0,3,salary,0,'unlocked',{orderId:undefined,sourceRef:undefined,orderAmountUSD:undefined})]:[]),
   ];
 }
 

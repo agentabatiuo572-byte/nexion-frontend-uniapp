@@ -38,8 +38,8 @@
                     <text class="nx-unilevel-source-label">{{ recordSource(event) }}</text>
                   </view>
                   <view class="nx-unilevel-record-amounts">
-                    <text class="nx-direct-amount nx-unilevel-currency-row">{{ visibility.mask((event.amountUSDT > 0 ? '+' : '') + formatAmount(event.amountUSDT)) }}<text class="nx-unilevel-unit">{{ '\u00A0' }}USDT</text></text>
-                    <text v-if="event.amountNEX > 0" class="nx-direct-amount nx-unilevel-uvt">{{ visibility.mask('+' + formatAmount(event.amountNEX)) }}{{ '\u00A0' }}UVT</text>
+                    <text class="nx-direct-amount nx-unilevel-currency-row">{{ visibility.mask((event.amountUSDT > 0 ? '+' : '') + formatGroupedAmount(event.amountUSDT, 'full')) }}<text class="nx-unilevel-unit">{{ '\u00A0' }}USDT</text></text>
+                    <text v-if="event.amountNEX > 0" class="nx-direct-amount nx-unilevel-uvt">{{ visibility.mask('+' + formatGroupedAmount(event.amountNEX, 'full')) }}{{ '\u00A0' }}UVT</text>
                     <text v-for="tag in statusTags(event)" :key="tag.key" class="nx-unilevel-status" :class="`nx-unilevel-status--${tag.tone}`">{{ tag.text }}</text>
                   </view>
                 </view>
@@ -81,7 +81,7 @@ import { teamRuleGuideCopy } from "@/components/team/team-rule-guide-copy";
 import { deviceLevel2On, deviceLevel2RatePct } from "@/lib/device-earning-level2";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { teamLogicCopy } from "@/i18n/team-logic-copy";
-import { formatAmount } from "@/lib/amount-display";
+import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import { toast } from "@/store/ui";

@@ -327,14 +327,14 @@ function eventCodes(e: CommissionEvent): { label: string; value: string }[] {
 
 // DESIGN 11.2-12: team reward rows write the currency as USDT, not $.
 function commissionAmountLabel(e: CommissionEvent): string {
-  const amount = `${visibility.mask(formatAmount(e.amountUSDT))}\u00A0USDT`;
+  const amount = `${visibility.mask(formatGroupedAmount(e.amountUSDT, "full"))}\u00A0USDT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;
 }
 
 function commissionNexLabel(e: CommissionEvent): string {
-  const amount = `${visibility.mask(formatAmount(e.amountNEX))}\u00A0UVT`;
+  const amount = `${visibility.mask(formatGroupedAmount(e.amountNEX, "full"))}\u00A0UVT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;

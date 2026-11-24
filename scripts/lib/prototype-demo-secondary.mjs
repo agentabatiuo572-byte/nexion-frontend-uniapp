@@ -331,7 +331,7 @@ export function secondaryDemo(url,state,request,walletBills){
     const window=demoTeamPeriod(period,now,url.searchParams.get('snapshotAt'));
     const seedAt=state.previewFactsAt??now;
     // Rank presets keep each layer-2 purchase as one dual-currency row, like the v2 purchase rows (DESIGN F2b).
-    const commissionRows=(state.rankPreset&&state.rankPreset!=='follow'?demoCommissionGroups(state,seedAt):demoCommissionEvents(state,seedAt)).filter(row=>row.kind==='unilevel');
+    const commissionRows=(state.rankPreset&&state.rankPreset!=='follow'?demoCommissionGroups(state,seedAt).map(row=>({currency:'DUAL',...row})):demoCommissionEvents(state,seedAt)).filter(row=>row.kind==='unilevel');
     const purchases=version===2?demoCommissionGroups(state,seedAt)
       .filter(row=>row.kind==='direct_purchase').map(row=>({...row,currency:'DUAL',policyVersion:3,nexUsdtPrice:.128})):[];
     const all=[...commissionRows,...purchases].filter(row=>window.contains(row.ts)).sort((a,b)=>b.ts-a.ts||b.id.localeCompare(a.id))

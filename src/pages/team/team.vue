@@ -272,9 +272,11 @@ const rankBars = computed(() => {
   const short = { selfComputePoints: copy.g1Self, directRefs: copy.g1Buy, teamComputePoints: copy.g1Team };
   const label = (kind: keyof typeof short | "vDownlines", vLevel?: number) => kind === "vDownlines" ? fmt(copy.g1Lead, { r: `V${vLevel}` }) : short[kind];
   const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
-  if (snapshot) return snapshot.bars.map(row => ({ key: row.key, label: label(row.kind, row.vLevel ?? undefined), percent: row.percent }));
+  // Board order (DESIGN G1): own compute, team compute, buyers, then the V{n}+ count.
+  const order = { selfComputePoints: 0, teamComputePoints: 1, directRefs: 2, vDownlines: 3 };
+  if (snapshot) return [...snapshot.bars].sort((a, b) => order[a.kind] - order[b.kind]).map(row => ({ key: row.key, label: label(row.kind, row.vLevel ?? undefined), percent: row.percent }));
   if (!next) return [];
-  return rankProgress.value.rows.filter(row => row.tier === next.v).map(row => ({
+  return rankProgress.value.rows.filter(row => row.tier === next.v).sort((a, b) => order[a.kind] - order[b.kind]).map(row => ({
     key: row.key,
     label: label(row.kind, row.vLevel),
     percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)),
