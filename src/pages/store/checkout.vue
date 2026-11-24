@@ -2,8 +2,8 @@
 <template>
   <AppChassis active="store" :checkout-capacity-target="promotionRoute ? promotionCheckout?.keepRecoveryTarget : keepCheckoutTarget" @checkout-capacity-cleared="resumeCheckoutAfterCapacity">
     <template #pageTop><SubPageHeader class="checkout-header" design :no-back="checkoutResultVisible" :back="checkoutBackHref" :back-action="requestCheckoutBack" :title="checkoutResultVisible ? flowCopy.resultTitle : promotionRoute && promotionCheckout?.orderPending ? t.promotion.pending : auditCopy.review" /></template>
-    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
-      :topup-network="promotionRoute.topupNetwork" :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment">
+    <PromotionCheckout class="checkout-promotion" :class="{ 'checkout-promotion--result': checkoutResultVisible }" v-if="promotionRoute" :key="app.accountKey+':'+app.accountBindingEpoch+':'+promotionCheckoutRevision" ref="promotionCheckout" :tray-height="promotionTrayHeight" :activity-id="promotionRoute.activityId" :items="promotionRoute.items" :order-no="promotionRoute.orderNo" :voucher-id="promotionRoute.voucherId" :upgrade-activity-id="promotionRoute.upgradeActivityId" :from-bundle="promotionRoute.fromBundle"
+      :topup-network="promotionRoute.topupNetwork" :external-order-no="cancelBlockedPayment?.orderNo" :leave-confirmation-open="leaveKeepOpen" @cancel-blocked="showCancelPaymentRefusal" @resume-external="resumeBlockedPayment" @restore-routed-order="promotionCheckoutRevision += 1">
       <template #review-footer>
         <CheckoutLegal @navigate="openCheckoutLegal" />
       </template>
@@ -524,6 +524,7 @@ const keepResumeAllowed = computed(() => {
 const keepRecoveryNotice = computed(() => capacityRecoveryNotice(t.value, keepCheckoutReadError.value, keepRecoveryOperation.value, keepResumeAllowed.value));
 defineExpose({ keepRecoveryOperation, keepRecoveryProduct, keepResumeAllowed, openKeepResume });
 const promotionCheckout=ref<InstanceType<typeof PromotionCheckout>|null>(null);
+const promotionCheckoutRevision = ref(0);
 // The bundle / activity tray as rendered, which the review content clears (04 §4.0).
 const promotionTray=ref<unknown>(null);
 const promotionTrayHeight=useTrayHeight(promotionTray, '.checkout-promotion-tray', () => [locale.code, promotionCheckout.value?.footer?.label,

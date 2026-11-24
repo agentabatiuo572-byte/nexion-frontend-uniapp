@@ -219,6 +219,7 @@ const props=defineProps<{activityId:string;items:PromotionItem[];orderNo?:string
 const emit=defineEmits<{
   (event:'cancel-blocked',orderNo:string,summary:string):void;
   (event:'resume-external'):void;
+  (event:'restore-routed-order'):void;
 }>();
 function formatDiscount(value: Parameters<typeof formatAmount>[0]): string {
   return formatCheckoutReviewAmount(value, 'USD', { discount: true });
@@ -311,6 +312,16 @@ const busy=computed(()=>writeBusy.value||quoteRead.value!==null);
 const createBlock=ref<CheckoutCreateBlock|null>(null);
 const quoteBlock=ref<CheckoutQuoteBlock|null>(null);
 const paymentSheetOpen=ref(false),paymentConfirming=ref(false),leaving=ref(false);
+const shouldRestoreRoutedOrder = computed(() => {
+  void revision.value;
+  const requested = routedOrderNo.value;
+  return openedOriginal && !!requested && requested !== presentedOrderNo.value && !session.record.pending
+    && current() && visible.value && !leaving.value;
+});
+// Re-enter the requested order through the same read path as initial entry.
+watch(shouldRestoreRoutedOrder, restore => {
+  if (restore) emit('restore-routed-order');
+}, { flush: 'sync' });
 const paymentEntryChecking=ref(false);
 const eventVoucherId=props.voucherId?.trim()??'';
 const ordinaryMultiItemEntry = !openedOriginal && !props.orderNo && !props.activityId && !eventVoucherId
@@ -801,7 +812,7 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
 }
 let recoveryReadGeneration=-1;
 function recover(foreground=false):Promise<boolean>{
-  if(!current()||!visible.value||busy.value)return Promise.resolve(false);
+  if(!current()||!visible.value||busy.value||shouldRestoreRoutedOrder.value)return Promise.resolve(false);
   if(recoveryRead.value){
     // Back can arrive while the foreground read is checking this same order.
     if(recoveryReadGeneration===readGeneration)return recoveryRead.value;
@@ -828,6 +839,7 @@ async function readCheckout(foreground=false):Promise<boolean>{
     }else if(recoveryReadFailed.value&&error.value===flowCopy.value.queryFailed)error.value='';
     recoveryReadFailed.value=false;
     revision.value++;
+    if(shouldRestoreRoutedOrder.value)return false;
     if(reopenPaidOnEntry.value){
       if(!session.confirmed||session.record.pending)return false;
       if(order.value?.paymentStatus==='PAID'&&canStartNew.value){
@@ -843,12 +855,8 @@ async function readCheckout(foreground=false):Promise<boolean>{
       readCheckoutPromotion(reward.activityId,generation,reward.version);
     const unpaidOrderEnded = order.value?.paymentStatus === 'EXPIRED' || order.value?.paymentStatus === 'CANCELLED';
     // If recovery was part of Back, let that navigation finish.
-    if (!foreground && openedOriginal && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded
-      && (!props.orderNo || props.orderNo !== order.value?.orderNo)) {
-      const requestedHref = props.orderNo
-        ? '/pages/store/checkout?orderNo=' + encodeURIComponent(props.orderNo)
-        : promotionCheckoutHref(props.items, props.activityId, props);
-      return await navReplace(requestedHref);
+    if (!foreground && openedOriginal && !props.orderNo && !leaving.value && session.confirmed && !session.record.pending && unpaidOrderEnded) {
+      return await navReplace(promotionCheckoutHref(props.items, props.activityId, props));
     }
     const reopenPurchase = ordinaryMultiItemEntry && canStartNew.value && !session.record.quote?.activityId
       && !order.value?.rewards?.length && unpaidOrderEnded;
