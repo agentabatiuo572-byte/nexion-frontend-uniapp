@@ -20,16 +20,24 @@ const PUBLIC_ROUTES: Record<string, true> = {
   // 与 terms/privacy 同类,必须能在未登录时打开 —— 否则登录守卫把用户送回引导页,
   // 等于要求先登录才能读一份强制阅读的风险披露。后端已同步放行其 GET 读取。
   "pages/me/risk-disclosure": true,
-  // 信任中心展示公开信任资料，与风险披露同类，访客可直接访问。
+};
+
+// 信任资料允许访客阅读，也属于已登录用户的业务页面。
+const PUBLIC_READING_ROUTES: Record<string, true> = {
   "pages/trust/trust": true,
   "pages/trust/document": true,
   "pages/trust/whitepaper": true,
   "pages/trust/nex": true,
 };
 
+export function isPublicReadingRoute(route?: string | null): boolean {
+  return PUBLIC_READING_ROUTES[normalizeRoute(route)] === true;
+}
+
 /** Only routes that can safely render without an authenticated account. */
 export function isPublicAuthRoute(route?: string | null): boolean {
   const normalized = normalizeRoute(route);
   return isStaticReviewRoute(normalized)
-    || PUBLIC_ROUTES[normalized] === true;
+    || PUBLIC_ROUTES[normalized] === true
+    || PUBLIC_READING_ROUTES[normalized] === true;
 }

@@ -43,7 +43,7 @@ import {
   normalizeRoute,
   routeFromH5Location,
 } from "@/lib/static-review-routes";
-import { isPublicAuthRoute } from "@/lib/auth-route-visibility";
+import { isPublicAuthRoute, isPublicReadingRoute } from "@/lib/auth-route-visibility";
 import { currentPublicPromotionRoute } from '@/lib/promotion-public-route';
 import { resolveBootstrapAccountKey } from "@/lib/bootstrap-account-key";
 import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
@@ -588,6 +588,10 @@ function isAuthWhitelisted(route: string): boolean {
   return isPublicAuthRoute(route) || (!useAuth().isAuthenticated && currentPublicPromotionRoute(route));
 }
 
+function isBusinessRoute(route: string): boolean {
+  return isPublicReadingRoute(route) || !isAuthWhitelisted(route);
+}
+
 /**
  * A server-authenticated user has an account projection that is distinct from
  * the prototype's default shell. It is only a routing hint after a reload:
@@ -690,8 +694,7 @@ function beginServerSessionRestore(): Promise<boolean> {
       return false;
     }
     const route = readCurrentRoute();
-    // Public legal pages remain readable during cookie restoration, including
-    // their query return targets. Login/intro entries keep their usual reset.
+    // Keep the current public reading or legal page and its query during restore.
     const preserveCurrentRoute = preserveRouteDuringSessionRestore(route);
     const completed = completeSignIn({
       identity: `user:${restored.user.userId}`,
@@ -875,7 +878,7 @@ function clearInvalidRemoteSessionState(auth: ReturnType<typeof useAuth>): void 
 // against the server session endpoint; the storage event becomes an SSE/push.
 function checkSession(): boolean {
   const route = readCurrentRoute();
-  if (!route || isAuthWhitelisted(route)) return false; // flow pages exempt
+  if (!route || !isBusinessRoute(route)) return false;
   const auth = useAuth();
   if (!auth.isAuthenticated) return false; // auth guard handles unauth
   if (remoteApiEnabled) {
@@ -1226,7 +1229,7 @@ function stopBusinessLoops() {
 
 function canRunBusinessLoops(): boolean {
   const route = readCurrentRoute();
-  if (!route || isAuthWhitelisted(route) || isLegalTermsGateExemptRoute(`/${route}`)) return false;
+  if (!route || !isBusinessRoute(route) || isLegalTermsGateExemptRoute(`/${route}`)) return false;
   const auth = useAuth();
   if (!auth.isAuthenticated) return false;
   // Formal App authority is the server session. The local carrier registry is
