@@ -544,6 +544,13 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const intent = openOrderPayment(orderNo);
     return intent ? view(intent) : null;
   };
+  function orderPaymentRecords(orderNo) {
+    sync();
+    return [
+      ...[...quotes.values()].filter(record => record.subject.orderNo === orderNo),
+      ...[...intents.values(), ...suspendedIntents.values()].filter(record => record.orderNo === orderNo),
+    ];
+  }
   return {handles, handle, paymentCommand, sync, observePayments, openOrderPayment, topupIntent, seedRemoteOrderPayment, selectPaymentMode, ownsPreviewPayments,
-    seedOrderTopupOriginal, deliveredOrderPayment, expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
+    seedOrderTopupOriginal, deliveredOrderPayment, orderPaymentRecords, expireOrderPayment, observeLateOrderPayment, confirmLateOrderPayment};
 }

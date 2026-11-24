@@ -1,5 +1,6 @@
 // B84 scenarios seed independent order stories against the preview account's shared wallet.
-import { demoAccountOrders, demoProducts, demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
+import { isDeepStrictEqual } from 'node:util';
+import { demoAccountOrders, demoOrderTimedOut, demoProducts, demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
 import { demoPurchasingAccountId, previewAccountId } from './prototype-demo-identity.mjs';
 import { demoChainDepositAddress, demoChainDepositFee as FEE, demoChainDepositMinimum as MIN, demoWalletUsdt,
   postDemoWalletEntries, recordDemoChainDeposit } from './prototype-demo-wallet.mjs';
@@ -51,7 +52,7 @@ const ok = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
 const refuse = (status, message) => ({ status, body: { code: status, message, data: null } });
 
 function postWalletMovement(state, bizNo, bizType, category, direction, amount, at) {
-  return postDemoWalletEntries(state, { bizNo, bizType, asset: 'USDT', direction, category, at,
+  postDemoWalletEntries(state, { bizNo, bizType, asset: 'USDT', direction, category, at,
     amount: Number(decimal(amount)), amountExact: decimal(amount) });
 }
 
@@ -111,8 +112,17 @@ function newOrder(url, state, scene, orderNo, now) {
     paidAt: null, paidTotalUsdt: null, activatedAt: null };
 }
 
-// Retry the story with a new sample only if an ordinary action or time finished the old one.
-// Keep every posted wallet movement and the user's receipts for the previous sample.
+function canReuseSample(order, sample, scene, state, checkoutFlow, now) {
+  if (!order || !isDeepStrictEqual(order, sample.initialOrder)) return false;
+  if (demoOrderTimedOut(order, state, now)
+      || (order.canonicalStatus === 'placed' && scene !== 'deadline' && order.expiresAt <= now)) return false;
+  const orderNo = order.orderNo;
+  if (checkoutFlow?.hasOrderCommands(orderNo)
+      || Object.values(state.commands ?? {}).some(command => command.order?.orderNo === orderNo)) return false;
+  return isDeepStrictEqual(checkoutFlow?.orderPaymentRecords(orderNo) ?? [], sample.initialPayments);
+}
+
+// Reuse the sample only while its seeded facts still hold. Keep earlier orders and their records intact.
 export function applyDemoOrderTopupScene(url, state, now, checkoutFlow, scene) {
   if (!orderScenes.has(scene)) return null;
   const defaultOrderNo = `DEMO-B84-${scene.toUpperCase()}`;
@@ -122,17 +132,14 @@ export function applyDemoOrderTopupScene(url, state, now, checkoutFlow, scene) {
   if (scene === 'missing') return ok({ orderNo: defaultOrderNo, network });
 
   const samples = state.orderTopupSamples ??= {};
-  const previous = samples[scene];
-  let order = state.createdOrders?.find(row => row.orderNo === previous?.orderNo);
-  const original = originals[scene];
-  const reusable = order && (terminalOrders[scene] || scene === 'paid' || scene === 'deadline'
-    || (order.canonicalStatus === 'placed' && order.expiresAt > now
-      && (!original || checkoutFlow?.topupIntent(order.orderNo)?.status === original.status)));
-  if (!reusable) {
-    const generation = previous ? previous.generation + 1 : 1;
+  let sample = samples[scene];
+  let order = state.createdOrders?.find(row => row.orderNo === sample?.orderNo);
+  if (!canReuseSample(order, sample, scene, state, checkoutFlow, now)) {
+    const generation = sample ? sample.generation + 1 : 1;
     const orderNo = generation === 1 ? defaultOrderNo : `${defaultOrderNo}-${generation}`;
     order = newOrder(url, state, scene, orderNo, now);
     (state.createdOrders ??= []).unshift(order);
+    const original = originals[scene];
     if (original) {
       const result = checkoutFlow?.seedOrderTopupOriginal(url.origin, orderNo, original) ?? refuse(503, 'PREVIEW_CHECKOUT_REQUIRED');
       if (result.status !== 200) {
@@ -146,21 +153,24 @@ export function applyDemoOrderTopupScene(url, state, now, checkoutFlow, scene) {
       // A historical wallet settlement has an actual debit. The refund is a separate credit.
       if (micro(demoWalletUsdt(state)) < micro(order.amountUsdt))
         creditDeposit(state, max(micro(order.amountUsdt) - micro(demoWalletUsdt(state)), micro(MIN) - micro(FEE)), now);
-      const balance = postWalletMovement(state, orderNo, 'ORDER_PURCHASE', 'purchase', 'OUT', micro(order.amountUsdt), now);
+      postWalletMovement(state, orderNo, 'ORDER_PURCHASE', 'purchase', 'OUT', micro(order.amountUsdt), now);
       Object.assign(order, { paymentMethod: 'UVEL_WALLET', paymentNo: `DEMO-PAY-${orderNo}`, paidAt: now,
         paidTotalUsdt: order.amountUsdt.toFixed(2) });
-      checkoutFlow?.seedOrderTopupWalletReceipt(order, balance.USDT);
       if (scene === 'refunded') {
         const refundBillNo = `E4-REFUND-${orderNo}`;
         postWalletMovement(state, refundBillNo, 'ORDER_REFUND', 'refund', 'IN', micro(order.amountUsdt), now);
         Object.assign(order, { refundBillNo, refundedAt: now, refundAmountUsdt: order.amountUsdt });
       }
     }
-    samples[scene] = { orderNo, generation };
+    sample = samples[scene] = { orderNo, generation,
+      initialPayments: structuredClone(checkoutFlow?.orderPaymentRecords(orderNo) ?? []) };
   }
-  if (scene === 'deadline') Object.assign(order, pendingOrder, { placedAt: now - 1000 - paymentWindow,
-    expiresAt: now - 1000, closeReasonCode: null });
-  applyWalletStory(state, scene, order, samples[scene], now);
+  if (scene === 'deadline') {
+    order.expiresAt = now - 1000;
+    order.placedAt = order.expiresAt - paymentWindow;
+  }
+  sample.initialOrder = structuredClone(order);
+  applyWalletStory(state, scene, order, sample, now);
   return ok({ orderNo: order.orderNo, network, name: order.productName });
 }
 

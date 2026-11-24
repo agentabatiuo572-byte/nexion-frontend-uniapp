@@ -12,6 +12,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   const orderCreates = new Map();
   const hiddenOrders = new Set();
   const hideCommands = new Map();
+  const ordersWithWalletCommands = new Set();
   let orderListScene;
   let nextHideFailure;
   const commandKeys = new Intl.Collator("en", {sensitivity:"base"});
@@ -36,6 +37,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       orderCreates.clear();
       hiddenOrders.clear();
       hideCommands.clear();
+      ordersWithWalletCommands.clear();
       orderListScene = undefined;
       nextHideFailure = undefined;
       omitCancelReceipt = omitWalletReceipt = failOrderRead = undefined;
@@ -287,22 +289,25 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       }
       catch (error) {
         const refusal = {status:error.status??409,message:error.message,data:null};
-        if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
+        if (key) {
+          pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'REJECTED',canResumeSameKey:false,code:refusal.status,message:refusal.message,receipt:null});
+          ordersWithWalletCommands.add(orderNo);
+        }
         return refusal;
       }
       if(firstPayment)pin.state.payWrites++;
-      if (key) pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
+      if (key) {
+        pin.commands.set(command,{kind:'order-pay',commandKey:key,status:'SUCCEEDED',canResumeSameKey:false,code:0,message:'OK',receipt:settled});
+        ordersWithWalletCommands.add(orderNo);
+      }
       if (omitWalletReceipt) { omitWalletReceipt = undefined; return unavailableReceipt; }
       return {...ok(settled),drop:pin.state.dropNextPayment?(pin.state.dropNextPayment=false,true):false};
     }
     return ok(demoFixture(url,locale(),state,request));
   }
-  function seedOrderTopupWalletReceipt(order, walletBalanceAfterUsdt) {
-    const commandKey = `wallet-pay:${order.orderNo}:history`;
-    pin.commands.set('order-pay:' + commandKey, {kind:'order-pay',commandKey,status:'SUCCEEDED',canResumeSameKey:false,code:0,
-      receipt:{orderNo:order.orderNo,paymentNo:order.paymentNo,paymentMethod:order.paymentMethod,amountUsdt:order.amountUsdt,
-        paymentStatus:'PAID',orderStatus:'PAID',paidTotalUsdt:order.paidTotalUsdt,walletBalanceAfterUsdt,
-        serverCanonical:true,source:'server',sourceEnvironment:'PRODUCTION',runId:'',idempotent:false}});
+  function hasOrderCommands(orderNo) {
+    syncScenario();
+    return ordersWithWalletCommands.has(orderNo) || [...hideCommands.values()].some(command => command.orderNo === orderNo);
   }
   function configureCheckoutReadback(update) {
     if (update.omitNextCancelReceipt === true) omitCancelReceipt = true;
@@ -320,7 +325,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   return {handles,handle,pin,syncScenario,resetOrderHides,paginateOrderPage,delayCreate:configureCreateDelay,seedRemoteOrderPayment:external.seedRemoteOrderPayment,observePayments:external.observePayments,
     expireOrderPayment:external.expireOrderPayment, observeLateOrderPayment:external.observeLateOrderPayment,
     confirmLateOrderPayment:external.confirmLateOrderPayment, topupIntent:external.topupIntent,
-    seedOrderTopupOriginal:external.seedOrderTopupOriginal, seedOrderTopupWalletReceipt, deliveredOrderPayment:external.deliveredOrderPayment,
+    seedOrderTopupOriginal:external.seedOrderTopupOriginal, deliveredOrderPayment:external.deliveredOrderPayment,
+    orderPaymentRecords:external.orderPaymentRecords, hasOrderCommands,
     failNextHide:failure=>{nextHideFailure=['unavailable','response-lost'].includes(failure)?failure:undefined;},
     selectOrderListScene:scene=>{orderListScene=['only-expired','expired-first-page'].includes(scene)?scene:undefined;},
     selectPaymentMode:external.selectPaymentMode,configureCheckoutReadback};
