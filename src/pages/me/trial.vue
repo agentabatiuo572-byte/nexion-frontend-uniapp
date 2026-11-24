@@ -18,11 +18,15 @@
     <view class="trial-page">
       <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="trialDeviceName || undefined" />
 
-      <view v-if="authorityScreenUnavailable" class="mx-4 trial-read-state" role="status" :aria-busy="freeTrial.authorityStatus === 'loading'">
-        <view v-if="freeTrial.authorityStatus === 'loading'" class="trial-read-skeleton" aria-hidden="true"><view/><view/><view/></view>
-        <text>{{ freeTrial.authorityStatus === 'loading' ? lifecycle.loading : lifecycle.unavailable }}</text>
-        <view v-if="freeTrial.authorityStatus !== 'loading'" role="button" tabindex="0" class="trial-read-retry" @click="freeTrial.refreshRemote(true)"><text>{{ lifecycle.retry }}</text></view>
+      <!-- Before the first answer the page keeps its shape (03 §3.4). Only a read that came back without a usable
+           state is the whole-page result with its one 重新加载 (03 §3.5.2). -->
+      <view v-if="authorityScreenUnavailable && authorityReadPending" class="trial-read-skeleton" role="status" aria-busy="true">
+        <view class="trial-read-skeleton__ring" aria-hidden="true" />
+        <view class="trial-read-skeleton__title" aria-hidden="true" />
+        <view class="trial-read-skeleton__body" aria-hidden="true" />
+        <text class="nx-sr-only">{{ lifecycle.loading }}</text>
       </view>
+      <EmptyState v-else-if="authorityScreenUnavailable" kind="recoverable-error" page :title="lifecycle.pageUnavailable" :cta-label="t.ui.reload" @cta="freeTrial.refreshRemote(true)" />
 
       <!-- ═══ active / grace — running cycle ═══ -->
       <view v-else-if="isActiveCycle" class="trial-state" :class="{ 'trial-state--grace': isGrace }">
@@ -251,6 +255,8 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import EmptyState from "@/components/empty-state.vue";
+import { appDeviceOffline } from "@/lib/foreground-read";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDeadline } from "@/lib/trial-date";
@@ -284,6 +290,12 @@ const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.autho
 // Keep the confirmed page on screen during a trial read
 // meanwhile instead of swapping in the read state. Actions still wait on authorityUnavailable.
 const authorityScreenUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityServerState === null || authorityIncomplete.value));
+// A read is under way or about to start: the cold open before the first read, or a read with no failure behind it.
+// A failed read keeps its result up while recovery re-reads; an observed disconnect, an unknown command result and
+// an incomplete answer have nothing to wait for on screen.
+const authorityReadPending = computed(() => freeTrial.authorityStatus === "loading"
+  ? !freeTrial.lastReadFailed
+  : freeTrial.authorityStatus === "unknown" && freeTrial.authorityError === null && !appDeviceOffline.value);
 
 const cfg = computed(() => trialConfig.config);
 const status = computed(() => freeTrial.status);
@@ -511,11 +523,11 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 </script>
 
 <style scoped>
-.trial-read-state { display:flex;flex-direction:column;gap:16px;padding:24px 0;color:var(--v5-ink-3);font-size:13px; }
-.trial-read-skeleton { display:flex;flex-direction:column;gap:14px; }
-.trial-read-skeleton > view { height:24px;width:70%;border-radius:8px;background:var(--v5-surface-2); }
-.trial-read-skeleton > view:first-child { height:100px;width:100%;border-radius:20px; }
-.trial-read-retry { min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--v5-surface-2);color:var(--v5-ink);font:600 13px/20px var(--font-v5); }
+/* Loading keeps the states' shape, still: the 208 ring track where every state's ring sits, then title and body lines (03 §3.4). */
+.trial-read-skeleton { display:flex;flex-direction:column;align-items:center;padding-top:48px; }
+.trial-read-skeleton__ring { width:198px;height:198px;margin:5px;box-sizing:border-box;border-radius:50%;border:6px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.trial-read-skeleton__title { width:60%;max-width:220px;height:20px;margin-top:32px;border-radius:10px;background:color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.trial-read-skeleton__body { width:44%;max-width:160px;height:14px;margin-top:10px;border-radius:7px;background:color-mix(in srgb, var(--v5-ink) 6%, transparent); }
 
 /* ── Page frame: each state is a full-width column; its one ambient glow is clipped to the page. ── */
 .trial-page { color:var(--v5-ink); }
