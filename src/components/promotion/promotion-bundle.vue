@@ -26,7 +26,7 @@
     <BundleHero :count="selection.length" :tiers="quotedTiers" :items="tiles" :rules="limitReached ? t.promotion.quantityLimit : t.bundle.sameModel" :addable="suggestions.length > 0" :add-disabled="limitReached" @remove="remove" @add="jumpToSuggestions">
       <template #tile="{ item }">
         <text v-if="levelsFor(item.id)" class="promotion-bundle__tile-note">{{ levelsFor(item.id) }}</text>
-        <view v-if="selectedProductBlock(item.id)" class="promotion-bundle__tile-status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><text>{{ selectedProductBlock(item.id) }}</text></view>
+        <NxTag v-if="tileTag(item.id)" class="promotion-bundle__tile-tag" tone="unavailable" :label="tileTag(item.id)" />
         <text v-for="(reward,index) in rewardsFor(item.id)" :key="index" class="promotion-bundle__tile-reward"><text class="promotion-bundle__reward-amount">+{{ reward.amount }}</text><text class="promotion-bundle__reward-unit" :class="{ 'is-uvt': reward.uvt }">{{ reward.unit }}</text></text>
         <view class="promotion-bundle__stepper" role="group" :aria-label="item.name+' · '+t.promotion.quantity">
           <view class="promotion-bundle__step" role="button" :tabindex="quantityOf(item.id)<=1?-1:0" :aria-disabled="quantityOf(item.id)<=1" :aria-label="t.uiChrome.decreaseQty" @click="changeQuantity(item.id,-1)" @keydown.enter.prevent="changeQuantity(item.id,-1)" @keydown.space.prevent="changeQuantity(item.id,-1)"><NxIcon name="minus" :size="16" /></view>
@@ -225,6 +225,12 @@ function selectedProductBlock(id: string) {
   if (scopeId.value && activity.value && !activity.value.productNos.includes(id)) return t.value.promotion.noMatchingProducts;
   return '';
 }
+/** Tile tag (03 §3.8 neutral unavailable): one short word on one line; the full reason is in the tray note. */
+function tileTag(id: string) {
+  const reason = selectedProductBlock(id);
+  if (!reason) return '';
+  return reason === t.value.store.temporarilyOutOfStock ? t.value.bundle.tileOutOfStock : t.value.bundle.tileUnavailable;
+}
 const selectionBlock = computed(() => selection.value.map(item => selectedProductBlock(item.productNo)).find(Boolean) ?? '');
 const productsReady = computed(() => catalogStatus.value === 'ready' && !selectionBlock.value);
 const canReadQuote=computed(()=>visible.value&&foregroundReadAllowed()&&signedIn.value&&app.accountKey!=='default'
@@ -363,10 +369,8 @@ onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryT
 .promotion-bundle__reward-unit.is-uvt { color: var(--v5-nex-ink); }
 .promotion-bundle__warning { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; color: var(--v5-warning-ink); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 .promotion-bundle__warning svg { flex: none; margin-top: 1px; }
-/* A chosen model that can no longer be bought: a status line under its meta in the warning ink with an icon
-   (design-rules: anomalies stand out), wrapping like the other tile lines; a pill would wrap in a 131px tile. */
-.promotion-bundle__tile-status { display: flex; align-items: flex-start; gap: 4px; margin-top: 6px; color: var(--v5-warning-ink); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; text-wrap: balance; }
-.promotion-bundle__tile-status svg { flex: none; margin-top: 1px; }
+/* A chosen model that can no longer be bought: the shared neutral tag under its meta, own width, one line. */
+.promotion-bundle__tile-tag { align-self: flex-start; margin-top: 6px; }
 .promotion-bundle__tile-note { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 .promotion-bundle__tile-reward { display: block; margin-top: 4px; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
 /* Quantity stepper (board B tile): a flat surface-3 pill, 32 visible, each side 44 wide with a 44 tall hit area; the

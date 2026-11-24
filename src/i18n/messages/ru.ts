@@ -1712,6 +1712,8 @@ export const ru: Messages = {
     checkout: "К оформлению",
     checkoutAria: "К оформлению, итого {amount}",
     tiersAria: "Уровни цены комплекта",
+    tileOutOfStock: "Нет в наличии",
+    tileUnavailable: "Недоступно",
   },
   tx: {
     navTitle: "Детали операции",

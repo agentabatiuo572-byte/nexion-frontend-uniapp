@@ -1712,6 +1712,8 @@ export const ms: Messages = {
     checkout: "Bayar",
     checkoutAria: "Bayar, jumlah {amount}",
     tiersAria: "Peringkat harga gabungan",
+    tileOutOfStock: "Habis stok",
+    tileUnavailable: "Tidak tersedia",
   },
   tx: {
     navTitle: "Butiran transaksi",

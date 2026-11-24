@@ -1712,6 +1712,8 @@ export const kk: Messages = {
     checkout: "Рәсімдеу",
     checkoutAria: "Рәсімдеу, барлығы {amount}",
     tiersAria: "Жиынтық баға деңгейлері",
+    tileOutOfStock: "Қоймада жоқ",
+    tileUnavailable: "Қолжетімсіз",
   },
   tx: {
     navTitle: "Транзакция мәліметі",

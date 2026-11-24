@@ -1712,6 +1712,8 @@ export const id: Messages = {
     checkout: "Checkout",
     checkoutAria: "Checkout, total {amount}",
     tiersAria: "Tingkat harga paket",
+    tileOutOfStock: "Stok habis",
+    tileUnavailable: "Tidak tersedia",
   },
   tx: {
     navTitle: "Detail transaksi",

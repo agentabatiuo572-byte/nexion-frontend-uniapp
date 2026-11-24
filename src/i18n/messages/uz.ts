@@ -1712,6 +1712,8 @@ export const uz: Messages = {
     checkout: "Rasmiylashtirish",
     checkoutAria: "Rasmiylashtirish, jami {amount}",
     tiersAria: "Toʻplam narxi darajalari",
+    tileOutOfStock: "Tugagan",
+    tileUnavailable: "Mavjud emas",
   },
   tx: {
     navTitle: "Tranzaksiya tafsilotlari",

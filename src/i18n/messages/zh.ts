@@ -1219,6 +1219,8 @@ trustReserve: "暂无可核验的储备资料。",
     checkout: "去结算",
     checkoutAria: "去结算，合计 {amount}",
     tiersAria: "组合价档位",
+    tileOutOfStock: "暂时缺货",
+    tileUnavailable: "不可购买",
   },
 
   tx: {

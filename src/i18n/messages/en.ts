@@ -1234,6 +1234,8 @@ trustReserve: "No verifiable reserve information available.",
     checkout: "Checkout",
     checkoutAria: "Checkout, total {amount}",
     tiersAria: "Bundle price tiers",
+    tileOutOfStock: "Out of stock",
+    tileUnavailable: "Unavailable",
   },
 
   tx: {

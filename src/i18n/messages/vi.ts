@@ -1232,6 +1232,8 @@ trustReserve: "Chưa có thông tin dự trữ có thể xác minh.",
     checkout: "Thanh toán",
     checkoutAria: "Thanh toán, tổng {amount}",
     tiersAria: "Các mức giá kết hợp",
+    tileOutOfStock: "Hết hàng",
+    tileUnavailable: "Không thể mua",
   },
 
   tx: {

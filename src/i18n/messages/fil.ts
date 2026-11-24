@@ -1712,6 +1712,8 @@ export const fil: Messages = {
     checkout: "Mag-checkout",
     checkoutAria: "Mag-checkout, kabuuan {amount}",
     tiersAria: "Mga antas ng bundle price",
+    tileOutOfStock: "Ubos na",
+    tileUnavailable: "Hindi mabibili",
   },
   tx: {
     navTitle: "Detalye ng transaksyon",
