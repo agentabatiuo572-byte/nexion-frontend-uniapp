@@ -252,7 +252,7 @@ import { openCheckoutCapacityProgressKey, ownsCheckoutCapacityPaymentKey, showsC
 import { onShow, onHide, useVisibleInterval } from '@/composables/use-tab-page-lifecycle';
 import { landFocusOnPage, useDialogA11y } from '@/composables/use-dialog-a11y';
 import { CHASSIS_QUERY_SCOPE } from '@/composables/use-loops-in-view';
-import { useStickyCTA } from '@/store/sticky-cta-bar';
+import { useStickyCTA, type StickyCTAPayload } from '@/store/sticky-cta-bar';
 import NxButton from '@/components/ui/nx-button.vue';
 import NxNoticeDialog from '@/components/ui/nx-notice-dialog.vue';
 import NxResultHead from '@/components/ui/nx-result-head.vue';
@@ -342,11 +342,18 @@ function placeBar() {
   }).exec();
 }
 watch(barShown, shown => { if (!shown && sharedBarHeight) sharedBarHeight.value = 0; });
-// The product page's tray is the chassis's sticky CTA, shown once the product has loaded, which on a slow load is after
-// the bar placed itself. When it comes or goes, the bar hides in that same render and shows again once it has measured
-// the new tray (BUG-604).
+// The product page's tray is the chassis's sticky CTA, published again whenever the page's reads land. Its height changes
+// with them while it stays on screen: with the purchase eligibility still loading it is a note over one row (98px at 390
+// wide), then a price and quantity row over the button (146px), so a bar placed above the first sat 36px on the second
+// (BUG-604). Each publish measures the tray again once it has rendered, which on H5 is before that frame paints. When the
+// tray comes, goes or changes its rows (note, quantity, subtext set its height), the bar also hides in that same render
+// until it has measured, as the App's query answers a frame or more later.
 const stickyCta = useStickyCTA();
-watch(() => !!stickyCta.cta, () => { placed.value = false; placeSince = null; void nextTick(placeBar); });
+const trayRows = (cta: StickyCTAPayload | null) => cta ? `${!!cta.note}${!!cta.quantity}${!!cta.amountSubtext}` : '';
+watch(() => stickyCta.cta, (cta, old) => {
+  if (trayRows(cta) !== trayRows(old)) { placed.value = false; placeSince = null; }
+  void nextTick(placeBar);
+});
 // ✕ removes the control that had focus. A keyboard or assistive activation (click without a pointer) lands focus on the
 // page heading (03 §3.5, BUG-563); a pointer tap leaves focus alone, so the page never scrolls to a heading under the finger.
 function closeBar(event: Event) {
@@ -354,7 +361,24 @@ function closeBar(event: Event) {
   payment.dismissResume(pending.value);
   if (event.type === 'keydown' || (event as MouseEvent).detail === 0) landFocusOnPage();
 }
-onUnmounted(() => { clearTimeout(placeRetry); if (sharedBarHeight) sharedBarHeight.value = 0; });
+// A width change can rewrap the tray's text with no publish (Russian: 162px at 390 wide, 146px at 440), so a window
+// resize measures again as well. The browser's resize event comes before that frame paints; uni's own callback on H5
+// waits 50ms.
+function placeOnResize() { if (barShown.value) placeBar(); }
+onMounted(() => {
+  // #ifdef APP-PLUS
+  uni.onWindowResize(placeOnResize);
+  // #endif
+  if (typeof window !== 'undefined') window.addEventListener('resize', placeOnResize);
+});
+onUnmounted(() => {
+  clearTimeout(placeRetry);
+  if (sharedBarHeight) sharedBarHeight.value = 0;
+  // #ifdef APP-PLUS
+  uni.offWindowResize(placeOnResize);
+  // #endif
+  if (typeof window !== 'undefined') window.removeEventListener('resize', placeOnResize);
+});
 watch(() => barShown.value && s.revision, shown => { if (shown !== false) setTimeout(placeBar, 50); }, { immediate: true });
 useVisibleInterval(placeBar, 2000, () => barShown.value);
 const statusBar = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
