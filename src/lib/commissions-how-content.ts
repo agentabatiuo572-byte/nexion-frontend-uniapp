@@ -1,4 +1,4 @@
-import { platformDisplayText } from "./brand-copy";
+import { commissionPublishedBlocks } from "@/components/team/team-rule-commission-copy";
 import { formatGroupedAmount as formatAmount } from "./amount-display";
 import type { HowContentDocument } from "@/api/how-content-api";
 import type { CommissionGuideRates, CommissionGuideRules } from "@/api/commission-guide-api";
@@ -6,9 +6,10 @@ import type { DirectReferralPolicy, DirectReferralRule } from "@/api/direct-refe
 import type { CanonicalVRankRow } from "@/api/v-rank-api";
 import { formatHowNumber } from "./rank-how-content";
 import { uiLocale } from "@/i18n";
-import { deviceLevel2On } from "./device-earning-level2";
+import { fmt } from "@/i18n/format";
+import { deviceLevel2On, deviceLevel2RatePct } from "./device-earning-level2";
 
-export interface CommissionsHowSnapshot { document: HowContentDocument; rates?: CommissionGuideRates; directPolicy: DirectReferralPolicy; guide: CommissionGuideRules; ranks: CanonicalVRankRow[] }
+export interface CommissionsHowSnapshot { document: HowContentDocument; rates?: CommissionGuideRates; directPolicy: DirectReferralPolicy | null; guide: CommissionGuideRules | null; ranks: CanonicalVRankRow[] | null }
 // Keep public settlement facts; current direct policy values come from the server.
 const COPY = {
   zh: {
@@ -121,8 +122,6 @@ const COPY = {
   },
 };
 
-export const COMMISSIONS_HOW_SLOTS = ["hero", "overview", "channels", "network", "binary", "peer", "cultivation", "leadership", "genesis", "lifecycle", "cooling", "unlocked", "withdrawn", "cooling-note", "example", "example-day", "example-network", "example-cultivation", "example-peer", "example-leadership", "example-total", "example-note", "faq", "faq-order", "faq-withdraw", "faq-reversal", "faq-cultivation", "footer"];
-
 function describeSevenLayerPurchase(policy: DirectReferralPolicy, copy: typeof COPY.en, number: (value: number) => string): string {
   const { purchaseSplit: split, sevenLayerReference: reference } = policy;
   if (!policy.configured || !split || !reference || policy.purchaseSplitConfigured === false || reference.coolingDays === null) return copy.notConfigured;
@@ -137,79 +136,62 @@ function describeSevenLayerPurchase(policy: DirectReferralPolicy, copy: typeof C
   return `${rate} · ${copy.split}: USDT ${number(split.usdtSharePct)}% / UVT ${number(100 - split.usdtSharePct)}% · ${copy.purchaseReplacement}`;
 }
 
-export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | null, locale: string) {
+export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | null, locale: string, deviceRateLabel: string) {
   const copy = COPY[uiLocale(locale.split("-")[0])];
   const number = (value: number) => formatHowNumber(value, locale);
   const money = (value: number, currency = "USDT") => `${formatAmount(value)}\u00A0${currency}`;
-  const tokens: Record<string, string> = {};
-  const publicBodies: Record<string, string> = {};
+  const exampleBase = money(100);
+  const tokens: Record<string, string> = { networkPurchaseRules: copy.networkPurchase, exampleBase };
   const amounts = { network: copy.unknownAmount, cultivation: copy.unknownAmount, peer: copy.unknownAmount, leadership: copy.unknownAmount };
-  if (snapshot) {
-    const { guide, directPolicy } = snapshot;
-    const ranks = snapshot.ranks.filter(r => r.visible).sort((a, b) => a.v - b.v);
-    const b = guide.binary, l = guide.leadership;
-    const describe = (rule: DirectReferralRule) => !directPolicy.configured ? copy.notConfigured : !rule.enabled ? copy.paused
-      : `${copy.totalRate} ${number(rule.totalRatePct)}% · ${copy.split}: USDT ${number(rule.usdtSharePct)}% / UVT ${number(100 - rule.usdtSharePct)}% · ${number(rule.coolingDays)} ${copy.days}`;
-    tokens.directPurchaseRules = directPolicy.settlementMode === "SEVEN_V2"
-      ? describeSevenLayerPurchase(directPolicy, copy, number)
-      : describe(directPolicy.purchase);
-    tokens.networkPurchaseRules = copy.networkPurchase;
-    tokens.directDeviceRules = describe(directPolicy.deviceEarning);
-    // Device rewards reach friends of friends only while the second level is on (lib/device-earning-level2.ts).
-    tokens.directScope = deviceLevel2On(directPolicy) ? copy.deviceScopeL2 : directPolicy.settlementMode === "SEVEN_V2" ? copy.deviceScope : copy.directOnly;
-    tokens.directPrice = directPolicy.nexUsdtPrice === null ? copy.priceUnavailable : `${number(directPolicy.nexUsdtPrice)}\u00A0USDT / UVT`;
+  const policy = snapshot?.directPolicy;
+  if (policy) {
+    const describe = (rule: DirectReferralRule, rate: string) => !policy.configured ? copy.notConfigured : !rule.enabled ? copy.paused
+      : `${rate} · ${copy.split}: USDT ${number(rule.usdtSharePct)}% / UVT ${number(100 - rule.usdtSharePct)}% · ${number(rule.coolingDays)} ${copy.days}`;
+    const total = (rule: DirectReferralRule) => `${copy.totalRate} ${number(rule.totalRatePct)}%`;
+    tokens.directPurchaseRules = policy.settlementMode === "SEVEN_V2"
+      ? describeSevenLayerPurchase(policy, copy, number)
+      : describe(policy.purchase, total(policy.purchase));
+    const level2 = deviceLevel2On(policy);
+    const device = policy.deviceEarning;
+    const deviceRates = level2
+      ? fmt(deviceRateLabel, { a: `${number(device.totalRatePct)}%`, b: `${number(deviceLevel2RatePct(policy)!)}%` })
+      : total(device);
+    tokens.directDeviceRules = describe(device, deviceRates);
+    tokens.directScope = !policy.configured ? copy.notConfigured : !device.enabled ? copy.paused
+      : level2 ? copy.deviceScopeL2 : policy.settlementMode === "SEVEN_V2" ? copy.deviceScope : copy.directOnly;
+    tokens.directPrice = policy.nexUsdtPrice === null ? copy.priceUnavailable : `${number(policy.nexUsdtPrice)}\u00A0USDT / UVT`;
+    amounts.network = policy.configured && policy.purchase.enabled && policy.nexUsdtPrice !== null ? copy.pendingAmount : copy.notConfigured;
+  }
+  const ranks = snapshot?.ranks?.filter(row => row.visible).sort((a, b) => a.v - b.v);
+  const guide = snapshot?.guide;
+  if (guide) {
+    const { binary, leadership } = guide;
     tokens.coolingDays = guide.coolingDays === null ? copy.missing : `${number(guide.coolingDays)} ${copy.days}`;
     // Caps and unmatched-volume handling are payout mechanics, not user guidance (APP-COPY-AUDIT rule 6).
-    tokens.binaryRules = b ? `${copy.settlementPeriod}: ${copy[b.settlePeriod]} · ${b.paused ? copy.paused : copy.unpaused}` : copy.missing;
+    tokens.binaryRules = binary ? `${copy.settlementPeriod}: ${copy[binary.settlePeriod]} · ${binary.paused ? copy.paused : copy.unpaused}` : copy.missing;
     tokens.peerRules = copy.records;
     tokens.cultivationRules = copy.cultivation;
-    tokens.leadershipRules = l ? `${copy.minRank} V${l.minRank}` : copy.hold;
-    tokens.leadershipVotes = "";
+    tokens.leadershipRules = leadership ? `${copy.minRank} V${leadership.minRank}` : copy.hold;
+    if (!leadership) tokens.leadershipVotes = copy.hold;
+    else if (ranks) tokens.leadershipVotes = ranks.filter(row => row.v >= leadership.minRank).map(row => `V${row.v}: ${number(row.leadershipVotes)}`).join(" · ");
     tokens.peerStatus = guide.capabilities.peer ? copy.supported : copy.unsupported;
     tokens.genesisStatus = guide.capabilities.genesis ? copy.supported : copy.unsupported;
-    // A unit illustration, not a purchase, account estimate, or settlement: no fictional named orders.
-    tokens.exampleBase = money(100);
-    amounts.network = directPolicy.configured && directPolicy.purchase.enabled && directPolicy.nexUsdtPrice !== null ? copy.pendingAmount : copy.notConfigured;
-    const cultivation = ranks.find(r => r.cultivationBonus > 0);
+    amounts.peer = guide.capabilities.peer ? copy.pendingAmount : copy.notOpen;
+    amounts.leadership = leadership ? copy.pendingAmount : copy.notConfigured;
+  }
+  if (ranks) {
+    const cultivation = ranks.find(row => row.cultivationBonus > 0);
     tokens.exampleRank = cultivation ? `V${cultivation.v}` : copy.none;
     const qualified = (value: string, note: string) => locale.startsWith("zh") ? `${value}（${note}）` : `${value} (${note})`;
     amounts.cultivation = cultivation ? qualified(money(cultivation.cultivationBonus, "UVT"), copy.configured) : copy.none;
-    amounts.peer = guide.capabilities.peer ? copy.pendingAmount : copy.notOpen;
-    amounts.leadership = l ? copy.pendingAmount : copy.notConfigured;
-    Object.assign(publicBodies, {
-      binary: `${copy.records} ${tokens.binaryRules}`,
-      peer: `${copy.records} ${tokens.peerStatus}`,
-      cultivation: copy.cultivation,
-      leadership: `${copy.records} ${tokens.leadershipRules}`,
-      "example-day": `${copy.exampleScope} ${tokens.exampleBase}`,
-      "example-network": copy.exampleNetwork,
-      "example-cultivation": copy.exampleCultivation,
-      "example-leadership": copy.pendingAmount,
-    });
   }
-  // The template must match the actual settlement generation, including both purchase groups.
-  const directBody = snapshot?.document.blocks.find(block => block.id === "network")?.body ?? "";
-  const currentPublication = directBody.includes("{directPurchaseRules}") && directBody.includes("{directDeviceRules}")
-    && (snapshot?.directPolicy.settlementMode !== "SEVEN_V2" || (snapshot.document.schemaVersion === 2
-      && snapshot.document.templateId === "commissions-v2" && directBody.includes("{networkPurchaseRules}")));
-  const blocks = new Map(currentPublication ? snapshot?.document.blocks.map(block => [block.id, block]) : []);
-  function section(id: string, fallbackTitle = copy.unavailable) {
-    const block = blocks.get(id);
-    let available = Boolean(block);
-    const render = (raw: string) => {
-      return raw.replace(/\{([^{}]+)\}/g, (_, key: string) => {
-      if (!Object.prototype.hasOwnProperty.call(tokens, key)) { available = false; return ""; }
-      return tokens[key];
-      });
-    };
-    const title = block ? render(block.title) : fallbackTitle;
-    const body = block ? render(block.body) : copy.unavailable;
-    return { id, available, title: platformDisplayText(available ? title.trim() : fallbackTitle), body: platformDisplayText(available ? (publicBodies[id] ?? body).trim() : copy.unavailable) };
-  }
-  const incomplete = COMMISSIONS_HOW_SLOTS.some(id => !section(id).available);
-  // Never show a numeric illustration without its published context and limitations.
-  if (incomplete) for (const key of Object.keys(amounts) as (keyof typeof amounts)[]) amounts[key] = copy.unknownAmount;
-  return { copy, section, amounts, exampleTotal: copy.noTotal, incomplete, directPurchaseRules: tokens.directPurchaseRules ?? copy.notConfigured };
+  const document = snapshot?.document;
+  const requiresV2 = policy?.settlementMode === "SEVEN_V2" || document?.schemaVersion === 2;
+  const blocks = document && (!requiresV2 || (document.schemaVersion === 2 && document.templateId === "commissions-v2"))
+    ? commissionPublishedBlocks(document, tokens)
+    : [];
+  const sections = new Map(blocks.map(block => [block.id, block]));
+  return { copy, blocks, sections, amounts, exampleBase };
 }
 
 export interface CommissionsHowState { loading: boolean; error: boolean; snapshot: CommissionsHowSnapshot | null }

@@ -6,7 +6,7 @@ const PROOF = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '' };
 // Existing direct-referral-runtime.mjs illustration; explicitly labelled below.
 const DEMO_POOL_MONTHLY_CAP_USDT = 1000;
 
-export function teamGuidesDemo(url, locale, request, read) {
+export function teamGuidesDemo(url, locale, request, read, edition) {
   if (request.method() !== 'GET') return undefined;
   const key = url.pathname.startsWith('/api/content/how-it-works/') ? url.pathname.slice('/api/content/how-it-works/'.length) : '';
   const isGuide = url.pathname === '/api/config/commission/guide';
@@ -79,7 +79,7 @@ export function teamGuidesDemo(url, locale, request, read) {
         'Số tiền hiển thị là ước tính; thưởng thực nhận theo bản ghi chi trả. Nếu quy tắc thay đổi, quy tắc mới nhất do nền tảng công bố sẽ được áp dụng.')),
     ];
   } else {
-    // commissions-v2 renders fixed slots, so every slot id stays; only the wording is the default copy.
+    // Keep the original commissions-v2 publication for compatibility previews.
     const slot = (id, titles, bodies) => block(id, 'text', text(...titles), text(...bodies));
     blocks = [
       slot('hero', ['奖励明细说明', 'About your reward history', 'Giới thiệu lịch sử thưởng'], ['这里记录你的全部奖励，按来源和状态分别显示。', 'All your rewards are recorded here, shown by source and status.', 'Tất cả khoản thưởng của bạn được ghi nhận tại đây, hiển thị theo nguồn và trạng thái.']),
@@ -112,8 +112,45 @@ export function teamGuidesDemo(url, locale, request, read) {
       slot('footer', ['返回奖励明细', 'Back to reward history', 'Về lịch sử thưởng'], ['金额以奖励记录为准；规则如有调整，以平台最新公布为准。', 'Amounts follow your reward records. If the rules change, the latest published rules apply.', 'Số tiền theo lịch sử thưởng. Nếu quy tắc thay đổi, quy tắc mới nhất do nền tảng công bố sẽ được áp dụng.']),
     ];
   }
+  const revised = edition === 'revised' && key !== 'team-binary-how';
+  if (revised && key === 'team-unilevel-how') {
+    blocks = [
+      block('seven-layer-scope', 'text', text('购买奖励', 'Purchase rewards', 'Thưởng mua hàng'), text(
+        '好友和好友的好友购买设备时，一级和二级的奖励比例按你自己的等级取值。',
+        'When friends or their friends buy devices, the first- and second-level reward rates follow your own rank.',
+        'Khi bạn bè hoặc bạn của họ mua thiết bị, tỷ lệ thưởng cấp một và cấp hai theo hạng của bạn.')),
+      block('direct-referral-scope', 'text', text('好友设备收益奖励', 'Friend device earnings reward', 'Thưởng thu nhập thiết bị của bạn bè'), text(
+        '平台额外发放好友设备收益奖励。政策启用二级且比例大于 0 时，好友的好友也计入。',
+        'The platform pays an extra reward on friends’ device earnings. Their friends also count when the second level is enabled and its rate is above 0.',
+        'Nền tảng trả thêm thưởng từ thu nhập thiết bị của bạn bè. Bạn của họ cũng được tính khi cấp hai được bật và tỷ lệ lớn hơn 0.')),
+      block('reward-records', 'text', text('奖励记录', 'Reward records', 'Lịch sử thưởng'), text(
+        '每笔奖励的来源、币种和状态以奖励记录为准。',
+        'See your reward records for each reward’s source, currency and status.',
+        'Xem lịch sử thưởng để biết nguồn, loại tiền và trạng thái của từng khoản.')),
+    ];
+  } else if (revised) {
+    const removed = new Set(['binary', 'peer', 'cultivation', 'leadership', 'genesis']);
+    blocks = blocks.filter(({ id }) => !removed.has(id) && !id.startsWith('example') && !id.startsWith('faq'))
+      .map(entry => entry.id === 'overview' ? { ...entry, body: text(
+        '按来源查看购买奖励、设备收益奖励、晋级奖励和等级月薪。',
+        'Find purchase rewards, device earnings rewards, rank-up rewards and monthly rank salaries by source.',
+        'Tra cứu theo nguồn các khoản thưởng mua hàng, thu nhập thiết bị, thưởng lên hạng và lương hạng hằng tháng.') }
+        : entry.id === 'network' ? { ...entry, body: text(
+          '好友和好友的好友的购买奖励比例按你自己的等级取值。',
+          'Purchase reward rates for friends and their friends follow your own rank.',
+          'Tỷ lệ thưởng mua hàng từ bạn bè và bạn của họ theo hạng của bạn.') } : entry);
+    blocks.push(
+      block('rank-up-reward', 'text', text('晋级奖励', 'Rank-up rewards', 'Thưởng lên hạng'), text(
+        '晋级时按规则给本人发放 UVT，冷却后可用。',
+        'When you rank up, your UVT reward is credited to you and becomes available after the cooling period.',
+        'Khi lên hạng, bạn nhận thưởng UVT và có thể sử dụng sau thời gian chờ.')),
+      block('device-policy', 'text', text('当前设备规则', 'Current device policy', 'Chính sách thiết bị hiện hành'), '{directScope} · {directDeviceRules}'),
+      block('unresolved-rule', 'list', text('待确认规则', 'Rule awaiting confirmation', 'Quy tắc chờ xác nhận'), text(
+        '发布的等待期。', 'Published waiting period.', 'Thời gian chờ đã công bố.'), ['{unrecognizedWaitingPeriod}']),
+    );
+  }
   return {
-    ...PROOF, contentKey: key, locale: language, version: 'default-2026.10.29', versionSource: 'ENTRY', status: 'PUBLISHED', blocks,
+    ...PROOF, contentKey: key, locale: language, version: revised ? 'demo-rank-rules-2026.11.25' : 'default-2026.10.29', versionSource: 'ENTRY', status: 'PUBLISHED', blocks,
     ...(key === 'team-binary-how' ? {} : { schemaVersion: 2, templateId: key === 'team-unilevel-how' ? 'unilevel-v2' : 'commissions-v2' }),
   };
 }

@@ -170,7 +170,8 @@ export function createDirectReferralApi(client: ApiClient, mode: ApiEnvironment 
           coolingDays: reference.coolingDays === null ? null : integer(reference.coolingDays), legacyNexPerUsd: reference.legacyNexPerUsd === null ? null : number(reference.legacyNexPerUsd),
           ...(purchaseBaseRateSource === undefined ? {} : { purchaseBaseRateSource }) };
         if (sevenLayerReference.coolingDays !== null && sevenLayerReference.coolingDays > 365) return invalid();
-        const ready = purchaseSplitConfigured !== false && sevenLayerReference.baseRatePct !== null && sevenLayerReference.coolingDays !== null;
+        const ready = purchaseSplitConfigured !== false && sevenLayerReference.coolingDays !== null
+          && (purchaseBaseRateSource === "BENEFICIARY_RANK" || sevenLayerReference.baseRatePct !== null);
         purchase ??= { ...purchaseSplit, enabled: purchaseSplit.enabled && ready, totalRatePct: sevenLayerReference.baseRatePct ?? 0, coolingDays: sevenLayerReference.coolingDays ?? 0 };
       }
       const nexUsdtPrice = source.nexUsdtPrice === null ? null : number(source.nexUsdtPrice, Number.MIN_VALUE);

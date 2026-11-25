@@ -56,6 +56,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   }
   if(p==='/api/config/commission/direct-referral'){
     const coolingDays=state.rankCoolingState==='zero'?0:7;
+    const rankBased=state.rankGuideEdition==='revised';
     const purchase={enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays};
     const {current}=rankDevicePolicies(state,state.previewFactsAt??now);
     const {effectiveAt,policyVersion,...deviceEarning}=current;
@@ -65,7 +66,8 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       nexUsdtPrice:empty?null:.128,purchase,deviceEarning,
       ...(v2&&{schemaVersion:2,settlementMode:'SEVEN_V2',purchaseSplitConfigured:!empty,
         purchaseSplit:{enabled:!empty,usdtSharePct:60},
-        sevenLayerReference:{revision:empty?0:3,baseRatePct:empty?null:10,coolingDays:empty?null:coolingDays,legacyNexPerUsd:0}})};
+        sevenLayerReference:{revision:empty?0:3,baseRatePct:empty||rankBased?null:10,coolingDays:empty?null:coolingDays,legacyNexPerUsd:0,
+          ...(rankBased&&{purchaseBaseRateSource:'BENEFICIARY_RANK'})}})};
   }
   if(p==='/api/app/team/insights/direct-referral') {
     const version=Number(url.searchParams.get('schemaVersion')??1);
