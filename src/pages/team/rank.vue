@@ -535,6 +535,7 @@ onShow(() => {
   void vState.ensureCanonicalVRank();
   releaseRankRefresh();
   releaseRankRefresh = registerActivePageRefresh(() => {
+    // The shared pull handler retries sections that were already failing.
     if (salaryPhase.value === "idle" && !rankReadFailed()) return vState.ensureCanonicalVRank();
   }, "pages/team/rank");
 });
@@ -701,6 +702,8 @@ useAutoRecovery({
 useAutoRecovery({
   failed: rankReadFailed,
   retry: () => vState.refreshCanonicalVRank(),
+  repeatMs: 30_000,
+  quiet: false,
 });
 </script>
 

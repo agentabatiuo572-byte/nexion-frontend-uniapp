@@ -40,7 +40,7 @@ export function demoCurrentTaskSample(state, device, settlement, now) {
     ...(settlement.simulation&&{amount:0.031874,simulation:{...settlement.simulation,rewardAmount:'0.031874'}})};
 }
 
-export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts) {
+export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts,networkMembers) {
   if(request.method()!=='GET')return undefined;
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty';
   const lang=(url.searchParams.get('locale')||url.searchParams.get('language')||locale).split('-')[0];
@@ -53,7 +53,8 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   if(p==='/api/app/proof') {
     const {createdAt:joinedAt}=read('/api/app/profile');
     const devices=fleetDevices();
-    const {totalMembers,activeMembers}=read('/api/app/team/network');
+    const members=networkMembers();
+    const totalMembers=members.length,activeMembers=members.filter(member=>member.status==='ACTIVE').length;
     const {streak}=read('/api/points/state');
     const {referralCode,invitedCount,lifetimeInviterNex}=referralFacts();
     const earningsTotalUsdt=demoLifetimeEarningsUsdt(walletBills());

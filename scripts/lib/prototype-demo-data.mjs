@@ -1089,6 +1089,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
+  const networkMembers=()=>usesRankPreset(state)?rankPresetTeamMembers(state,now):demoTeamNetworkMembers(state,now);
   const walletBills=()=>{
     const order=demoHasLongBillRefs(state)&&!empty&&state.accountDeletionState!=='clear'
       ?demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===longBillOrderNo&&row.canonicalStatus==='refunded'):null;
@@ -1107,7 +1108,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,
       invitedCount,pendingCount:state.accountDeletionState==='clear'?0:Math.max(0,invitedCount-rewards.settledCount),...rewards};
   };
-  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,()=>demoFleetFacts(url,locale,state).devices,referralFacts);if(auxiliary!==undefined)return auxiliary;
+  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,()=>demoFleetFacts(url,locale,state).devices,referralFacts,networkMembers);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   if(pathname.startsWith('/api/tasks/receipts')&&state.fleetState==='earning-credit'&&!state.fleetSeed)
@@ -1831,7 +1832,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/app/team/network') {
     const preset=usesRankPreset(state);
     const afterId=Number(url.searchParams.get('afterId')??0);
-    const available=preset?rankPresetTeamMembers(state,now).filter(member=>Number(member.id)>afterId):demoTeamNetworkMembers(state,now);
+    const roster=networkMembers();
+    const available=preset?roster.filter(member=>Number(member.id)>afterId):roster;
     // Small preview pages exercise the same cursor contract without a larger synthetic network.
     const pageSize=100;
     const members=preset?available.slice(0,pageSize).map(({paidOrders,sponsorUserId,...member})=>member):available;
