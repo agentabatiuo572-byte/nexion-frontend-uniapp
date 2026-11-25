@@ -92,7 +92,7 @@ const mockBest = computed<BannerQuote | null>(() => {
   let out: { name: string; credit: number; target: string; net: number } | null = null;
   for (const d of app.visibleDevices) {
     const paid = d.paidPriceUsdt ?? 0;
-    if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) continue;
+    if (paid <= 0 || d.kind === "cloud-share") continue;
     const targets = PRODUCTS.filter(
       (p) =>
         p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
