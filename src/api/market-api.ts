@@ -6,7 +6,6 @@ import type { ServerSourceEnvironment } from "./runtime-provenance";
 export interface NexMarketSnapshot {
   currentPrice: number;
   costBasis: number;
-  volume24hUsdt: number;
   sparkline: number[];
   history: Array<{ price: number; sampledAt: string; sampledAtEpochMs?: number }>;
   historyMaxDays: number;
@@ -87,8 +86,6 @@ export function parseNexMarketSnapshot(value: unknown, mode: ApiEnvironment = "p
   }
   const sparkline = data.sparkline.map(positive);
   if (sparkline.some((point) => point === null) || sparkline.length !== 7) return invalid();
-  const volume = data.volume24hUsdt;
-  const volume24hUsdt = typeof volume === "number" && Number.isFinite(volume) && volume >= 0 ? volume : 0;
   const history = historyPayload.map((item) => {
     const point = row(item);
     const price = positive(point?.price);
@@ -102,7 +99,6 @@ export function parseNexMarketSnapshot(value: unknown, mode: ApiEnvironment = "p
   return {
     currentPrice,
     costBasis,
-    volume24hUsdt,
     sparkline: sparkline as number[],
     history,
     historyMaxDays,

@@ -277,16 +277,16 @@ export function demoTeamNetworkMembers(state,now) {
 }
 
 // F3 whole-leg counts walk valid parent edges from the assigned direct roots.
-export function demoBinaryLegMembers(members, rootAccountId = demoAccountId) {
+export function demoBinaryLegMembers(members) {
   const children=new Map();
   for(const member of members){
     if(!children.has(member.sponsorUserId))children.set(member.sponsorUserId,[]);
     children.get(member.sponsorUserId).push(member);
   }
-  const direct=children.get(rootAccountId)??[];
+  const direct=children.get('900001')??[];
   const legs={A:[],B:[]};
   for(const leg of ['A','B']){
-    const queue=direct.filter(member=>member.leg===leg),seen=new Set([rootAccountId]);
+    const queue=direct.filter(member=>member.leg===leg),seen=new Set(['900001']);
     for(const member of queue){
       if(seen.has(member.id))continue;
       seen.add(member.id);

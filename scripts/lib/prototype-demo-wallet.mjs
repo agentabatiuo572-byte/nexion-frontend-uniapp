@@ -70,8 +70,6 @@ function deviceRewardAmounts(basis, layer, policy) {
 
 export function demoCommissionGroups(state,at) {
   if(!demoHasEarningsHistory(state))return [];
-  // The legacy balance match has no corresponding paid orders in a rank preset.
-  if(usesRankPreset(state))return demoRankPresetRewardRows(state,at).sort((a,b)=>b.ts-a.ts);
   const [year,month]=demoTeamBusinessDate(at).split('-').map(Number);
   const matchedAt=Date.UTC(year,month-1,1)-7*3600000-1;
   const legacy=state.walletLegacySeed;
@@ -98,6 +96,7 @@ export function demoCommissionGroups(state,at) {
     amountUSDT:legacy?100:120,amountNEX:0,status:legacy?'frozen':'unlocked',
     ts:matchedAt,unlockAt:Math.min(at,matchedAt+7*day),
   };
+  if(usesRankPreset(state))return [...demoRankPresetRewardRows(state,at),binary].sort((a,b)=>b.ts-a.ts);
   const { current, previous } = rankDevicePolicies(state, at);
   if (state.rankCoolingState === 'zero') {
     const order = demoH4TeamMembers(state, at).find(member => member.name === 'Maya').paidOrders[1];
