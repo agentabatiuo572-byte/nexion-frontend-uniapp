@@ -139,7 +139,7 @@ function describeSevenLayerPurchase(policy: DirectReferralPolicy, copy: typeof C
 export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | null, locale: string, deviceRateLabel: string) {
   const copy = COPY[uiLocale(locale.split("-")[0])];
   const number = (value: number) => formatHowNumber(value, locale);
-  const money = (value: number, currency = "USDT") => `${formatAmount(value)} ${currency}`;
+  const money = (value: number, currency = "USDT") => `${formatAmount(value)}\u00A0${currency}`;
   const exampleBase = money(100);
   const tokens: Record<string, string> = { networkPurchaseRules: copy.networkPurchase, exampleBase };
   const amounts = { network: copy.unknownAmount, cultivation: copy.unknownAmount, peer: copy.unknownAmount, leadership: copy.unknownAmount };
@@ -159,7 +159,7 @@ export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | nu
     tokens.directDeviceRules = describe(device, deviceRates);
     tokens.directScope = !policy.configured ? copy.notConfigured : !device.enabled ? copy.paused
       : level2 ? copy.deviceScopeL2 : policy.settlementMode === "SEVEN_V2" ? copy.deviceScope : copy.directOnly;
-    tokens.directPrice = policy.nexUsdtPrice === null ? copy.priceUnavailable : `${number(policy.nexUsdtPrice)} USDT / UVT`;
+    tokens.directPrice = policy.nexUsdtPrice === null ? copy.priceUnavailable : `${number(policy.nexUsdtPrice)}\u00A0USDT / UVT`;
     amounts.network = policy.configured && policy.purchase.enabled && policy.nexUsdtPrice !== null ? copy.pendingAmount : copy.notConfigured;
   }
   const ranks = snapshot?.ranks?.filter(row => row.visible).sort((a, b) => a.v - b.v);
