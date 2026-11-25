@@ -20,7 +20,7 @@
 
       <!-- Before the first answer the page keeps its shape (03 §3.4). An unknown command result is confirmed by automatic
            reads: a pending status, no query button. Only a read failure is the whole-page result with its one 重新加载 (03 §3.5.2). -->
-      <view v-if="authorityScreenUnavailable && freeTrial.authorityResultUnknown" class="trial-confirming nx-empty--page">
+      <view v-if="trialResultConfirming" class="trial-confirming nx-empty--page">
         <NxResultHead tone="warning" icon="clock" :title="lifecycle.resultConfirming" :description="lifecycle.resultConfirmingNote" />
       </view>
       <view v-else-if="authorityScreenUnavailable && authorityReadPending" class="trial-read-skeleton" role="status" aria-busy="true">
@@ -29,7 +29,7 @@
         <view class="trial-read-skeleton__body" aria-hidden="true" />
         <text class="nx-sr-only">{{ lifecycle.loading }}</text>
       </view>
-      <EmptyState v-else-if="authorityScreenUnavailable" kind="recoverable-error" page :title="lifecycle.pageUnavailable" :cta-label="t.ui.reload" @cta="freeTrial.refreshRemote(true)" />
+      <EmptyState v-else-if="authorityScreenUnavailable" kind="recoverable-error" page :title="lifecycle.pageUnavailable" :cta-label="t.ui.reload" :cta-busy="freeTrial.authorityStatus === 'loading'" @cta="freeTrial.refreshRemote()" />
 
       <!-- ═══ active / grace — running cycle ═══ -->
       <view v-else-if="isActiveCycle" class="trial-state" :class="{ 'trial-state--grace': isGrace }">
@@ -294,8 +294,10 @@ import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { useTrialCheckout } from "@/store/trial-checkout";
+import { trialOrderResultKey, trialRefusalResultKey, useTrialPurchaseResult } from "@/store/trial-purchase-result";
+import { useLocaleStore } from "@/store/locale";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
-import { useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { useTrialCreditOptionsRead, useTrialPurchaseConfirmation } from "@/composables/use-trial-credit-option";
 import { parseTrialConvertReceipt, trialPriceChanged } from "@/api/trial-api";
 import { resumeTrialPurchasePayment, TRIAL_PAYMENT_CARD_KEY, usePurchasePayment } from "@/store/purchase-payment";
 import TrialDevicePicker from "@/components/trial/trial-device-picker.vue";
@@ -321,7 +323,7 @@ const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.autho
 // The last complete snapshot belongs to this account and only supplies display values.
 const displayState = computed(() => freeTrial.displayState);
 const staleDisplay = computed(() => freeTrial.transientReadFailure && displayState.value !== null);
-const authorityScreenUnavailable = computed(() => remoteApiEnabled && (!displayState.value || (!!freeTrial.pendingStart && !displayState.value.canStart)));
+const authorityScreenUnavailable = computed(() => remoteApiEnabled && (!displayState.value || trialResultConfirming.value));
 // A read is under way or about to start: the cold open before the first read, or a read with no failure behind it.
 // A failed or incomplete read keeps its result up while recovery re-reads; an observed disconnect has nothing to wait for.
 const authorityReadPending = computed(() => freeTrial.authorityStatus === "loading"
@@ -369,6 +371,7 @@ const estimatedOffsetUSD = computed(() => cfg.value.shadowDailyUSD === null
   ? null : computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays).offsetUSD);
 const trialOptions = useTrialPurchaseOptions();
 const checkout = useTrialCheckout();
+const trialResults = useTrialPurchaseResult();
 const entryProductNo = ref<string>();
 let entryAccountEpoch: number | null = null;
 onLoad(query => {
@@ -386,6 +389,9 @@ const optionsRead = useTrialCreditOptionsRead(() => pageVisible.value, () => {
 });
 const purchaseClaim = computed(() => isActiveCycle.value ? displayState.value?.claimNo ?? null : null);
 const originalPurchase = computed(() => purchaseClaim.value ? checkout.originalPurchase : null);
+const purchaseConfirmation = useTrialPurchaseConfirmation();
+const trialResultConfirming = computed(() => (freeTrial.authorityResultUnknown && !freeTrial.startRetryable)
+  || (purchaseConfirmation.value && !originalPurchase.value));
 provide(TRIAL_PAYMENT_CARD_KEY, () => {
   const original = originalPurchase.value;
   return pageVisible.value && !authorityScreenUnavailable.value && original?.kind === "EXTERNAL" ? original.paymentNo : null;
@@ -602,7 +608,7 @@ const barRetry = computed(() => (isActiveCycle.value || status.value === "ended"
   && !usePurchaseOptions.value && !originalPurchase.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
-  if (freeTrial.pendingStart) return t.value.trial.claimUnknownInline;
+  if (freeTrial.startRetryable) return t.value.trial.claimUnknownInline;
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
@@ -676,8 +682,11 @@ async function goCheckout() {
         onExpired: () => { if (visit.current()) void freeTrial.refreshRemote(); },
       });
     } else if (original?.kind === "BALANCE") {
-      if (original.status === "RESUMABLE") await navTo(checkoutHref(original.device.productNo, { kind: "resume", submissionNo: original.submissionNo }));
-      else await readOriginalBalance();
+      const legacy = freeTrial.pendingConversion(original.device.productNo)?.key === original.submissionNo;
+      if (original.status === "RESUMABLE") await navTo(checkoutHref(original.device.productNo,
+        legacy ? undefined : { kind: "resume", submissionNo: original.submissionNo }));
+      else if (legacy) await freeTrial.recoverLegacyConversion();
+      else await checkout.readSubmission();
     } else if (productNo) {
       if (usePurchaseOptions.value) {
         await trialOptions.refresh();
@@ -711,84 +720,117 @@ watch([() => app.accountBindingEpoch, () => displayState.value?.claimNo], () => 
   observedOriginalClaim = handledRefusal = null;
   openingPurchase.value = false;
 }, { flush: "sync" });
-watch([pageVisible, displayState, authorityUnavailable], ([visible, state, unavailable]) => {
-  if (visible && state && !unavailable) checkout.adoptAuthority(state);
-});
 watch(() => hasScopedOptions.value ? trialOptions.current.invalidatedProductNo : null, (invalidated) => {
-  if (invalidated && pageVisible.value && !originalPurchase.value) toast.warn(detail.value.deviceGone);
+  if (!invalidated || !pageVisible.value || originalPurchase.value) return;
+  const outcome = checkout.outcome;
+  if (outcome.status === "refused" && outcome.claimNo === purchaseClaim.value && outcome.productNo === invalidated) {
+    const reason = outcome.refusal.reasonCode;
+    const optionReason = trialOptions.current.options.find(option => option.productNo === invalidated)?.reasonCode;
+    if ((reason === optionReason || reason === "TRIAL_PRODUCT_NOT_AVAILABLE" || trialDeviceNeedsReselection(reason))
+        && trialResults.takeAnnouncedRefusal(trialRefusalResultKey(outcome.claimNo, outcome.submissionNo))) return;
+  }
+  toast.warn(detail.value.deviceGone);
 }, { flush: "post" });
-watch([pageVisible, originalPurchase], ([visible, original]) => {
-  if (visible && original) observedOriginalClaim = original.claimNo;
+watch([pageVisible, originalPurchase, purchaseConfirmation], ([visible, original, confirming]) => {
+  if (visible && (original || confirming)) observedOriginalClaim = original?.claimNo ?? displayState.value?.claimNo ?? null;
 }, { flush: "post" });
 
 async function openTrialResult(orderNo: string) {
-  if (openingResult) return;
+  if (openingResult || !trialResults.consume(trialOrderResultKey(orderNo))) return;
   openingResult = true;
   try {
-    if (await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`)) checkout.clearSettled(orderNo);
+    if (await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`)) {
+      checkout.clearSettled(orderNo);
+      freeTrial.clearLegacyConversionResult(orderNo);
+    }
   } finally {
     openingResult = false;
   }
 }
 
-async function readOriginalBalance() {
-  if (!pageVisible.value || !foregroundReadAllowed() || checkout.outcome.status !== "processing") return;
-  await checkout.readSubmission();
-}
 const pendingBalanceSubmission = computed(() => {
   const original = originalPurchase.value;
   return original?.kind === "BALANCE" && original.status === "PROCESSING" ? original.submissionNo : null;
 });
 watch([pageVisible, pendingBalanceSubmission, foregroundReadAllowed], ([visible, submissionNo, allowed]) => {
-  if (visible && submissionNo && allowed) void readOriginalBalance().catch(() => {});
-});
-useAutoRecovery({
-  active: () => pageVisible.value, failed: () => !!pendingBalanceSubmission.value,
-  retry: readOriginalBalance, repeatMs: 15_000, quiet: true,
+  if (visible && submissionNo && allowed) {
+    const original = originalPurchase.value;
+    const read = original && freeTrial.pendingConversion(original.device.productNo)?.key === submissionNo
+      ? freeTrial.recoverLegacyConversion : checkout.readSubmission;
+    void read().catch(() => {});
+  }
 });
 const payment = usePurchasePayment();
 useVisibleInterval(() => { if (foregroundReadAllowed()) void freeTrial.refreshRemote(); }, 15_000,
   () => originalPurchase.value?.kind === "EXTERNAL" && !payment.state.open);
 
-watch([pageVisible, displayState, () => checkout.outcome], ([visible, state, outcome]) => {
-  if (!visible || !state?.claimNo || observedOriginalClaim !== state.claimNo) return;
+function trialRefusalCopy(reason: string) {
+  return reason === "ORDER_MONTHLY_QUOTA_UNAVAILABLE" ? purchase.value.coPurchaseUnavailable
+    : trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable;
+}
+
+watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () => freeTrial.deniedLegacyConversion,
+  () => checkout.outcome], ([visible, state, legacyResult, legacyDenial, outcome]) => {
+  if (!visible || !state?.claimNo) return;
+  if (legacyResult?.claimNo === state.claimNo && !state.conversion?.refunded) {
+    void openTrialResult(legacyResult.orderNo);
+    return;
+  }
+  if (legacyDenial?.claimNo === state.claimNo) {
+    const key = trialRefusalResultKey(legacyDenial.claimNo, legacyDenial.key);
+    if (!trialResults.wasDelivered(key)) {
+      toast.warn(trialRefusalCopy(legacyDenial.reason));
+      trialResults.consume(key, true);
+    }
+  }
   if (outcome.status === "settled" && outcome.claimNo === state.claimNo) {
     void openTrialResult(outcome.receipt.orderNo);
-  } else if (state.status === "converted" && state.conversion?.orderNo && !state.conversion.refunded) {
+  } else if (observedOriginalClaim === state.claimNo && state.status === "converted"
+      && state.conversion?.orderNo && !state.conversion.refunded) {
     void openTrialResult(state.conversion.orderNo);
   } else if (outcome.status === "refused" && outcome.claimNo === state.claimNo && handledRefusal !== outcome.submissionNo) {
+    const key = trialRefusalResultKey(outcome.claimNo, outcome.submissionNo);
+    if (trialResults.wasDelivered(key)) return;
     handledRefusal = outcome.submissionNo;
     const reason = outcome.refusal.reasonCode;
     if (trialDeviceNeedsReselection(reason)) {
       if (trialOptions.claimNo === state.claimNo) trialOptions.invalidateSelection(outcome.productNo);
+      toast.warn(detail.value.deviceGone);
+      trialResults.consume(key, true);
       void optionsRead.refresh().catch(() => {});
     } else if (reason === "TRIAL_NOT_CONVERTIBLE") {
+      toast.warn(trialRefusalCopy(reason));
+      trialResults.consume(key, true);
       void freeTrial.refreshRemote();
     } else if (reason === "TRIAL_WALLET_INSUFFICIENT" || trialPriceChanged(reason) || reason === "TRIAL_PRODUCT_NOT_AVAILABLE") {
       void navTo(checkoutHref(outcome.productNo, { kind: "refusal", submissionNo: outcome.submissionNo }));
     } else {
-      toast.warn(reason === "ORDER_MONTHLY_QUOTA_UNAVAILABLE" ? purchase.value.coPurchaseUnavailable
-        : trialPurchaseReasonMessage(t.value, reason) ?? purchase.value.coPurchaseUnavailable);
+      toast.warn(trialRefusalCopy(reason));
+      trialResults.consume(key, true);
       void optionsRead.refresh().catch(() => {});
     }
   }
 }, { flush: "post" });
 watch(pageVisible, (visible, _, onCleanup) => {
-  if (visible) onCleanup(registerActivePageRefresh(async () => {
+  if (!visible) return;
+  const unregisterPresenter = trialResults.registerPresenter(claimNo => displayState.value?.claimNo === claimNo);
+  const unregisterRefresh = registerActivePageRefresh(async () => {
     if (purchaseClaim.value) {
       await freeTrial.refreshRemote();
-      await optionsRead.refresh();
+      if (!purchaseConfirmation.value) await optionsRead.refresh();
     }
-  }, "pages/me/trial"));
+  }, "pages/me/trial");
+  onCleanup(() => { unregisterPresenter(); unregisterRefresh(); });
 });
 
 useAutoRecovery({
   active: () => !claimSheet.open,
-  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
-    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown || freeTrial.authorityIncomplete),
+  failed: () => remoteApiEnabled && !freeTrial.authorityResultUnknown && !purchaseConfirmation.value
+    && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityIncomplete),
   retry: () => freeTrial.refreshRemote(),
   repeatMs: 30_000,
-  repeatWhile: () => freeTrial.authorityResultUnknown || !hasVisiblePullRefresh(),
+  repeatWhile: () => !hasVisiblePullRefresh(),
 });
 useAutoRecovery({ failed: () => productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 function retryCatalog() {

@@ -309,6 +309,7 @@ const server=http.createServer(async(req,res)=>{
         longContentUnavailable=normalizeDemoLongContent(state);
         if(scenarioChange)for(const key of scenarioFields)delete state[key];
         if(scenarioChange){
+          delete state.trialLifecycleAdvanceDays;
           delete state.trialBalancePurchase;
           delete state.trialBalanceCanResume;
           delete state.trialAccrualReductionUsdt;
@@ -316,6 +317,8 @@ const server=http.createServer(async(req,res)=>{
           delete state.trialDropNextExternalRefusal;
           state.trialOriginalPurchaseState='none';
         }
+        if(Number.isInteger(update.trialLifecycleAdvanceDays)&&update.trialLifecycleAdvanceDays>=0&&update.trialLifecycleAdvanceDays<=90)
+          state.trialLifecycleAdvanceDays=update.trialLifecycleAdvanceDays;
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;

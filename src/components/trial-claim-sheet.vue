@@ -105,10 +105,10 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
   "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
 const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
-const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.displayState?.canStart === true
+const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
   : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
-const claimDisabled = computed(() => claiming.value || claimDenied.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
-  || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
+const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
+  ? !freeTrial.canStart() : !claimOpensAnotherPage.value && !trialView.actionsReady.value));
 // View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
 // so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
 const claimFromRetry = ref(false);
@@ -117,8 +117,8 @@ const retryHeld = computed(() => claiming.value && claimFromRetry.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
-  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
-    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown || freeTrial.authorityIncomplete),
+  failed: () => remoteApiEnabled && !freeTrial.authorityResultUnknown && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityIncomplete),
   retry: () => freeTrial.refreshRemote(),
   repeatMs: 30_000,
 });

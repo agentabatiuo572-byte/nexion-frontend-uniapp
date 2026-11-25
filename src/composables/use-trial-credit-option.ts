@@ -5,6 +5,7 @@ import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialCheckout } from "@/store/trial-checkout";
+import { trialExternalCreatePending } from "@/store/purchase-payment";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 
 /**
@@ -14,12 +15,25 @@ import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-pu
  * user's own trial device and carries a server quote. Loading, failed and unsupported lists show nothing, so the store
  * reads exactly as it does without the feature.
  */
-export function useTrialCreditOption(productNo: () => string | undefined) {
+export function useTrialPurchaseConfirmation() {
+  const trial = useFreeTrial(), checkout = useTrialCheckout();
+  return computed(() => {
+    const original = checkout.originalPurchase;
+    return trial.legacyConversionPending || trialExternalCreatePending(trial.displayState?.claimNo)
+      || checkout.outcome.status === "submitting" || checkout.outcome.status === "processing"
+      || original?.status === "PROCESSING" || original?.status === "CREATING" || original?.status === "SUBMIT_UNKNOWN";
+  });
+}
+
+export function useTrialCreditOption(productNo: () => string | undefined, forConfirmationNote = false) {
   const trial = useFreeTrial(), options = useTrialPurchaseOptions(), checkout = useTrialCheckout();
+  const confirming = useTrialPurchaseConfirmation();
   return computed<TrialPurchaseOption | null>(() => {
     const state = trial.displayState;
-    if (!state?.claimNo || (state.status !== "active" && state.status !== "grace") || state.claimNo !== trial.authorityClaimNo
-        || options.claimNo !== state.claimNo || options.current.status !== "ready" || checkout.originalPurchase) return null;
+    if (!state?.claimNo || (state.status !== "active" && state.status !== "grace") || options.claimNo !== state.claimNo
+        || options.current.status !== "ready") return null;
+    if (forConfirmationNote ? !confirming.value
+      : state.claimNo !== trial.authorityClaimNo || checkout.originalPurchase || confirming.value || trial.authorityResultUnknown) return null;
     const no = productNo();
     return options.current.options.find((option) => option.productNo === no
       && option.canBuy && !option.isTrialProduct && option.quote !== undefined) ?? null;
@@ -33,6 +47,7 @@ export function useTrialCreditOption(productNo: () => string | undefined) {
 export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProduct?: () => string | undefined) {
   const trial = useFreeTrial();
   const options = useTrialPurchaseOptions();
+  const confirming = useTrialPurchaseConfirmation();
   const claim = computed(() => {
     const state = trial.displayState;
     return state?.claimNo === trial.authorityClaimNo && (state?.status === "active" || state?.status === "grace")
@@ -46,7 +61,7 @@ export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProdu
         && options.current.status !== "unsupported" && options.current.status !== "not-convertible") await options.refresh();
   }
   const recovery = useAutoRecovery({
-    active, failed, retry: read, quiet: false, repeatMs: 30_000,
+    active, failed, retry: read, quiet: () => trial.authorityResultUnknown || confirming.value, repeatMs: 30_000,
     repeatWhile: () => !hasVisiblePullRefresh(),
   });
   watch([visible, claim, foregroundReadAllowed], ([shown, claimNo, allowed]) => {

@@ -272,6 +272,7 @@ import { usePublishedTrust } from "@/composables/use-published-trust";
 import { serverLanguage } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
 import { useTrialCreditOption, useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
@@ -589,6 +590,8 @@ watch(trialCreditReadVisible, (visible, _, onCleanup) => {
   if (visible) onCleanup(registerActivePageRefresh(trialCreditRead.refresh, "pages/store/detail"));
 }, { immediate: true });
 const trialCredit = useTrialCreditOption(() => product.value?.id);
+const trialConfirmationOption = useTrialCreditOption(() => product.value?.id, true);
+const trialLifecycleCopy = useTrialLifecycleCopy();
 const trialCreditEntry = computed(() => {
   const option = trialCredit.value;
   if (!option?.quote || activityId.value || voucherContext.value.voucherId) return null;
@@ -702,13 +705,15 @@ function publishStickyCTA() {
       amount: `${priceText.value}`,
       amountSubtext: dailyEstimateLine.value,
       // With the trial-credit entry on this page, say once that this button is the plain full-price purchase (PLAN §2.3).
-      note: trialCreditEntry.value ? t.value.store.plainBuyNote : undefined,
+      note: trialCreditEntry.value ? t.value.store.plainBuyNote
+        : trialConfirmationOption.value && !activityId.value && !voucherContext.value.voucherId
+          ? trialLifecycleCopy.value.resultConfirming : undefined,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption],
   publishStickyCTA,
   { immediate: true },
 );

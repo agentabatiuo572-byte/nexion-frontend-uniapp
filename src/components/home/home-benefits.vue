@@ -100,7 +100,8 @@ const COUPON_ART = '/static/img/home-glass-20260928/coupon.webp';
 const copy = useAuditUiCopy(), t = useT(), lifecycleCopy = useTrialLifecycleCopy();
 const voucher = useVoucher(), voucherSheet = useVoucherClaimSheet();
 const trial = useFreeTrial(), trialCfg = useTrialConfig(), trialView = useTrialPresentation(), trialSheet = useTrialClaimSheet();
-useAutoRecovery({ failed: () => remoteApiEnabled && !trialSheet.open && trial.authorityStatus === "error", retry: () => trialView.refresh() });
+useAutoRecovery({ failed: () => remoteApiEnabled && !trialSheet.open && !trial.authorityResultUnknown
+  && trial.authorityStatus === "error", retry: () => trialView.refresh() });
 const visibility = useDataVisibility();
 
 // Voucher: same remote/local sources as the previous home banner, split into claimable and claimed.
@@ -128,7 +129,8 @@ const showRestartOffer = computed(() => confirmedOffer.value?.status === 'ended'
 const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value && trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || showCapacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
-const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
+const trialOfferEnabled = computed(() => trial.startRetryable ? eligibility.value.ok
+  : trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
 // B53: only the confirmed trial product is named; until then the card shows the same "—" as its unknown amounts, never a default S1.
 const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '—');
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
@@ -147,6 +149,7 @@ const offerState = computed(() => trial.lastReadFailed ? 'error' : trial.confirm
 // A failed background re-read keeps the confirmed slots-full snapshot and its 「管理 ›」 entry (03 §3.4); the read recovers on its own.
 const showCapacityManagement = computed(() => showCapacityFull.value);
 const trialPill = computed<[string, string, string]>(() => {
+  if (trial.authorityResultUnknown) return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking, lifecycleCopy.value.resultConfirming];
   if (showRestartOffer.value && offerState.value !== "error") return [copy.value.benefitTrialAgain, copy.value.benefitTrialAgain, copy.value.benefitTrialAgain];
   switch (offerState.value) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim, copy.value.benefitTrialClaim];
@@ -164,7 +167,7 @@ const trialPillWait = computed(() => trialRechecking.value && !trialReadFailed.v
 // The name reads the state the card's bottom row shows: slots full stays in it while a failed read shows its pill.
 const trialOfferLabel = computed(() => showCapacityManagement.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${lifecycleCopy.value.manageDevices}`
   : showCapacityFull.value ? `${trialName.value} · ${copy.value.benefitSlotsFull} · ${trialPill.value[2]}`
-  : trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
+  : !trial.authorityResultUnknown && trial.status === "none" && (eligibility.value.ok || offerState.value === "claimable")
     ? fmt(copy.value.benefitTrialAria, { name: trialName.value })
   : `${trialName.value} · ${fmt(copy.value.benefitTrialFree, { n: trialDays.value })} · ${trialPill.value[2]}`);
 // Slots full and a read in flight (a background recheck, or a retry after a failed read): say it is checking.

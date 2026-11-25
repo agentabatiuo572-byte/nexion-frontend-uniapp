@@ -219,6 +219,8 @@ import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TrialDeviceRow from "@/components/trial-device-row.vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
+import { useTrialPurchaseConfirmation } from "@/composables/use-trial-credit-option";
+import { trialExternalPaymentActive } from "@/store/purchase-payment";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
@@ -286,16 +288,19 @@ onHide(() => {
   app.setDeviceInventoryVisible(false);
   closeReplacementDialogs();
 });
-const trialPresentation = useTrialPresentation();
+const trialPurchaseConfirmation = useTrialPurchaseConfirmation();
+const trialConfirming = computed(() => !!trial.pendingCancel || trialPurchaseConfirmation.value);
+const trialPresentation = useTrialPresentation(undefined, { retainWhileConfirming: () => trialConfirming.value });
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
 const trialCancelConflict = shallowRef<ReturnType<typeof useFreeTrial>["displayState"]>(null);
 const trialCancelLocked = computed(() => {
   const state = trial.displayState;
+  if (trialPurchaseConfirmation.value) return true;
   if (!state?.claimNo) return false;
   const original = trial.originalPurchase;
   const current = trialCheckout.outcome;
-  return original?.kind === "EXTERNAL" || original?.status === "PROCESSING"
+  return trialExternalPaymentActive(state.claimNo) || original?.kind === "EXTERNAL" || original?.status === "PROCESSING"
     || ((current.status === "processing" || current.status === "submitting" || current.status === "resumable" && current.accepted)
       && current.submission.claimNo === state.claimNo)
     || state === trialCancelConflict.value;
@@ -321,7 +326,8 @@ async function retryInventory(retryTransientAssignments = false) {
 }
 useAutoRecovery({
   failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"
-    && productCatalogState.status !== "loading" && (app.remoteFleetStatus === "error" || trial.authorityStatus === "error"
+    && productCatalogState.status !== "loading" && (app.remoteFleetStatus === "error"
+      || (!trialConfirming.value && trial.authorityStatus === "error")
       || app.remoteAssignmentStatus === "error"
       || (app.remoteFleetHasSnapshot && !app.remoteAssignmentHasSnapshot && app.remoteAssignmentStatus === "idle")
       || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")),
@@ -335,7 +341,7 @@ const unconfirmedDevices = computed(() => app.visibleDevices.filter((d) => d.kin
 // The separately cached trial is listed unless this account's confirmed fleet says no trial holds a slot.
 // Older fleets without trialSlotCount keep the trial read as the only source.
 const trialListed = computed(() => trialPresentation.active.value
-  && !(remoteApiEnabled && app.remoteFleetHasSnapshot && app.remoteSlotUsage?.trialSlotCount === 0));
+  && (trialConfirming.value || !(remoteApiEnabled && app.remoteFleetHasSnapshot && app.remoteSlotUsage?.trialSlotCount === 0)));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0
   && inactiveDevices.value.length === 0
   && unconfirmedDevices.value.length === 0 && !trialListed.value);
@@ -593,7 +599,7 @@ async function handleActivate(d: Device) {
 }
 
 async function handleCancelTrial() {
-  if (cancelTrialBusy.value || trialCancelLocked.value || !trialPresentation.actionsReady.value || trial.status !== "active") return;
+  if (cancelTrialBusy.value || trial.pendingCancel || trialCancelLocked.value || !trialPresentation.actionsReady.value || trial.status !== "active") return;
   const accountKey = app.accountKey;
   const bindingEpoch = app.accountBindingEpoch;
   cancelTrialBusy.value = true;
@@ -609,14 +615,13 @@ async function handleCancelTrial() {
     const claimNo = trial.authorityClaimNo;
     const result = await trial.cancel();
     if (accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
-    if (result.ok) {
+    if (result.ok && !remoteApiEnabled) {
       toast.info(t.value.trial.toastCancelled);
-      if (remoteApiEnabled) void app.refreshRemoteFleet();
     }
     else if (result.reason === "payment-in-progress") {
       const state = trial.displayState;
       if (state && state.claimNo === claimNo && !trial.originalPurchase) trialCancelConflict.value = state;
-    } else toast.warn(t.value.trial.cancelError);
+    } else if (!result.ok && result.reason !== "confirming" && result.reason !== "not-executed") toast.warn(t.value.trial.cancelError);
   } finally {
     cancelTrialBusy.value = false;
   }

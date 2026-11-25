@@ -7,18 +7,23 @@ import type { TrialRowSnapshot } from "@/store/trial-boundary";
 import { useNow } from "./use-now";
 
 /** A retained row is presentation only. Mutations must still require a fresh authority. */
-export function useTrialPresentation(displayActive?: () => boolean, options: { retainOnReadFailure?: boolean } = {}) {
+export function useTrialPresentation(displayActive?: () => boolean, options: {
+  retainOnReadFailure?: boolean;
+  retainWhileConfirming?: () => boolean;
+} = {}) {
   const app = useApp();
   const trial = useFreeTrial();
   const trialConfig = useTrialConfig();
   const now = useNow(displayActive);
-  const retained = shallowRef<(TrialRowSnapshot & { config: TrialConfig; offsetUSD: number | null }) | null>(null);
+  type TrialPresentationRow = Pick<TrialRowSnapshot, "status" | "startedAt" | "expiresAt" | "graceEndsAt">
+    & { config: TrialConfig; offsetUSD: number | null };
+  const retained = shallowRef<TrialPresentationRow | null>(null);
   let binding = `${app.accountKey}:${app.accountBindingEpoch}`;
   const presentationReady = computed(() => !remoteApiEnabled || trial.authorityServerState !== null);
   const displayReady = computed(() => presentationReady.value
     || (options.retainOnReadFailure === true && trial.transientReadFailure && retained.value !== null));
   const readFailedWithoutData = computed(() => remoteApiEnabled && trial.lastReadFailed && !displayReady.value);
-  const actionsReady = computed(() => !remoteApiEnabled || trial.authorityStatus === "ready");
+  const actionsReady = computed(() => !remoteApiEnabled || (trial.authorityStatus === "ready" && !trial.authorityResultUnknown));
 
   // Run after the store finishes applying/clearing a receipt. A synchronous
   // observer could retain the intermediate `none` row while a failed read clears.
@@ -33,6 +38,17 @@ export function useTrialPresentation(displayActive?: () => boolean, options: { r
       config: { ...trialConfig.config },
       offsetUSD: trial.authoritativeOffsetUSD,
     };
+    else if (options.retainWhileConfirming?.() && trial.displayState) {
+      const state = trial.displayState;
+      retained.value = {
+        status: state.status,
+        startedAt: state.startedAt,
+        expiresAt: state.expiresAt,
+        graceEndsAt: state.serverState === "EXTENDED" ? state.extendedEndsAt ?? null : state.graceEndsAt,
+        config: { ...trialConfig.config },
+        offsetUSD: state.offsetUSD ?? null,
+      };
+    }
     else if (options.retainOnReadFailure && trial.lastReadFailed && !trial.transientReadFailure) retained.value = null;
   });
 

@@ -130,10 +130,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     }
     return {status:error.status,message:error.message,data:null};
   }
-  const originalTrialPurchase = () => external.originalTrialPurchase() ?? state.trialBalancePurchase;
-  const trialCommand = (key, status, receipt, message, code, canResumeSameKey = status==='NOT_SEEN') => ({
+  const originalTrialPurchase = () => external.originalTrialPurchase()
+    ?? (state.trialBalancePurchase?.claimNo===state.trialRow?.claimNo ? state.trialBalancePurchase : undefined);
+  const trialCommand = (key, status, receipt, message, code, canResumeSameKey = status==='NOT_SEEN', claimNo = state.trialRow?.claimNo) => ({
     kind:'trial-convert',commandKey:key,status,canResumeSameKey,paymentMethod:'WALLET',
-    claimNo:state.trialRow?.claimConfig?'DEMO-TRIAL':'',
+    ...(claimNo&&{claimNo}),
     ...(code===undefined?{}:{receipt,message,code}),
   });
   const sameTrialSubmission = (body, purchase) => body.productNo===purchase.productNo
@@ -205,7 +206,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       const original=state.trialBalancePurchase;
       if (original?.status==='PROCESSING') {
         const key=original.commandKey;
-        pin.commands.set('trial-convert:'+key,trialCommand(key,'REJECTED',null,'TRIAL_KILL_SWITCH_DISABLED',409));
+        pin.commands.set('trial-convert:'+key,trialCommand(key,'REJECTED',null,'TRIAL_KILL_SWITCH_DISABLED',409,false,original.claimNo));
       }
       delete state.trialBalancePurchase;
       delete state.trialBalanceCanResume;
@@ -226,6 +227,11 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       const result=settleTrialWallet(new URL('/api/trial/convert',origin),request,original.commandKey,true,true);
       if (result.status===200) state.trialOriginalPurchaseState=mode;
       return result;
+    }
+    if (mode==='balance-ready'&&state.trialBalancePurchase?.claimNo===state.trialRow?.claimNo&&state.trialBalancePurchase) {
+      state.trialBalanceCanResume=true;
+      state.trialOriginalPurchaseState=mode;
+      return {status:200};
     }
     if (originalTrialPurchase()) return {status:409,message:originalTrialPurchase().kind==='BALANCE'
       ?'TRIAL_BALANCE_SUBMISSION_IN_PROGRESS':'TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS'};
@@ -354,8 +360,8 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       if (kind==='trial-convert') {
         const recorded=pin.commands.get(kind+':'+commandKey);
         if (recorded) return ok(recorded);
-        if (original?.commandKey===commandKey) return ok(trialCommand(commandKey,'PROCESSING',undefined,undefined,undefined,state.trialBalanceCanResume===true));
-        return ok(trialCommand(commandKey,'NOT_SEEN'));
+        if (original?.commandKey===commandKey) return ok(trialCommand(commandKey,'PROCESSING',undefined,undefined,undefined,state.trialBalanceCanResume===true,original.claimNo));
+        return ok({kind,commandKey,status:'NOT_SEEN',canResumeSameKey:true,paymentMethod:'WALLET'});
       }
     }
     if (path.startsWith('/api/app/security/payment-password') || path.startsWith('/api/app/payment-commands/')) return pin.handle(url, request);
