@@ -71,12 +71,13 @@ export function salaryDates(localeCode: string) {
 /** 窗口结束（不含）的前一天，即最后可领的那天。 */
 export const lastClaimDay = (expiresAt: string) => shiftDate(salaryDay(expiresAt), -1);
 
-/** The month's window can outlast the amount currently open for that month. */
+/** The month's window can outlast the amount currently open for that month. A lower next amount ends the current one early;
+ *  a higher one (晋升当天, D4) keeps the month's window, except that at month end (D4c) the deadline is the last day of that month. */
 export function salaryAmountExpiresAt(salary: RankSalary, item: RankSalaryMonth): string {
   const next = salary.upcoming;
-  return item.status === "CLAIMABLE" && next?.month === item.month
-    && compareSalaryAmounts(next.amountUsdt, item.amountUsdt) !== 0
-    && Date.parse(next.claimableFrom) < Date.parse(item.expiresAt) ? next.claimableFrom : item.expiresAt;
+  if (item.status !== "CLAIMABLE" || next?.month !== item.month || Date.parse(next.claimableFrom) >= Date.parse(item.expiresAt)) return item.expiresAt;
+  const change = compareSalaryAmounts(next.amountUsdt, item.amountUsdt);
+  return change < 0 || (change > 0 && salaryDay(next.claimableFrom).slice(0, 7) !== item.month) ? next.claimableFrom : item.expiresAt;
 }
 
 const STATUS_ORDER = { CLAIMABLE: 0, PENDING: 1, CLAIMED: 2 };
@@ -119,7 +120,9 @@ export function salaryView(input: {
   const expiresAt = pending?.amountExpiresAt ?? salaryAmountExpiresAt(salary, item);
   const lastDay = lastClaimDay(expiresAt);
   const expiresOn = salaryDay(expiresAt);
-  const amountEndsToday = expiresAt !== item.expiresAt && lastDay === salary.businessDate;
+  const next = salary.upcoming?.month === item.month ? salary.upcoming : null;
+  // 金额会降或变 0 时才提示今天截止；晋升当天金额会升，提示由托盘和气泡讲（DESIGN D4、D4c）。
+  const amountEndsToday = item.status === "CLAIMABLE" && !!next && compareSalaryAmounts(next.amountUsdt, item.amountUsdt) < 0 && lastDay === salary.businessDate;
   const claimBy = say(copy.claimBy, { d: d.day(lastDay) });
   const amount = hidden ? "••••" : num(item.amountUsdt);
   const businessMonth = salary.businessDate.slice(0, 7);
