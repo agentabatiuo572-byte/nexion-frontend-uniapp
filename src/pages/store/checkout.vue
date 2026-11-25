@@ -4964,7 +4964,7 @@ button.checkout-policy-link::after { border:0; }
    under the header. The chassis scroller has a definite height, so each wrapper down to this state stretches to it. */
 :global(.nx-content > :has(.checkout-page-center)) { display:flex; flex-direction:column; min-height:100%; }
 :global(.nx-page-enter:has(.checkout-page-center)) { flex:1 0 auto; display:flex; flex-direction:column; }
-.checkout-content:has(.checkout-page-center) { flex:1 0 auto; display:flex; flex-direction:column; padding-bottom:0; }
+.checkout-content:has(.checkout-page-center), .checkout-content:has(.nx-empty--page) { flex:1 0 auto; display:flex; flex-direction:column; padding-bottom:0; }
 .checkout-page-center { flex:1 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:var(--v5-space-5); text-align:center; }
 /* With the floating 重新提交 button the group centres in the space above it (button 48 + offset 22 + gap 16). */
 .checkout-content:has(.checkout-original-open--action) { padding-bottom:calc(48px + var(--nx-tray-bottom, 22px) + 16px); }
