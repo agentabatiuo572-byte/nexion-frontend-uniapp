@@ -173,7 +173,7 @@
           <NxButton v-else-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary"
             :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })"
             :busy-label="pendingPaymentChecking || trialOrderWaitReason === 'loading' ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet || trialOrderWaitReason === 'loading'"
-            :disabled="trialOrderWaitReason === 'failed'" :aria-describedby="trialOrderWaitReason === 'failed' ? 'order-trial-wait-note' : undefined"
+            :disabled="trialOrderWaitReason === 'failed'" :aria-describedby="trialOrderWaitNote ? 'order-trial-wait-note' : undefined"
             @click="requestPendingPayment(false, 'tray')"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
         </template>
         <template v-else-if="needsRecovery">
@@ -720,11 +720,11 @@ const trialOrderProduct = computed(() => order.value?.status === 'placed' ? plai
 const trialOrderWaitReason = computed(() => {
   const productNo = trialOrderProduct.value;
   if (!remoteApiEnabled || walletPaymentConfirmed.value || !productNo) return null;
+  if (pendingExternalPayment.value?.intentNo || freeTrial.canConfirmOrdinaryProduct(productNo)) return null;
   if (!trialOrderReadStarted.value || freeTrial.authorityStatus === 'unknown') return 'loading';
   if (freeTrial.authorityStatus === 'loading') return freeTrial.lastReadFailed ? 'failed' : 'loading';
   if (freeTrial.authorityStatus === 'error') return 'failed';
-  if (freeTrial.isOwnTrialDevice(productNo)) return 'ownTrialDeviceOrder';
-  return freeTrial.canConfirmOrdinaryProduct(productNo) ? null : 'failed';
+  return freeTrial.isOwnTrialDevice(productNo) ? 'ownTrialDeviceOrder' : 'failed';
 });
 const ownTrialOrderProduct = computed(() => trialOrderWaitReason.value === 'ownTrialDeviceOrder' ? trialOrderProduct.value : null);
 const trialOrderWaitNote = computed(() => ownTrialOrderProduct.value ? purchaseCopy.value.coOwnTrialOrderDetail
@@ -793,7 +793,11 @@ const statusColor = computed(() => (order.value ? STATUS_COLORS[order.value.stat
 const statusTone = computed(() => (order.value ? STATUS_TONES[order.value.status] : "neutral"));
 // An external payment for this order is underway: the hero says so and resumes it.
 const purchasePaymentState = usePurchasePayment().state;
-const externalPayment = computed(() => { purchasePaymentState.revision; return order.value?.status === 'placed' && !!pendingOrderPayment(app.accountKey, id.value); });
+const pendingExternalPayment = computed(() => {
+  purchasePaymentState.revision;
+  return order.value?.status === 'placed' ? pendingOrderPayment(app.accountKey, id.value) : null;
+});
+const externalPayment = computed(() => !!pendingExternalPayment.value);
 watch(() => purchasePaymentState.notice, notice => {
   if (notice === 'existing' && purchasePaymentState.orderNo === id.value) paymentLookupScope = null;
 });

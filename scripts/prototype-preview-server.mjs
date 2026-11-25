@@ -70,6 +70,10 @@ const fixtureFor=(url,request)=>{
 };
 const trialLifecycle=createTrialLifecyclePreview(state,(url,request,mode)=>{
   if(state.trialReadState==='user-not-found')throw Object.assign(new Error('USER_NOT_FOUND'),{status:404});
+  if(mode==='rejected-unknown'&&url.pathname==='/api/trial/start'){
+    state.trialStartPhaseClosed=true;
+    throw Object.assign(new Error('TRIAL_START_PREVIEW_UNKNOWN_DENIAL'),{status:409});
+  }
   if(mode==='rejected'){
     if(url.pathname==='/api/trial/start')state.trialStartPhaseClosed=true;
     else if(state.trialRow?.state==='ACTIVE'&&!checkoutFlow?.originalTrialPurchase())
