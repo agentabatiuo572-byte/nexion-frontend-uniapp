@@ -17,7 +17,7 @@
         <view class="payment-vault-stage"><view class="payment-vault-aura payment-vault-aura--outer" aria-hidden="true" /><view class="payment-vault nx-tint">
           <view class="payment-vault-lock" aria-hidden="true"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14.5v2.5"/></svg></view>
           <view class="payment-vault-dots" aria-hidden="true"><view v-for="n in 6" :key="n" :style="{ animationDelay: `${n * 80}ms` }" /></view>
-          <text class="payment-vault-title">{{ t.paymentPin.title }}</text><text class="payment-vault-status">{{ t.paymentPin.notConfigured }}</text><text class="payment-vault-purpose">{{ t.paymentPin.purpose }}</text>
+          <text class="payment-vault-title">{{ t.paymentPin.title }}</text><NxTag class="payment-vault-status" :label="t.paymentPin.notConfigured" /><text class="payment-vault-purpose">{{ t.paymentPin.purpose }}</text>
         </view></view>
       </template>
       <!-- Change in two steps (PRD §4.6.6): 1 verify the current PIN, 2 set the new one (enter, then enter again).
@@ -33,8 +33,8 @@
           :auto-focus="!inputDisabled" :disabled="inputDisabled" @complete="completeStep" />
         <!-- In-place result line under the digits: lock (with time) wins, then the error, then the busy status. -->
         <text v-if="step === 'verify' && state.lockedUntil" class="pin-change__error" role="alert">{{ lockMessage }}</text>
-        <text v-else-if="stepError" class="pin-change__error" role="alert">{{ stepError }}</text>
-        <text v-else-if="stepStatus" class="pin-change__status" role="status">{{ stepStatus }}</text>
+        <text v-else-if="stepError" id="pin-change-error" class="pin-change__error" role="alert">{{ stepError }}</text>
+        <text v-else-if="stepStatus" id="pin-change-status" class="pin-change__status" role="status">{{ stepStatus }}</text>
         <view v-if="step === 'verify'" class="pin-change__links">
           <view v-if="retryVerification || (state.lockedUntil && !pin.locked())" class="pin-change__link" role="button" tabindex="0" @click="retryVerification ? verifyCurrent() : load()">{{ t.paymentPin.retry }}</view>
           <view class="pin-change__link" role="button" :tabindex="actionBusy ? -1 : 0" :aria-disabled="actionBusy" @click="recover">{{ t.paymentPin.forgot }}</view>
@@ -49,8 +49,13 @@
       <!-- Step 2's action is the lone floating button (04 §4.0). Its box follows the visible viewport, so with the keyboard up
            it rests above the keyboard instead of under it (BUG-738; same measure as the PIN layer, BUG-735). -->
       <view v-if="dockOpen" class="pin-change-dock" :style="{ top: dockViewport.top, height: dockViewport.height }">
-        <NxButton variant="primary" class="nx-tray-float pin-change-dock__primary" :disabled="step === 'new' ? !canNext : !canSave" :busy="step === 'confirm' && ui.busy"
-          @click="step === 'new' ? toConfirm() : save()">{{ step === 'new' ? t.paymentPin.next : ui.busy ? t.paymentPin.changing : t.paymentPin.save }}</NxButton>
+        <!-- While the action is unavailable its reason sits above it (03 §3.1 bottom bar, 04 §4.0 tray note) and names it for
+             screen readers; a reason already on screen (the error or status line under the digits) is linked instead. -->
+        <view class="nx-glass-bar pin-change-dock__bar">
+          <text v-if="dockReason" id="pin-change-reason" class="nx-tray-note">{{ dockReason }}</text>
+          <NxButton variant="primary" :disabled="step === 'new' ? !canNext : !canSave" :busy="step === 'confirm' && ui.busy" :aria-describedby="dockDescribedBy"
+            @click="step === 'new' ? toConfirm() : save()">{{ step === 'new' ? t.paymentPin.next : ui.busy ? t.paymentPin.changing : t.paymentPin.save }}</NxButton>
+        </view>
       </view>
     </template>
   </AppChassis>
@@ -63,6 +68,7 @@ import { onBackPress, onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 // #ifdef H5
@@ -128,6 +134,17 @@ const canNext = computed(() => step.value === "new" && !inputDisabled.value && v
 const canSave = computed(() => step.value === "confirm" && !!verifiedChange.value && !inputDisabled.value && validPaymentPassword(passwords.new) && validPaymentPassword(passwords.confirm) && !validation.value && !state.value?.lockedUntil && !ui.pendingOperation);
 const dockOpen = computed(() => active.value && !loading.value && !!state.value?.configured && canBackToVerify.value);
 const dockViewport = usePaymentPinViewport(dockOpen);
+// Why step 2's action is unavailable: digits still missing is said above the button; any other reason is the line under
+// the digits, which the button points to.
+const dockReason = computed(() => {
+  if (actionBusy.value || stepError.value || stepStatus.value) return "";
+  const digits = step.value === "new" ? passwords.new : step.value === "confirm" ? passwords.confirm : "";
+  return validPaymentPassword(digits) ? "" : t.value.paymentPin.incomplete;
+});
+const dockDescribedBy = computed(() => {
+  if (step.value === "new" ? canNext.value : canSave.value) return undefined;
+  return dockReason.value ? "pin-change-reason" : stepError.value ? "pin-change-error" : stepStatus.value ? "pin-change-status" : undefined;
+});
 function completeStep() {
   if (!active.value || step.value !== "verify" || inputDisabled.value || !state.value?.configured || !validPaymentPassword(passwords.current)) return;
   try {
@@ -318,7 +335,7 @@ onUnmounted(() => { clear(); unsubscribe?.(); if (typeof document !== "undefined
 /* The dock spans the visible viewport (keyboard excluded) and passes touches through; only the button takes them. */
 .pin-change-dock { position: fixed; z-index: 20; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none; }
 .pin-change-dock[style*="height"] { bottom: auto; }
-.pin-change-dock__primary { position: absolute; left: 12px; right: 12px; bottom: var(--nx-tray-bottom); pointer-events: auto; }
+.pin-change-dock__bar { position: absolute; display: flex; flex-direction: column; pointer-events: auto; }
 </style>
 
 <style scoped>
@@ -337,9 +354,8 @@ onUnmounted(() => { clear(); unsubscribe?.(); if (typeof document !== "undefined
 .payment-vault-dots { display:flex; gap:10px; margin-top:22px; }
 .payment-vault-dots > view { width:12px; height:12px; border-radius:50%; background:var(--v5-brand); animation:nx-viz-pop 360ms both; }
 .payment-vault-title { margin-top:22px; font-size:20px; line-height:28px; font-weight:600; }
-.payment-vault-status { margin-top:var(--v5-space-2); height:24px; box-sizing:border-box; padding:var(--v5-space-1) 8px; border-radius:var(--v5-radius-full); background:color-mix(in srgb,var(--v5-warning) 16%,transparent); color:var(--v5-warning-ink); font-size:12px; line-height:16px; font-weight:500; }
-/* Warning ink on its own soft chip falls under 4.5:1 on the light tint; the light chip uses primary ink. */
-:global([data-theme="light"] .payment-vault-status) { color:var(--v5-ink); }
+/* 「未设置」 is a status: the shared NxTag, status size, neutral tone (03 §3.8). */
+.payment-vault-status { margin-top:var(--v5-space-2); }
 .payment-vault-purpose { margin-top:var(--v5-space-3); font-size:13px; line-height:20px; color:var(--v5-ink-3); }
 .payment-pin-page__dock { position:fixed; display:flex; }
 .payment-pin-page__dock > .nx-button { flex:1; }

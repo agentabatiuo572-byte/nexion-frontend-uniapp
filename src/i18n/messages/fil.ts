@@ -72,7 +72,7 @@ export const fil: Messages = {
     codeInvalid: "Hindi ma-verify ang code na ito. Suriin ito o humiling ng bago.",
     proofExpired: "Nag-expire ang pag-verify ng identity. Mag-verify ulit.",
     changeProofExpired: "Hindi na valid ang pag-verify. Ilagay ulit ang kasalukuyang PIN sa pagbabayad.",
-    verifyUnavailable: "Hindi makumpleto ang pag-verify sa ngayon. Subukan ulit.",
+    verifyUnavailable: "Hindi makumpleto ang pag-verify sa ngayon.",
     verifyReenter: "Ilagay ulit ang kasalukuyang PIN sa pagbabayad.",
     resubmit: "Isumite ulit",
     newTitle: "Mag-set ng bagong PIN",

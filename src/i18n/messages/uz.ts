@@ -72,7 +72,7 @@ export const uz: Messages = {
     codeInvalid: "Bu kodni tasdiqlab boʻlmadi. Tekshiring yoki yangi kod soʻrang.",
     proofExpired: "Shaxs tasdigʻi muddati tugadi. Qayta tasdiqlang.",
     changeProofExpired: "Tasdiq endi amal qilmaydi. Joriy toʻlov PIN-kodini qayta kiriting.",
-    verifyUnavailable: "Hozircha tekshiruvni yakunlab boʻlmadi. Qayta urinib koʻring.",
+    verifyUnavailable: "Hozircha tekshiruvni yakunlab boʻlmadi.",
     verifyReenter: "Joriy toʻlov PIN-kodini qayta kiriting.",
     resubmit: "Qayta yuborish",
     newTitle: "Yangi PIN-kod oʻrnatish",
