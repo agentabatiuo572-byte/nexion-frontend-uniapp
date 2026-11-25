@@ -46,7 +46,7 @@
       <view class="tcs-ctas">
         <template v-if="activated">
           <NxButton variant="primary" :label="copy.viewDevices" @click="goDevices" />
-          <NxButton variant="secondary" :label="copy.buyEarly" @click="goTrial" />
+          <NxButton variant="secondary" :label="fleetCopy.buy" @click="goTrial" />
         </template>
         <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" />
         <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
@@ -71,6 +71,7 @@ import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useTrialPresentation } from '@/composables/use-trial-presentation';
 import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecycle';
+import { useTrialFleetCopy } from '@/i18n/trial-fleet';
 
 const sheet = useTrialClaimSheet();
 const freeTrial = useFreeTrial();
@@ -78,6 +79,7 @@ const trialView = useTrialPresentation(() => sheet.open, { retainOnReadFailure: 
 const app = useApp();
 const t = useT();
 const copy = useTrialLifecycleCopy();
+const fleetCopy = useTrialFleetCopy();
 
 // The result stays up while recovery re-reads, so a retry does not blink it away.
 const stateReadFailed = trialView.readFailedWithoutData;

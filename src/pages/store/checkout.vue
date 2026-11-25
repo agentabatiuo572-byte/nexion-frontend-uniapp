@@ -157,7 +157,7 @@
               </template>
               <!-- While the original order's external payment is under way, this is the order's amount, not what that payment
                    charges (its total, fees included, lives on the payment itself). -->
-              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /><CheckoutAmount v-else :value="shownConfirmationTotal" currency="USD" /></view>
+              <view class="checkout-fee checkout-fee--total checkout-summary-total" :class="{ 'checkout-fee--noted': trialCheckoutShown }"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /><CheckoutAmount v-else :value="shownConfirmationTotal" currency="USD" /></view>
               <text v-if="trialCheckoutShown" class="checkout-fees-note">{{ trialCopy.voucherUnavailable }}</text>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
@@ -4685,6 +4685,9 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-fee :deep(.tabular-nums) { text-align:right; flex-shrink:0; max-width:65%; overflow-wrap:break-word; }
 .checkout-fee--discount :deep(.tabular-nums) { color:var(--v5-brand) !important; }
 .checkout-fee--total { margin-top:var(--v5-space-1); padding-block:12px; min-height:55px; box-sizing:border-box; border-top:1px solid var(--v5-border); }
+/* Trial review: the note under the total carries the divider, so the total sits level between the rows and that line. */
+.checkout-fee--noted { min-height:0; border-top:0; }
+.checkout-fee--noted + .checkout-fees-note { margin-top:2px; }
 .checkout-fee--total > text,.checkout-fee--total > uni-text { font-weight:600; }
 .checkout-fee--total :deep(.tabular-nums) { font-size:18px !important; }
 .checkout-note { display:block; margin:var(--v5-space-3) 2px 0; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); }
