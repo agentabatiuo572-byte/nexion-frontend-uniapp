@@ -31,7 +31,7 @@
           <text v-else-if="row.quoteFailed" class="tdp-row__unknown">—</text>
           <view class="tdp-row__radio" aria-hidden="true" />
         </view>
-        <view v-if="row.link" class="tdp-row__link" role="link" tabindex="0" @click="emit('openConditions', row.option.productNo)" @keydown.enter.stop.prevent="emit('openConditions', row.option.productNo)" @keydown.space.stop.prevent="emit('openConditions', row.option.productNo)"><text class="nx-after-chevron">{{ copy.viewConditions }}</text></view>
+        <view v-if="row.link" class="tdp-row__link" role="link" tabindex="0" @click="emit('openConditions', row.option.productNo)" @keydown.enter.stop.prevent="emit('openConditions', row.option.productNo)"><text class="nx-after-chevron">{{ copy.viewConditions }}</text></view>
       </view>
     </view>
     <view v-if="showBalanceNote" class="tdp__note">

@@ -83,7 +83,7 @@
             <!-- Trial credit can buy this product (PLAN §2.3): an in-card info block (01 §1.3) that opens the trial detail with
                  this product chosen. The amount is the server quote for one unit, never recalculated here. -->
             <view v-if="trialCreditEntry" class="detail-trial-credit" data-testid="detail-trial-credit" role="link" tabindex="0"
-              :aria-label="trialCreditEntry.ariaLabel" @click="openTrialCredit" @keydown.enter.prevent="openTrialCredit" @keydown.space.prevent="openTrialCredit">
+              :aria-label="trialCreditEntry.ariaLabel" @click="openTrialCredit" @keydown.enter.prevent="openTrialCredit">
               <view class="detail-trial-credit__copy">
                 <text class="detail-trial-credit__title">{{ t.store.buyWithTrialCredit }}</text>
                 <text class="detail-trial-credit__note">{{ trialCreditEntry.limit }}</text>
