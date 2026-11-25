@@ -153,6 +153,7 @@
 <script setup lang="ts">
 import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
+import { sessionEndReason } from "@/auth/session-end";
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, nextTick, watch, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
@@ -336,9 +337,9 @@ const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
 const remoteTwoFactorChallenge = ref<string | null>(null);
-const notice = ref("");
-const sessionEndNotice = computed(() => notice.value === "session-replaced" ? t.value.login.sessionReplacedNotice
-  : notice.value !== "server-session-reload" ? ""
+const serverSessionReloadNotice = ref(false);
+const sessionEndNotice = computed(() => sessionEndReason.value === "APP_REPLACED" ? t.value.login.sessionReplacedNotice
+  : !serverSessionReloadNotice.value ? ""
     : h5RefreshCookieEnabled ? t.value.login.serverSessionReloadNotice : t.value.login.nativeSessionReloadNotice);
 // #ifdef H5
 const browserUnsupportedNotice = ref(false);
@@ -356,7 +357,7 @@ onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   const forwarded = new URLSearchParams(takeNavigationQuery("/pages/login/login"));
   if (forwarded.get("return") || o.return) returnParam.value = forwarded.get("return") || o.return;
-  notice.value = o.notice || "";
+  serverSessionReloadNotice.value = o.notice === "server-session-reload";
   // #ifdef H5
   browserUnsupportedNotice.value = o.notice === "secure-browser-unsupported";
   // #endif
