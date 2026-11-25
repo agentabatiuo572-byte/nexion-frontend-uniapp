@@ -1099,13 +1099,19 @@ const trialCfg = computed(() => useTrialConfig().config);
 type TrialReviewStatus = "ordinary" | "loading" | "failed" | "legacy" | "ready" | "unavailable";
 const trialReviewStatus = ref<TrialReviewStatus>("ordinary");
 const trialReviewOption = shallowRef<TrialPurchaseOption | null>(null);
+const trialReviewClaimNo = ref<string | null>(null);
 const trialQuoteChange = shallowRef<{ previousAmountUSD: number; quote: TrialConversionQuote } | null>(null);
 const trialServerShortfall = ref(false);
 const trialExternalWalletOnly = ref(false);
-watch(() => app.accountBindingEpoch, () => {
-  trialReviewStatus.value = "ordinary";
+function clearTrialReviewQuote() {
+  trialReviewClaimNo.value = null;
   trialReviewOption.value = null;
   trialQuoteChange.value = null;
+}
+watch([productId, () => trialCheckout.authority?.claimNo], clearTrialReviewQuote, { flush: "sync" });
+watch(() => app.accountBindingEpoch, () => {
+  trialReviewStatus.value = "ordinary";
+  clearTrialReviewQuote();
   trialServerShortfall.value = false;
   trialExternalWalletOnly.value = false;
   trialTopupWalletReady.value = false;
@@ -1137,8 +1143,17 @@ const trialOriginal = computed<TrialOriginalPurchase | null>(() => {
     ? trialCheckout.originalPurchase ?? state.originalPurchase : state.originalPurchase;
   return "submission" in state ? { ...state.submission, status: state.status === "resumable" ? "RESUMABLE" : "PROCESSING" } : null;
 });
+const scopedTrialReviewQuote = computed(() => {
+  const option = trialReviewOption.value;
+  if (!option || option.productNo !== productId.value || trialReviewClaimNo.value !== trialCheckout.authority?.claimNo) return;
+  return trialQuoteChange.value?.quote ?? option.quote;
+});
 const trialReviewQuote = computed(() => trialReviewStatus.value === "ready" && !trialOriginalLocked.value
-  ? trialQuoteChange.value?.quote ?? trialReviewOption.value?.quote : undefined);
+  ? scopedTrialReviewQuote.value : undefined);
+// A failed refresh can retain displayed amounts without authorizing a payment.
+const retainedTrialReviewQuote = computed(() => multiTrialCheckout.value && !trialOriginalLocked.value
+    && (trialReviewStatus.value === "loading" || trialReviewStatus.value === "failed")
+  ? scopedTrialReviewQuote.value : undefined);
 const trialWalletOnly = computed(() => multiTrialCheckout.value && (trialExternalWalletOnly.value
   || trialReviewOption.value?.paymentMethods.every(method => method === "WALLET") === true));
 const trialUnavailablePrice = computed(() => multiTrialCheckout.value && !trialReviewQuote.value);
@@ -1150,6 +1165,7 @@ const checkoutQuantityLabel = computed(() => trialShare.value
 function leaveTrialReview(message: string | null = trialDetailCopy.value.deviceGone) {
   if (trialReviewStatus.value === "unavailable") return false;
   trialReviewStatus.value = "unavailable";
+  clearTrialReviewQuote();
   clearTrialTopup(app.accountKey, trialTopupId.value);
   if (message) toast.warn(message);
   const pages = getCurrentPages();
@@ -1234,7 +1250,7 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
     }
     if (trialOptions.claimNo !== state.claimNo) trialOptions.bindClaim(state.claimNo);
     if (trialOptions.current.status !== "unsupported" && trialOptions.current.status !== "not-convertible") await trialOptions.refresh();
-    if (!isCurrentCheckoutRoute(scope)) return true;
+    if (!isCurrentCheckoutRoute(scope) || trialCheckout.authority?.claimNo !== state.claimNo || trialOptions.claimNo !== state.claimNo) return true;
     if (trialOptions.current.status === "unsupported") {
       if (scope.productNo !== trialDeviceNo.value) {
         leaveTrialReview();
@@ -1260,6 +1276,7 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
       leaveTrialReview(reselect ? trialDetailCopy.value.deviceGone : trialRefusalCopy(reason));
       return true;
     }
+    trialReviewClaimNo.value = state.claimNo;
     trialReviewOption.value = option;
     if (trialQuoteChange.value) trialQuoteChange.value = { ...trialQuoteChange.value, quote: option.quote };
     trialReviewStatus.value = "ready";
@@ -1373,7 +1390,7 @@ const trialOffsetText = computed(() => formatAmount(trialOffsetView.value.offset
 const trialEarlyDiscountText = computed(() => formatAmount(trialOffsetView.value.earlyDiscountUSD));
 // What the trial purchase credits right after payment (server quote convert() settles).
 const trialCreditText = computed(() => {
-  const quote = multiTrialCheckout.value ? trialReviewQuote.value
+  const quote = multiTrialCheckout.value ? trialReviewQuote.value ?? retainedTrialReviewQuote.value
     : remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote : null;
   if (!quote) return "";
   // Number and unit never split (03 §3.6.1): U+00A0 between them.
@@ -1977,11 +1994,12 @@ const trialBalanceShortfallBelowCent = computed(() => trialBalanceShortfallUSD.v
 const trialNeedsTopup = computed(() => trialWalletOnly.value
   && ((trialBalanceShortfallUSD.value ?? 0) > 0 || trialServerShortfall.value));
 watch(() => app.user.usdtBalance, () => { trialServerShortfall.value = false; });
-const shownPurchaseSubtotal = computed(() => trialUnavailablePrice.value ? null : purchaseSubtotal.value);
+const shownPurchaseSubtotal = computed(() => trialUnavailablePrice.value
+  ? retainedTrialReviewQuote.value?.priceUSD ?? null : purchaseSubtotal.value);
 const shownConfirmationTotal = computed(() => legacyTrialResume.value?.amount ?? trialOriginal.value?.confirmedAmountUSD
-  ?? (trialUnavailablePrice.value ? null : confirmationTotal.value));
+  ?? (trialUnavailablePrice.value ? retainedTrialReviewQuote.value?.amountUSD ?? null : confirmationTotal.value));
 const shownTrialDiscounts = computed(() => {
-  const quote = trialReviewQuote.value;
+  const quote = trialReviewQuote.value ?? retainedTrialReviewQuote.value;
   if (!quote) return { promo: promoDiscount.value, offset: trialOffsetView.value.offsetUSD, early: trialOffsetView.value.earlyDiscountUSD };
   return trialDiscountDisplay(quote);
 });
@@ -2038,7 +2056,7 @@ function totalStillConfirmed(confirmed: number) {
 // Every trial checkout (the multi-device list, the legacy trial-device path, the local mock) drops the 优惠 group and
 // lists the trial discounts once in 核对订单 under the ticket's names.
 const trialCheckoutShown = computed(() => multiTrialCheckout.value || trialConversionMode.value);
-const trialQuotePending = computed(() => multiTrialCheckout.value && !trialOriginalLocked.value && !trialReviewQuote.value
+const trialQuotePending = computed(() => multiTrialCheckout.value && !trialOriginalLocked.value && !retainedTrialReviewQuote.value
   && (trialReviewStatus.value === "loading" || trialReviewStatus.value === "failed"));
 const trialQuoteLoading = computed(() => trialQuotePending.value && trialReviewStatus.value === "loading");
 const trialPromoRowLabel = computed(() => {
@@ -2059,8 +2077,8 @@ const trialPreviousTotal = computed(() => trialPriceChanged.value && trialQuoteC
 const trialTrayWarning = computed(() => {
   const status = activeTrialOutcome.value?.status;
   if (status === "storage-error") return t.value.errors.txNotSavedTitle;
-  if (trialQuotePending.value && trialReviewStatus.value === "failed")
-    return trialResumeNo || trialRefusalNo ? purchaseCopy.value.coConfirming : purchaseCopy.value.coQuoteFailed;
+  if (multiTrialCheckout.value && !trialOriginalLocked.value && trialReviewStatus.value === "failed")
+    return !retainedTrialReviewQuote.value && (trialResumeNo || trialRefusalNo) ? purchaseCopy.value.coConfirming : purchaseCopy.value.coQuoteFailed;
   if (trialNeedsTopup.value) {
     const shortfall = trialBalanceShortfallUSD.value;
     if (shortfall === null || shortfall <= 0) return t.value.errors.insufficientBalanceTitle;
