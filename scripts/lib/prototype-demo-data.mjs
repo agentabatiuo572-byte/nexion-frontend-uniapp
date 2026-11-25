@@ -12,7 +12,7 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
-import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions } from './prototype-demo-rank-presets.mjs';
+import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -931,8 +931,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(pathname==='/api/exchange')finance.wallet.nexAvailable=demoWalletNex(state,now);
     return finance;
   }
-  const rankPolicy=rankPolicyDemo(url,locale,state.rankGuideEdition);if(rankPolicy!==undefined)return rankPolicy;
-  const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),state.rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
+  const rankGuideEdition = state.rankGuideEdition ?? (usesRankPreset(state) ? 'revised' : 'original');
+  const rankPolicy=rankPolicyDemo(url,locale,rankGuideEdition,state.rankReviewState!=='off');if(rankPolicy!==undefined)return rankPolicy;
+  const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
   const walletBills=()=>{

@@ -135,15 +135,19 @@ export function teamGuidesDemo(url, locale, request, read, edition) {
         '按来源查看购买奖励、设备收益奖励、晋级奖励和等级月薪。',
         'Find purchase rewards, device earnings rewards, rank-up rewards and monthly rank salaries by source.',
         'Tra cứu theo nguồn các khoản thưởng mua hàng, thu nhập thiết bị, thưởng lên hạng và lương hạng hằng tháng.') }
-        : entry.id === 'network' ? { ...entry, body: text(
-          '好友和好友的好友的购买奖励比例按你自己的等级取值。',
-          'Purchase reward rates for friends and their friends follow your own rank.',
-          'Tỷ lệ thưởng mua hàng từ bạn bè và bạn của họ theo hạng của bạn.') } : entry);
+        : entry);
+    const lifecycle = blocks.findIndex(({ id }) => id === 'lifecycle');
+    blocks.splice(lifecycle, 0,
+      block('rank-reward', 'text', text('晋级奖励', 'Rank-up reward', 'Thưởng thăng hạng'), text(
+        '升到新等级时发放 UVT，发给你本人，冷却后可用。',
+        'A UVT reward paid to you when you reach a new rank, usable after the cooling period.',
+        'Thưởng UVT trả cho bạn khi lên hạng mới, dùng được sau thời gian chờ.')),
+      block('salary', 'text', text('月薪', 'Monthly reward', 'Thưởng tháng'), text(
+        '设有月薪的等级每月领取，领取后进入可用余额，规则见等级说明。',
+        'Ranks with a monthly reward claim it each month; it goes to your available balance. See the rank guide.',
+        'Các hạng có thưởng tháng nhận mỗi tháng; vào số dư khả dụng. Xem hướng dẫn hạng.')),
+    );
     blocks.push(
-      block('rank-up-reward', 'text', text('晋级奖励', 'Rank-up rewards', 'Thưởng lên hạng'), text(
-        '晋级时按规则给本人发放 UVT，冷却后可用。',
-        'When you rank up, your UVT reward is credited to you and becomes available after the cooling period.',
-        'Khi lên hạng, bạn nhận thưởng UVT và có thể sử dụng sau thời gian chờ.')),
       block('device-policy', 'text', text('当前设备规则', 'Current device policy', 'Chính sách thiết bị hiện hành'), '{directScope} · {directDeviceRules}'),
       block('unresolved-rule', 'list', text('待确认规则', 'Rule awaiting confirmation', 'Quy tắc chờ xác nhận'), text(
         '发布的等待期。', 'Published waiting period.', 'Thời gian chờ đã công bố.'), ['{unrecognizedWaitingPeriod}']),

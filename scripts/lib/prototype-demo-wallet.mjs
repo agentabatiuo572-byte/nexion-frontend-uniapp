@@ -79,7 +79,7 @@ export function demoCommissionGroups(state,at) {
 }
 
 // Team-reward rows for the my-rank boards F2 / F2b / F3 and the monthly-reward row (DESIGN F2, 5, 6):
-// friends' purchases (layer 1), friends-of-friends' purchases (layer 2), device earnings on both layers, and one
+// friends' purchases (layer 1), friends-of-friends' purchases (layer 2), device earnings on both layers, and
 // credited monthly rewards from the same facts as the rank page. Only used with a rank preset.
 function demoRankPresetRewardRows(state,at) {
   const hour=3600000;
@@ -109,7 +109,8 @@ function demoRankPresetRewardRows(state,at) {
     device('d3','Kai',1,'DEMO-KAI-S1',40,current.enabled?current.effectiveAt+hour:current.effectiveAt-2*day,l1Policy),
     device('d4','Rustam Abdullayev',2,'DEMO-RUSTAM-S1',25,current.effectiveAt-2*day-hour,previous),
     ...rankSalaryPaidFacts(state,Date.now()).map(item=>({
-      id:item.claimNo, kind:'vrank_salary', sourceUserName:item.rankCode, layer:0,
+      id:item.claimNo, kind:'vrank_salary', sourceUserName:'System', layer:0,
+      ...(!item.legacyProjection && {salaryMonth:item.month, salaryRank:item.rankCode}),
       amountUSDT:Number(item.amountUsdt), amountNEX:0, status:'unlocked',
       ts:Date.parse(item.claimedAt), unlockAt:Date.parse(item.claimedAt),
     })),

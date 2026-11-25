@@ -31,6 +31,7 @@ export const rankPriorOptions=[['met','前序条件全部满足'],['one-short','
 export const rankCoolingOptions=[['normal','奖励冷却 7 天'],['zero','奖励不冷却（0 天）']];
 export const rankDeviceLevel2Options=[['off','设备收益二级为 0%'],['on','设备收益二级为 2%'],['disabled','设备收益暂停发放']];
 export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankSalaryClaimState:'success',rankReviewState:'required',rankPriorState:'met',rankCoolingState:'normal',rankDeviceLevel2State:'off'};
+export const usesRankPreset = state => !!state.rankPreset && state.rankPreset !== 'follow';
 
 export function rankDevicePolicies(state, at) {
   const day = 86_400_000;
@@ -89,12 +90,12 @@ export function rankPresetSalary(v,businessDate,state='present'){
     return salary(lastDay,[item('CLAIMABLE',{rankCode:'V'+(v-1),amountUsdt:prior,expiresAt:followingSecond})],
       {month:ym,rankCode:'V'+v,amountUsdt:nextAmount,claimableFrom:nextFirst});
   }
-  if(state==='carry'){const prev=iso(year,month-1,1).slice(0,7);return salary(first,[{month:prev,rankCode:'V'+v,amountUsdt:amount,status:'CLAIMABLE',claimableFrom:prev+'-01',expiresAt:iso(year,month,2)},item('CLAIMABLE')]);}
+  if(state==='carry')return salary(first,[item('CLAIMABLE',{month:iso(year,month-1,1).slice(0,7),expiresAt:iso(year,month,2)}),item('CLAIMABLE')]);
   return salary(businessDate,[item('CLAIMABLE')]);
 }
 
 function baseRankSalary(state, now) {
-  if (!state.rankPreset || state.rankPreset === 'follow' || ['absent', 'unavailable'].includes(state.rankSalaryState)) return null;
+  if (!usesRankPreset(state) || ['absent', 'unavailable'].includes(state.rankSalaryState)) return null;
   const v = Number(state.rankPreset.slice(1));
   const today = demoTeamBusinessDate(now);
   const scenario = state.rankSalaryClaimState === 'amount-changed' && state.rankSalaryState === 'present' && v >= 3
@@ -109,7 +110,13 @@ function baseRankSalary(state, now) {
 export function rankSalaryPaidFacts(state, now) {
   const accountId = previewSelectedAccountId(state);
   const paid = (state.rankSalaryClaims ?? []).filter(fact => fact.accountId === accountId).map(fact => fact.item);
-  const seeded = baseRankSalary(state, now)?.months.filter(item => item.status === 'CLAIMED') ?? [];
+  const salary = baseRankSalary(state, now);
+  const seeded = salary?.months.filter(item => item.status === 'CLAIMED') ?? [];
+  if (state.rankSalaryState === 'claimed' && seeded.length) {
+    const [year, month] = salary.businessDate.split('-').map(Number);
+    const prior = rankPresetSalary(Number(state.rankPreset.slice(1)), iso(year, month, 0), 'claimed').months[0];
+    seeded.push({...prior, legacyProjection:true});
+  }
   return [...paid, ...seeded.filter(item => !paid.some(fact => fact.month === item.month))];
 }
 
@@ -126,9 +133,13 @@ export function rankSalaryReadback(state, now) {
     salary.nextClaimableFrom = null;
   }
   const expired = state.rankSalaryExpirations?.filter(row => row.accountId === accountId) ?? [];
-  const paid = rankSalaryPaidFacts(state, now);
+  const businessDayStart = Date.parse(atStart(salary.businessDate));
+  const paid = rankSalaryPaidFacts(state, now).filter(fact =>
+    demoTeamBusinessDate(Date.parse(fact.claimedAt)) <= salary.businessDate && businessDayStart < Date.parse(fact.expiresAt));
   salary.months = salary.months.filter(item => !expired.some(row => row.month === item.month))
     .map(item => paid.find(fact => fact.month === item.month) ?? item);
+  salary.months.push(...paid.filter(fact => !salary.months.some(item => item.month === fact.month)));
+  salary.months.sort((a,b) => a.month.localeCompare(b.month));
   if (salary.upcoming && salary.months.every(item => item.month !== salary.upcoming.month || item.status === 'CLAIMED')) {
     salary.upcoming = null;
     salary.nextClaimableFrom = null;
@@ -138,7 +149,7 @@ export function rankSalaryReadback(state, now) {
 
 /** 预设开着时接管 /api/config/v-ranks 和 /api/team/rank；其余路径返回 undefined。base 是原有应答（保留校验需要的公共字段）。 */
 export function rankPresetResponse(pathname,base,state,now){
-  if(!state.rankPreset||state.rankPreset==='follow')return undefined;
+  if(!usesRankPreset(state))return undefined;
   const v=Number(state.rankPreset.slice(1));
   if(pathname==='/api/config/v-ranks'){
     const template=base.ranks?.[0]??{};
