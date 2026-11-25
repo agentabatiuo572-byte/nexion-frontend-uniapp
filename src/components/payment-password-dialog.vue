@@ -92,10 +92,11 @@ const active = ref(true); const password = ref(""); const code = ref(""); const 
 const standalone = computed(() => !ui.context && (ui.stage === "setup" || ui.stage === "confirm"));
 const statusHeight = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const open = computed(() => ui.visible && active.value);
+const unlockReady = computed(() => !!ui.state?.lockedUntil && !pin.locked());
 useAutoRecovery({
   active: () => open.value,
-  failed: () => ui.stage === "read-error" && !ui.busy,
-  retry: () => pin.load(false), repeatMs: 30_000,
+  failed: () => !ui.busy && (ui.stage === "read-error" || (ui.stage === "pay" && unlockReady.value)),
+  retry: () => pin.load(ui.stage === "pay"), repeatMs: 30_000,
 });
 useAutoRecovery({
   active: () => open.value,
@@ -129,13 +130,12 @@ const title = computed(() => {
   return t.value.paymentPin.verification;
 });
 const resendLeft = computed(() => Math.max(0, Math.ceil((ui.resendAt - ui.now) / 1000)));
-const unlockReady = computed(() => !!ui.state?.lockedUntil && !pin.locked());
 const lockMessage = computed(() => {
   const seconds = Math.max(0, Math.ceil((Date.parse(ui.state?.lockedUntil ?? "") - ui.now) / 1000));
   return fmt(t.value.paymentPin.locked, { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` });
 });
 const errorMessage = computed(() => {
-  if (!ui.error || (ui.error === "locked" && pin.locked())) return "";
+  if (!ui.error || ui.error === "locked") return "";
   return ui.error === "incorrect" ? fmt(t.value.paymentPin.incorrect, { n: ui.state?.remainingAttempts ?? 0 }) : t.value.paymentPin[ui.error];
 });
 watch(() => [ui.stage, ui.revision, ui.visible], () => { password.value = ""; code.value = ""; }, { flush: "sync" });

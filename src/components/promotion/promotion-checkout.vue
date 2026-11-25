@@ -760,12 +760,10 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
       const pending = session.record.pending;
       const walletOnly = session.retryOriginal && pending?.operation === 'payOrder' && pending.paymentMethod !== 'EXTERNAL';
       const orderItems = expectedOrder.items ?? [];
-      // Older receipts omit amounts. Read the confirmed order's lines, using the same subtotal as checkout.
+      // Older receipts may need a read to complete their display amounts. The PIN layer owns that recovery.
       const needsOrderLines = orderItems.some(item => itemSubtotal(item) === undefined);
       const readOrderLines = async () => (await orders.ensureRemoteOrder(orderNo))?.lineItems;
-      const orderLines = needsOrderLines
-        ? orders.getById(orderNo)?.lineItems ?? await readOrderLines().catch(() => undefined)
-        : undefined;
+      const orderLines = needsOrderLines ? orders.getById(orderNo)?.lineItems : undefined;
       if (!paymentCurrent()) return;
       const lineAmounts = (rows: typeof orderLines) => orderItems.map(item =>
         rows?.find(line => line.sku === item.productNo && line.quantity === item.quantity)?.lineAmountUsdt);
