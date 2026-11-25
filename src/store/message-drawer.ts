@@ -9,8 +9,8 @@ export type MessageSection = "notifications" | "service";
 export const useMessageDrawer = defineStore("messageDrawer", () => {
   const section = ref<MessageSection>("notifications");
   const notifications = useNotifications(), conversations = useConversations();
-  const advisorUnread = computed(() => conversations.byType("advisor").reduce((sum, row) => sum + row.unread, 0));
-  const supportUnread = computed(() => conversations.byType("support").reduce((sum, row) => sum + row.unread, 0));
+  const advisorUnread = computed(() => conversations.unreadByType("advisor"));
+  const supportUnread = computed(() => conversations.unreadByType("support"));
   const humanUnread = computed(() => advisorUnread.value + supportUnread.value);
   const serviceUnread = computed(() => humanUnread.value);
   const totalUnread = computed(() => notifications.unread + serviceUnread.value);

@@ -156,7 +156,9 @@ const notificationRecovery = useAutoRecovery({
   repeatMs: 30_000,
 });
 const serviceRecovery = useAutoRecovery({
-  failed: () => remoteApiEnabled && !!center.serviceReadError && !conversations.loading && !conversations.categoryLoading,
+  failed: () => remoteApiEnabled && !conversations.loading && !conversations.categoryLoading
+    && (!!center.serviceReadError || conversations.managementUnavailable
+      || (app.accountKey.startsWith("user:") && !conversations.unreadAvailable)),
   retry: () => center.refreshService(),
   repeatMs: 30_000,
 });
