@@ -17,7 +17,7 @@
         @click="goToReplacement(pending[0].pair.newDeviceId)" @keydown.enter.prevent="goToReplacement(pending[0].pair.newDeviceId)" @keydown.space.prevent="goToReplacement(pending[0].pair.newDeviceId)"><text>{{ copy.cancel }}</text></view>
     </view>
     <view v-for="item in pending" :key="item.pair.oldDeviceId" class="slot-replacement-status__pair">
-      <text class="slot-replacement-status__line"><text v-for="(part, i) in slotCopyParts(item.line, item.sides)" :key="i" :class="{ 'slot-replacement-status__name': part.key }">{{ part.text }}<text v-if="part.code" class="slot-replacement-status__code">{{ '\u00a0' + part.code }}</text></text></text>
+      <view class="slot-replacement-status__line"><template v-for="(part, i) in slotCopyParts(item.line, item.sides)" :key="i"><view v-if="part.key" class="slot-replacement-status__name"><text class="slot-replacement-status__name-text">{{ part.text }}</text><NxCodeValue v-if="part.code" class="slot-replacement-status__code" :value="part.code" :label="part.text" :copyable="false" /></view><text v-else>{{ part.text }}</text></template></view>
       <view v-if="pending.length > 1 && item.canUndo" class="slot-replacement-status__undo nx-reverse-action" role="button" tabindex="0"
         @click="goToReplacement(item.pair.newDeviceId)" @keydown.enter.prevent="goToReplacement(item.pair.newDeviceId)" @keydown.space.prevent="goToReplacement(item.pair.newDeviceId)"><text>{{ copy.cancel }}</text></view>
     </view>
@@ -27,6 +27,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import DeviceArt from "@/components/device-art.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { fmt } from "@/i18n/format";
 import { slotCopyParts, useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { isLiteShownDevice } from "@/lib/lite-scope";
@@ -84,8 +85,11 @@ function goToReplacement(id: number) {
 .slot-replacement-status--multi .slot-replacement-status__pair { margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .slot-replacement-status--multi .slot-replacement-status__line { margin: 3px 0 0; }
 .slot-replacement-status--multi .slot-replacement-status__undo { margin-top: -10px; }
-.slot-replacement-status__name { white-space: nowrap; }
-/* Instance numbers are codes: JetBrains Mono, one line (03 §3.6.1). */
-.slot-replacement-status__code { white-space: nowrap; font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-list-subtitle-lh) var(--font-metric); }
+/* A device in the sentence is one unit: the name stays whole and its instance number gives way in the middle (03 §3.6.1).
+   When the unit does not fit after the text before it, it moves whole to the next line. */
+.slot-replacement-status__name { display: inline-flex; max-width: 100%; align-items: baseline; gap: 0 .3em; }
+.slot-replacement-status__name-text { flex: none; white-space: nowrap; }
+/* Instance numbers are codes (NxCodeValue): JetBrains Mono, one line, the middle gives way when room runs out. */
+.slot-replacement-status__code { max-width: 100%; color: inherit; font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-list-subtitle-lh) var(--font-metric); }
 .slot-replacement-status__undo:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>
