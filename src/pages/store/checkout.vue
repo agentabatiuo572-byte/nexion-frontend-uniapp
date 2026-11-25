@@ -2638,7 +2638,8 @@ async function submitMultiTrialReview() {
           const valid = await checkQuote();
           if (!routeCurrent()) return "abandoned";
           if (!valid) return "changed";
-          return method !== "WALLET" && trialDueBelowCent(exactTrialDue.value) ? "wallet-required" : "current";
+          // A due that fell below one cent, or to exactly 0, never opens an external payment (R12).
+          return method !== "WALLET" && (trialDueBelowCent(exactTrialDue.value) || exactTrialDue.value === 0) ? "wallet-required" : "current";
         },
         onTrialWalletRequired: () => { if (current()) trialExternalWalletOnly.value = true; },
         parseReceipt: raw => { trialCheckout.settleExternal(claimNo, parseTrialConvertReceipt(raw)); },
@@ -2795,7 +2796,7 @@ async function onConfirmPay() {
               if (!state || !paymentCurrent()) return "changed";
               const due = state.quote?.amountUSD;
               if (due === undefined) return "changed";
-              return trialDueBelowCent(due) ? "wallet-required" : "current";
+              return trialDueBelowCent(due) || due === 0 ? "wallet-required" : "current";
             },
             onTrialWalletRequired: () => {
               if (paymentCurrent()) trialExternalWalletOnly.value = true;
