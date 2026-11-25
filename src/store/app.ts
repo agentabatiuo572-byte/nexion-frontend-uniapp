@@ -1054,9 +1054,13 @@ export const useApp = defineStore("app", () => {
                 || !remoteAccountEpoch.isCurrent(request)) return;
               if (`user:${binding.userId}` !== request.accountKey || binding.deviceId !== installationId)
                 throw new Error("PHONE_BINDING_IDENTITY_MISMATCH");
-              nativeBoundPhoneId.value = binding.activationStatus === "ACTIVE" && binding.userDeviceId != null ? String(binding.userDeviceId) : null;
-              if (binding.activationStatus !== "ACTIVE" || binding.userDeviceId == null) return;
-              nativePhoneBinding = { ...request, deviceId: binding.userDeviceId };
+              const boundPhoneId = binding.activationStatus === "ACTIVE" ? binding.userDeviceId : null;
+              nativeBoundPhoneId.value = boundPhoneId == null ? null : String(boundPhoneId);
+              // Calibrated here before, but the server no longer binds this installation (replaced, or calibrated
+              // again without activating): offer binding again.
+              remotePhoneBindingInvalid.value = boundPhoneId == null;
+              if (boundPhoneId == null) return;
+              nativePhoneBinding = { ...request, deviceId: boundPhoneId };
             }
             const online = await taskAssignmentApi.confirmPhoneOnline(nativePhoneBinding.deviceId, getDeviceId());
             if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch

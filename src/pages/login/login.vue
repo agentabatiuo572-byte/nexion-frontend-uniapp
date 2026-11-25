@@ -330,7 +330,10 @@ async function recoverLoginResult() {
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
-    error.value = cause instanceof Error && ["APP_REPLACED", "H5_REPLACED"].includes(cause.message) ? t.value.login.sessionReplaced : remoteLoginError(cause);
+    // A recovered attempt whose session was taken over says why, like any other ended session.
+    const replaced = cause instanceof Error && ["APP_REPLACED", "H5_REPLACED"].includes(cause.message);
+    if (replaced) sessionEndReason.value = (cause as Error).message;
+    error.value = replaced ? null : remoteLoginError(cause);
   } finally { if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 const returnParam = ref<string | null>(null);
