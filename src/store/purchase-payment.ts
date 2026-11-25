@@ -38,14 +38,15 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   walletOnly?: boolean;
   paymentMethods?: readonly PurchaseMethod[];
   /** Recheck order facts after any read already in flight. */
-  checkCurrent?: () => Promise<PurchaseContextCheck>;
+  checkCurrent?: (method: PurchaseMethod) => Promise<PurchaseContextCheck>;
   topupHref?: (shortfall: number) => string | undefined;
   claimNo?: string;
   legacyTrialExpiry?: boolean;
   onTrialRefusal?: (refusal: TrialExternalRefusal) => void;
   onTrialWalletRequired?: () => void;
+  onTrialSubmit?: (submission: { claimNo: string; key: string }) => void;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
-export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
+export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned' | 'wallet-required';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
   paymentMethod?: PurchaseQuote['paymentMethod']; network?: PurchaseQuote['network'];
   intentNo?: string; lookupOnly?: boolean; resumedOnThisDevice?: boolean; useOrderTopup?: boolean; quotaRefusal?: DefinitePaymentNotice; summary: string; startedAt?: number;
@@ -376,7 +377,7 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   }
   if (businessDelivered && pending.kind === 'TRIAL_CONVERT') {
     const claimNo = intent.claimNo ?? paymentRecordClaimNo(pending);
-    if (claimNo) useTrialCheckout().settleExternal(claimNo, parseTrialConvertReceipt(intent.receipt));
+    if (claimNo) useTrialCheckout().settleExternal(claimNo, parseTrialConvertReceipt(intent.receipt), pending.commandKey);
   }
   if (pending.kind === 'ORDER_PAY') return JSON.parse(pending.fingerprint)[1].orderNo;
 }
@@ -469,7 +470,7 @@ function accept(intent: PurchasePaymentIntent, pending: PendingExternal) {
   if (intent.deadlineAt) state.deadlineAt = Date.parse(intent.deadlineAt);
   if (known.businessDelivered) {
     if (known.kind === 'TRIAL_CONVERT' && known.claimNo)
-      useTrialCheckout().settleExternal(known.claimNo, parseTrialConvertReceipt(intent.receipt));
+      useTrialCheckout().settleExternal(known.claimNo, parseTrialConvertReceipt(intent.receipt), known.commandKey);
     finish({ method: 'EXTERNAL', receipt: intent.receipt, commandKey: known.commandKey, accountKey: state.accountKey });
     return;
   }
@@ -745,9 +746,14 @@ function reconcileChannel() {
   if (other && available(other)) void select(other);
   else choose('WALLET');
 }
-function acceptQuoteContext(check: PurchaseContextCheck): boolean {
+function acceptQuoteContext(check: PurchaseContextCheck, expected: PurchasePaymentContext): boolean {
   if (check === 'changed') throw new Error('PURCHASE_CONTEXT_CHANGED');
   if (check === 'abandoned') { finish(null); return false; }
+  if (check === 'wallet-required') {
+    finish(null);
+    expected.onTrialWalletRequired?.();
+    return false;
+  }
   return true;
 }
 async function select(method: PurchaseMethod, step?: PurchaseStep) {
@@ -763,14 +769,14 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (expected.kind === 'ORDER_PAY' && orderTopupMethod(method)) { state.loading = false; return; }
   state.loading = true;
   try {
-    const before = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
-    if (!owns(version, accountKey) || !acceptQuoteContext(before)) return;
+    const before = expected.checkCurrent ? await expected.checkCurrent(method) : expected.current() ? 'current' : 'changed';
+    if (!owns(version, accountKey) || !acceptQuoteContext(before, expected)) return;
     const quote = await (expected.kind === 'TRIAL_CONVERT' && expected.onTrialRefusal
       ? api.trialQuote(method, expected.payload) : api.quote(expected.kind, method, expected.payload));
     if (!owns(version, accountKey)) return;
     if ('status' in quote) { finishTrialRefusal(quote); return; }
-    const after = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
-    if (!owns(version, accountKey) || !acceptQuoteContext(after)) return;
+    const after = expected.checkCurrent ? await expected.checkCurrent(method) : expected.current() ? 'current' : 'changed';
+    if (!owns(version, accountKey) || !acceptQuoteContext(after, expected)) return;
     if (!isVisiblePayment(quote)) { finish(null); return; }
     // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
     const amountChanged = expected.kind === 'TRIAL_CONVERT' ? Number(quote.subtotalUsdt) > Number(expected.amount) : formatAmount(quote.subtotalUsdt) !== formatAmount(expected.amount);
@@ -1144,10 +1150,10 @@ async function confirm() {
     const version = requestVersion, notice = state.notice;
     state.loading = true;
     try {
-      const check = await expected.checkCurrent();
+      const check = await expected.checkCurrent(state.method);
       if (!owns(version, accountKey) || state.notice !== notice) return;
-      if (check === 'abandoned') { finish(null); return; }
       if (check === 'changed') { state.notice = 'changed'; return; }
+      if (!acceptQuoteContext(check, expected)) return;
     } finally {
       if (owns(version, accountKey)) state.loading = false;
     }
@@ -1174,6 +1180,8 @@ async function confirm() {
     ...(expected.kind === 'TRIAL_CONVERT' ? { quoteExpiresAt: Date.parse(quote.expiresAt) } : {}),
     claimNo: expected.claimNo, legacyTrialExpiry: expected.legacyTrialExpiry, structuredTrialRefusals: !!expected.onTrialRefusal };
   save(pending); state.pending = pending;
+  if (pending.kind === 'TRIAL_CONVERT' && pending.claimNo)
+    expected.onTrialSubmit?.({ claimNo: pending.claimNo, key: commandKey });
   await submitOriginal();
 }
 /** After a failed bank attempt: retire that intent and its key, then start a fresh choice.

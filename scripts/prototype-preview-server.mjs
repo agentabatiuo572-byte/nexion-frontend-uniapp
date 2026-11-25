@@ -331,6 +331,7 @@ const server=http.createServer(async(req,res)=>{
           delete state.trialBalancePurchase;
           delete state.trialBalanceCanResume;
           delete state.trialAccrualReductionUsdt;
+          delete state.trialAccruedSeconds;
           delete state.trialNextWalletRefusal;
           delete state.trialDropNextExternalRefusal;
           delete state.trialExternalRefusalReadDelayMs;
@@ -399,6 +400,8 @@ const server=http.createServer(async(req,res)=>{
           postDemoWalletEntries(state,{bizNo:'TRIAL-PREVIEW-WALLET-'+now,bizType:'TRIAL_PREVIEW_WALLET',
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
+        if(Number.isSafeInteger(update.trialAccruedSeconds)&&update.trialAccruedSeconds>=0
+            &&update.trialAccruedSeconds<=90*86400)state.trialAccruedSeconds=update.trialAccruedSeconds;
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
         if(Number.isInteger(update.trialExternalRefusalReadDelayMs)&&update.trialExternalRefusalReadDelayMs>=0
             &&update.trialExternalRefusalReadDelayMs<=6000)state.trialExternalRefusalReadDelayMs=update.trialExternalRefusalReadDelayMs;

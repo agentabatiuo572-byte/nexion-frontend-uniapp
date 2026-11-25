@@ -132,7 +132,7 @@ export const demoOptions = {
   setupGateState:[['open','正常写入'],['setup-required','服务端拒绝：需完成初始设置（试用领取 / 首日浏览商店任务 / 课程开始）']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['sub-half-cent','试用设备 · 抵后应付 0.004000（配合试用中）'],['sub-cent','试用设备 · 抵后应付 0.008000（配合试用中）'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
+  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['sub-half-cent','试用设备 · 抵后应付 0.004000（配合试用中）'],['sub-cent','试用设备 · 抵后应付 0.008000（配合试用中）'],['sub-cent-crossing','试用设备 · 累计抵扣跨过一分'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['grace-ending','抵扣期剩余 45 秒'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
   trialReadState:[['normal','正常读取'],['slow','试用状态 · 延迟返回原快照'],['error','试用读取失败'],['user-not-found','试用读取 · 用户不存在']],
   trialStartReceiptState:[...trialReceiptOptions,['rejected-unknown','通用拒绝（未知原因）＋资格重读']],
@@ -255,7 +255,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     return {stock,sold:42+index*13+bought,purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null};
   };
   const products=skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
-    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, 'sub-cent':11.774117, precision:402.123456,
+    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, 'sub-cent':11.774117, 'sub-cent-crossing':19.072962, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const priceChange=state.trialPurchasePriceState==='extra-up'&&id==='stellarrack-p1'?100:
       id===trialSku?({ 'trial-up':100,'trial-down':-100 })[state.trialPurchasePriceState]??0:0;

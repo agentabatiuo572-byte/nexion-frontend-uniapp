@@ -310,9 +310,9 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     return read;
   }
 
-  function settleExternal(claimNo: string, receipt: TrialConvertReceipt) {
+  function settleExternal(claimNo: string, receipt: TrialConvertReceipt, key?: string) {
     if (receipt.claimNo && receipt.claimNo !== claimNo) return;
-    useTrialPurchaseResult().publish({ status: "settled", claimNo, orderNo: receipt.orderNo });
+    useTrialPurchaseResult().publish({ status: "settled", claimNo, key, orderNo: receipt.orderNo });
     if (authority.value?.claimNo !== claimNo) return;
     outcome.value = { status: "settled", claimNo, receipt };
   }

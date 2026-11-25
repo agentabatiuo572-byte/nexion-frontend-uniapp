@@ -104,7 +104,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     id:cfg.trialProductId,productType:'DEVICE',imageUrl:null,
   },cfg.trialProductName);
   function accruedAt(at){
-    const days=min(BigInt(Math.max(0,Math.floor((at-row.startedAt)/1000)))*100000000n/86400n,BigInt(cfg.trialDays)*100000000n);
+    const seconds=state.trialAccruedSeconds??Math.max(0,Math.floor((at-row.startedAt)/1000));
+    const days=min(BigInt(seconds)*100000000n/86400n,BigInt(cfg.trialDays)*100000000n);
     const shadow=units(cfg.shadowDailyUSD)*days/100000000n;
     return {shadow:max(0n,shadow-units(state.trialAccrualReductionUsdt??0)),nex:units(cfg.shadowDailyNEX)*days/100000000n};
   }
