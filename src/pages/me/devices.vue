@@ -782,6 +782,7 @@ function goStore() {
 .device-replacement-note .device-replacement-code { color: inherit; line-height: inherit; }
 .device-replacement-undo { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; white-space: nowrap; cursor: pointer; }
 .device-replacement-undo[aria-disabled="true"] { opacity: .5; cursor: default; }
+.device-replacement-undo:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .device-replacement-reason { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
 .device-replacement-reason__more { display: inline-block; margin: 0 1px; vertical-align: -3px; }
 .device-replacement-row :deep(.device-inventory-row__foot),
