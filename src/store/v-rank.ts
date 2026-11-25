@@ -251,22 +251,24 @@ export const useVRank = defineStore("vRank", () => {
     const previous = snapshot.salary;
     const months = previous?.months.filter(month => month.month !== receipt.month) ?? [];
     const upcoming = previous?.upcoming?.month === receipt.month ? null : previous?.upcoming ?? null;
+    // The next-open date belongs to this month's upcoming amount and ends with it.
+    const nextClaimableFrom = previous?.upcoming?.month === receipt.month ? null : previous?.nextClaimableFrom ?? null;
     if (receipt.status === "SUCCEEDED") {
       const month = previous?.months.find(month => month.month === receipt.month) ?? attempt.item;
       months.push({ ...month, status: "CLAIMED", rankCode: receipt.rankCode, amountUsdt: receipt.amountUsdt, claimNo: receipt.claimNo });
       rankPageSnapshot.value = { ...snapshot, salary: {
         businessDate: previous?.businessDate ?? attempt.businessDate,
-        months, upcoming, nextClaimableFrom: previous?.nextClaimableFrom ?? null,
+        months, upcoming, nextClaimableFrom,
       } };
       return;
     }
     if (!previous) return;
     const code = receipt.rejectionCode;
     if (code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_ALREADY_CLAIMED") {
-      rankPageSnapshot.value = { ...snapshot, salary: { ...previous, months, upcoming } };
+      rankPageSnapshot.value = { ...snapshot, salary: { ...previous, months, upcoming, nextClaimableFrom } };
     } else if (code === "SALARY_AMOUNT_CHANGED" || code === "COVERAGE_BELOW_REDLINE" || code === "COVERAGE_UNAVAILABLE") {
       // The receipt withdraws this month's prior eligibility. A new read supplies its next state.
-      rankPageSnapshot.value = { ...snapshot, salary: months.length ? { ...previous, months, upcoming } : null };
+      rankPageSnapshot.value = { ...snapshot, salary: months.length ? { ...previous, months, upcoming, nextClaimableFrom } : null };
     }
   }
 
