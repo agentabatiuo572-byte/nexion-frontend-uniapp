@@ -2204,7 +2204,7 @@ export const ms: Messages = {
     inventoryConfirmDeactivateCancel: "Kembali",
     inventorySlotsFullWarning: "Slot penuh. Nyahaktifkan satu peranti dahulu.",
     inventoryCtaGoStore: "Ke kedai",
-    inventoryPendingDeactivateChip: "Nyahaktif selepas tugasan tamat",
+    inventoryPendingDeactivateChip: "Nyahaktif selepas kerja tamat",
     inventoryRowActivate: "Aktifkan",
     inventoryRowDeactivate: "Nyahaktif",
     inventoryMoreActions: "Tindakan lain",

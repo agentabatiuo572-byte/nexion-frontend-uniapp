@@ -52,14 +52,15 @@ function goToReplacement(id: number) {
 /* Its spacing comes from the host: home under the section title, earn under the device stage. */
 .slot-replacement-status { padding: 6px 4px 12px 14px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); color: var(--v5-ink); }
 [data-theme="light"] .slot-replacement-status { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
-.slot-replacement-status__head { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+/* The undo never shrinks or wraps (03 §3.6.1): when the title row cannot hold it, it moves whole to the next line, right-aligned. */
+.slot-replacement-status__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; min-height: 44px; }
 .slot-replacement-status__avatars { position: relative; flex: none; width: 66px; height: 38px; }
 .slot-replacement-status__av { position: absolute; top: 0; left: 0; width: 38px; height: 38px; overflow: hidden; border-radius: 50%; background: radial-gradient(80% 70% at 50% 72%, color-mix(in srgb, var(--v5-ink) 10%, transparent), transparent), var(--v5-surface-2); box-shadow: 0 0 0 2.5px var(--v5-surface); }
 .slot-replacement-status__av--new { left: 28px; }
 .slot-replacement-status__art { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; transform: translate(-50%, -56%); }
-.slot-replacement-status__title { display: flex; flex: 1; align-items: center; gap: 6px; min-width: 0; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.slot-replacement-status__title { display: flex; flex: 1; align-items: center; gap: 6px; min-width: min-content; font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .slot-replacement-status__title > svg { flex: none; color: var(--v5-warning-ink); }
-.slot-replacement-status__undo { display: inline-flex; flex: none; align-items: center; min-height: 44px; padding: 0 8px; white-space: nowrap; cursor: pointer; }
+.slot-replacement-status__undo { display: inline-flex; flex: none; align-items: center; min-height: 44px; margin-left: auto; padding: 0 8px; white-space: nowrap; cursor: pointer; }
 .slot-replacement-status__pair { display: flex; align-items: flex-start; gap: 8px; }
 .slot-replacement-status__line { flex: 1; min-width: 0; margin: 6px 10px 0 0; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 /* Several pairs: one line each, 1px rules between, the undo beside its own line. */

@@ -2204,7 +2204,7 @@ export const fil: Messages = {
     inventoryConfirmDeactivateCancel: "Bumalik",
     inventorySlotsFullWarning: "Puno ang slot. Mag-deactivate muna ng isang device.",
     inventoryCtaGoStore: "Pumunta sa store",
-    inventoryPendingDeactivateChip: "Auto-deactivate pagkatapos ng task",
+    inventoryPendingDeactivateChip: "Auto-deactivate pagkatapos ng job",
     inventoryRowActivate: "I-activate",
     inventoryRowDeactivate: "I-deactivate",
     inventoryMoreActions: "Iba pang aksyon",
