@@ -7,7 +7,7 @@
     </view>
 
 
-    <DeviceSlotReplacementStatus />
+    <DeviceSlotReplacementStatus class="hf-replacement" />
     <view v-if="!fleet.fleetVisible.value" class="hf-dock" role="status" :aria-busy="app.remoteFleetStatus === 'loading'">
       <view class="hf-avatars" aria-hidden="true"><view v-for="n in app.slotCap" :key="n" class="hf-av hf-av--loading" /></view>
       <text class="hf-dock__sub">{{ app.remoteFleetStatus === 'error' ? '—' : copy.fleetLoading }}</text>
@@ -132,6 +132,7 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 
 <style scoped>
 .hf-section { min-width: 0; color: var(--v5-ink); }
+.hf-replacement { margin: 4px 0 8px; }
 .hf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0 2px; }
 .hf-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .hf-title__text { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }

@@ -54,7 +54,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg>
         </view>
       </view>
-      <view v-if="showAction" class="device-inventory-row__actions">
+      <view v-if="showAction" class="device-inventory-row__actions" :class="{ 'device-inventory-row__actions--full': !active && $slots['inventory-action-note'] }">
         <!-- An activated card keeps one 更多 control; trade-in and deactivation live in its bottom sheet (03 §3.5.1 选择). -->
         <NxButton v-if="active" class="device-inventory-row__more" size="small" variant="text" :label="moreLabel" :disabled="moreDisabled"
           aria-haspopup="dialog" :aria-expanded="menuOpen" @click="menuOpen = true"><NxIcon name="more" :size="20" /></NxButton>
@@ -84,6 +84,8 @@
           </NxSheet>
         </view>
       </view>
+      <!-- Why the action is disabled and the way out, on the line right under the buttons (03 §3.1 禁用). -->
+      <view v-if="showAction && !active && $slots['inventory-action-note']" class="device-inventory-row__action-note"><slot name="inventory-action-note" /></view>
     </view>
     <!-- An explanation the user opens is a bottom sheet (03 §3.5.1); taps inside it stay off the page's close-on-tap. -->
     <view v-if="tradeinCreditText || tradeinDisabledText" @click.stop>
@@ -332,6 +334,9 @@ async function chooseMenu(action: "toggle" | "tradein") {
    only 6px down: wrapped buttons start 8px below, and their own hit boxes stay theirs. */
 .device-inventory-row__quote::after { content: ""; position: absolute; inset: calc(var(--ui-type-list-subtitle-lh) + 6px - 44px) -4px -6px; }
 .device-inventory-row__actions { display: flex; gap: 8px; flex: none; margin-left: auto; }
+/* With a reason line the buttons and the reason form one right-aligned column under the amounts (board S9). */
+.device-inventory-row__actions--full { flex-basis: 100%; justify-content: flex-end; }
+.device-inventory-row__action-note { flex-basis: 100%; margin-top: -4px; text-align: right; }
 /* Explainer sheet (board B-8a): device row and tier table are surface-2 blocks 16 apart, then one footnote line. */
 .device-inventory-row__ladder-device, .device-inventory-row__ladder { border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
 .device-inventory-row__ladder-device { display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 8px; }

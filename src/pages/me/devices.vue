@@ -86,7 +86,7 @@
               :device="d"
               :active="true"
               :runtime-confirmed="!remoteApiEnabled || app.remoteFleetStatus === 'ready' || app.remoteFleetStatus === 'loading'"
-              :tasks-confirmed="!remoteApiEnabled || app.remoteAssignmentStatus === 'ready' || (app.remoteAssignmentStatus === 'loading' && app.remoteAssignmentHasSnapshot)"
+              :tasks-confirmed="tasksConfirmed"
               :show-action="canControlDevice(d)"
               :activate-label="t.myDevices.inventoryRowActivate"
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
@@ -99,8 +99,9 @@
               @toggle="handleDeactivate(d)"
               @tradein="handleTradein(d)"
             >
+              <!-- Board S6: the waiting pair as a warning strip; name and instance number never split. -->
               <template v-if="d.replacement" #replacement-status>
-                <text class="device-replacement-note" role="status">{{ fmt(replacementCopy.oldWaiting, { old: d.replacement.oldDeviceName, new: d.replacement.newDeviceName }) }}</text>
+                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.oldWaiting, pairSides(d.replacement))" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
               </template>
             </DeviceInventoryRow>
           </view>
@@ -133,13 +134,18 @@
               @tradein="handleTradein(d)"
             >
               <template v-if="d.replacement" #replacement-status>
-                <text class="device-replacement-note" role="status">{{ fmt(replacementCopy.newWaiting, { old: d.replacement.oldDeviceName, new: d.replacement.newDeviceName }) }}</text>
+                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.newWaiting, pairSides(d.replacement))" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
               </template>
+              <!-- Undoing is a reverse action (03 §3.1): plain ink-3 text, no container. With no candidate the entry stays,
+                   greyed, and the reason with its way out sits on the line below (board S9). -->
               <template v-if="d.replacement || canStartSlotReplacement(d)" #inventory-action>
-                <NxButton v-if="d.replacement" size="small" variant="secondary" :label="replacementCopy.cancel"
-                  :disabled="replacementBusy" @click="cancelSlotReplacement(d)" />
+                <view v-if="d.replacement" class="device-replacement-undo nx-reverse-action" role="button" :tabindex="replacementBusy ? -1 : 0" :aria-disabled="replacementBusy"
+                  @click="cancelSlotReplacement(d)" @keydown.enter.prevent="cancelSlotReplacement(d)" @keydown.space.prevent="cancelSlotReplacement(d)"><text>{{ replacementCopy.cancel }}</text></view>
                 <NxButton v-else size="small" variant="brand" :label="replacementCopy.replace"
-                  :disabled="replacementBusy" @click="openSlotReplacement(d)" />
+                  :disabled="replacementBusy || !replacementCandidates.length" :aria-describedby="replacementCandidates.length ? undefined : `device-replacement-reason-${d.id}`" @click="openSlotReplacement(d)" />
+              </template>
+              <template v-if="!d.replacement && canStartSlotReplacement(d) && !replacementCandidates.length" #inventory-action-note>
+                <text :id="`device-replacement-reason-${d.id}`" class="device-replacement-reason"><template v-for="(part, i) in slotCopyParts(replacementCopy.noCandidateReason)" :key="i"><svg v-if="part.key" class="device-replacement-reason__more" role="img" :aria-label="t.myDevices.inventoryMoreActions" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg><text v-else>{{ part.text }}</text></template></text>
               </template>
             </DeviceInventoryRow>
           </view>
@@ -196,12 +202,74 @@
       @force="onSheetForce"
       @dismiss="sheetDevice = null"
     />
-    <NxSheet :open="replacementDevice !== null" :title="replacementCopy.choose" @close="replacementDevice = null">
-      <view class="device-replacement-choices">
-        <NxButton v-for="device in replacementCandidates" :key="device.id" variant="secondary"
-          :label="[deviceName(t, device), device.instanceNo].filter(Boolean).join(' · ')" @click="confirmSlotReplacement(device)" />
+    <!-- Board S2/S4/S5: choosing the device to swap out, then the confirm step in the same sheet (03 §3.5.1 选择).
+         With one candidate the sheet opens on the confirm step. While the request runs every exit stays shut. -->
+    <NxSheet :open="replacementDevice !== null" :title="replacementStep ? replacementCopy.confirmTitle : replacementCopy.choose" @close="closeReplacementSheet">
+      <view v-if="replacementDevice && !replacementStep" class="device-replacement-sheet">
+        <view class="device-replacement-lead">
+          <DeviceArt class="device-replacement-lead__art" :device="replacementDevice" />
+          <text class="device-replacement-lead__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.lead, { new: deviceSide(replacementDevice) })" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text>
+        </view>
+        <view v-if="!tasksConfirmed" class="device-replacement-job-note" role="status">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+          <text>{{ replacementCopy.jobUnknownNote }}</text>
+        </view>
+        <view class="device-replacement-list">
+          <view v-for="device in replacementCandidates" :key="device.id" class="device-replacement-target" role="button" tabindex="0"
+            :aria-label="candidateLabel(device)" @click="confirmSlotReplacement(device)" @keydown.enter.prevent="confirmSlotReplacement(device)" @keydown.space.prevent="confirmSlotReplacement(device)">
+            <DeviceArt class="device-replacement-target__art" :device="device" />
+            <view class="device-replacement-target__meta" aria-hidden="true">
+              <text class="device-replacement-target__name">{{ deviceName(t, device) }}</text>
+              <view class="device-replacement-target__line"><text v-if="device.instanceNo" class="device-replacement-code">{{ device.instanceNo }}</text><text class="device-replacement-target__today">{{ device.instanceNo ? '· ' : '' }}{{ fmt(replacementCopy.todayInline, { amount: visibility.mask(fmtMoney(device.todayEarnings)) }) }}</text></view>
+              <text v-if="replacementTiming(device)" class="device-replacement-target__time">{{ replacementTiming(device) === 'busy' ? replacementCopy.rowBusy : replacementCopy.rowIdle }}</text>
+            </view>
+            <view class="device-replacement-target__chev" aria-hidden="true"><NxIcon name="chevron-right" :size="16" /></view>
+          </view>
+        </view>
+        <NxButton class="device-replacement-quiet" variant="text" :label="t.ui.cancel" @click="closeReplacementSheet" />
+      </view>
+      <view v-else-if="replacementDevice && replacementStep" class="device-replacement-sheet">
+        <view class="device-replacement-arrive">
+          <view class="device-replacement-arrive__stage"><view class="device-replacement-arrive__floor" /><DeviceArt class="device-replacement-arrive__art" :device="replacementDevice" /></view>
+          <text class="device-replacement-arrive__name">{{ deviceName(t, replacementDevice) }}</text>
+          <text v-if="replacementDevice.instanceNo" class="device-replacement-code">{{ replacementDevice.instanceNo }}</text>
+        </view>
+        <view class="device-replacement-yield">
+          <DeviceArt class="device-replacement-yield__art" :device="replacementStep.oldDevice" />
+          <view class="device-replacement-yield__meta">
+            <text class="device-replacement-yield__name">{{ fmt(replacementCopy.confirmStop, { old: deviceName(t, replacementStep.oldDevice) }) }}</text>
+            <text v-if="replacementStep.oldDevice.instanceNo" class="device-replacement-code">{{ replacementStep.oldDevice.instanceNo }}</text>
+          </view>
+          <view class="device-replacement-online"><view class="device-replacement-online__dot" aria-hidden="true" /><text>{{ t.earn.online }}</text></view>
+        </view>
+        <view class="device-replacement-effects">
+          <view v-for="line in replacementEffects" :key="line.icon" class="device-replacement-effect">
+            <svg v-if="line.icon === 'now'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13h6l-1 8 8-10h-6l1-8Z" /></svg>
+            <svg v-else-if="line.icon === 'job'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            <svg v-else-if="line.icon === 'info'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5.5 5h13L21 13v6H3v-6Z" /></svg>
+            <text class="device-replacement-effect__text">{{ line.text }}</text>
+          </view>
+        </view>
+        <NxButton variant="primary" :label="replacementCopy.confirmCta" :busy="replacementSubmitting" @click="settleReplacementDecision(true)" />
+        <NxButton class="device-replacement-quiet" variant="text" :label="t.ui.cancel" :disabled="replacementSubmitting" @click="closeReplacementSheet" />
       </view>
     </NxSheet>
+    <!-- Board S7: undoing is a decision about two devices, so a centred confirm whose title says the result and whose block
+         says where each device goes (03 §3.5). Back / Esc take 继续等待; both exits stay shut while the request runs. -->
+    <NxNoticeDialog :open="replacementDecision?.cancel === true" icon="clock" tone="neutral" focus-title
+      :title="replacementCopy.cancelTitle" :primary="replacementCopy.cancel" :secondary="replacementCopy.keepWaiting" :busy="replacementSubmitting"
+      @primary="settleReplacementDecision(true)" @secondary="settleReplacementDecision(false)">
+      <view v-if="replacementDecision?.cancel" class="device-replacement-fate">
+        <view v-for="side in undoSides" :key="side.device.id" class="device-replacement-fate__row">
+          <DeviceArt class="device-replacement-fate__art" :device="side.device" />
+          <view class="device-replacement-fate__meta">
+            <text class="device-replacement-fate__name">{{ deviceName(t, side.device) }}</text>
+            <view class="device-replacement-fate__sub"><text v-if="side.device.instanceNo" class="device-replacement-code">{{ side.device.instanceNo }}</text><text>{{ side.device.instanceNo ? '· ' : '' }}{{ side.fate }}</text></view>
+          </view>
+        </view>
+      </view>
+    </NxNoticeDialog>
     <!-- Buying more devices is the page's main action, in the thumb zone (DS-30). -->
     <template #pageFixed>
       <view class="device-page__bar nx-glass-bar"><NxButton class="device-page__bar-btn" variant="primary" :label="t.myDevices.inventoryCtaGoStore" @click="goStore"><view class="device-page__bar-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg><text>{{ t.myDevices.inventoryCtaGoStore }}</text></view></NxButton></view>
@@ -225,6 +293,9 @@ import DeviceBay from "@/components/me/device-bay.vue";
 import LoopScope from "@/components/loop-scope.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
+import DeviceArt from "@/components/device-art.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TrialDeviceRow from "@/components/trial-device-row.vue";
@@ -232,10 +303,11 @@ import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useDeviceDeactivation } from "@/composables/use-device-deactivation";
 import { useTradeinStrip } from "@/composables/use-tradein-strip";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
-import { useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
+import { slotCopyParts, useDeviceSlotReplacementCopy } from "@/i18n/device-slot-replacement";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
-import { fmt } from "@/i18n/format";
+import { fmt, fmtMoney } from "@/i18n/format";
+import { useDataVisibility } from "@/store/data-visibility";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { hasNativePhoneRuntime } from "@/lib/native-phone-runtime";
@@ -244,9 +316,9 @@ import { canControlDevice } from "@/lib/device-control-platform";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { useFreeTrial } from "@/store/free-trial";
 import type { Device } from "@/store/types";
-import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
+import { confirm as uiConfirm, toast } from "@/store/ui";
 import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalTradeinConfig } from "@/api/device-e3-api";
+import type { CanonicalTradeinConfig, PendingDeviceReplacement } from "@/api/device-e3-api";
 import { isSettledRejection } from "@/api/errors";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -258,14 +330,38 @@ import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/
 const t = useT();
 const app = useApp();
 const replacementCopy = useDeviceSlotReplacementCopy();
+const visibility = useDataVisibility();
 const replacementDevice = ref<Device | null>(null);
 const replacementBusy = ref(false);
-const replacementDialogOwner = `device-slot-replacement:${Date.now()}:${Math.random()}`;
+// The decision runSlotReplacement waits for: the sheet's confirm step (replace) or the undo dialog (cancel).
+const replacementDecision = ref<{ cancel: boolean; oldDevice: Device; newDevice: Device } | null>(null);
+const replacementSubmitting = ref(false);
+let resolveReplacementDecision: ((accepted: boolean) => void) | null = null;
 let replacementPageEpoch = 0;
+function askReplacementDecision(cancel: boolean, oldDevice: Device, newDevice: Device) {
+  resolveReplacementDecision?.(false);
+  replacementDecision.value = { cancel, oldDevice, newDevice };
+  return new Promise<boolean>((resolve) => { resolveReplacementDecision = resolve; });
+}
+function settleReplacementDecision(accepted: boolean) {
+  if (replacementSubmitting.value) return;
+  const resolve = resolveReplacementDecision;
+  resolveReplacementDecision = null;
+  if (!accepted) replacementDecision.value = null;
+  resolve?.(accepted);
+}
+function closeReplacementSheet() {
+  if (replacementSubmitting.value) return;
+  settleReplacementDecision(false);
+  replacementDevice.value = null;
+}
 function closeReplacementDialogs() {
   replacementPageEpoch += 1;
   replacementDevice.value = null;
-  useUI().clearConfirmsBy(replacementDialogOwner);
+  const resolve = resolveReplacementDecision;
+  resolveReplacementDecision = null;
+  replacementDecision.value = null;
+  resolve?.(false);
 }
 watch([() => app.accountKey, () => app.accountBindingEpoch], closeReplacementDialogs);
 const session = useSession();
@@ -369,6 +465,44 @@ type Bay = { key: string; kind: "device" | "trial" | "reserved" | "empty" | "loa
 const deviceOnline = (d: Device) => deviceOnlineState(d, Date.now(), !remoteApiEnabled || app.remoteFleetStatus === "ready" || app.remoteFleetStatus === "loading") === "online";
 const replacementCandidates = computed(() => activeDevices.value.filter((device) =>
   device.kind !== "unknown" && deviceOnline(device) && !device.pendingDeactivate && !device.replacement));
+const tasksConfirmed = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
+  || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
+// The swap-out timing is written only from a confirmed job read: no job swaps out now, a claimed or running job defers
+// it (the server's active-task check); any other job state gets the neutral wording.
+function replacementTiming(device: Device): "idle" | "busy" | null {
+  if (!tasksConfirmed.value) return null;
+  const status = device.currentTask?.status;
+  if (!device.currentTask) return "idle";
+  return status === undefined || status === "CLAIMED" || status === "RUNNING" ? "busy" : null;
+}
+const replacementStep = computed(() => replacementDecision.value?.cancel === false ? replacementDecision.value : null);
+const replacementEffects = computed(() => {
+  const step = replacementStep.value;
+  if (!step) return [];
+  const copy = replacementCopy.value;
+  const timing = replacementTiming(step.oldDevice);
+  if (timing === "idle") return [{ icon: "now", text: copy.confirmNow }];
+  if (timing === "busy") return [{ icon: "job", text: copy.confirmAfterJob }, { icon: "return", text: copy.confirmReturnUndo }];
+  return [{ icon: "info", text: copy.confirm }, { icon: "return", text: copy.confirmReturn }];
+});
+const undoSides = computed(() => {
+  const decision = replacementDecision.value;
+  if (!decision?.cancel) return [];
+  return [{ device: decision.oldDevice, fate: replacementCopy.value.cancelKeepsOld }, { device: decision.newDevice, fate: replacementCopy.value.cancelKeepsNew }];
+});
+function deviceSide(device: Device) {
+  return { name: deviceName(t.value, device), code: device.instanceNo };
+}
+// Waiting rows keep the server's names for the pair and add each device's instance number, so same-named devices differ.
+function pairSides(pair: PendingDeviceReplacement) {
+  const code = (id: number) => app.visibleDevices.find((device) => device.id === String(id))?.instanceNo;
+  return { old: { name: pair.oldDeviceName, code: code(pair.oldDeviceId) }, new: { name: pair.newDeviceName, code: code(pair.newDeviceId) } };
+}
+function candidateLabel(device: Device) {
+  const timing = replacementTiming(device);
+  return [deviceName(t.value, device), device.instanceNo, fmt(replacementCopy.value.todayInline, { amount: visibility.mask(fmtMoney(device.todayEarnings)) }),
+    timing === "busy" ? replacementCopy.value.rowBusy : timing === "idle" ? replacementCopy.value.rowIdle : ""].filter(Boolean).join(", ");
+}
 
 function canStartSlotReplacement(device: Device) {
   return remoteApiEnabled && slotsUsed.value !== null && slotsFull.value && activationReady.value && device.kind !== "phone"
@@ -504,12 +638,13 @@ function openSlotReplacement(device: Device) {
     return;
   }
   replacementDevice.value = device;
+  // One candidate: nothing to choose, so the sheet opens on its confirm step.
+  if (replacementCandidates.value.length === 1) void confirmSlotReplacement(replacementCandidates.value[0]);
 }
 
 async function confirmSlotReplacement(oldDevice: Device) {
   const newDevice = replacementDevice.value;
   if (!newDevice) return;
-  replacementDevice.value = null;
   await runSlotReplacement(oldDevice, newDevice, false);
 }
 
@@ -536,14 +671,9 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
   const pairKey = `${oldDevice.id}:${newDevice.id}:${newVersion}`;
   replacementBusy.value = true;
   try {
-    const names = { old: deviceName(t.value, oldDevice), new: deviceName(t.value, newDevice) };
-    const accepted = await uiConfirm({
-      title: cancel ? replacementCopy.value.cancel : replacementCopy.value.replace,
-      message: fmt(cancel ? replacementCopy.value.cancelConfirm : replacementCopy.value.confirm, names),
-      confirmLabel: cancel ? replacementCopy.value.cancel : t.value.ui.confirm,
-      owner: replacementDialogOwner,
-    });
+    const accepted = await askReplacementDecision(cancel, oldDevice, newDevice);
     if (!accepted || !currentPage()) return;
+    replacementSubmitting.value = true;
     const key = acquireDeviceCommandKey(accountKey, operation, pairKey, oldVersion);
     const payload = { oldDeviceId: Number(oldDevice.id), newDeviceId: Number(newDevice.id),
       oldExpectedVersion: oldVersion, newExpectedVersion: newVersion };
@@ -565,6 +695,11 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
     if (currentPage()) toast.warn(replacementCopy.value.retry);
   } finally {
     replacementBusy.value = false;
+    replacementSubmitting.value = false;
+    if (pageEpoch === replacementPageEpoch) {
+      replacementDecision.value = null;
+      if (!cancel) replacementDevice.value = null;
+    }
   }
 }
 
@@ -637,14 +772,75 @@ function goStore() {
 </script>
 
 <style scoped>
-.device-replacement-note { display: block; margin-top: 10px; font: 400 13px/18px var(--font-v5); overflow-wrap: anywhere; }
-.device-replacement-choices { display: grid; gap: 8px; padding: 12px 16px 20px; }
-.device-replacement-choices :deep(.nx-button) { width: 100%; min-width: 0; }
-.device-replacement-choices :deep(.nx-button__content),
-.device-replacement-choices :deep(.nx-button__content uni-text) { white-space: normal; overflow-wrap: anywhere; }
+/* Waiting strips on the pair's rows (board S6): warning tint with a clock, the description role; a name and its instance number never split. */
+.device-replacement-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.device-replacement-note > svg { flex: none; margin-top: calc((var(--ui-type-description-lh) - 14px) / 2); }
+.device-replacement-note__text { min-width: 0; overflow-wrap: break-word; }
+.device-replacement-name { white-space: nowrap; }
+/* Instance numbers are codes: JetBrains Mono on one line (03 §3.6.1), in the auxiliary-figure size. */
+.device-replacement-code { white-space: nowrap; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); letter-spacing: 0; }
+.device-replacement-note .device-replacement-code { color: inherit; line-height: inherit; }
+.device-replacement-undo { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; white-space: nowrap; cursor: pointer; }
+.device-replacement-undo[aria-disabled="true"] { opacity: .5; cursor: default; }
+.device-replacement-reason { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); overflow-wrap: break-word; }
+.device-replacement-reason__more { display: inline-block; margin: 0 1px; vertical-align: -3px; }
 .device-replacement-row :deep(.device-inventory-row__foot),
 .device-replacement-row :deep(.device-inventory-row__actions) { flex-wrap: wrap; }
 .device-replacement-row :deep(.device-inventory-row__actions) { max-width: 100%; justify-content: flex-end; }
+/* Replacement sheet (boards S2, S4, S5): blocks 16 apart, the quiet exit last. */
+.device-replacement-sheet { display: flex; flex-direction: column; gap: 16px; }
+.device-replacement-lead { display: flex; align-items: center; gap: 8px; }
+.device-replacement-lead__art { flex: none; width: 36px; height: 36px; margin: -4px 0; }
+.device-replacement-lead__text { min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.device-replacement-lead__text .device-replacement-code { line-height: inherit; }
+/* A job read that failed is a status line (10.2): warning icon, body ink. */
+.device-replacement-job-note { display: flex; align-items: flex-start; gap: 8px; margin-top: -4px; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.device-replacement-job-note > svg { flex: none; margin-top: calc((var(--ui-type-description-lh) - 16px) / 2); color: var(--v5-warning-ink); }
+.device-replacement-list { overflow: hidden; padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.device-replacement-target { display: flex; align-items: center; gap: 12px; padding: var(--ui-space-row-y) 12px var(--ui-space-row-y) 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.device-replacement-target + .device-replacement-target { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.device-replacement-target:active { background: color-mix(in srgb, var(--v5-ink) 4%, transparent); }
+.device-replacement-target:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: -2px; }
+.device-replacement-target__art { flex: none; width: 64px; height: 64px; margin: -4px 0; }
+.device-replacement-target__meta { flex: 1 1 auto; min-width: 0; }
+.device-replacement-target__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.device-replacement-target__line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; margin-top: 2px; }
+.device-replacement-target__line .device-replacement-code { line-height: var(--ui-type-list-subtitle-lh); }
+.device-replacement-target__today, .device-replacement-target__time { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); font-variant-numeric: tabular-nums; }
+.device-replacement-target__today { white-space: nowrap; }
+.device-replacement-target__time { display: block; margin-top: 2px; overflow-wrap: break-word; }
+.device-replacement-target__chev { display: flex; flex: none; margin-left: -4px; color: var(--v5-ink-4); }
+.device-replacement-quiet { margin-block: 12px; }
+/* Confirm step (board S4/S5, the B-6a composition): the arriving machine on its stage, then the row it swaps out. */
+.device-replacement-arrive { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.device-replacement-arrive__stage { position: relative; display: grid; place-items: center; width: 180px; height: 120px; }
+.device-replacement-arrive__floor { position: absolute; left: 50%; bottom: 14px; width: 140px; height: 20px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-ink) 16%, transparent), transparent); pointer-events: none; }
+.device-replacement-arrive__art { position: relative; width: 128px; height: 128px; }
+.device-replacement-arrive__name { display: block; margin-bottom: 4px; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+.device-replacement-yield { display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 8px; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.device-replacement-yield__art { flex: none; width: 52px; height: 52px; margin: -2px 0; }
+.device-replacement-yield__meta { display: flex; flex: 1 1 auto; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.device-replacement-yield__name { overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.device-replacement-online { display: inline-flex; flex: none; align-items: center; gap: 6px; white-space: nowrap; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.device-replacement-online__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v5-success-ink); }
+/* What happens next: a neutral icon and main-ink text (it reassures, so no warning colour). */
+.device-replacement-effects { display: flex; flex-direction: column; gap: 8px; }
+.device-replacement-effect { display: flex; align-items: flex-start; gap: 8px; color: var(--v5-ink-3); }
+.device-replacement-effect > svg { flex: none; margin-top: calc((var(--ui-type-description-lh) - 16px) / 2); }
+.device-replacement-effect__text { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+/* Undo dialog (board S7): where each device goes, one surface-2 block. */
+.device-replacement-fate { align-self: stretch; margin-top: 16px; padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); text-align: left; }
+.device-replacement-fate__row { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 6px; }
+.device-replacement-fate__row + .device-replacement-fate__row { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.device-replacement-fate__art { flex: none; width: 48px; height: 48px; margin: -4px 0; }
+.device-replacement-fate__meta { flex: 1 1 auto; min-width: 0; }
+.device-replacement-fate__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.device-replacement-fate__sub { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.device-replacement-fate__sub .device-replacement-code { line-height: var(--ui-type-list-subtitle-lh); }
+@media (max-width: 374px) {
+  .device-replacement-target { gap: 10px; }
+  .device-replacement-target__art { width: 52px; height: 52px; }
+}
 .device-stage { position: relative; margin-top: 15px; }
 .device-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
 .device-stage__aura > view { position: absolute; width: 190px; height: 150px; border-radius: 50%; filter: blur(42px); }
