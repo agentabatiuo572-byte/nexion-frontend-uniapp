@@ -216,7 +216,7 @@ export function checkEligibility(
 
 /**
  * FEAT-DEV02:目标 SKU 视角的可抵扣设备清单(设备级,替代旧的 kind 级 sources)。
- * 资格 = 实付价 > 0(赠送/免费排除)∧ kind ∈ ladder applyTo ∧ 目标目录价严格更高
+ * 资格 = 实付价 > 0(赠送/免费排除)∧ 非 Cloud Share ∧ 目标目录价严格更高
  * ∧ 置换总开关开 ∧ 无运行中任务(需先完成/放弃当前任务,入口层给阻断提示)。
  * 活跃与库存设备都可抵(随时下架);排序按可抵金额高→低(转化优先)。
  */
@@ -232,7 +232,7 @@ export function eligibleTradeInDevices(
     .filter((d) => {
       const paid = d.paidPriceUsdt ?? 0;
       if (paid <= 0) return false;
-      if (!TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return false;
+      if (d.kind === "cloud-share") return false;
       if (TRADEIN_LADDER_RULES.requireHigherPrice && !(targetPrice > paid)) return false;
       if (isDeviceTaskBlocked(d)) return false; // 激活中且任务运行 → 入口阻断,不入候选
       return true;
