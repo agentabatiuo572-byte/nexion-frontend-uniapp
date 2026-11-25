@@ -732,7 +732,8 @@ function publishStickyCTA() {
       const checkingBalance = original?.kind === "BALANCE" && original.status === "PROCESSING";
       sticky.show({
         href: continuing ? originalTrialCheckoutHref(continuing) : `/pages/store/detail?id=${product.value.id}`,
-        amount: checkingBalance ? undefined : `${priceText.value}`,
+        // The catalog price beside 继续支付 would read as the amount of the original payment.
+        amount: checkingBalance || continuing ? undefined : `${priceText.value}`,
         // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
         note: checkingBalance ? trialPurchaseCopy.value.coConfirming : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
         buttonLabel: checkingBalance ? undefined : continuing ? t.value.orders.pendingContinue : t.value.store.cardBuyNow,
