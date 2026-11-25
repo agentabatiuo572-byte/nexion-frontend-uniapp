@@ -456,7 +456,7 @@ const salaryViewOptions = computed(() => ({
 const salary = computed(() => salaryView({
   ...salaryViewOptions.value,
   salary: displayRank.value?.salary,
-  qualificationUnavailable: vState.remoteTransientFailure,
+  qualificationUnavailable: vState.remoteTransientFailure || vState.salarySectionStale,
   phase: salaryPhase.value,
   pending: salaryAttempt.value,
 }));
