@@ -1229,7 +1229,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,
       trackATotalMembers:legs.A.length,trackBTotalMembers:legs.B.length,autoPlacedMembers:0,
       matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:estimateBlocked?0:Number(Math.min(periodCap,weakerVolume*matchRate).toFixed(6)),
-      settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
+      settlePeriod:'monthly',residualPolicy:preset?'monthlyClear':'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
       recentMatches:matches
         .map(event=>({id:event.id,amountUsdt:event.amountUSDT,status:event.status.toUpperCase(),
           createdAt:new Date(event.ts).toISOString(),unlockAt:new Date(event.unlockAt).toISOString()}))};

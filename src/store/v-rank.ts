@@ -223,13 +223,15 @@ export const useVRank = defineStore("vRank", () => {
   const remoteTransientFailure = ref(false);
   // The rank page can display its last verified read while live facts are unavailable.
   const rankPageSnapshot = shallowRef<(VRankData & { ladder: VRankDef[]; salary: RankSalary | null | undefined }) | null>(null);
+  // The rank read succeeded but its salary section did not: the page keeps the last verified salary and treats it as unconfirmed.
+  const salarySectionStale = ref(false);
   let retryAt = 0;
   let environmentInvalidated = false;
   let inFlight: { account: VRankRemoteRequest; runtime: RuntimeRevisionScope; promise: Promise<void> } | null = null;
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
   function clearRemoteFacts(keepRankPageSnapshot = false): void {
-    if (!keepRankPageSnapshot) rankPageSnapshot.value = null;
+    if (!keepRankPageSnapshot) { rankPageSnapshot.value = null; salarySectionStale.value = false; }
     myRank.value = 0;
     selfComputePoints.value = undefined;
     teamComputePoints.value = undefined;
@@ -352,9 +354,11 @@ export const useVRank = defineStore("vRank", () => {
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Record<VRank, number>;
       salary.value = remoteCurrent.salary;
+      const keptSalary = remoteCurrent.salary === null && rankPageSnapshot.value?.salary ? rankPageSnapshot.value.salary : remoteCurrent.salary;
+      salarySectionStale.value = keptSalary !== remoteCurrent.salary;
       rankPageSnapshot.value = { myRank: myRank.value, selfComputePoints: selfComputePoints.value,
         teamComputePoints: teamComputePoints.value, directRefs: directRefs.value, vDownlineCounts: vDownlineCounts.value,
-        ladder: ladder.value, salary: salary.value };
+        ladder: ladder.value, salary: keptSalary };
       remoteReady.value = true;
       remoteError.value = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
       const progress = teamRankProgress({ myRank: myRank.value, selfComputePoints: selfComputePoints.value, directRefs: directRefs.value, teamComputePoints: teamComputePoints.value, vDownlineCounts: vDownlineCounts.value }, ladder.value);
@@ -413,7 +417,7 @@ export const useVRank = defineStore("vRank", () => {
   // the new revision so discarding the old response cannot strand the loading
   // state. Keep the account/revision/generation fences on both success and error.
   const unsubscribeRuntime = subscribeRuntimeRevision((_scope, reason) => {
-    if (reason === "authority") rankPageSnapshot.value = null;
+    if (reason === "authority") { rankPageSnapshot.value = null; salarySectionStale.value = false; }
     if (remoteApiEnabled) void refreshCanonicalVRank();
   });
   onScopeDispose(unsubscribeRuntime);
@@ -449,7 +453,7 @@ export const useVRank = defineStore("vRank", () => {
     selfComputePoints, teamComputePoints,
     myRank, directRefs, vDownlineCounts, ladder, prizeName, salary,
     capabilities,
-    remoteReady, remoteError, remoteRateLimited, remoteTransientFailure, rankPageSnapshot,
+    remoteReady, remoteError, remoteRateLimited, remoteTransientFailure, rankPageSnapshot, salarySectionStale,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner, applySalaryReceipt,
   };
 });
