@@ -837,14 +837,31 @@ function demoLiveActivity(product,now) {
   return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:Math.min(sales24h,Math.max(1,sales30m))};
 }
 
+function demoReplacementAssignmentsPath(state) {
+  return ['app','cycles'].includes(state.computeState??'app')?'/api/tasks/assignments':'/api/tasks/v2/assignments';
+}
+
+function demoActiveSlotReplacementTask(assignment) {
+  const task=assignment?.currentTask;
+  return ['CLAIMED','RUNNING'].includes(task?.status)?task:null;
+}
+
+function demoSlotReplacementTiming(assignment) {
+  if(!assignment||assignment.recoveryPending||assignment.simulationState==='WAITING_CONFIG')return 'UNKNOWN';
+  if(demoActiveSlotReplacementTask(assignment))return 'PENDING';
+  const task=assignment.currentTask;
+  if(!task||['COMPLETED','FAILED','CANCELLED'].includes(task.status))return 'IMMEDIATE';
+  return 'UNKNOWN';
+}
+
 // Read the effective task projection used by the preview before changing the source or payment.
 export function demoReplacementSourceCheck(source, state, external, read) {
   if(source?.activatedAt==null)return {assignment:null,refusal:null};
-  const explicitV2=!['app','cycles'].includes(state.computeState??'app');
-  const projection=read(explicitV2?'/api/tasks/v2/assignments':'/api/tasks/assignments');
+  const path=demoReplacementAssignmentsPath(state);
+  const projection=read(path);
   const assignment=projection.devices.find(row=>row.deviceId===source.id);
   const task=assignment?.currentTask;
-  if(explicitV2){
+  if(path==='/api/tasks/v2/assignments'){
     if(assignment?.recoveryPending)return {assignment,refusal:'COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED'};
     const drained=!task||(task.startedAt==null?task.status==='FAILED':['COMPLETED','FAILED','CANCELLED'].includes(task.status));
     return {assignment,refusal:drained?null:'COMPUTE_V2_DEVICE_BUSY'};
@@ -939,8 +956,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       const {assignment,refusal}=demoReplacementSourceCheck(oldDevice,state,false,
         path=>demoFixture(new URL(path,url.origin),locale,state,{...request,method:()=>'GET'},now));
       if(refusal==='COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED')refuse(refusal);
-      const task=assignment?.currentTask;
-      if(['CLAIMED','RUNNING'].includes(task?.status)){
+      const task=demoActiveSlotReplacementTask(assignment);
+      if(task){
         const taskEndsAt=typeof task.completableAt==='number'?task.completableAt:Date.parse(task.completableAt);
         if(!computeFacts)retainDemoSlotReplacementTask(state,oldDevice,now,task);
         // deactivateAfterTask with an active task: the old device keeps its slot and only gets pending_deactivate.
@@ -1928,6 +1945,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     data.realizedTodayUsdt=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsUsdt??0),0).toFixed(6));
     data.realizedTodayNex=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsNex??0),0).toFixed(6));
     Object.assign(data,facts);
+    if(active.length){
+      let assignments=[];
+      try{
+        assignments=read(demoReplacementAssignmentsPath(state)).devices;
+      }catch(error){
+        if(error.status!==404||error.message!=='COMPUTE_V2_NOT_AVAILABLE')throw error;
+      }
+      const byDevice=new Map(assignments.map(row=>[row.deviceId,row]));
+      data.devices=facts.devices.map(device=>device.activatedAt===null?device:{
+        ...device,slotReplacementTiming:demoSlotReplacementTiming(byDevice.get(device.id)),
+      });
+    }
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {

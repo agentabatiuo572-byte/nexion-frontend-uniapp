@@ -200,7 +200,7 @@
           <DeviceArt class="device-replacement-lead__art" :device="replacementDevice" />
           <text class="device-replacement-lead__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.lead, { new: deviceSide(replacementDevice) })" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text>
         </view>
-        <view v-if="!tasksConfirmed" class="device-replacement-job-note" role="status">
+        <view v-if="hasUnknownReplacementTiming" class="device-replacement-job-note" role="status">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
           <text>{{ replacementCopy.jobUnknownNote }}</text>
         </view>
@@ -451,13 +451,17 @@ const canDeactivateActive = computed(() => activeDevices.value.some((device) => 
   && !(remoteApiEnabled && device.pendingDeactivate) && !device.replacement));
 const tasksConfirmed = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
-// Predict the timing from the job read. After submission, the fresh fleet read determines the message.
 function replacementTiming(device: Device): "idle" | "busy" | null {
+  if (device.slotReplacementTiming === "IMMEDIATE") return "idle";
+  if (device.slotReplacementTiming === "PENDING") return "busy";
+  if (device.slotReplacementTiming === "UNKNOWN") return null;
+  // Older fleet responses omit the forecast.
   if (!tasksConfirmed.value || device.recoveryPending) return null;
   const task = device.currentTask;
   if (!task) return "idle";
   return task.status == null || task.status === "CLAIMED" || task.status === "RUNNING" ? "busy" : null;
 }
+const hasUnknownReplacementTiming = computed(() => replacementCandidates.value.some(device => replacementTiming(device) === null));
 const replacementStep = computed(() => replacementDecision.value?.cancel === false ? replacementDecision.value : null);
 const replacementEffects = computed(() => {
   const step = replacementStep.value;
@@ -657,6 +661,12 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
   const accountKey = app.accountKey;
   const pageEpoch = replacementPageEpoch;
   const currentPage = () => pageEpoch === replacementPageEpoch && isCurrentAccountScope(scope);
+  const closeDecision = () => {
+    replacementSubmitting.value = false;
+    if (!currentPage()) return;
+    replacementDecision.value = null;
+    if (!cancel) replacementDevice.value = null;
+  };
   replacementBusy.value = true;
   try {
     const accepted = await askReplacementDecision(cancel, oldDevice, newDevice);
@@ -672,21 +682,20 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
     const pairKey = `${oldDevice.id}:${newDevice.id}:${newVersion}`;
     const payload = { oldDeviceId: Number(oldDevice.id), newDeviceId: Number(newDevice.id),
       oldExpectedVersion: oldVersion, newExpectedVersion: newVersion };
+    let refused = false;
     try {
       const key = acquireDeviceCommandKey(accountKey, operation, pairKey, oldVersion);
       if (cancel) await deviceE3Api.cancelDeviceReplacement(payload, key);
       else await deviceE3Api.replaceDevice(payload, key);
       finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
     } catch (error) {
-      if (isSlotReplacementRefusal(error)) {
-        finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
-        if (isCurrentAccountScope(scope)) void app.refreshRemoteFleet();
-        if (currentPage()) toast.warn(replacementCopy.value.retry);
-        return;
-      }
+      refused = isSlotReplacementRefusal(error);
+      if (refused) finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
       // The command may have committed. Keep its key until a fresh read confirms the outcome.
     }
-    if (!isCurrentAccountScope(scope) || !await app.refreshRemoteFleet() || !currentPage()) return;
+    closeDecision();
+    if (refused && currentPage()) toast.warn(replacementCopy.value.retry);
+    if (!isCurrentAccountScope(scope) || !await app.refreshRemoteFleet() || refused || !currentPage()) return;
     const latestNew = app.visibleDevices.find(device => device.id === newDevice.id);
     const latestOld = app.visibleDevices.find(device => device.id === oldDevice.id);
     if (!latestNew || !latestOld) return;
@@ -704,12 +713,8 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
     }
     finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
   } finally {
+    closeDecision();
     replacementBusy.value = false;
-    replacementSubmitting.value = false;
-    if (pageEpoch === replacementPageEpoch) {
-      replacementDecision.value = null;
-      if (!cancel) replacementDevice.value = null;
-    }
   }
 }
 
