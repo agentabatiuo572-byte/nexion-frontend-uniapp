@@ -145,7 +145,7 @@
                   :disabled="replacementBusy || !replacementCandidates.length" :aria-describedby="replacementCandidates.length ? undefined : `device-replacement-reason-${d.id}`" @click="openSlotReplacement(d)" />
               </template>
               <template v-if="!d.replacement && canStartSlotReplacement(d) && !replacementCandidates.length" #inventory-action-note>
-                <text :id="`device-replacement-reason-${d.id}`" class="device-replacement-reason"><template v-for="(part, i) in slotCopyParts(replacementCopy.noCandidateReason)" :key="i"><svg v-if="part.key" class="device-replacement-reason__more" role="img" :aria-label="t.myDevices.inventoryMoreActions" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg><text v-else>{{ part.text }}</text></template></text>
+                <text :id="`device-replacement-reason-${d.id}`" class="device-replacement-reason"><template v-for="(part, i) in slotCopyParts(canDeactivateActive ? replacementCopy.noCandidateReason : replacementCopy.noCandidateLine)" :key="i"><svg v-if="part.key" class="device-replacement-reason__more" role="img" :aria-label="t.myDevices.inventoryMoreActions" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg><text v-else>{{ part.text }}</text></template></text>
               </template>
             </DeviceInventoryRow>
           </view>
@@ -467,6 +467,9 @@ type Bay = { key: string; kind: "device" | "trial" | "reserved" | "empty" | "loa
 const deviceOnline = (d: Device) => deviceOnlineState(d, Date.now(), !remoteApiEnabled || app.remoteFleetStatus === "ready" || app.remoteFleetStatus === "loading") === "online";
 const replacementCandidates = computed(() => activeDevices.value.filter((device) =>
   device.kind !== "unknown" && deviceOnline(device) && !device.pendingDeactivate && !device.replacement));
+// The ⋯ way out only when some activated device can still be deactivated from its menu (same gate as its menu row).
+const canDeactivateActive = computed(() => activeDevices.value.some((device) => canControlDevice(device)
+  && !(remoteApiEnabled && device.pendingDeactivate) && !device.replacement));
 const tasksConfirmed = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
 // The job read can omit expired legacy assignments and drained v2 jobs that still affect stopping.
