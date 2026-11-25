@@ -399,8 +399,11 @@ const selectedProductNo = computed(() => originalPurchase.value ? null : selecte
 const usePurchaseOptions = computed(() => remoteApiEnabled && isActiveCycle.value && purchaseOptionsView.value.status !== "unsupported");
 const purchaseOptionLoading = computed(() => usePurchaseOptions.value && !purchaseOptionsView.value.options.length
   && ["idle", "loading"].includes(purchaseOptionsView.value.status));
-const purchaseOptionsFailed = computed(() => usePurchaseOptions.value && purchaseOptionsView.value.status === "failed");
-const noBuyableDevices = computed(() => usePurchaseOptions.value && purchaseOptionsView.value.status === "ready"
+// Only the first read: a later failure keeps the rows, the selection and the ticket it already has.
+const purchaseOptionsFailed = computed(() => usePurchaseOptions.value && purchaseOptionsView.value.status === "failed"
+  && !purchaseOptionsView.value.options.length);
+const noBuyableDevices = computed(() => usePurchaseOptions.value
+  && (purchaseOptionsView.value.status === "ready" || purchaseOptionsView.value.options.length > 0)
   && !purchaseOptionsView.value.options.some(option => option.canBuy));
 const showDevicePicker = computed(() => {
   if (!usePurchaseOptions.value) return false;
@@ -555,7 +558,7 @@ const trialBuyBusy = computed(() => openingPurchase.value || (originalPurchase.v
   : usePurchaseOptions.value ? purchaseOptionLoading.value : trialCatalogLoading.value));
 const listLoading = computed(() => purchaseOptionLoading.value && !originalPurchase.value);
 const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalPurchase.value ? false
-  : usePurchaseOptions.value ? purchaseOptionsView.value.status !== "ready" || !selectedOption.value || !purchaseQuote.value
+  : usePurchaseOptions.value ? !selectedOption.value || !purchaseQuote.value
     : trialProductUnavailable.value && !trialCatalogLoading.value));
 const trialBuyCtaText = computed(() => {
   const original = originalPurchase.value;
@@ -563,7 +566,7 @@ const trialBuyCtaText = computed(() => {
     ? t.value.orders.pendingContinue : detail.value.viewProgress;
   if (usePurchaseOptions.value) {
     if (waitingForReselection.value) return detail.value.chooseDevice;
-    return purchaseOptionsView.value.status === "ready" && purchaseQuote.value
+    return selectedOption.value && purchaseQuote.value
       ? fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
   }
   if (productCatalogState.status === "error") return t.value.store.catalogErrorTitle;
@@ -614,7 +617,7 @@ const barNote = computed(() => {
     if (purchaseOptionsFailed.value) return detail.value.listFailed;
     if (purchaseOptionsView.value.status === "not-convertible") return detail.value.optionUnavailable;
     if (noBuyableDevices.value) return isGrace.value ? detail.value.noneBuyableGrace : detail.value.noneBuyable;
-    return "";
+    return purchaseOptionsView.value.status === "failed" ? t.value.exchange.staleSnapshot : "";
   }
   if ((isActiveCycle.value || status.value === "ended") && trialProductUnavailable.value && productCatalogState.status === "ready") {
     return t.value.store.trialProductUnavailable;
@@ -692,7 +695,9 @@ async function goCheckout() {
       if (visit.current()) await navTo(checkoutHref(productNo));
     }
   } catch {
-    if (visit.current() && original?.kind === "EXTERNAL") toast.warn(purchase.value.coPurchaseUnavailable);
+    if (!visit.current()) return;
+    if (original?.kind === "EXTERNAL") toast.warn(purchase.value.coPurchaseUnavailable);
+    else if (!original) toast.warn(detail.value.listFailed);
   } finally {
     if (visit.sameClaim()) openingPurchase.value = false;
   }
