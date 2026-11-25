@@ -746,6 +746,7 @@ export const useApp = defineStore("app", () => {
       activationUnconfirmed,
       pendingDeactivate: device.pendingDeactivate,
       ...(device.replacement && { replacement: device.replacement }),
+      ...(device.slotReplacementTiming && { slotReplacementTiming: device.slotReplacementTiming }),
       lastSettledAt: null,
       onlineHeartbeatAt: null,
       runtimeStatus: device.runtimeStatus ?? "UNKNOWN",

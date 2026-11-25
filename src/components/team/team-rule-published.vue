@@ -22,8 +22,10 @@ import SubPageHeader from '@/components/sub-page-header.vue';
 import TeamRuleHero from './team-rule-hero.vue';
 import TeamRuleDocument from './team-rule-document.vue';
 import { teamRuleGuideCopy } from './team-rule-guide-copy';
-import { ApiError } from '@/api/errors';
-import { howContentApi, remoteApiEnabled } from '@/api/runtime';
+import { apiRuntimeConfig, howContentApi, remoteApiEnabled } from '@/api/runtime';
+import { captureAccountScope, isCurrentAccountScope } from '@/lib/account-scope';
+import { isTransientReadFailure } from '@/lib/remote-read-failure';
+import { useApp } from '@/store/app';
 import type { HowContentDocument, HowContentKey } from '@/api/how-content-api';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
@@ -33,6 +35,7 @@ import { serverLanguage } from '@/i18n';
 
 const props = defineProps<{ contentKey: HowContentKey; back: string; backLabel: string; kind: 'members' | 'balance'; heading: string }>();
 const locale = useLocaleStore(), t = useT();
+const app = useApp();
 const languageFallback = computed(() => !!content.value && content.value.locale.split(/[-_]/)[0].toLowerCase() !== locale.code.split(/[-_]/)[0].toLowerCase());
 const copy = computed(() => teamRuleGuideCopy(locale.code));
 const content = ref<HowContentDocument | null>(null);
@@ -54,30 +57,35 @@ const directory = computed(() => {
 async function load() {
   const generation = requestFence.begin(`${props.contentKey}:${locale.code}`);
   if (generation === null) return;
+  const owner = captureAccountScope();
+  const current = () => requestFence.isCurrent(generation) && isCurrentAccountScope(owner);
   loading.value = true; error.value = false;
   try {
     const next = await howContentApi.published(props.contentKey, serverLanguage(locale.code));
-    if (!requestFence.isCurrent(generation)) return;
+    if (!current()) return;
     if (next.blocks.some(block => [block.title, block.body, ...(block.items ?? [])].some(text => text.includes('{value}')))) throw new Error('HOW_CONTENT_RULE_VALUE_UNRESOLVED');
     if (props.contentKey === 'team-unilevel-how' && (!next.blocks.some(block => block.id === 'direct-referral-scope')
       || (next.schemaVersion === 2 && (next.templateId !== 'unilevel-v2' || !next.blocks.some(block => block.id === 'seven-layer-scope'))))) throw new Error('TEAM_PUBLICATION_REQUIRED');
     content.value = next;
     failureShown.value = false;
   } catch (failure) {
-    if (!requestFence.isCurrent(generation)) return;
-    // 断网和服务端故障时已读到的正文照常显示；发布内容本身不合格才清掉。
-    if (!(failure instanceof ApiError && (failure.kind === 'network' || (failure.kind === 'http' && (failure.status ?? 0) >= 500)))) content.value = null;
+    if (!current()) return;
+    if (!isTransientReadFailure(failure)) content.value = null;
     error.value = true;
     failureShown.value = true;
   } finally {
     if (requestFence.isCurrent(generation)) { loading.value = false; requestFence.settle(generation); }
   }
 }
-watch(() => [props.contentKey, locale.code], () => {
+const scope = () => [props.contentKey, locale.code, app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
+watch(scope, () => {
   requestFence.invalidate(); content.value = null; error.value = false; failureShown.value = false;
+  loading.value = remoteApiEnabled;
+}, { flush: 'sync' });
+watch(scope, () => {
   if (remoteApiEnabled) void load();
   else loading.value = false;
-}, { immediate: true, flush: 'sync' });
+}, { immediate: true });
 onShow(() => { if (remoteApiEnabled && !loading.value) void load(); });
 useAutoRecovery({ failed: () => remoteApiEnabled && error.value && !loading.value, retry: load });
 onUnmounted(() => requestFence.invalidate());

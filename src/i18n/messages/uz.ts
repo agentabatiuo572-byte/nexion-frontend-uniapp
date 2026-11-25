@@ -2212,7 +2212,7 @@ export const uz: Messages = {
     inventoryConfirmDeactivateCancel: "Orqaga",
     inventorySlotsFullWarning: "Slotlar toʻla. Avval bitta qurilmani oʻchiring.",
     inventoryCtaGoStore: "Doʻkonga",
-    inventoryPendingDeactivateChip: "Vazifa tugagach oʻchiriladi",
+    inventoryPendingDeactivateChip: "Ish tugagach oʻchiriladi",
     inventoryRowActivate: "Yoqish",
     inventoryRowDeactivate: "Oʻchirish",
     inventoryMoreActions: "Boshqa amallar",

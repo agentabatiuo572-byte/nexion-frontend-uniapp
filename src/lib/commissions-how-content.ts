@@ -8,11 +8,12 @@ import { formatHowNumber } from "./rank-how-content";
 import { uiLocale } from "@/i18n";
 import { fmt } from "@/i18n/format";
 import { deviceLevel2On, deviceLevel2RatePct } from "./device-earning-level2";
+import { isTransientReadFailure } from "./remote-read-failure";
 
 export interface CommissionsHowSnapshot {
   document: HowContentDocument;
   rates?: CommissionGuideRates;
-  ratesFailed: boolean;
+  sectionsFailed: boolean;
   directPolicy: DirectReferralPolicy | null;
   guide: CommissionGuideRules | null;
   ranks: CanonicalVRankRow[] | null;
@@ -201,7 +202,7 @@ export function buildCommissionsHowContent(snapshot: CommissionsHowSnapshot | nu
   return { copy, blocks, sections, amounts, exampleBase };
 }
 
-export interface CommissionsHowState { loading: boolean; error: boolean; snapshot: CommissionsHowSnapshot | null }
+export interface CommissionsHowState { loading: boolean; error: boolean; transientFailure?: boolean; snapshot: CommissionsHowSnapshot | null }
 export function createCommissionsHowResource(deps: { read(locale: string): Promise<CommissionsHowSnapshot>; apply(state: CommissionsHowState): void }) {
   let epoch = 0, disposed = false;
   let pending: { locale: string; promise: Promise<void> } | undefined;
@@ -212,7 +213,9 @@ export function createCommissionsHowResource(deps: { read(locale: string): Promi
     deps.apply({ loading: true, error: false, snapshot: null });
     const promise = Promise.resolve().then(() => deps.read(locale))
       .then(snapshot => { if (!disposed && epoch === request) deps.apply({ loading: false, error: false, snapshot }); })
-      .catch(() => { if (!disposed && epoch === request) deps.apply({ loading: false, error: true, snapshot: null }); })
+      .catch(cause => {
+        if (!disposed && epoch === request) deps.apply({ loading: false, error: true, transientFailure: isTransientReadFailure(cause), snapshot: null });
+      })
       .finally(() => { if (epoch === request) pending = undefined; });
     pending = { locale, promise };
     return promise;

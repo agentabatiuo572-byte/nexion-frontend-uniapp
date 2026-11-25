@@ -1,6 +1,12 @@
 import type { CanonicalQuest } from "@/api/quest-api";
 import type { Product } from "@/mock/products";
-import type { DeviceKind } from "@/store/types";
+import type { Device, DeviceKind } from "@/store/types";
+
+/** Lite's device views leave out phones, and a device missing from the list is out of view too. A replacement whose
+ *  other end is out of view still shows on the visible end, without naming that other device (Lite PRD §5.0). */
+export function isLiteShownDevice(id: number | string, devices: readonly Device[]): boolean {
+  return devices.some(device => device.id === String(id) && device.kind !== "phone");
+}
 
 /** Native phone setup and legacy multi-platform review pages are not Lite routes. */
 export function isLiteNativeRoute(href: string): boolean {

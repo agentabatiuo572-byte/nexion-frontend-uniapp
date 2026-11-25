@@ -48,7 +48,9 @@ export function demoComputeFacts(state,now,fleetDevices) {
     for(const device of fleet){
       if(device.activatedAt===null)continue;
       const snapshot=snapshots[device.id];
-      while(starts[device.id]+cycleMs<=now){
+      // A waiting replacement lets this cycle settle through its normal ledger path, then frees the slot.
+      const cutoff=Math.min(now,state.slotReplacements?.[device.id]?.taskEndsAt??now);
+      while(starts[device.id]+cycleMs<=cutoff){
         const startedAt=starts[device.id],identity=`${device.id}-${startedAt}`;
         const task=describe(snapshot,startedAt,now,`DEMO-TASK-${identity}`,`DEMO-RECEIPT-${identity}`,null,true);
         due.push({...task,queuedAt:Math.max(device.activatedAt,startedAt-1000)});
@@ -173,6 +175,7 @@ export function computeDemo(url, state, request, now, facts) {
   }
   if (path === '/api/tasks/simulated/stop' && request.method() === 'POST') {
     const { deviceId, expectedVersion } = request.postDataJSON();
+    if(state.slotReplacements?.[deviceId])throw Object.assign(new Error('DEVICE_REPLACEMENT_PENDING'),{status:409});
     // expectedVersion is optional (decision 3: the App omits it); a stated version must still match.
     if (!devices.includes(deviceId) || (expectedVersion!=null&&expectedVersion!==(state.deviceActivations?.[deviceId]?.rowVersion??snapshots[deviceId].device.rowVersion))) throw Object.assign(new Error('DEVICE_VERSION_CONFLICT'), { status: 409 });
     if(!state.stoppedDevices?.includes(deviceId))(state.stoppedDevices??=[]).push(deviceId);
