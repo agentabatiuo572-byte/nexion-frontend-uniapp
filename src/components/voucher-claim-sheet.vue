@@ -7,7 +7,7 @@
   Zero card chrome on the protected tab pages — this is a chassis overlay.
 -->
 <template>
-  <view v-if="sheet.open" class="vcs-root" role="dialog" aria-modal="true">
+  <view v-if="sheet.open" class="vcs-root" role="dialog" aria-modal="true" :aria-label="t.voucher.popupTitle">
     <view class="vcs-backdrop" @click="hide" />
 
     <view class="nx-glass-sheet vcs-panel" @click.stop>
@@ -22,9 +22,8 @@
             <text class="vcs-title">{{ t.voucher.popupTitle }}</text>
           </view>
         </view>
-        <view class="vcs-close" role="button" tabindex="0" :aria-label="t.voucher.closeAria" @click="hide">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-        </view>
+        <!-- The shared sheet close (as NxSheet): neutral glass M, round (03 §3.1 圆形关闭, 全站玻璃控件边缘). -->
+        <NxButton class="vcs-close" :label="t.voucher.closeAria" size="medium" round @click="hide"><NxIcon name="close" :size="18" /></NxButton>
       </view>
 
       <text class="vcs-sub">{{ t.voucher.popupSubtitle }}</text>
@@ -40,23 +39,19 @@
             <text class="vcs-name">{{ v.name }}</text>
             <text class="vcs-scope">{{ scopeText(v) }}</text>
             <text class="vcs-expiry">{{ expiryText(v) }}</text>
-            <view
-              class="vcs-cta"
-              :class="voucher.isClaimed(v.id) ? 'vcs-cta-use' : 'vcs-cta-claim'"
-              role="button"
-              tabindex="0"
-              :aria-label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta"
-              @click.stop="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)"
-            >
-              <text class="vcs-cta-t">{{ voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta }}</text>
-              <svg v-if="voucher.isClaimed(v.id)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+            <!-- One control whose role follows the voucher (03 §3.1, 3.9): 领取 repeated down a list is brand glass M; once
+                 claimed, 「去使用」 is an inline brand text action with a trailing arrow into the next page. The same node stays,
+                 so focus stays on it when the claim lands. The slot keeps the 44px row in both states. -->
+            <view class="vcs-cta">
+              <NxButton :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
       </view>
 
-      <view class="vcs-dismiss" role="button" tabindex="0" :aria-label="t.voucher.dismissCta" @click="hide">
-        <text class="vcs-dismiss-t">{{ t.voucher.dismissCta }}</text>
+      <!-- Text button (03 §3.1). Once every listed voucher is claimed there is nothing left to decline, so it closes (06.1). -->
+      <view class="vcs-dismiss" role="button" tabindex="0" :aria-label="dismissLabel" @click="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide">
+        <text class="vcs-dismiss-t">{{ dismissLabel }}</text>
       </view>
     </view>
   </view>
@@ -77,6 +72,8 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 
 const sheet = useVoucherClaimSheet();
 const voucher = useVoucher();
@@ -92,6 +89,9 @@ const vouchers = computed<VoucherDef[]>(() => {
     sheet.surface,
   );
 });
+
+const dismissLabel = computed(() => vouchers.value.length > 0 && vouchers.value.every(v => voucher.isClaimed(v.id))
+  ? t.value.voucher.closeAria : t.value.voucher.dismissCta);
 
 function formatDate(ms: number): string {
   return formatDisplayDate(ms, dateLocale());
@@ -218,41 +218,29 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   display: flex;
   flex-direction: column;
 }
+/* Eyebrow: interface font, label role 12/16 500, no tracking or capitals (01 §1.2 字距, 06 §6.3 no monospace for style). */
 .vcs-cap {
-  font-size: 12px;
-  font-family: var(--font-jet-mono), monospace;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5);
   color: var(--v5-brand);
 }
+/* Sheet title: overview-title role (03 §3.9). */
 .vcs-title {
-  font-family: var(--font-v5);
-  font-size: var(--ui-type-hero-title);
-  font-weight: 600;
+  font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);
+  letter-spacing: -0.01em;
   color: var(--v5-ink);
   margin-top: 2px;
-  line-height: 1.25;
+}
+.vcs-title:lang(zh) {
+  letter-spacing: 0;
 }
 .vcs-close {
-  /* 《07》tap≥44 —— 与本弹层主/次 CTA 同批修(原 36 漏改) */
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  background: var(--v5-surface-2);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: background 0.12s ease;
-}
-.vcs-close:active {
-  background: var(--v5-surface-3);
+  flex: none;
 }
 .vcs-sub {
   display: block;
-  margin-top: 10px;
-  font-size: var(--ui-type-list-subtitle);
+  margin-top: 8px;
+  font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);
   color: var(--v5-ink-3);
-  line-height: 1.5;
 }
 .vcs-list {
   margin-top: 16px;
@@ -279,21 +267,18 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   border-right: 1px dashed color-mix(in srgb, var(--v5-brand) 32%, transparent);
   padding-right: 12px;
 }
+/* Face value: the card's own main figure under 30px, Montserrat 500 (10 §10.1 卡内主数值, 01 §1.2 金额不另设 600). */
 .vcs-val {
-  font-family: var(--font-amount);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount);
   color: var(--v5-brand);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+/* Conditions and expiry carry information: auxiliary ink, never the disabled ink (01 §1.1.1). */
 .vcs-cond {
-  font-size: 12px;
-  color: var(--v5-ink-4);
+  font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);
+  color: var(--v5-ink-3);
   text-align: center;
-  line-height: 1.3;
 }
 .vcs-card-r {
   flex: 1;
@@ -301,57 +286,30 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   display: flex;
   flex-direction: column;
 }
+/* Voucher name and its lines: list title 500 and list subtitle (10 §10.1; same as the voucher list, rewards-list). */
 .vcs-name {
-  font-family: var(--font-v5);
-  font-size: 13px;
-  font-weight: 600;
+  font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5);
   color: var(--v5-ink);
-  line-height: 1.3;
+  overflow-wrap: break-word;
 }
 .vcs-scope {
-  font-size: 12px;
+  margin-top: 4px;
+  font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);
   color: var(--v5-ink-3);
-  margin-top: 3px;
-  line-height: 1.35;
 }
 .vcs-expiry {
-  font-size: 12px;
-  font-family: var(--font-jet-mono), monospace;
-  color: var(--v5-ink-4);
   margin-top: 2px;
+  font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);
+  font-variant-numeric: tabular-nums;
+  color: var(--v5-ink-3);
 }
 .vcs-cta {
   /* 主人 2026-08-16:CTA 落卡片右下角,与上方文字块拉开,不挤在一起 */
-  margin-top: 14px;
+  margin-top: 12px;
   align-self: flex-end;
-  /* 《07》tap≥44 + 转化场景主 CTA 权重必须压过 dismiss(原 34px 比满宽 40px
-     的 dismiss 还矮,视觉权重倒挂) */
   min-height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  transition: transform 0.12s ease, opacity 0.12s ease;
-}
-.vcs-cta:active {
-  transform: scale(0.97);
-  opacity: 0.92;
-}
-.vcs-cta-claim {
-  background: var(--v5-brand);
-}
-.vcs-cta-use {
-  background: var(--v5-brand);
-  box-shadow: 0 0 20px color-mix(in srgb, var(--v5-brand) 22%, transparent);
-}
-.vcs-cta-t {
-  font-family: var(--font-v5);
-  /* 《02》§2 button.m 15/20/600 */
-  font-size: var(--ui-type-button);
-  line-height: 20px;
-  font-weight: 600;
-  color: var(--v5-on-brand);
 }
 .vcs-dismiss {
   margin-top: 16px;
@@ -366,11 +324,14 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
 .vcs-dismiss:active {
   opacity: 0.7;
 }
+/* Text button (03 §3.1): no container, brand ink, button role. */
 .vcs-dismiss-t {
-  /* 《02》§4:用户需读懂才能决策 → body.s 13 而非 caption 12 */
-  font-size: var(--ui-type-list-subtitle);
-  line-height: 18px;
-  font-weight: 400;
-  color: var(--v5-ink-3);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-brand);
+  text-align: center;
+}
+.vcs-dismiss:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 3px;
 }
 </style>

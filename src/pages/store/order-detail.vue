@@ -164,9 +164,17 @@
       </view>
       <view v-if="order && stickyActionsVisible && !resultShown" ref="orderTray" class="order-sticky order-actions-tray nx-glass-bar">
         <template v-if="pendingOrderActionsVisible">
+          <!-- A full-price order for the device now on trial (R13) cannot be paid: the reason above the tray, cancel stays, and the
+               way on is the trial credit with this device preselected (04 普通结算与本人试用设备). -->
+          <text v-if="trialOrderWaitNote" id="order-trial-wait-note" class="nx-tray-note w-full" role="status">{{ trialOrderWaitNote }}</text>
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <!-- One verb for paying an open order on every surface (结算页, 外付中, 钱包待付): 继续付款; the name also says the amount. -->
-          <NxButton v-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })" :busy-label="pendingPaymentChecking || trialOrderWaitReason === 'loading' ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet || trialOrderWaitReason === 'loading'" @click="requestPendingPayment(false, 'tray')"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
+          <NxButton v-if="ownTrialOrderProduct" variant="primary" :label="t.store.buyWithTrialCredit" @click="navTo('/pages/me/trial?product=' + encodeURIComponent(ownTrialOrderProduct))"><text>{{ t.store.buyWithTrialCredit }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
+          <NxButton v-else-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary"
+            :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })"
+            :busy-label="pendingPaymentChecking || trialOrderWaitReason === 'loading' ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet || trialOrderWaitReason === 'loading'"
+            :disabled="trialOrderWaitReason === 'failed'" :aria-describedby="trialOrderWaitNote ? 'order-trial-wait-note' : undefined"
+            @click="requestPendingPayment(false, 'tray')"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="buyAgainLabel" @click="goStore" />
@@ -732,6 +740,9 @@ const trialOrderWaitReason = computed(() => {
   if (freeTrial.authorityStatus === 'error') return 'failed';
   return freeTrial.isOwnTrialDevice(productNo) ? 'ownTrialDeviceOrder' : 'failed';
 });
+const ownTrialOrderProduct = computed(() => trialOrderWaitReason.value === 'ownTrialDeviceOrder' ? trialOrderProduct.value : null);
+const trialOrderWaitNote = computed(() => ownTrialOrderProduct.value ? purchaseCopy.value.coOwnTrialOrderDetail
+  : trialOrderWaitReason.value === 'failed' ? purchaseCopy.value.coLoadFailed : '');
 useAutoRecovery({
   failed: () => trialOrderWaitReason.value === 'failed',
   retry: () => freeTrial.refreshRemote(),

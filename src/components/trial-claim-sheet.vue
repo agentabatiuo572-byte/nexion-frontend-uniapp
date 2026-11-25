@@ -12,11 +12,10 @@
           </view>
         </view>
       </view>
-      <view class="tcs-close" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-      </view>
+      <!-- The shared sheet close (as NxSheet): neutral glass M, round (03 §3.1 圆形关闭, 全站玻璃控件边缘). The wrapper only places it. -->
+      <view class="tcs-close"><NxButton :label="t.trial.sheetCloseAria" size="medium" round @click="hide"><NxIcon name="close" :size="18" /></NxButton></view>
 
-      <view class="tcs-device">
+      <view class="tcs-device" :class="{ 'tcs-device--sub': activated }">
         <CatalogMachineImage class="tcs-device-art" :sku="trialView.productId.value" :image-url="getProductMedia(trialView.productId.value)?.src" scope-key="trial-claim" />
         <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '—' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
       </view>
@@ -29,15 +28,15 @@
         <view class="tcs-hero">
           <view aria-hidden="true" class="tcs-hero-grid" />
           <view class="tcs-hero-row"><text class="tcs-hero-label">{{ copy.estimateLabel }}</text></view>
-          <view class="tcs-hero-num-row"><text class="tcs-hero-num">{{ estimateText }}</text></view>
-          <text class="tcs-estimate-note">{{ estimateNote }}</text>
+          <view class="tcs-hero-num-row"><text v-if="estimateParts" class="tcs-hero-num"><text class="tcs-hero-num__cur">$</text>{{ estimateParts.int }}<text class="tcs-hero-num__dec">{{ estimateParts.dec }}</text></text><text v-else class="tcs-hero-num tcs-hero-num--unknown">—</text></view>
+          <text class="tcs-estimate-note"><text v-for="(part, i) in estimateNoteParts" :key="i" :class="{ 'tcs-estimate-note__num': part.value }">{{ part.text }}</text></text>
         </view>
       </template>
 
       <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary.
            The line itself is a sheet status or hint line (10 §10.2): a result still being confirmed is a status line (16px status
            icon, body ink); a refusal is a hint line (16px warning icon, primary ink). -->
-      <view v-if="freeTrial.pendingStart || claimError || retryHeld || standingReason" class="tcs-error" :class="lineIsStatus ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
+      <view v-if="reasonLine" id="tcs-reason" class="tcs-error" :class="lineIsStatus ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
         <svg v-if="lineIsStatus" class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
         <svg v-else class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
@@ -53,8 +52,8 @@
           <NxButton variant="primary" :label="copy.viewDevices" @click="goDevices" />
           <NxButton variant="secondary" :label="fleetCopy.buy" @click="goTrial" />
         </template>
-        <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" />
-        <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
+        <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" :aria-describedby="claimDisabled && reasonLine ? 'tcs-reason' : undefined" @click="onClaim" />
+        <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="dismissLabel" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ dismissLabel }}</text></view>
       </view>
     </view>
   </view>
@@ -63,6 +62,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
@@ -90,13 +90,26 @@ const fleetCopy = useTrialFleetCopy();
 // The result stays up while recovery re-reads, so a retry does not blink it away.
 const stateReadFailed = trialView.readFailedWithoutData;
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
-const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '—' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
+// Sheet main amount (10 §10.2): the whole part stays, the $ and the decimals take the auxiliary ink; unknown is a whole 「—」.
+const estimateParts = computed(() => {
+  if (trialView.estimatedOffsetUSD.value === null) return null;
+  const [int, dec] = formatAmount(trialView.estimatedOffsetUSD.value).split('.');
+  return { int, dec: dec === undefined ? '' : `.${dec}` };
+});
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
-const estimateNote = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value ? t.value.exchange.staleSnapshot : trialView.config.value
-  ? trialView.config.value.shadowDailyUSD === null ? '' : fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
-  rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
-  cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
-}) : stateReadFailed.value ? '' : copy.value.loading);
+// The estimate card holds catalog information only (03 §3.4); a failed refresh is said on the status line by the button.
+// The basis line under the amount sets its figures in 500 (10 §10.2), so the sentence is split around its placeholders;
+// a "$" written right before a placeholder belongs to the figure.
+const estimateNoteParts = computed<{ text: string; value: boolean }[]>(() => {
+  const config = trialView.config.value;
+  if (!config) return stateReadFailed.value ? [] : [{ text: copy.value.loading, value: false }];
+  if (config.shadowDailyUSD === null) return [];
+  const values: Record<string, string> = { rate: formatAmount(config.shadowDailyUSD), days: String(config.trialDays), cap: formatAmount(config.trialOffsetCapUSD) };
+  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\$?\{\w+\})/).filter(Boolean).map((part) => {
+    const match = /^(\$?)\{(\w+)\}$/.exec(part);
+    return match && match[2] in values ? { text: match[1] + values[match[2]], value: true } : { text: part, value: false };
+  });
+});
 const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
 
 // Claim submission — loading guard against double taps (异常3; the store's
@@ -133,8 +146,15 @@ const retryHeld = computed(() => claiming.value && claimFromRetry.value);
 // A start found not to have run offers 重新领取, so its line says it did not start (a hint), not that it is confirming (03 §3.5.2).
 const startNotRun = computed(() => !!freeTrial.pendingStart && freeTrial.startRetryable);
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
-const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value);
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
+// A refresh that failed over the shown data holds the claim: that is why 「免费激活」 is off, said as a status line beside it
+// while recovery reads again on its own (03 §3.1 禁用要有原因, §3.5.2).
+const staleRead = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value && !freeTrial.pendingStart
+  && !activated.value && !claiming.value && !claimError.value && !standingReason.value);
+const reasonLine = computed(() => !!freeTrial.pendingStart || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value);
+// Nothing left to decide once the claim is refused for now: the exit closes the sheet instead of 「我再想想」.
+const dismissLabel = computed(() => activated.value || claimDenied.value ? copy.value.close : t.value.trial.sheetDismissCta);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
   failed: () => remoteApiEnabled && !freeTrial.authorityResultUnknown && freeTrial.authorityStatus !== "loading"
@@ -152,6 +172,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
 const claimErrorText = computed(() => freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
+  : staleRead.value ? t.value.exchange.staleSnapshot
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : sheet.failureText(shownReason.value));
@@ -234,22 +255,33 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-spark-box--success { box-shadow:0 0 24px color-mix(in srgb,var(--v5-brand) 14%,transparent);animation:tcs-success .4s ease-out; }
 @keyframes tcs-success { from { transform:scale(.8);opacity:.4; } to { transform:scale(1);opacity:1; } }
 .tcs-head-meta { display:flex;flex-direction:column;min-width:0; }
-.tcs-title { font:600 17px/1.35 var(--font-v5);color:var(--v5-ink);margin-top:3px;overflow-wrap:break-word; }
-.tcs-close { position:absolute;right:16px;top:16px;z-index:1;width:44px;height:44px;border-radius:999px;background:var(--v5-surface-2);display:grid;place-items:center;flex-shrink:0; }
-.tcs-close:active { background:var(--v5-surface-3); }
+/* Sheet title and the device name it opens on: the overview-title role (03 §3.9 弹层标题, 10 §10.1). */
+.tcs-title { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
+.tcs-close { position:absolute;right:16px;top:16px;z-index:1; }
 .tcs-device { display:flex;align-items:center;gap:12px;padding:8px 0 12px;border-bottom:1px solid var(--v5-border); }
 .tcs-device-art { width:200px;height:200px;flex:none; }
 .tcs-device-meta { min-width:0;display:flex;flex-direction:column;gap:5px; }
 .tcs-device-caption { font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3); }
-.tcs-device-name { font:600 19px/1.3 var(--font-v5);color:var(--v5-ink);overflow-wrap:break-word; }
+.tcs-device-name { font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
+.tcs-title:lang(zh),.tcs-device-name:lang(zh) { letter-spacing:0; }
+/* Once activated the sheet has its own title above, so the device name is a card title under it (03 §3.9). */
+.tcs-device--sub .tcs-device-name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5);letter-spacing:0; }
 .tcs-device-duration { font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-brand);overflow-wrap:break-word; }
 .tcs-hero { margin-top:16px;border-radius:16px;padding:16px;position:relative;overflow:hidden;background:color-mix(in srgb,var(--v5-brand) 6%,var(--v5-surface-2));border:none; }
 .tcs-hero-grid { position:absolute;inset:0;pointer-events:none;opacity:.04;background-image:linear-gradient(var(--v5-brand) 1px,transparent 1px),linear-gradient(90deg,var(--v5-brand) 1px,transparent 1px);background-size:16px 16px; }
 .tcs-hero-row,.tcs-hero-num-row { position:relative; }
-.tcs-hero-label { font:500 12px/1.5 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
-.tcs-hero-num-row { margin-top:8px; }
-.tcs-hero-num { font:500 34px/1.15 var(--font-amount);letter-spacing:-.025em;color:var(--v5-brand);font-variant-numeric:tabular-nums;overflow-wrap:break-word; }
-.tcs-estimate-note { display:block;position:relative;margin-top:9px;font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+/* The amount's field name: auxiliary ink, 400 (01 §1.1.1 字段名), 4px above the figure (01 §1.3). */
+.tcs-hero-label { font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.tcs-hero-num-row { margin-top:4px; }
+/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500 (not the role's 550), $ and decimals auxiliary. */
+.tcs-hero-num { display:block;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount);letter-spacing:-.02em;color:var(--v5-brand);font-variant-numeric:tabular-nums;white-space:nowrap; }
+/* line-height 1: the smaller symbol sits inside the figure's line instead of growing it. */
+.tcs-hero-num__cur { color:var(--v5-ink-3);font-size:max(12px,.55em);line-height:1; }
+.tcs-hero-num__dec { color:var(--v5-ink-3); }
+.tcs-hero-num--unknown { color:var(--v5-ink-3); }
+/* Basis line under the amount: auxiliary figure 12/16, its figures 500 (10 §10.2). */
+.tcs-estimate-note { display:block;position:relative;margin-top:8px;font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
+.tcs-estimate-note__num { font-weight:500;font-variant-numeric:tabular-nums; }
 .tcs-success { margin-top:16px;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--v5-brand) 7%,var(--v5-surface-2));border:1px solid color-mix(in srgb,var(--v5-brand) 25%,transparent); }
 .tcs-success-body { display:block;font:400 var(--ui-type-list-subtitle)/1.65 var(--font-v5);color:var(--v5-ink-2); }
 .tcs-success-time { display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-top:14px;font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3); }
@@ -272,7 +304,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-dismiss { width:100%;min-height:44px;display:flex;align-items:center;justify-content:center; }
 .tcs-dismiss:active { opacity:.7; }
 .tcs-dismiss-t { font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);color:var(--v5-brand);text-align:center; }
-.tcs-close:focus-visible,.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
-@media(max-width:350px) { .tcs-device-art { width:160px;height:160px; }.tcs-device-name {font-size:17px;}.tcs-title {font-size:16px;} }
+.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
+@media(max-width:350px) { .tcs-device-art { width:160px;height:160px; } }
 @media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-spark-box--success { animation:none; } }
 </style>

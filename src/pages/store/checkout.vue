@@ -110,24 +110,28 @@
                 <text v-if="hasVoucher" class="checkout-discount">{{ reviewMoney(voucherDiscount, true) }}</text><svg class="checkout-chevron" :class="{ 'checkout-chevron--open': voucherDetailsOpen }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
               </view>
               <view v-if="voucherDetailsOpen && !multiTrialCheckout" class="checkout-voucher-details">
+                <!-- Locked group (03 §3.5 整组暂时不能改选): every row at 50% and one sentence under the group's title saying why. -->
+                <view v-if="voucherLockedByOrder" id="checkout-voucher-lock" class="checkout-voucher-lock"><svg class="checkout-voucher-lock__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg><text>{{ reviewCopy.voucherLocked }}</text></view>
                 <text v-if="voucherMatch" class="checkout-row-description checkout-voucher-match">{{ voucherMatch.def.name }}</text>
-                <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher">
+                <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher" :aria-describedby="voucherLockedByOrder ? 'checkout-voucher-lock' : undefined">
                   <!-- Single-select rows (03 §3.5): the checked row is the one tab stop; arrows move to the other choice and select it; Space/Enter select.
                        Written out (no v-for) so the radio-group keyboard gate sees both members. -->
                   <view class="checkout-voucher-choice" role="radio" data-automatic="true" :aria-checked="voucherAutomatic === true" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === true ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(true)"
                     @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)"
                     @keydown.down.stop.prevent="moveVoucherChoice(true)" @keydown.right.stop.prevent="moveVoucherChoice(true)" @keydown.up.stop.prevent="moveVoucherChoice(true)" @keydown.left.stop.prevent="moveVoucherChoice(true)">
+                    <view class="checkout-voucher-choice__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M9 9h.01" /><path d="m15 9-6 6" /><path d="M15 15h.01" /></svg></view>
                     <text class="checkout-voucher-choice__label">{{ reviewCopy.automaticVoucher }}</text>
                     <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === true }" aria-hidden="true" />
                   </view>
                   <view class="checkout-voucher-choice" role="radio" data-automatic="false" :aria-checked="voucherAutomatic === false" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === false ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(false)"
                     @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)"
                     @keydown.down.stop.prevent="moveVoucherChoice(false)" @keydown.right.stop.prevent="moveVoucherChoice(false)" @keydown.up.stop.prevent="moveVoucherChoice(false)" @keydown.left.stop.prevent="moveVoucherChoice(false)">
+                    <view class="checkout-voucher-choice__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="m9.5 14.5 5-5" /><path d="m9.5 9.5 5 5" /></svg></view>
                     <text class="checkout-voucher-choice__label">{{ t.promotion.noVoucher }}</text>
                     <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === false }" aria-hidden="true" />
                   </view>
                 </view>
-                <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
+                <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')" @keydown.enter.stop.prevent="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
               </view>
               <view v-if="promoDiscount > 0" class="checkout-option"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12v9h16v-9M2 7h20v5H2zM12 7v14M12 7C3 8 4 0 8 2c3 1 4 5 4 5s1-4 4-5c4-2 5 6-4 5" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ promoRowLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(promoDiscount, true) }}</text></view>
               <view v-if="trialOffsetView.offsetUSD > 0" class="checkout-option"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ t.store.coRowTrialOffset }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.offsetUSD, true) }}</text></view>
@@ -318,7 +322,7 @@
       </view>
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && (!trialQuoteScreenUnavailable || trialWaitLoading) && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && (!trialQuoteScreenUnavailable || trialWaitLoading) && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar" :class="{ 'checkout-sticky--single': ownTrialOrderExit }">
         <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the tray holds only its status capsule (04 §4.0). -->
         <view v-if="trialProgressOnly" class="nx-tray-status checkout-tray-status" role="status"><text>{{ purchaseCopy.coConfirming }}</text></view>
         <template v-else>
@@ -327,8 +331,10 @@
           <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
         </template>
         <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
-        <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" :currency="shownTrialDueBelowCent ? 'USDT' : 'USD'" :below-cent="shownTrialDueBelowCent" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
-        <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || trialWaitLoading || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
+        <!-- An unpaid full-price order for the device now on trial (R13): no total to pay here; the way on is the trial credit. -->
+        <NxButton v-if="ownTrialOrderExit" variant="primary" :label="t.store.buyWithTrialCredit" @click="openOwnTrialPurchase"><text>{{ t.store.buyWithTrialCredit }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
+        <view v-if="!ownTrialOrderExit" class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" :currency="shownTrialDueBelowCent ? 'USDT' : 'USD'" :below-cent="shownTrialDueBelowCent" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
+        <NxButton v-if="!ownTrialOrderExit" variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || trialWaitLoading || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
         </template>
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
@@ -1469,6 +1475,10 @@ const trialWaitNote = computed(() => multiTrialCheckout.value || !hasOriginalChe
   || trialWaitReason.value === "loading" ? ""
   : trialWaitReason.value === "confirming" ? trialCopy.value.resultConfirming
   : trialWaitReason.value === "ownTrialDeviceOrder" ? purchaseCopy.value.coOwnTrialOrder : purchaseCopy.value.coLoadFailed);
+// The same order's way on: buy this device with the trial credit, the trial detail preselecting it (04 普通结算与本人试用设备).
+const ownTrialOrderExit = computed(() => !multiTrialCheckout.value && hasOriginalCheckout.value && trialQuoteUnavailable.value
+  && trialWaitReason.value === "ownTrialDeviceOrder");
+function openOwnTrialPurchase() { navTo('/pages/me/trial?product=' + encodeURIComponent(productId.value)); }
 useAutoRecovery({
   failed: () => remoteApiEnabled && !multiTrialCheckout.value && !useTrialClaimSheet().open
     && (freeTrial.authorityStatus === "error" || trialQuoteUnavailable.value && trialWaitReason.value === "failed"),
@@ -1531,6 +1541,8 @@ function canChangeVoucher():boolean {
     &&!remoteTradeinRecoveryRequired.value&&!activeSession.value&&!resumeSessionId&&!orderId.value
     &&!remoteOrderFailure.value&&!receiptWriteFailure.value&&!createdCheckoutOrder.value&&!pendingCheckoutCreate.value;
 }
+// A submitted order already carries its voucher: the choice stays locked and says why (03 §3.5 整组暂时不能改选).
+const voucherLockedByOrder = computed(() => !!(createdCheckoutOrder.value || pendingCheckoutCreate.value || orderId.value || activeSession.value));
 async function selectAutomaticVoucher(enabled:boolean):Promise<void> {
   if(!canChangeVoucher())return;
   const scope=captureCheckoutRoute();voucherSelecting.value=true;
@@ -1899,7 +1911,11 @@ async function moveVoucherChoice(automatic: boolean) {
   const group = document.activeElement?.closest('[role="radiogroup"]');
   await selectAutomaticVoucher(!automatic);
   await nextTick();
-  if (group?.isConnected) group.querySelector<HTMLElement>(`[role="radio"][data-automatic="${voucherAutomatic.value}"]`)?.focus();
+  // A failed selection leaves the old choice checked: focus stays with the one tab stop. Only while focus is still in the group
+  // (or on nothing): a user who moved on during the wait keeps their place.
+  const active = document.activeElement;
+  if (group?.isConnected && (!active || active === document.body || group.contains(active)))
+    group.querySelector<HTMLElement>(`[role="radio"][data-automatic="${voucherAutomatic.value}"]`)?.focus();
 }
 
 const step = ref<Step>("select-payment");
@@ -4890,10 +4906,13 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-chevron { flex:none; width:16px; height:16px; color:var(--v5-ink-4); transition:transform 180ms ease; }
 .checkout-chevron--open { transform:rotate(180deg); }
 .checkout-voucher { cursor:pointer; }
-/* Voucher choice is a single-select list aligned with the row copy, then a muted link to the voucher list. */
+/* Voucher choice is a single-select list (03 §3.5 单选行), then a muted link to the voucher list. Each row leads with its own
+   line glyph in the 36/32 leading slot (10 §10.3): a discount ticket for the best voucher, a crossed ticket for none, flat
+   and auxiliary, so the 代金券 row's raised amber tile is not repeated beneath it. The slot sits where the indent was, so
+   the labels keep their 64px start and width. */
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
 .checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
-.checkout-voucher-choices { display:flex; flex-direction:column; gap:var(--v5-space-1); padding:var(--v5-space-1) var(--v5-space-1) var(--v5-space-2) 52px; }
+.checkout-voucher-choices { display:flex; flex-direction:column; gap:var(--v5-space-1); padding:var(--v5-space-1) var(--v5-space-1) var(--v5-space-2); }
 .checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; }
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
@@ -5015,10 +5034,16 @@ button.checkout-policy-link::after { border:0; }
 <style scoped>
 /* Single-select rows (03 §3.5): the checked row is brand 10% with a 1.5px brand inner edge; the circle is a 1.5px ink-3 ring,
    checked a 2px brand ring with a 12px brand dot; no movement on change. A group that cannot change is 50% throughout. */
-.checkout-voucher-choice { min-height:48px; display:flex; align-items:center; gap:var(--v5-space-3); padding:0 var(--v5-space-3); border-radius:12px; cursor:pointer; }
+/* Single-select row height follows 10.3: 64 standard, 56 at small widths (03 §3.5). */
+.checkout-voucher-choice { min-height:64px; display:flex; align-items:center; gap:var(--v5-space-3); padding:0 var(--v5-space-3); border-radius:12px; cursor:pointer; }
 .checkout-voucher-choice[aria-checked="true"] { background:color-mix(in srgb, var(--v5-brand) 10%, transparent); box-shadow:inset 0 0 0 1.5px var(--v5-brand); }
-.checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink-2); font:400 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.checkout-voucher-choice[aria-checked="true"] .checkout-voucher-choice__label { color:var(--v5-ink); font-weight:var(--ui-type-subheading-weight); }
+/* Row title = list title role in main ink, the same in both states (03 §3.5, 10.1). */
+.checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.checkout-voucher-choice:active:not([aria-disabled="true"]) { opacity:.85; }
+.checkout-voucher-choice__icon { flex:none; display:grid; place-items:center; width:36px; height:36px; color:var(--v5-ink-3); }
+@media (max-width:374px) { .checkout-voucher-choice { min-height:56px; padding-left:var(--v5-space-4); } .checkout-voucher-choice__icon { width:32px; height:32px; } }
+.checkout-voucher-lock { display:flex; align-items:flex-start; gap:6px; padding:var(--v5-space-2) var(--v5-space-4) 0 64px; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.checkout-voucher-lock__icon { flex:none; width:16px; height:16px; margin-top:2px; }
 .checkout-voucher-choice[aria-disabled="true"] { opacity:.5; pointer-events:none; }
 /* Radio per design rules: hollow 1.5px ring; selected = 2px brand ring + 12px brand dot, no checkmark. */
 .checkout-voucher-radio { width:22px; height:22px; flex:none; box-sizing:border-box; display:grid; place-items:center; border-radius:999px; border:1.5px solid var(--v5-ink-3); }

@@ -1,5 +1,5 @@
 <template>
-  <view class="nx-button" :class="[`nx-button--${variant}`, `nx-button--${size}`, { 'nx-button--disabled': disabled || busy }]"
+  <view class="nx-button" :class="[`nx-button--${variant}`, `nx-button--${size}`, { 'nx-button--disabled': disabled || busy, 'nx-button--round': round }]"
     role="button" :tabindex="disabled || busy ? -1 : 0" :aria-disabled="disabled || busy" :aria-busy="busy" :aria-label="busy && busyLabel ? busyLabel : label"
     @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
     <view class="nx-button__surface" :class="{ 'nx-frosted-button': variant === 'secondary' || variant === 'brand' }">
@@ -14,8 +14,10 @@
 // Design system 03 §3.1: primary = solid brand, brand = brand glass, secondary = neutral glass,
 // text = in-place action in brand color, link = next-level navigation in muted color.
 // icon = trailing glyph after the label (forward arrow, chevron); never a text character in the copy.
+// round = an icon-only control (the slot holds one icon, label names it): a circle as tall as the size's surface,
+// centred in a 44px-wide target, e.g. a sheet's close (03 §3.1 圆形关闭).
 import NxIcon, { type NxIconName } from './nx-icon.vue';
-const props = withDefaults(defineProps<{ label?: string; variant?: 'primary' | 'brand' | 'secondary' | 'text' | 'link'; size?: 'large' | 'medium' | 'small'; disabled?: boolean; busy?: boolean; busyLabel?: string; icon?: NxIconName }>(), { variant: 'secondary', size: 'large' });
+const props = withDefaults(defineProps<{ label?: string; variant?: 'primary' | 'brand' | 'secondary' | 'text' | 'link'; size?: 'large' | 'medium' | 'small'; disabled?: boolean; busy?: boolean; busyLabel?: string; icon?: NxIconName; round?: boolean }>(), { variant: 'secondary', size: 'large' });
 const emit = defineEmits<{ (event: 'click'): void }>();
 function activate(event?: Event) { if (!props.disabled && !props.busy && !(event as KeyboardEvent)?.repeat) emit('click'); }
 </script>
@@ -35,6 +37,10 @@ function activate(event?: Event) { if (!props.disabled && !props.busy && !(event
 .nx-button--small { min-height: 44px; padding-block: 6px; font: var(--ui-type-compact-button-weight) var(--ui-type-compact-button)/var(--ui-type-compact-button-lh) var(--font-v5); }
 .nx-button--medium > .nx-button__surface { min-height: 40px; padding: 8px 16px; }
 .nx-button--small > .nx-button__surface { min-height: 32px; padding: 6px 12px; }
+.nx-button--round { min-width: 44px; }
+.nx-button--round > .nx-button__surface { flex: none; width: 48px; padding: 0; }
+.nx-button--medium.nx-button--round > .nx-button__surface { width: 40px; padding: 0; }
+.nx-button--small.nx-button--round > .nx-button__surface { width: 32px; padding: 0; }
 .nx-button--link { color: var(--v5-ink-3); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 .nx-button--text > .nx-button__surface, .nx-button--link > .nx-button__surface { padding-inline: 8px; }
 /* Text and link buttons have no container (03 §3.1): outside the bottom tray their box is the label line, so no
