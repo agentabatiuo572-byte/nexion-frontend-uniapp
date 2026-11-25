@@ -13,7 +13,7 @@ export interface CommissionsHowSnapshot { document: HowContentDocument; rates?: 
 // Keep public settlement facts; current direct policy values come from the server.
 const COPY = {
   zh: {
-    purchaseRankRate: "按你当前的等级",
+    purchaseRankRate: "按算奖励时你的等级",
     purchaseBudget: "好友购买奖励比例", purchaseReplacement: "奖励中的 UVT 部分已包含该笔购买的额外 UVT 奖励，不重复发放", purchaseOriginal: "好友购买和团队购买奖励按当前规则发放", networkPurchase: "团队购买奖励含额外 UVT 奖励，以实际发放为准", deviceScope: "好友设备收益奖励只发给邀请人，由平台额外发放，不影响好友自己的收益", deviceScopeL2: "好友和好友的好友的设备收益奖励由平台额外发放，不影响他们自己的收益",
     loading: "正在加载说明…", unavailable: "说明暂时无法加载，请重新加载。", missing: "规则暂时无法加载", none: "暂无可展示的奖励", retry: "重新加载",
     days: "天", settlementPeriod: "发放周期", minRank: "参与起点",
@@ -25,7 +25,7 @@ const COPY = {
     purchase: "好友购买", deviceEarning: "好友设备收益", totalRate: "总奖励比例", split: "奖励拆分", directOnly: "仅限你邀请的好友；由平台额外发放，不影响好友自己的收益", priceUnavailable: "UVT 价格暂时无法获取，稍后计入",
   },
   en: {
-    purchaseRankRate: "Based on your current rank",
+    purchaseRankRate: "Based on your rank when the reward is calculated",
     purchaseBudget: "Friend purchase reward rate", purchaseReplacement: "The UVT share already includes this purchase's extra UVT reward; it isn't paid twice", purchaseOriginal: "Friend and team purchase rewards are paid under the current rules", networkPurchase: "Team purchase rewards include extra UVT and are subject to actual payout", deviceScope: "Friend device earnings rewards go only to the inviter, are paid extra by the platform, and don't reduce your friends' earnings", deviceScopeL2: "Device earnings rewards from your friends and their friends are paid extra by the platform and don't reduce their earnings",
     loading: "Loading…", unavailable: "This guide couldn't load. Please reload.", missing: "Rules couldn't load", none: "No rewards to display", retry: "Reload",
     days: "days", settlementPeriod: "Payout period", minRank: "entry rank",
@@ -37,7 +37,7 @@ const COPY = {
     purchase: "Friend purchases", deviceEarning: "Friends' device earnings", totalRate: "Total reward", split: "Reward split", directOnly: "Friends you invited only; paid extra by the platform without reducing your friends' earnings", priceUnavailable: "UVT price unavailable; it will be added later",
   },
   vi: {
-    purchaseRankRate: "Theo hạng hiện tại của bạn",
+    purchaseRankRate: "Theo hạng của bạn khi tính thưởng",
     purchaseBudget: "Tỷ lệ thưởng bạn bè mua hàng", purchaseReplacement: "Phần UVT đã bao gồm thưởng UVT bổ sung của giao dịch mua này và không được chi trả hai lần", purchaseOriginal: "Thưởng mua hàng của bạn bè và của nhóm được chi trả theo quy tắc hiện hành", networkPurchase: "Thưởng mua hàng của nhóm bao gồm UVT bổ sung, theo kết quả chi trả thực tế", deviceScope: "Thưởng thu nhập thiết bị của bạn bè chỉ dành cho người mời, do nền tảng chi trả thêm và không làm giảm thu nhập của bạn bè", deviceScopeL2: "Thưởng thu nhập thiết bị của bạn bè và bạn của bạn bè do nền tảng chi trả thêm và không làm giảm thu nhập của họ",
     loading: "Đang tải…", unavailable: "Chưa tải được hướng dẫn. Vui lòng tải lại.", missing: "Chưa tải được quy tắc", none: "Chưa có phần thưởng để hiển thị", retry: "Tải lại",
     days: "ngày", settlementPeriod: "Kỳ chi trả", minRank: "hạng tham gia",
@@ -49,7 +49,7 @@ const COPY = {
     purchase: "Bạn bè mua hàng", deviceEarning: "Thu nhập thiết bị của bạn bè", totalRate: "Tổng thưởng", split: "Phân chia thưởng", directOnly: "Chỉ dành cho bạn bè bạn đã mời; nền tảng chi trả thêm và không làm giảm thu nhập của bạn bè", priceUnavailable: "Chưa lấy được giá UVT; sẽ được ghi nhận sau",
   },
   id: {
-    purchaseRankRate: "Berdasarkan peringkat Anda saat ini",
+    purchaseRankRate: "Sesuai peringkat Anda saat hadiah dihitung",
     purchaseBudget: "Persentase hadiah pembelian teman", purchaseReplacement: "Porsi UVT sudah termasuk hadiah UVT ekstra dari pembelian ini; tidak dibayarkan dua kali", purchaseOriginal: "Hadiah pembelian teman dan tim dibayarkan sesuai aturan saat ini", networkPurchase: "Hadiah pembelian tim termasuk UVT ekstra dan mengikuti pembayaran aktual", deviceScope: "Hadiah pendapatan perangkat teman hanya untuk pengundang, dibayarkan ekstra oleh platform, dan tidak mengurangi pendapatan teman Anda", deviceScopeL2: "Hadiah pendapatan perangkat teman dan teman mereka dibayarkan ekstra oleh platform dan tidak mengurangi pendapatan mereka",
     loading: "Memuat…", unavailable: "Panduan ini gagal dimuat. Muat ulang.", missing: "Aturan gagal dimuat", none: "Belum ada hadiah untuk ditampilkan", retry: "Muat ulang",
     days: "hari", settlementPeriod: "Periode pembayaran", minRank: "peringkat awal",
@@ -61,7 +61,7 @@ const COPY = {
     purchase: "Pembelian teman", deviceEarning: "Pendapatan perangkat teman", totalRate: "Total persentase", split: "Pembagian hadiah", directOnly: "Hanya teman yang Anda undang; dibayarkan ekstra oleh platform tanpa mengurangi pendapatan teman Anda", priceUnavailable: "Harga UVT tidak tersedia; akan ditambahkan nanti",
   },
   ms: {
-    purchaseRankRate: "Mengikut pangkat semasa anda",
+    purchaseRankRate: "Mengikut pangkat anda semasa ganjaran dikira",
     purchaseBudget: "Kadar ganjaran pembelian rakan", purchaseReplacement: "Bahagian UVT sudah termasuk ganjaran UVT tambahan bagi pembelian ini; ia tidak dibayar dua kali", purchaseOriginal: "Ganjaran pembelian rakan dan pasukan dibayar mengikut peraturan semasa", networkPurchase: "Ganjaran pembelian pasukan termasuk UVT tambahan dan tertakluk kepada pembayaran sebenar", deviceScope: "Ganjaran pendapatan peranti rakan hanya untuk penjemput, dibayar tambahan oleh platform, dan tidak mengurangkan pendapatan rakan anda", deviceScopeL2: "Ganjaran pendapatan peranti rakan dan rakan mereka dibayar tambahan oleh platform dan tidak mengurangkan pendapatan mereka",
     loading: "Memuatkan…", unavailable: "Panduan ini gagal dimuatkan. Sila muat semula.", missing: "Peraturan gagal dimuatkan", none: "Tiada ganjaran untuk dipaparkan", retry: "Muat semula",
     days: "hari", settlementPeriod: "Tempoh bayaran", minRank: "pangkat permulaan",
@@ -73,7 +73,7 @@ const COPY = {
     purchase: "Pembelian rakan", deviceEarning: "Pendapatan peranti rakan", totalRate: "Kadar keseluruhan", split: "Pecahan ganjaran", directOnly: "Hanya rakan yang anda jemput; dibayar tambahan oleh platform tanpa mengurangkan pendapatan rakan anda", priceUnavailable: "Harga UVT tidak tersedia; ia akan ditambah kemudian",
   },
   fil: {
-    purchaseRankRate: "Batay sa kasalukuyan mong rank",
+    purchaseRankRate: "Ayon sa rank mo kapag kinakalkula ang reward",
     purchaseBudget: "Rate ng reward sa pagbili ng kaibigan", purchaseReplacement: "Kasama na sa UVT na bahagi ang dagdag na reward na UVT ng pagbiling ito; hindi ito ibibigay nang dalawang beses", purchaseOriginal: "Ibinibigay ang reward sa pagbili ng kaibigan at ng team ayon sa kasalukuyang patakaran", networkPurchase: "May dagdag na UVT ang reward sa pagbili ng team at batay sa aktuwal na payout", deviceScope: "Sa nag-imbita lang ibinibigay ang reward sa kita ng device ng kaibigan, dagdag ito mula sa platform, at hindi nito binabawasan ang kita ng mga kaibigan mo", deviceScopeL2: "Dagdag mula sa platform ang reward sa kita ng device ng mga kaibigan mo at ng kaibigan nila, at hindi nito binabawasan ang kita nila",
     loading: "Naglo-load…", unavailable: "Hindi ma-load ang gabay. I-reload.", missing: "Hindi ma-load ang patakaran", none: "Walang reward na maipapakita", retry: "I-reload",
     days: "araw", settlementPeriod: "Panahon ng payout", minRank: "simulang rank",
@@ -85,7 +85,7 @@ const COPY = {
     purchase: "Pagbili ng kaibigan", deviceEarning: "Kita ng device ng kaibigan", totalRate: "Kabuuang rate", split: "Hati ng reward", directOnly: "Para lang sa mga kaibigang inimbitahan mo; dagdag mula sa platform nang hindi binabawasan ang kita nila", priceUnavailable: "Di makuha ang presyo ng UVT; idadagdag mamaya ang bagong reward",
   },
   ru: {
-    purchaseRankRate: "По вашему текущему рангу",
+    purchaseRankRate: "По вашему рангу на момент расчёта награды",
     purchaseBudget: "Ставка награды за покупки друзей", purchaseReplacement: "Доля UVT уже включает доп. награду UVT за эту покупку; дважды она не выплачивается", purchaseOriginal: "Награды за покупки друзей и команды выплачиваются по текущим правилам", networkPurchase: "Награды за покупки команды включают доп. UVT, по фактической выплате", deviceScope: "Награду за доход устройств друзей получает только пригласивший; её дополнительно выплачивает платформа, доход друзей не уменьшается", deviceScopeL2: "Награду за доход устройств друзей и их друзей дополнительно выплачивает платформа, их доход не уменьшается",
     loading: "Загрузка…", unavailable: "Не удалось загрузить описание. Обновите страницу.", missing: "Правила не загрузились", none: "Наград для показа нет", retry: "Обновить",
     days: "дн.", settlementPeriod: "Период выплат", minRank: "Участие с",
@@ -97,7 +97,7 @@ const COPY = {
     purchase: "Покупки друзей", deviceEarning: "Доход устройств друзей", totalRate: "Ставка награды:", split: "Разделение", directOnly: "Только приглашённые вами друзья; выплачивается платформой дополнительно, доход друзей не уменьшается", priceUnavailable: "Цена UVT недоступна; сумма в UVT будет учтена позже",
   },
   kk: {
-    purchaseRankRate: "Қазіргі дәрежеңізге сай",
+    purchaseRankRate: "Сыйақы есептелген кездегі дәрежеңіз бойынша",
     purchaseBudget: "Дос сатып алғандағы сыйақы мөлшерлемесі", purchaseReplacement: "Сыйақының UVT бөлігіне осы сатып алудың қосымша UVT сыйақысы кірген; ол екі рет төленбейді", purchaseOriginal: "Достар мен команда мүшелерінің сатып алулары үшін сыйақылар ағымдағы ережелер бойынша төленеді", networkPurchase: "Команданың сатып алулары үшін сыйақыға қосымша UVT кіреді, нақты төленген сома негізге алынады", deviceScope: "Достың құрылғы табысына берілетін сыйақы тек шақырушыға төленеді, оны платформа қосымша төлейді және достарыңыздың табысы азаймайды", deviceScopeL2: "Достарыңыз бен олардың достарының құрылғы табысына берілетін сыйақыны платформа қосымша төлейді, олардың табысы азаймайды",
     loading: "Жүктелуде…", unavailable: "Бұл нұсқаулық жүктелмеді. Қайта жүктеңіз.", missing: "Ережелер жүктелмеді", none: "Көрсететін сыйақы жоқ", retry: "Жаңарту",
     days: "күн", settlementPeriod: "Төлем кезеңі", minRank: "бастапқы дәреже",
@@ -109,7 +109,7 @@ const COPY = {
     purchase: "Достардың сатып алуы", deviceEarning: "Достардың құрылғы табысы", totalRate: "Жалпы мөлшерлеме", split: "Сыйақы бөлінісі", directOnly: "Тек сіз шақырған достар; платформа достарыңыздың табысын азайтпай қосымша төлейді", priceUnavailable: "UVT бағасы қолжетімсіз; ол кейін қосылады",
   },
   uz: {
-    purchaseRankRate: "Joriy darajangizga qarab",
+    purchaseRankRate: "Mukofot hisoblanayotgandagi darajangiz boʻyicha",
     purchaseBudget: "Doʻst xaridi mukofoti koʻrsatkichi", purchaseReplacement: "UVT ulushiga shu xarid uchun qoʻshimcha UVT mukofoti kiritilgan; u ikki marta toʻlanmaydi", purchaseOriginal: "Doʻst va jamoa xaridi mukofotlari amaldagi qoidalar boʻyicha toʻlanadi", networkPurchase: "Jamoa xaridi mukofotlariga qoʻshimcha UVT kiradi, yakuniy summa haqiqiy toʻlov boʻyicha", deviceScope: "Doʻstlar qurilmalari daromadi mukofoti faqat taklif qilgan foydalanuvchiga beriladi, platforma tomonidan qoʻshimcha toʻlanadi va doʻstlaringiz daromadini kamaytirmaydi", deviceScopeL2: "Doʻstlaringiz va ularning doʻstlari qurilmalari daromadi mukofotini platforma qoʻshimcha toʻlaydi, ularning daromadi kamaymaydi",
     loading: "Yuklanmoqda…", unavailable: "Qoʻllanmani yuklab boʻlmadi. Qayta yuklang.", missing: "Qoidalar yuklanmadi", none: "Koʻrsatiladigan mukofot yoʻq", retry: "Yangilash",
     days: "kun", settlementPeriod: "Toʻlov davri", minRank: "boshlash darajasi",
