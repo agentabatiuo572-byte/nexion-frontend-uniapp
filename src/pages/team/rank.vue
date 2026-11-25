@@ -186,6 +186,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useVRank, type VRank, type VRankDef } from "@/store/v-rank";
+import { useCommission } from "@/store/commission";
 import { rankLabel } from "@/lib/v-rank-copy";
 import { formatHowNumber, formatRankPurchaseRate } from "@/lib/rank-how-content";
 import { useLocaleStore } from "@/store/locale";
@@ -202,6 +203,7 @@ const copy = useAuditUiCopy();
 const locale = useLocaleStore();
 const guideCopy = computed(() => rankGuideCopy(locale.code));
 const vState = useVRank();
+const commission = useCommission();
 const auth = useAuth();
 const theme = useTheme();
 const visibility = useDataVisibility();
@@ -300,8 +302,14 @@ const countsHint = computed(() => prog.value.rows.some(row => row.tier === prog.
   ? [t.value.myRank.countsNote] : []);
 
 // ── 「升到 Vn 后」：只列升级后会变的项（DESIGN 第 5 节；7.2 箭头用目标等级点缀色）──
-const percentText = (rate: string | number) => formatRankPurchaseRate(rate, locale.code);
-const l1Rate = (rank: VRankDef) => rank.purchaseL1Rate ?? String(rank.directBonus);
+const percentText = (rate: string | number | undefined) => formatRankPurchaseRate(rate, locale.code);
+// 没有公开购买字段时读有效七层配置的第 1、2 层，读不到为未知；有字段且为 0 不回退。
+const sharedRate = (layer: 1 | 2) => remoteApiEnabled ? commission.config?.unilevelUsdt[layer] : commission.unilevelRate(layer);
+const l1Rate = (rank: VRankDef) => rank.purchaseL1Rate ?? sharedRate(1);
+const l2Rate = (rank: VRankDef) => rank.purchaseL2Rate ?? sharedRate(2);
+watch(() => rankAvailable.value && rankDefs.value.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined), missing => {
+  if (remoteApiEnabled && missing) void commission.ensureCanonicalConfig();
+}, { immediate: true });
 const uvtReward = (rank: VRankDef) => rank.rewards.reduce((sum, reward) => !isEntitlementVRankReward(reward) && reward.type === 'UVT' && Number.isFinite(reward.amount) ? sum + reward.amount : sum, 0);
 type Gain = { key: string; icon: NxIconName; tone: 'sky' | 'purple' | 'amber'; name: string; old?: string; value: string; unit?: string; hint?: string[] };
 const gains = computed<Gain[]>(() => {
@@ -310,8 +318,7 @@ const gains = computed<Gain[]>(() => {
   if (!next || !current) return [];
   const rows: Gain[] = [];
   if (l1Rate(current) !== l1Rate(next)) rows.push({ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, old: percentText(l1Rate(current)), value: percentText(l1Rate(next)) });
-  const l2From = current.purchaseL2Rate, l2To = next.purchaseL2Rate;
-  if (l2To !== undefined && l2To !== l2From) rows.push({ key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, old: l2From === undefined ? undefined : percentText(l2From), value: percentText(l2To) });
+  if (l2Rate(current) !== l2Rate(next)) rows.push({ key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, old: percentText(l2Rate(current)), value: percentText(l2Rate(next)) });
   const uvt = uvtReward(next);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: `+${formatHowNumber(uvt, locale.code)}`, unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: nextName.value })] });
   const salaryFrom = current.monthlySalaryUsdt ?? '0', salaryTo = next.monthlySalaryUsdt;
@@ -321,9 +328,10 @@ const gains = computed<Gain[]>(() => {
 const gainArrowInk = computed(() => prog.value.next ? rankTierVars(prog.value.next.v, theme.resolved, visibility.hidden)['--tier-ink'] : '');
 // 一级的权益行（详情卡、「你现在的权益」）。
 function benefitRows(rank: VRankDef): Gain[] {
-  const rows: Gain[] = [{ key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, value: percentText(l1Rate(rank)) }];
-  const l2 = rank.purchaseL2Rate;
-  if (l2 !== undefined) rows.push({ key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, value: percentText(l2) });
+  const rows: Gain[] = [
+    { key: 'l1', icon: 'rank-rate-l1', tone: 'sky', name: t.value.myRank.gainF1, value: percentText(l1Rate(rank)) },
+    { key: 'l2', icon: 'rank-rate-l2', tone: 'sky', name: t.value.myRank.gainF2, value: percentText(l2Rate(rank)) },
+  ];
   const uvt = uvtReward(rank);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: formatHowNumber(uvt, locale.code), unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: `V${rank.v}` })] });
   const salaryUsdt = rank.monthlySalaryUsdt;
