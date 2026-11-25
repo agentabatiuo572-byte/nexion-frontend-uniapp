@@ -38,7 +38,7 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   walletOnly?: boolean;
   paymentMethods?: readonly PurchaseMethod[];
   /** Recheck order facts after any read already in flight. */
-  checkCurrent?: () => Promise<PurchaseContextCheck>;
+  checkCurrent?: (method: PurchaseMethod) => Promise<PurchaseContextCheck>;
   topupHref?: (shortfall: number) => string | undefined;
   claimNo?: string;
   legacyTrialExpiry?: boolean;
@@ -763,13 +763,13 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
   if (expected.kind === 'ORDER_PAY' && orderTopupMethod(method)) { state.loading = false; return; }
   state.loading = true;
   try {
-    const before = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
+    const before = expected.checkCurrent ? await expected.checkCurrent(method) : expected.current() ? 'current' : 'changed';
     if (!owns(version, accountKey) || !acceptQuoteContext(before)) return;
     const quote = await (expected.kind === 'TRIAL_CONVERT' && expected.onTrialRefusal
       ? api.trialQuote(method, expected.payload) : api.quote(expected.kind, method, expected.payload));
     if (!owns(version, accountKey)) return;
     if ('status' in quote) { finishTrialRefusal(quote); return; }
-    const after = expected.checkCurrent ? await expected.checkCurrent() : expected.current() ? 'current' : 'changed';
+    const after = expected.checkCurrent ? await expected.checkCurrent(method) : expected.current() ? 'current' : 'changed';
     if (!owns(version, accountKey) || !acceptQuoteContext(after)) return;
     if (!isVisiblePayment(quote)) { finish(null); return; }
     // A trial's offset grows with accrual under one quote version, so only its rise needs a new confirmation.
@@ -1144,7 +1144,7 @@ async function confirm() {
     const version = requestVersion, notice = state.notice;
     state.loading = true;
     try {
-      const check = await expected.checkCurrent();
+      const check = await expected.checkCurrent(state.method);
       if (!owns(version, accountKey) || state.notice !== notice) return;
       if (check === 'abandoned') { finish(null); return; }
       if (check === 'changed') { state.notice = 'changed'; return; }

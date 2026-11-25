@@ -260,7 +260,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const legacyConversionResumable = computed(() => !!legacyConversion.value && legacyConversion.value.key === legacyResumableKey.value);
   const legacyConversionPending = computed(() => !!legacyConversion.value && !legacyConversionResumable.value);
   const legacyReadbackPending = computed(() => legacyConversions.value.some(command => command.key !== legacyResumableKey.value));
-  const confirmedLegacyConversion = shallowRef<{ claimNo: string; orderNo: string; productNo: string } | null>(null);
+  const confirmedLegacyConversion = shallowRef<{ claimNo: string; key: string; orderNo: string; productNo: string } | null>(null);
   const deniedLegacyConversion = shallowRef<{ claimNo: string; key: string; reason: string } | null>(null);
   let legacyConversionRead: Promise<void> | null = null;
   let legacyConversionWriting: string | null = null;
@@ -308,7 +308,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const authorityVersion = ref(0);
   const serverClockOffsetMs = ref(0);
   let sampledServerTime = 0;
-  let refreshInFlight: Promise<boolean> | null = null;
+  let refreshInFlight: Promise<{ applied: boolean; state: TrialAuthorityState | null }> | null = null;
   let refreshInFlightAccount: string | null = null;
   let authorityRequestSequence = 0;
   let lastAppliedSequence = 0;
@@ -525,8 +525,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   async function refreshRemote(force = false, lifecycle?: LifecycleStateRead): Promise<boolean> {
-    invalidateBeforePassiveTabRead("trial-state");
     if (!remoteApiEnabled) return true;
+    return (await readRemoteState(force, lifecycle)).applied;
+  }
+
+  async function readRemoteState(force = false, lifecycle?: LifecycleStateRead) {
+    invalidateBeforePassiveTabRead("trial-state");
     if (!force && refreshInFlight && refreshInFlightAccount === boundKey) return refreshInFlight;
     const requestedAccount = boundKey;
     const requestedEpoch = accountBindingEpoch;
@@ -536,10 +540,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const sequence = ++authorityRequestSequence;
     authorityStatus.value = "loading";
     authorityError.value = null;
-    let request!: Promise<boolean>;
+    let request!: NonNullable<typeof refreshInFlight>;
     request = trialApi.state()
       .then((next) => {
-        if (requestedEpoch !== accountBindingEpoch) return false;
+        if (requestedEpoch !== accountBindingEpoch) return { applied: false, state: null };
         const applied = applyAuthority(next, sequence, true);
         const pending = currentLifecycle();
         if (pending && applied && displayState.value === next
@@ -550,15 +554,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           pending.lastFallbackState = answer;
           if (lifecycle?.pending === pending) settleLifecycleState(next, lifecycle);
         }
-        return applied;
+        return { applied, state: applied && displayState.value === next ? next : null };
       })
       .catch((error: unknown) => {
-        if (requestedEpoch !== accountBindingEpoch) return false;
+        if (requestedEpoch !== accountBindingEpoch) return { applied: false, state: null };
         if (sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
           markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
         }
-        return false;
+        return { applied: false, state: null };
       })
       .finally(() => {
         if (refreshInFlight === request) {
@@ -1019,7 +1023,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // 绝不信任调用方(结算页)缓存的 now 或内存里的旧 status —— 用户离线跨过宽限期
   // 后趁 poll 未跑下单,这里按真实时点判到 ended 即拒绝(边界推进结果已落盘)。
   async function convert(productNo?: string, expectedAmountUsdt?: number, quoteVersion?: string | null,
-    authorization?: PaymentPasswordAuthorization): Promise<ConversionResult> {
+    authorization?: PaymentPasswordAuthorization, onSubmission?: (submission: Pick<LegacyConversion, "claimNo" | "key">) => void): Promise<ConversionResult> {
     const requestedProductNo = productNo ?? useTrialConfig().config.trialProductId;
     if (remoteApiEnabled) {
       const requestedEpoch = accountBindingEpoch;
@@ -1036,12 +1040,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
       if (pending) {
         if (pending.claimNo !== claimNo || pending.productNo !== requestedProductNo) return { ok: false, reason: "unknown" };
+        onSubmission?.(pending);
         if (!legacyConversion.value) legacyConversions.value = [...legacyConversions.value, pending];
         if (!legacyConversionResumable.value) {
           await recoverLegacyConversion().catch(() => {});
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
           const settled = confirmedLegacyConversion.value;
-          if (settled?.claimNo === claimNo) return { ok: true, orderNo: settled.orderNo };
+          if (settled?.claimNo === claimNo && settled.key === pending.key) return { ok: true, orderNo: settled.orderNo };
           if (!legacyConversion.value) return { ok: false, reason: "refusal-readback" };
           if (!legacyConversionResumable.value) return { ok: false, reason: "unknown" };
         }
@@ -1066,6 +1071,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       // Keep the key from dispatch onward. The recovery owner can only read it.
       const submission = pending;
       if (submission.amount === null) return { ok: false, reason: "unknown" };
+      if (!resuming) onSubmission?.(submission);
       legacyResumableKey.value = null;
       if (!resuming) legacyConversions.value = [...legacyConversions.value, submission];
       legacyConversionWriting = submission.key;
@@ -1150,8 +1156,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         if (status.value !== "converted" || (stateOrderNo && stateOrderNo !== receipt.orderNo)) return false;
       }
     }
-    confirmedLegacyConversion.value = { claimNo: submission.claimNo, productNo: submission.productNo, orderNo: receipt.orderNo };
-    useTrialPurchaseResult().publish({ status: "settled", claimNo: submission.claimNo, orderNo: receipt.orderNo });
+    confirmedLegacyConversion.value = { claimNo: submission.claimNo, key: submission.key, productNo: submission.productNo, orderNo: receipt.orderNo };
+    useTrialPurchaseResult().publish({ status: "settled", claimNo: submission.claimNo, key: submission.key, orderNo: receipt.orderNo });
     releaseLegacyConversion(submission);
     return true;
   }
@@ -1318,7 +1324,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   return {
-    status, startedAt, expiresAt, graceEndsAt, finishedAt, pendingConversion, legacyConversionPending, legacyConversionResumable,
+    status, startedAt, expiresAt, graceEndsAt, finishedAt, pendingConversion, legacyConversionPending, legacyConversionResumable, readRemoteState,
     legacyReadbackPending, confirmedLegacyConversion,
     deniedLegacyConversion, recoverLegacyConversion, clearLegacyConversionResult,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,

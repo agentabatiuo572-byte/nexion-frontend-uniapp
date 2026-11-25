@@ -7,7 +7,7 @@ const REFUSALS_KEY = "nexgrid-trial-shown-refusals-v1";
 const REFUSAL_LIMIT = 64;
 
 type TrialPurchaseResult =
-  | { status: "settled"; claimNo: string; orderNo: string }
+  | { status: "settled"; claimNo: string; orderNo: string; key?: string }
   | { status: "refused"; claimNo: string; key: string; reason: string };
 
 export const trialOrderResultKey = (orderNo: string) => JSON.stringify(["settled", orderNo]);
@@ -24,7 +24,7 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
   const openingOrders = new Set<string>();
   const failedOrderNavigations = new Map<string, boolean>();
   const announcedRefusals = new Set<string>();
-  const presenters = new Set<(claimNo: string) => boolean>();
+  const presenters = new Set<(result: TrialPurchaseResult) => boolean>();
   const visibilityRevision = ref(0);
   function savedRefusals() {
     const keys = readAccountRow<{ keys: string[] }>(REFUSALS_KEY, app.accountKey)?.keys;
@@ -36,7 +36,7 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     void visibilityRevision.value;
     return pending.value.filter(result => !openingOrders.has(resultKey(result))
       && failedOrderNavigations.get(resultKey(result)) !== true
-      && ![...presenters].some(presents => presents(result.claimNo)));
+      && ![...presenters].some(presents => presents(result)));
   });
   watch(() => app.accountBindingEpoch, () => {
     pending.value = [];
@@ -100,7 +100,7 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     return announcedRefusals.delete(key);
   }
 
-  function registerPresenter(presents: (claimNo: string) => boolean) {
+  function registerPresenter(presents: (result: TrialPurchaseResult) => boolean) {
     presenters.add(presents);
     visibilityRevision.value++;
     return () => {

@@ -820,7 +820,7 @@ watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () 
 }, { flush: "post" });
 watch(pageVisible, (visible, _, onCleanup) => {
   if (!visible) return;
-  const unregisterPresenter = trialResults.registerPresenter(claimNo => displayState.value?.claimNo === claimNo);
+  const unregisterPresenter = trialResults.registerPresenter(result => displayState.value?.claimNo === result.claimNo);
   const unregisterRefresh = registerActivePageRefresh(async () => {
     if (purchaseClaim.value) {
       await freeTrial.refreshRemote();

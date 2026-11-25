@@ -295,6 +295,7 @@ const server=http.createServer(async(req,res)=>{
           delete state.trialBalancePurchase;
           delete state.trialBalanceCanResume;
           delete state.trialAccrualReductionUsdt;
+          delete state.trialPreviewAccruedMicros;
           delete state.trialNextWalletRefusal;
           delete state.trialDropNextExternalRefusal;
           delete state.trialExternalRefusalReadDelayMs;
@@ -361,6 +362,8 @@ const server=http.createServer(async(req,res)=>{
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
+        if(Number.isSafeInteger(update.trialPreviewAccruedMicros)&&update.trialPreviewAccruedMicros>=0)
+          state.trialPreviewAccruedMicros=update.trialPreviewAccruedMicros;
         if(Number.isInteger(update.trialExternalRefusalReadDelayMs)&&update.trialExternalRefusalReadDelayMs>=0
             &&update.trialExternalRefusalReadDelayMs<=6000)state.trialExternalRefusalReadDelayMs=update.trialExternalRefusalReadDelayMs;
         if([3,4].includes(update.trialPaymentFeePolicyVersion))state.trialPaymentFeePolicyVersion=update.trialPaymentFeePolicyVersion;

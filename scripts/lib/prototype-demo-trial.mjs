@@ -105,7 +105,10 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   },cfg.trialProductName);
   function accruedAt(at){
     const days=min(BigInt(Math.max(0,Math.floor((at-row.startedAt)/1000)))*100000000n/86400n,BigInt(cfg.trialDays)*100000000n);
-    const shadow=units(cfg.shadowDailyUSD)*days/100000000n;
+    const dailyShadow=units(cfg.shadowDailyUSD);
+    // The loopback preview can advance accrual between interactions without changing the claim or quote terms.
+    const shadow=state.trialPreviewAccruedMicros===undefined ? dailyShadow*days/100000000n
+      : min(BigInt(state.trialPreviewAccruedMicros),dailyShadow*BigInt(cfg.trialDays));
     return {shadow:max(0n,shadow-units(state.trialAccrualReductionUsdt??0)),nex:units(cfg.shadowDailyNEX)*days/100000000n};
   }
   const snapshot=()=>{
