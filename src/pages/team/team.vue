@@ -76,7 +76,7 @@
               <view class="team-bento__head"><NxIconTile tone="device" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="binary && !visibility.hidden" class="team-bento__split" aria-hidden="true"><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.left}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION }" /><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.right}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: bentoInView === false ? '0ms' : vizStagger(1) }" /></view>
               <view class="team-bento__foot">
-                <text v-if="binarySettlementNotDue" class="team-bento__status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount" :class="{ 'team-bento__amount--long': binaryAmountParts.join('.').length >= 8 }">{{ binaryAmountParts[0] }}<text v-if="binaryAmountParts[1]" class="team-bento__fraction">.{{ binaryAmountParts[1] }}</text><text class="team-bento__amount-unit">&nbsp;USDT</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
+                <text v-if="binarySettlementNotDue" class="team-bento__status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount" :class="binaryAmountSize">{{ binaryAmountParts[0] }}<text v-if="binaryAmountParts[1]" class="team-bento__fraction">.{{ binaryAmountParts[1] }}</text><text class="team-bento__amount-unit">&nbsp;USDT</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
                 <text class="team-bento__caption">{{ designCopy.twoGroupRewards }}<template v-if="!binarySettlementNotDue"> ·&nbsp;<text class="team-bento__muted">{{ designCopy.estimated }}</text></template></text>
               </view>
             </view>
@@ -356,7 +356,14 @@ const binary = computed(() => {
 });
 const binarySettlementNotDue = computed(() => binaryPresentation.value?.blockedReason === "F3_SETTLEMENT_NOT_DUE");
 const binaryMatchText = computed(() => binary.value === null ? "—" : formatUsd(binary.value.binaryMatch));
-const binaryAmountParts = computed(() => binary.value === null ? null : formatFinanceAmount(binary.value.binaryMatch).split("."));
+// A non-zero estimate under 0.01 reads "<0.01", never 0.00; a true zero stays 0.00.
+const binaryAmountParts = computed(() => binary.value === null ? null
+  : (binary.value.binaryMatch > 0 && binary.value.binaryMatch < 0.01 ? "<0.01" : formatFinanceAmount(binary.value.binaryMatch)).split("."));
+// Long amounts step down so the full amount and its unit stay on one line in the half-width card at 360 (01 §1.2).
+const binaryAmountSize = computed(() => {
+  const length = binaryAmountParts.value?.join(".").length ?? 0;
+  return length >= 12 ? "team-bento__amount--longest" : length >= 10 ? "team-bento__amount--longer" : length >= 8 ? "team-bento__amount--long" : "";
+});
 
 const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vrank.myRank));
 const leadershipUnlockRank = computed(() => remoteApiEnabled ? remotePool.value?.unlockRank ?? 3 : 3);
@@ -688,8 +695,11 @@ useAutoRecovery({
 .team-bento__unit { margin-left: 6px; font: 400 13px/1 var(--font-v5); color: var(--v5-ink-3); }
 .team-bento__status { font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .team-bento__currency { font-size: 14px; }
-/* Amounts from 1,000.00 step down to the card-figure role so the number and its unit stay on one line in a half-width card at 360 (01 §1.2). */
+/* Long amounts step down so the number and its unit stay on one line in a half-width card at 360 (01 §1.2):
+   from 1,000.00 the card-figure role, from 100,000.00 the inline-figure role, from 1,000,000.00 the meta role. */
 .team-bento__amount--long { font-size: var(--ui-type-card-figure); }
+.team-bento__amount--longer { font-size: var(--ui-type-inline-figure); }
+.team-bento__amount--longest { font-size: var(--ui-type-meta); }
 .team-bento__amount-unit { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .team-bento__fraction { color: var(--v5-ink-3); }
 /* The caption names the figure above it: auxiliary description role, 400, muted (10 §10.1; 01 §1.1.1 pairing 1). */

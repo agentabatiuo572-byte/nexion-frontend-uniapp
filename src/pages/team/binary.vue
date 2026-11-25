@@ -17,17 +17,17 @@
                 <view class="binary-rule-link nx-card-link" role="link" tabindex="0" :aria-label="t.binary.howItWorksEntry"
                   @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="nx-after-chevron">{{ binaryCopy.rules }}</text></view>
               </view>
-              <view class="binary-comparison">
+              <view class="binary-comparison" :class="{ 'binary-comparison--wide': volumeSizes.includes('binary-points--longest') }">
                 <view v-for="(wing, index) in wings" :key="wing.key" class="binary-contribution">
                   <view class="binary-group-heading"><text v-if="!visibility.hidden && leftMonthVol !== rightMonthVol" class="binary-group-badge" :class="{ 'binary-weak': wing.isWeak }">{{ wing.isWeak ? t.binary.weakBadge : t.binary.strongBadge }}</text></view>
                   <view class="binary-contribution-track" aria-hidden="true"><view v-if="contributionWidths && !visibility.hidden" class="binary-contribution-fill" :class="{ 'binary-contribution-fill--other': index === 1 }" :style="{ height: (comparisonInView === false ? 0 : contributionWidths[index]) + '%', transition: comparisonInView === false ? 'none' : VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: comparisonInView === false ? '0ms' : vizStagger(index, 120) }" /></view>
                   <text class="binary-group-name">{{ wing.name }}</text>
-                  <text class="binary-points tabular-nums" :class="{ 'binary-points--long': formatFinanceAmount(wing.monthVol).length >= 10 }">{{ visibility.mask(formatFinanceAmount(wing.monthVol)) }}<text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text>
+                  <text class="binary-points tabular-nums" :class="volumeSizes[index]">{{ visibility.mask(formatFinanceAmount(wing.monthVol)) }}<text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text>
                   <text v-if="wing.count !== null" class="binary-note">{{ wingMembersText(wing.count) }}</text>
                 </view>
                 <view class="binary-rate"><text class="nx-num-metric">×{{ rateLabel }}%</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><text class="binary-note">{{ t.binary.weakBadge }}</text></view>
               </view>
-              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text v-if="settlementNotDue" class="binary-estimate-status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else class="reward-amount nx-num-amount">{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text><text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text></view>
+              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text v-if="settlementNotDue" class="binary-estimate-status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else class="reward-amount nx-num-amount" :class="estimateSize">{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text><text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text></view>
             </view>
               <view class="reward-binary-basis">
                 <text class="binary-note">{{ formulaText }}</text>
@@ -70,6 +70,7 @@
 
             <view v-if="recentBinaries.length > 0" class="binary-recent" :style="recentBlockStyle">
               <text class="binary-section-title" :style="recentCapStyle">{{ t.binary.recentMatches }}</text>
+              <view v-if="recentStale" class="binary-recent-stale" role="status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg><text>{{ t.exchange.staleSnapshot }}</text></view>
               <view class="binary-recent-card" :style="recentGroupStyle">
                 <view v-if="!visibility.hidden" class="binary-recent-unit" aria-hidden="true"><text>USDT</text></view>
                 <view v-for="(e, i) in recentBinaries" :key="e.id" class="binary-recent-row" :style="recentRowStyle(i === recentBinaries.length - 1)">
@@ -90,6 +91,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, VIZ_GROW_HEIGHT_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { useLocaleStore } from "@/store/locale";
 import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
@@ -198,7 +200,14 @@ const periodMatch = computed(() => {
   const factor = settleDays.value / 30;
   return Math.min(weakVol.value * factor * MATCH_RATE.value, DAILY_CAP.value * settleDays.value);
 });
-const estimateAmountParts = computed(() => visibility.mask(formatFinanceAmount(periodMatch.value)).split('.'));
+// A non-zero estimate under 0.01 reads "<0.01", never 0.00; a true zero stays 0.00.
+const estimateAmountParts = computed(() => visibility.mask(periodMatch.value > 0 && periodMatch.value < 0.01 ? "<0.01" : formatFinanceAmount(periodMatch.value)).split('.'));
+// Long estimates step down so the full amount and its unit stay on one line (01 §1.2); a masked value keeps the base size (03 §3.10).
+const estimateSize = computed(() => {
+  if (visibility.hidden) return "";
+  const length = estimateAmountParts.value.join(".").length;
+  return length >= 12 ? "reward-amount--longest" : length >= 10 ? "reward-amount--long" : "";
+});
 // Both groups qualified, payout day not reached: the server gives no estimate, so the amount slot shows a status line.
 const settlementNotDue = computed(() => remoteApiEnabled && snapshot.value?.blockedReason === "F3_SETTLEMENT_NOT_DUE");
 const blocked = computed(() => remoteApiEnabled
@@ -212,6 +221,8 @@ const recentBinaries = computed(() =>
     }))
     : commission.events.filter((e) => e.kind === "binary").slice(0, 5),
 );
+// Recorded rewards are fund amounts: a snapshot kept through a temporary failure says so in one line, without a button (03 §3.4).
+const recentStale = computed(() => commission.binaryTransientFailure && snapshot.value !== null);
 const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPlacedMembers ?? 0 : network.members.filter((m) => m.isSpillover).length);
 
 // Older backends omit the snapshot totals. A network group reaching layer 7 may have deeper members.
@@ -253,6 +264,14 @@ const wings = computed<Wing[]>(() => [
   },
 ]);
 
+// Long volumes step down so the full number stays on one line with its unit (01 §1.2). Masked values keep one size,
+// so the dots do not reveal the amount range (03 §3.10).
+const volumeSizes = computed(() => wings.value.map((wing) => {
+  if (visibility.hidden) return "";
+  const length = formatFinanceAmount(wing.monthVol).length;
+  return length >= 12 ? "binary-points--longest" : length >= 10 ? "binary-points--long" : "";
+}));
+
 // 结算周期文案 + 数字据后台同源配置派生(默认每月),消除「页面暗示日结」与「每月结算」矛盾,
 // 并让 hero 预计金额随结算周期联动(数字 periodMatch + 标签 {period} + 节奏 {freq} 三者一致)。
 const periodFreqLabel = computed(() => t.value.binary.settlePeriodLabel[settlePeriod.value]);
@@ -292,7 +311,8 @@ function go(url: string) {
 }
 
 function binaryAmountLabel(event: { amountUSDT: number; status?: string }): string {
-  const amount = formatFinanceAmount(event.amountUSDT);
+  // Recorded rewards keep the ledger's precision without trailing zeros, like the commission list.
+  const amount = formatGroupedAmount(event.amountUSDT, "full");
   if (event.status === "reversed") return `−${amount}`;
   if (event.status === "frozen" || event.status === "rejected") return amount;
   return `+${amount}`;
@@ -367,6 +387,9 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-estimate { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-4); padding: 14px var(--v5-space-4); border-radius: 18px; background: color-mix(in srgb, var(--ui-device-ink) 10%, var(--v5-surface-2)); }
 .binary-estimate .binary-label { flex: 1; min-width: 0; color: var(--v5-ink-3); }
 .binary-hero .reward-amount { margin: 0; max-width: 68%; font-size: 30px; line-height: 38px; font-weight: 500; letter-spacing: -.03em; overflow-wrap: break-word; }
+/* From 100,000.00 the page-title role, from 1,000,000.00 the overview-title role, so the unit never wraps under the number. */
+.binary-hero .reward-amount.reward-amount--long { font-size: var(--ui-type-page-title); }
+.binary-hero .reward-amount.reward-amount--longest { font-size: var(--ui-type-hero-title); }
 .binary-estimate-status { flex: 0 1 auto; max-width: 60%; text-align: right; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .binary-unit { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .binary-decimals { color: var(--v5-ink-3); }
@@ -384,8 +407,11 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-weak { background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); color: var(--ui-device-ink); }
 .binary-group-name { color: var(--v5-ink-2); font-size: 13px; line-height: 18px; }
 .binary-points { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
-/* From 100,000.00 the volume steps down to the inline-figure role so it stays on one line with its unit (01 §1.2). */
+/* Long volumes step down so the full number stays on one line with its unit (01 §1.2): from 100,000.00 the inline-figure
+   role, from 1,000,000.00 the meta role, and the columns drop their side padding to give the number the room. */
 .binary-points--long { font-size: var(--ui-type-inline-figure); }
+.binary-points--longest { font-size: var(--ui-type-meta); }
+.binary-comparison--wide { padding-inline: 0; }
 .binary-contribution-track { position: relative; width: 64px; height: 150px; margin: var(--v5-space-1) 0; border-radius: 18px; background: var(--v5-surface-3); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; }
 .binary-contribution-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px; background: linear-gradient(180deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 25%, transparent)); }
 .binary-contribution-fill--other { background: linear-gradient(180deg, var(--ui-device-ink), color-mix(in srgb, var(--ui-device-ink) 25%, transparent)); }
@@ -404,6 +430,9 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .reward-wing-member__rank { flex: none; }
 .reward-wing-member__rank :deep(.nx-vbadge__level) { display: none; }
 .reward-wing-member__points { display: block; max-width: 100%; overflow-wrap: break-word; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
+/* Stale-data line: warning colour with an icon, auxiliary description role; 4px under the title, 12px above the list. */
+.binary-recent-stale { display: flex; align-items: flex-start; gap: var(--v5-space-1); margin: -8px 0 var(--v5-space-3); color: var(--v5-warning-ink); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.binary-recent-stale > svg, .binary-recent-stale > .nx-native-svg { flex: 0 0 16px; margin-top: calc((var(--ui-type-description-lh) - 16px) / 2); }
 .binary-recent-card { padding: 0 var(--v5-space-4); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .binary-recent-unit { display: flex; justify-content: flex-end; padding-top: var(--v5-space-3); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: .04em; color: var(--v5-ink-3); }
 .binary-recent-row { display: flex; align-items: center; min-height: 64px; }
