@@ -264,7 +264,7 @@ export const useBills = defineStore("bills", () => {
       ref: orderRefund ? validOrderNo(publicReference) : publicReference,
       ledgerBizNo: row.bizNo,
       chainTopup: row.bizType === "CHAIN_TOPUP" && row.asset === "USDT" && row.direction === "IN",
-      ...(Object.hasOwn(row, "deposit") ? { deposit: row.deposit } : {}),
+      ...(Object.prototype.hasOwnProperty.call(row, "deposit") ? { deposit: row.deposit } : {}),
       hiddenNetwork: !visibleServerBill(row),
       balanceAfter: row.balanceAfter,
       balanceAfterExact: row.balanceAfterExact,

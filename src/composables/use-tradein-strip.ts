@@ -13,6 +13,7 @@ import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase"
 import { useProductPhase } from "@/composables/use-product-phase";
 import type { Device } from "@/store/types";
 import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalTradeinQuote } from "@/api/device-e3-api";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { isProductAvailable } from "@/store/product-availability";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
@@ -35,7 +36,8 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
   const monthsSinceJoin = computed(() => getMonthsSince(app.user.joinedAt));
   const remoteEligibilityRows = ref(new Map<number, {
     sourceKey: string; request: number; target: string; price: number;
-    quote?: number; quoteRequest: number; earnings: number | undefined;
+    quote?: Pick<CanonicalTradeinQuote, "discountUsdt" | "outputRatioPct" | "creditRatePct"> | null;
+    quoteRequest: number; earnings: number | undefined;
     account: ReturnType<typeof captureAccountScope>; context: string;
   }>());
   let remoteEligibilityRequest = 0;
@@ -62,16 +64,21 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
     const row = remoteEligibilityRows.value.get(id);
     if (!row?.target || !remoteEligibilityRowCurrent(id, row)) return;
     const device = app.devices.find(device => Number(device.id) === id)!;
+    const version = device.rowVersion;
     row.earnings = device.cumulativeEarningsUsdt;
     row.quote = undefined;
     const request = ++row.quoteRequest;
     const target = row.target;
+    const current = () => remoteEligibilityRowCurrent(id, row) && request === row.quoteRequest && target === row.target;
     try {
       const quote = await deviceE3Api.quote(id, target);
-      if (remoteEligibilityRowCurrent(id, row) && request === row.quoteRequest && target === row.target
-          && quote.sourceDeviceId === id && quote.targetProductNo === target
-          && quote.sourceRowVersion === device.rowVersion) row.quote = quote.discountUsdt;
-    } catch { /* The authorized entry remains usable; an unknown preview stays “—”. */ }
+      if (!current()) return;
+      const { discountUsdt, outputRatioPct, creditRatePct } = quote;
+      const matches = quote.sourceDeviceId === id && quote.targetProductNo === target && quote.sourceRowVersion === version;
+      row.quote = matches ? { discountUsdt, outputRatioPct, creditRatePct } : null;
+    } catch {
+      if (current()) row.quote = null;
+    }
   }
   async function refreshRemoteTradeinEligibility(sourceIds = app.devices.map(device => Number(device.id))): Promise<void> {
     if (!remoteApiEnabled || !enabled() || !remoteEligibilityMounted || sourceIds.length === 0) return;
@@ -146,7 +153,7 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
       return {
         tradeinCtaLabel: t.value.tradein.stripCta,
         tradeinCreditText: t.value.tradein.remoteQuoteCreditLabel,
-        tradeinQuoteAmount: row.quote,
+        tradeinQuoteAmount: row.quote?.discountUsdt,
       };
     }
     if (!DEFAULT_TRADEIN_CONFIG.enabled) return {};
@@ -192,5 +199,11 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
     tradeinSheet.showRetire(d.id);
   }
 
-  return { tradeinStrip, handleTradein, refreshRemoteTradeinEligibility };
+  function tradeinQuote(deviceId: string) {
+    const id = Number(deviceId);
+    const row = remoteEligibilityRows.value.get(id);
+    return row?.target && remoteEligibilityRowCurrent(id, row) ? row.quote : undefined;
+  }
+
+  return { tradeinStrip, handleTradein, refreshRemoteTradeinEligibility, tradeinQuote, refreshRemoteTradeinQuote };
 }

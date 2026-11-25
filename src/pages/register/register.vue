@@ -17,12 +17,12 @@
 
       <!-- Sponsor card (arrived via ?ref) -->
       <view v-if="sponsorPreview" class="rg-sponsor nx-tint">
-        <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ displayNickname(sponsorPreview.displayName)[0] }}</text></view>
+        <view class="rg-sponsor__av"><text class="rg-sponsor__av-t nx-avatar-letter">{{ displayNickname(sponsorPreview.displayName)[0] }}</text></view>
         <view class="rg-sponsor__body">
-          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ displayNickname(sponsorPreview.displayName) }}</text> {{ t.ref.invitedYou }}</text>
+          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ displayNickname(sponsorPreview.displayName) }}</text> {{ sponsorPreview.kind === "ADVISOR" ? t.ref.advisorLabel : t.ref.invitedYou }}</text>
           <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text v-if="sponsorPreview.vRank" class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
+        <text v-if="sponsorPreview.vRank && sponsorPreview.kind !== 'ADVISOR'" class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
 
       <!-- Step dots -->
@@ -291,7 +291,8 @@ let sponsorPreviewLoadVersion = 0;
 // [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
 // 无码,回到可手输。锁定后无任何解锁入口(防截断归因/换码自荐)。
 const lockedRef = ref<string | null>(null);
-type SponsorPreview = { displayName: string; vRank: string | null };
+// kind: a support advisor's code (ADVISOR) is not a friend invitation, so the card says so and shows no V rank.
+type SponsorPreview = { displayName: string; vRank: string | null; kind: "USER" | "ADVISOR" };
 const sponsorPreview = ref<SponsorPreview | null>(null);
 
 onLoad(async (options) => {
@@ -310,7 +311,7 @@ onLoad(async (options) => {
       const preview = await publicSponsorPreviewApi.preview(norm);
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
       lockedRef.value = preview.code;
-      sponsorPreview.value = preview.sponsor;
+      sponsorPreview.value = { ...preview.sponsor, kind: preview.kind };
     } catch (cause) {
       if (!mounted || previewLoadVersion !== sponsorPreviewLoadVersion) return;
       sponsorPreview.value = null;
@@ -323,7 +324,7 @@ onLoad(async (options) => {
   if (norm) {
     lockedRef.value = norm;
     const mock = pickSponsor(norm);
-    sponsorPreview.value = { displayName: mock.name, vRank: `V${mock.vRank}` };
+    sponsorPreview.value = { displayName: mock.name, vRank: `V${mock.vRank}`, kind: "USER" };
   }
 });
 
@@ -973,7 +974,7 @@ async function finish() {
         if (posted && giftPosted) {
           toast.success(
             `+$${formatAmount(gift.usdt)} + ${formatAmount(gift.nex)} UVT`,
-            sponsorPreview.value
+            sponsorPreview.value?.kind === "USER"
               ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: displayNickname(sponsorPreview.value.displayName) })
               : t.value.register.giftCreditedToastSub,
           );
@@ -1082,7 +1083,7 @@ onUnmounted(() => cleanup());
 .rg-top__sp { }
 .rg-sponsor { --nx-tint: var(--v5-brand); margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; }
 .rg-sponsor__av { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: linear-gradient(135deg, var(--v5-brand), var(--v5-tech-cyan)); }
-.rg-sponsor__av-t { color: var(--v5-on-brand); font-family: var(--font-v5); font-weight: 600; font-size: 20px; }
+.rg-sponsor__av-t { color: var(--v5-on-brand); font-size: 24px; }
 .rg-sponsor__body { flex: 1; min-width: 0; }
 .rg-sponsor__name { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rg-sponsor__name-b { font-weight: 600; }

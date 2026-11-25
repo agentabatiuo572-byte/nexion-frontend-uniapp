@@ -31,6 +31,39 @@ const RADIUS_RE = /border-radius:\s*([0-9.]+)(?:px|rpx)/g;
 const RADIUS_LADDER = new Set(["12", "16", "20", "24", "28", "32", "999", "9999"]);
 const args = process.argv.slice(2);
 
+const APPROVED_FONT_SIZES = {
+  // 用户批准的邀请落地页设计，包括票面与礼包数字的尺寸档。
+  "src/pages/ref/code.vue": new Map([
+    [".rf-h1", "32"],
+    [".rf-name", "22"],
+    [".rf-rank", "11"],
+    [".rf-who__code", "14"],
+    [".rf-amt__v", "92"],
+    [".rf-amts--m .rf-amt__v", "66"],
+    [".rf-amts--s .rf-amt__v", "54"],
+    [".rf-fact__t", "17"],
+    [".rf-fact__p", "14"],
+    [".rf-stat__v", "22"],
+    [".rf-cta__t", "16"],
+    [".rf-cta__t--long", "14"],
+  ]),
+  // 头像字母按圆径定字号。
+  "src/pages/daily/daily.vue": new Map([
+    [".dly-av .nx-avatar-letter", "24"],
+    [".dly-av--big .nx-avatar-letter", "29"],
+  ]),
+  "src/pages/register/register.vue": new Map([[".rg-sponsor__av-t", "24"]]),
+};
+
+function isApprovedFontSize(file, lines, index, match) {
+  const before = lines[index].slice(0, match.index);
+  // 个人资料的字母头像也按圆径定字号，其字号写在行内样式对象里。
+  if (file === "src/pages/me/profile.vue" && lines[index - 1] === "const avatarTextStyle: CSSProperties = {"
+    && before.trim() === "" && match[0] === 'fontSize: "38px') return true;
+  const selector = before.match(/^\s*([^{}]+?)\s*\{[^{}]*$/)?.[1];
+  return APPROVED_FONT_SIZES[file]?.get(selector) === match[1];
+}
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -54,7 +87,7 @@ function scan() {
     const lines = text.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
       for (const m of lines[i].matchAll(FONT_RE)) {
-        if (!isOffLadderFont(m[1])) continue;
+        if (!isOffLadderFont(m[1]) || isApprovedFontSize(rel, lines, i, m)) continue;
         perFile[rel] = (perFile[rel] || 0) + 1;
         (fontLoc[rel] ||= []).push(`${parseFloat(m[1])}px@${i + 1}`);
       }
