@@ -16,6 +16,7 @@ const reward=row=>row.direction==='IN'&&row.amount>0&&!(row.bizType==='TEAM_COMM
 
 export function demoSettledTasks(state,at) {
   if(!demoHasEarningsHistory(state))return [];
+  const completedReplacements=Object.values(state.slotReplacementTasks??{}).filter(task=>task.completedAt!=null);
   if(demoHasLongTasks(state)) {
     return [
       ['LL','language inference - structured knowledge extraction','0.029745'],
@@ -34,7 +35,7 @@ export function demoSettledTasks(state,at) {
         deviceId:41,taskClass,taskName,amount:Number(rewardAmount),nex:0,completedAt,postedAt:completedAt+60000,
         durationSec:300,client:'UVEL',model:'',simulation:{executionMode:'SIMULATED',proofKind:'TASK_RECEIPT',
           modelExecuted:false,rewardAsset:'USDT',rewardAmount}};
-    });
+    }).concat(completedReplacements);
   }
   return [['IG',2.34],['LL',8.5],['VG',5.4]].map(([taskClass,amount],index)=>{
     const completedAt=at-(index+1)*3600000;
@@ -43,7 +44,7 @@ export function demoSettledTasks(state,at) {
       nex:0,completedAt,postedAt:completedAt+600000,durationSec:600,
       taskName:['Image generation','Language inference','Video generation'][index],
       client:'Demo Studio',model:['SDXL','Llama 3.1','Video generation'][index]};
-  });
+  }).concat(completedReplacements);
 }
 
 export function demoCommissionGroups(state,at) {
@@ -361,7 +362,8 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
     // Saved legacy ledgers keep their original pending row and identity.
     ...(state.walletLegacySeed&&cooling?[['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING']]:[]),
-    ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
+    ...tasks.filter(task=>!task.deliveryCycle&&!posted.has(task.taskNo))
+      .map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
     ...commissions.filter(event=>event.kind!=='vrank_salary'||!posted.has(`${event.id}-RELEASE`))
       .flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
       .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-RELEASE`])),

@@ -319,7 +319,7 @@ import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { apiRuntimeConfig, deviceE3Api, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalTradeinConfig, PendingDeviceReplacement } from "@/api/device-e3-api";
-import { isSettledRejection } from "@/api/errors";
+import { isApiRefusal } from "@/api/errors";
 import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { productCatalogState } from "@/store/product-catalog";
@@ -472,12 +472,12 @@ const canDeactivateActive = computed(() => activeDevices.value.some((device) => 
   && !(remoteApiEnabled && device.pendingDeactivate) && !device.replacement));
 const tasksConfirmed = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
-// The job read can omit expired legacy assignments and drained v2 jobs that still affect stopping.
-// Simulated jobs may finish during the stop command. These reads cannot guarantee the swap-out timing.
+// Predict the timing from the job read. After submission, the fresh fleet read determines the message.
 function replacementTiming(device: Device): "idle" | "busy" | null {
-  if (!tasksConfirmed.value || device.recoveryPending || device.currentTask?.executionMode === "SIMULATED") return null;
-  const status = device.currentTask?.status;
-  return status === "CLAIMED" || status === "RUNNING" ? "busy" : null;
+  if (!tasksConfirmed.value || device.recoveryPending) return null;
+  const task = device.currentTask;
+  if (!task) return "idle";
+  return task.status == null || task.status === "CLAIMED" || task.status === "RUNNING" ? "busy" : null;
 }
 const replacementStep = computed(() => replacementDecision.value?.cancel === false ? replacementDecision.value : null);
 const replacementEffects = computed(() => {
@@ -660,6 +660,17 @@ async function cancelSlotReplacement(newDevice: Device) {
   if (oldDevice) await runSlotReplacement(oldDevice, newDevice, true);
 }
 
+function isSlotReplacementRefusal(error: unknown): boolean {
+  return isApiRefusal(error, 403, "DEVICE_FORBIDDEN", "CANONICAL_PRODUCTION_USER_REQUIRED", "USER_SUBJECT_REQUIRED")
+    || isApiRefusal(error, 404, "DEVICE_NOT_FOUND", "USER_NOT_FOUND")
+    || isApiRefusal(error, 409, "DEVICE_VERSION_CONFLICT", "DEVICE_REPLACEMENT_STATE_CHANGED",
+      "DEVICE_REPLACEMENT_PENDING", "DEVICE_STATE_CONFLICT", "DEVICE_FORBIDDEN", "USER_EVENT_ATTRIBUTION_UNAVAILABLE",
+      "COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED", "COMPUTE_V2_OWNER_CHANGED", "SIMULATED_TASKS_UNAVAILABLE",
+      "IDEMPOTENCY_PREVIOUS_REQUEST_FAILED")
+    || isApiRefusal(error, 422, "DEVICE_ID_REQUIRED", "DEVICE_VERSION_REQUIRED",
+      "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID");
+}
+
 async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: boolean) {
   if (replacementBusy.value) return;
   const scope = captureAccountScope();
@@ -687,7 +698,7 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
       else await deviceE3Api.replaceDevice(payload, key);
       finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
     } catch (error) {
-      if (isSettledRejection(error)) {
+      if (isSlotReplacementRefusal(error)) {
         finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
         if (isCurrentAccountScope(scope)) void app.refreshRemoteFleet();
         if (currentPage()) toast.warn(replacementCopy.value.retry);

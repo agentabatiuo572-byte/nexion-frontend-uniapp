@@ -14,7 +14,7 @@ import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs'
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
 import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
-import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
+import { auxiliaryDemo, demoCurrentTaskSample, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
@@ -624,9 +624,13 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
   const seeding=!state.fleetSeed;
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
   // slotReplacementState=pending: the state a PENDING replacement leaves (markDevicePendingDeactivate does not bump row_version).
-  if(seeding&&state.slotReplacementState==='pending'&&[41,47].every(id=>state.fleetSeed.some(device=>device.id===id))){
-    (state.deviceActivations??={})[41]={...state.deviceActivations[41],pendingDeactivate:true};
-    state.slotReplacements={41:{newDeviceId:47,taskEndsAt:now+300000}};
+  if(seeding&&state.slotReplacementState==='pending'&&state.fleetSeed.some(device=>device.id===47)){
+    const oldDevice=state.fleetSeed.find(device=>device.id===41);
+    const task=oldDevice&&retainDemoSlotReplacementTask(state,oldDevice,now);
+    if(task){
+      (state.deviceActivations??={})[41]={...state.deviceActivations[41],pendingDeactivate:true};
+      state.slotReplacements={41:{newDeviceId:47,taskNo:task.taskNo,taskEndsAt:Date.parse(task.completableAt)}};
+    }
   }
   // Payment committed the DEVICE reservation. Its receipt or cancellation releases that reservation.
   if(!state.promotionGift&&state.promotionRewardState!=='CANCELLED'&&demoAccountOrders(url,locale,state,now)
@@ -647,7 +651,19 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
         ...(gift===state.promotionGift&&{sourceChannel:'PROMOTION_GIFT',sourceOrderNo:demoPromotionGift.orderNo})});
     }
   }
-  // The old device's job has really ended: its deactivation and the successor's activation are one step
+  // Restore the fixed task schedule from older preview handoffs that saved only the pair.
+  for(const [oldId,pair] of Object.entries(state.slotReplacements??{})){
+    if(pair.taskNo)continue;
+    const oldDevice=roster.find(device=>device.id===Number(oldId));
+    if(oldDevice)pair.taskNo=retainDemoSlotReplacementTask(state,oldDevice,pair.taskEndsAt-300000)?.taskNo;
+  }
+  for(const task of Object.values(state.slotReplacementTasks??{})){
+    if(task.completedAt!=null)continue;
+    const pair=state.slotReplacements?.[task.deviceId];
+    const endsAt=pair?.taskNo===task.taskNo?pair.taskEndsAt:Date.parse(task.completableAt);
+    if(endsAt<=now)completeDemoSlotReplacementTask(state,task,endsAt);
+  }
+  // The old device's job has ended: its deactivation and the successor's activation are one step
   // (DeviceSlotReplacementCompletion.afterDeactivation). A successor that left the account only unbinds.
   for(const [oldId,pair] of Object.entries(state.slotReplacements??{})){
     if(pair.taskEndsAt>now)continue;
@@ -679,6 +695,23 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
   }
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
+}
+
+function retainDemoSlotReplacementTask(state,device,now,currentTask){
+  const [settlement]=demoSettledTasks(state,state.previewFactsAt??now);
+  const sample=demoCurrentTaskSample(state,device,settlement,now);
+  if(!sample)return null;
+  const tasks=state.slotReplacementTasks??={};
+  return tasks[sample.taskNo]??={...sample,...(currentTask&&{
+    startedAt:currentTask.startedAt,completableAt:currentTask.completableAt,
+  }),receiptId:11+Object.keys(tasks).length};
+}
+
+function completeDemoSlotReplacementTask(state,task,at){
+  postDemoWalletEntries(state,{bizNo:task.taskNo,bizType:'COMPUTE_TASK_REWARD',asset:'USDT',direction:'IN',
+    amount:task.amount,at,category:'bonus'});
+  Object.assign(task,{completedAt:at,postedAt:at,batchNo:null,
+    receiptNo:task.taskNo.replace('DEMO-TASK-','DEMO-RECEIPT-')});
 }
 
 // Old device first (deactivateOwnedDeviceCas), then the successor (activateOwnedDeviceCas): the active count never passes the cap.
@@ -794,6 +827,9 @@ export function demoReplacementSourceCheck(source, state, external, read) {
 export function demoFixture(url,locale,state,request,now=Date.now()) {
   state.previewFactsAt??=demoStartedAt;
   state.walletLegacySeed??=false;
+  if(Object.values(state.slotReplacements??{}).some(pair=>pair.taskEndsAt<=now)
+    ||Object.values(state.slotReplacementTasks??{}).some(task=>task.completedAt==null&&Date.parse(task.completableAt)<=now))
+    demoFleetFacts(url,locale,state);
   const iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin);
@@ -866,9 +902,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         path=>demoFixture(new URL(path,url.origin),locale,state,{...request,method:()=>'GET'},now));
       const task=assignment?.currentTask;
       if(['CLAIMED','RUNNING'].includes(task?.status)){
+        retainDemoSlotReplacementTask(state,oldDevice,now,task);
         // deactivateAfterTask with an active task: the old device keeps its slot and only gets pending_deactivate.
         activations[oldDeviceId]={...activations[oldDeviceId],pendingDeactivate:true};
-        replacements[oldDeviceId]={newDeviceId,taskEndsAt:Date.parse(task.completableAt)};
+        replacements[oldDeviceId]={newDeviceId,taskNo:task.taskNo,taskEndsAt:Date.parse(task.completableAt)};
         status='PENDING';
       }else{
         completeDemoSlotReplacement(state,oldDevice,newDevice,now);
