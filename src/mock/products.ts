@@ -66,6 +66,8 @@ export interface Product {
   monthlyPrice?: number;
   installMonths?: number;
   sold: number;
+  /** Per-product switch for the live-activity overlay on the detail image; only an explicit false hides it. */
+  liveActivityVisible?: boolean;
   /** Short-lived server-issued URL for the SKU's approved main image. */
   imageUrl?: string;
   /** Short-lived server-issued URL for an approved SKU detail video. */
