@@ -3584,7 +3584,7 @@ export const uz: Messages = {
     remoteUnavailableToast: "Yuklab boʻlmadi. Keyinroq qayta urining",
     swapFailed: "Almashuv amalga oshmadi. Birozdan keyin urinib koʻring.",
     swapCancelledReason: "Almashuv bekor qilindi — hech narsa almashtirilmadi.",
-    swapFailedReason: "Almashuv amalga oshmadi. Qayta urinishdan oldin tarix va balansni tekshiring.",
+    swapFailedReason: "Almashuv amalga oshmadi. |Qayta urinishdan oldin |tarix va balansni tekshiring.",
     swapUserCapReason: "Shaxsiy limitingiz tugadi — hech narsa almashtirilmadi.",
     swapPlatformCapReason: "Bugungi almashuv limiti tugadi; bu almashuv bajarilmadi",
     swapGeoBlockedReason: "Hududingizda almashuv mavjud emas",

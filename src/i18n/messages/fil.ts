@@ -3584,7 +3584,7 @@ export const fil: Messages = {
     remoteUnavailableToast: "Hindi ma-load. Subukan ulit mamaya",
     swapFailed: "Hindi natuloy ang exchange. Subukan ulit mamaya.",
     swapCancelledReason: "Kinansela ang order ng swap — walang na-exchange.",
-    swapFailedReason: "Nabigo ang swap. Suriin ang history at balanse mo bago subukan ulit.",
+    swapFailedReason: "Nabigo ang swap. |Suriin ang history |at balanse mo |bago subukan ulit.",
     swapUserCapReason: "Naabot mo na ang personal na limit — walang na-exchange.",
     swapPlatformCapReason: "Naabot na ang limit ng exchange ngayong araw; hindi natuloy ang exchange na ito",
     swapGeoBlockedReason: "Hindi available ang exchange sa rehiyon mo",

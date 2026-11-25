@@ -3584,7 +3584,7 @@ export const id: Messages = {
     remoteUnavailableToast: "Gagal memuat. Coba lagi nanti",
     swapFailed: "Penukaran tidak berhasil. Coba lagi sebentar lagi.",
     swapCancelledReason: "Pesanan penukaran dibatalkan — tidak ada yang ditukar.",
-    swapFailedReason: "Penukaran gagal. Cek riwayat dan saldo Anda sebelum mencoba lagi.",
+    swapFailedReason: "Penukaran gagal. |Cek riwayat |dan saldo Anda |sebelum mencoba lagi.",
     swapUserCapReason: "Batas pribadi Anda tercapai — tidak ada yang ditukar.",
     swapPlatformCapReason: "Batas penukaran hari ini sudah tercapai; penukaran ini tidak berhasil",
     swapGeoBlockedReason: "Penukaran tidak tersedia di wilayah Anda",
