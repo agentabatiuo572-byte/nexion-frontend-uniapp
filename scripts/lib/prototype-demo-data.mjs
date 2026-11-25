@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { demoAccountId, demoPurchasingAccountId, demoReferralBuyer, previewAccountId, previewSelectedAccountId } from './prototype-demo-identity.mjs';
+import { trialReceiptOptions } from './trial-lifecycle-preview-fixture.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { quoteBundleAmountUsdt } from '../../src/api/bundle-quote.ts';
 import { computeDemo, demoComputeFacts } from "./prototype-demo-compute.mjs";
@@ -116,6 +117,7 @@ export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all'
 Object.assign(demoDefaults,{
   trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
   trialPurchaseReadState:'normal',trialPurchasePriceState:'normal',trialOriginalPurchaseState:'none',trialPurchaseWindow:'follow',
+  trialStartReceiptState:'normal',trialCancelReceiptState:'normal',purchaseCreateReceiptState:'normal',
 });
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
@@ -130,12 +132,15 @@ export const demoOptions = {
   setupGateState:[['open','正常写入'],['setup-required','服务端拒绝：需完成初始设置（试用领取 / 首日浏览商店任务 / 课程开始）']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
-  trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
-  trialReadState:[['normal','正常读取'],['error','试用读取失败']],
+  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
+  trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['grace-ending','抵扣期剩余 45 秒'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
+  trialReadState:[['normal','正常读取'],['error','试用读取失败'],['user-not-found','试用读取 · 用户不存在']],
+  trialStartReceiptState:trialReceiptOptions,
+  trialCancelReceiptState:trialReceiptOptions,
+  purchaseCreateReceiptState:[['normal','正常建单'],['processing','原建单请求处理中（稍后出单）']],
   trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share']],
   trialPurchaseOptionTarget:[['rack-p1','UVELRack P1'],['trial-device','本人试用设备']],
-  trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架']],
+  trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架'],['image-missing','清单未返回图片']],
   trialPurchaseReadState:[['normal','正常读取'],['loading','清单慢速读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
   trialPurchasePriceState:[['normal','正常价格'],['trial-up','试用设备商城价上涨'],['trial-down','试用设备商城价下调'],['extra-up','Rack P1 涨价']],
   trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-expired','试用设备 · 过期仍确认中（先从页面发起外部付款再切）'],['external-unpaid-terminal','试用设备 · 未付款终结（先从页面发起外部付款再切）'],['external-late','试用设备 · 迟付允许重选（先从页面发起外部付款再切）'],['external-late-unmarked','试用设备 · 迟付仍进行中（先从页面发起外部付款再切）'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-ready','Rack P1 · 余额已受理可继续'],['balance-resumable','下一次余额提交不送达'],['balance-hold-next','下一次余额提交已受理 · 丢响应'],['balance-settled','原余额付款出结果'],['external-quote-conflict','下次试用外部报价遇到 Rack P1 原提交']],

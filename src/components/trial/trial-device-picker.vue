@@ -91,7 +91,8 @@ const rows = computed(() => props.options.map(option => {
   const claimPrice = option.isTrialProduct && option.marketPriceUSD !== undefined && option.marketPriceUSD !== option.priceUSD;
   // Beside the struck price the label only fits in Chinese; longer words take the line above.
   const claimStack = claimPrice && copy.value.claimPrice.length > 6;
-  const link = option.reasonCode === "PURCHASE_GATE_NOT_MET" && (props.conditionLinks?.includes(option.productNo) ?? true);
+  const link = (option.reasonCode === "PURCHASE_GATE_NOT_MET" || option.reasonCode === "ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET")
+    && (props.conditionLinks?.includes(option.productNo) ?? true);
   const checked = !props.locked && option.canBuy && option.productNo === props.selectedProductNo;
   const aria = [option.productName, option.isTrialProduct ? copy.value.thisTrialTag : "", reason || (estimate ? estimate.label + estimate.value : ""),
     due ? `${copy.value.finalPrice} $${due.whole}${due.decimals}` : "", due ? `${claimPrice ? copy.value.claimPrice : copy.value.unitPrice} ${was}` : ""].filter(Boolean).join(", ");

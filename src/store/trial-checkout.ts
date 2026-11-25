@@ -20,12 +20,16 @@ type Submission = Omit<TrialBalancePurchase, "status">;
 type SubmissionResultTarget = Pick<Submission, "claimNo" | "submissionNo" | "confirmedAmountUSD"> & { device: Pick<Submission["device"], "productNo"> };
 type ConfirmedSubmission = Submission & { confirmedAmountUSD: number; quoteVersion: string };
 
+type RefusedTrialCheckout = {
+  status: "refused"; claimNo: string; submissionNo: string; productNo: string;
+  confirmedAmountUSD: number | null; refusal: TrialRefusal;
+};
 type TrialCheckoutOutcome =
   | { status: "idle" | "storage-error" }
   | { status: "submitting" | "processing"; submission: Submission }
   | { status: "resumable"; submission: ConfirmedSubmission; accepted: boolean }
   | { status: "original"; originalPurchase: TrialOriginalPurchase }
-  | { status: "refused"; claimNo: string; submissionNo: string; productNo: string; confirmedAmountUSD: number | null; refusal: TrialRefusal }
+  | RefusedTrialCheckout
   | { status: "settled"; claimNo: string; receipt: TrialConvertReceipt };
 
 const COMMANDS = "nexgrid-trial-checkout-accounts-v1";
@@ -182,6 +186,12 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     } catch { return null; }
   });
 
+  function hasUnsettledBalanceSubmission(): boolean {
+    if (workingSubmission.value || originalPurchase.value?.kind === "BALANCE") return true;
+    try { return !!readStoredSubmission(); }
+    catch { return true; }
+  }
+
   async function submit(input: Omit<ConfirmedSubmission, "submissionNo" | "kind" | "paymentMethod">, authorization: PaymentPasswordAuthorization) {
     const before = outcome.value;
     if (["submitting", "processing", "original", "settled", "storage-error"].includes(before.status)
@@ -242,18 +252,22 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
 
   // The original disappears from trial/state once it settles or is refused.
   // A cold checkout then has only the route identity to read its final receipt.
-  async function readRoutedResult(claimNo: string, productNo: string, submissionNo: string, amount: number | null) {
+  async function readRoutedResult(claimNo: string, productNo: string, submissionNo: string): Promise<
+    RefusedTrialCheckout | Extract<TrialCheckoutOutcome, { status: "settled" }> | undefined
+  > {
     const current = currentAccount();
     const reply = await readPaymentCommand(apiClient, "trial-convert", submissionNo);
-    if (!current() || authority.value?.claimNo !== claimNo || (reply.paymentMethod && reply.paymentMethod !== "WALLET")
-        || (workingSubmission.value && workingSubmission.value.submissionNo !== submissionNo)) return;
+    if (!current() || authority.value?.claimNo !== claimNo || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
     const result = terminalResult(reply);
-    if (!result) return;
+    if (!result || (result.status === "refused" && result.originalPurchase)) return;
     const receiptClaim = result.status === "settled" ? result.receipt.claimNo : result.claimNo;
-    if ((reply.claimNo ?? receiptClaim) !== claimNo) return;
-    if (result.status === "settled" && result.receipt.productNo !== productNo) return;
-    finish({ claimNo, submissionNo, confirmedAmountUSD: amount, device: { productNo } }, result);
-    return result;
+    if ((reply.claimNo ?? receiptClaim) !== claimNo || (receiptClaim && receiptClaim !== claimNo)) return;
+    if (result.status === "settled") {
+      if (result.receipt.productNo === productNo) return { status: "settled", claimNo, receipt: result.receipt };
+      return;
+    }
+    if (result.productNo !== productNo) return;
+    return { status: "refused", claimNo, submissionNo, productNo, confirmedAmountUSD: null, refusal: result };
   }
 
   function readSubmission(): Promise<void> {
@@ -309,5 +323,5 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       outcome.value = { status: "idle" };
   }
 
-  return { authority, outcome, workingSubmission, originalPurchase, adoptAuthority, adoptOriginal, readSubmission, readRoutedResult, submit, settleExternal, clearSettled, rememberExternalRefusal };
+  return { authority, outcome, workingSubmission, originalPurchase, hasUnsettledBalanceSubmission, adoptAuthority, adoptOriginal, readSubmission, readRoutedResult, submit, settleExternal, clearSettled, rememberExternalRefusal };
 });

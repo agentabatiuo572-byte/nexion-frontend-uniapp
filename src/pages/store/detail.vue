@@ -272,7 +272,16 @@ import { usePublishedTrust } from "@/composables/use-published-trust";
 import { serverLanguage } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
 import { useTrialCreditOption, useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { useFreeTrial } from "@/store/free-trial";
+import { resolveTrialCheckoutProductId } from "@/store/trial-config";
+import { useTrialCheckout } from "@/store/trial-checkout";
+import { originalTrialCheckoutHref } from "@/lib/trial-topup-return";
+import { trialExternalPaymentActive } from "@/store/purchase-payment";
+import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
+import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
+import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
@@ -592,6 +601,33 @@ watch(trialCreditReadVisible, (visible, _, onCleanup) => {
 const trialCredit = useTrialCreditOption(() => product.value?.id);
 const trialConfirmationOption = useTrialCreditOption(() => product.value?.id, true);
 const trialLifecycleCopy = useTrialLifecycleCopy();
+const trialDetailCopy = useTrialDetailCopy();
+const trialPurchaseCopy = useTrialPurchaseCopy();
+const freeTrial = useFreeTrial();
+const trialCheckout = useTrialCheckout();
+const trialOptions = useTrialPurchaseOptions();
+const ownTrialClaim = computed(() => {
+  const state = freeTrial.displayState;
+  if (!remoteApiEnabled || !state?.claimNo || (state.status !== "active" && state.status !== "grace")
+      || qty.value !== 1 || activityId.value || voucherContext.value.voucherId) return null;
+  return resolveTrialCheckoutProductId(state.config.trialProductId) === product.value?.id ? state.claimNo : null;
+});
+const ownTrialOriginal = computed(() => {
+  const original = trialCheckout.originalPurchase;
+  return original?.claimNo === ownTrialClaim.value && original.device.productNo === product.value?.id ? original : null;
+});
+const ownTrialBlock = computed(() => {
+  const claim = ownTrialClaim.value;
+  if (!claim) return "";
+  if (trialCheckout.originalPurchase || trialExternalPaymentActive(claim) || freeTrial.legacyConversionPending)
+    return trialDetailCopy.value.lockNote;
+  if (freeTrial.authorityClaimNo !== claim || freeTrial.authorityStatus !== "ready"
+      || trialOptions.claimNo !== claim || trialOptions.current.status !== "ready")
+    return t.value.store.purchaseEligibilityLoading;
+  const option = trialOptions.current.options.find(row => row.isTrialProduct && row.productNo === product.value?.id);
+  if (!option || trialOptionReadFailed(option)) return t.value.store.purchaseEligibilityLoading;
+  return option.canBuy ? "" : trialPurchaseReasonMessage(t.value, option.reasonCode, locale.code) ?? trialDetailCopy.value.optionUnavailable;
+});
 const trialCreditEntry = computed(() => {
   const option = trialCredit.value;
   if (!option?.quote || activityId.value || voucherContext.value.voucherId) return null;
@@ -626,11 +662,11 @@ function publishStickyCTA() {
       sticky.hide(stickyOwner);
       return;
     }
-    if (!product.value || isLocked.value || purchaseUnavailable.value) {
+    if (!product.value || isLocked.value || (!ownTrialClaim.value && purchaseUnavailable.value)) {
       sticky.hide(stickyOwner);
       return;
     }
-    if (stockUnavailable.value) {
+    if (!ownTrialClaim.value && stockUnavailable.value) {
       sticky.show({
         href: `/pages/store/detail?id=${product.value.id}`,
         amount: `${priceText.value}`,
@@ -654,19 +690,23 @@ function publishStickyCTA() {
         return;
       }
     }
-    if (remoteApiEnabled && (eligibility.value.status !== "ready" || purchaseEligibilityMessage.value === "error")) {
+    if (ownTrialBlock.value || (!ownTrialClaim.value && remoteApiEnabled
+        && (eligibility.value.status !== "ready" || purchaseEligibilityMessage.value === "error"))) {
+      const original = ownTrialOriginal.value;
+      const continuing = original?.kind === "EXTERNAL" && original.status === "AWAITING_PAYMENT" ? original : null;
+      const checkingBalance = original?.kind === "BALANCE" && original.status === "PROCESSING";
       sticky.show({
-        href: `/pages/store/detail?id=${product.value.id}`,
-        amount: `${priceText.value}`,
+        href: continuing ? originalTrialCheckoutHref(continuing) : `/pages/store/detail?id=${product.value.id}`,
+        amount: checkingBalance ? undefined : `${priceText.value}`,
         // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
-        note: t.value.store.purchaseEligibilityLoading,
-        buttonLabel: t.value.store.cardBuyNow,
-        disabled: true,
+        note: checkingBalance ? trialPurchaseCopy.value.coConfirming : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
+        buttonLabel: checkingBalance ? undefined : continuing ? t.value.orders.pendingContinue : t.value.store.cardBuyNow,
+        disabled: !continuing,
         showTabBar: false,
       }, stickyOwner);
       return;
     }
-    if (remoteApiEnabled && !eligibility.value.eligible) {
+    if (!ownTrialClaim.value && remoteApiEnabled && !eligibility.value.eligible) {
       const quotaDepleted = purchaseEligibilityMessage.value === "quotaDepleted";
       sticky.show({
         // A rank-only product has no quota tier; take the user to rank progression.
@@ -685,7 +725,7 @@ function publishStickyCTA() {
       return;
     }
     // Purchase gate blocks → CTA routes to /team/quota with locked label, not checkout.
-    if (purchaseGate.value.blocked) {
+    if (!ownTrialClaim.value && purchaseGate.value.blocked) {
       sticky.show({
         href: `/pages/team/quota?product=${encodeURIComponent(product.value.id)}`,
         amount: `${priceText.value}`,
@@ -700,7 +740,8 @@ function publishStickyCTA() {
       return;
     }
     sticky.show({
-      href: isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
+      href: ownTrialClaim.value ? `/pages/store/checkout?product=${product.value.id}&source=trial`
+        : isShare.value || activityId.value || voucherContext.value.voucherId || qty.value > 1 ? promotionCheckoutHref([{productNo:product.value.id,quantity:qty.value}],activityId.value,voucherContext.value) : `/pages/store/checkout?product=${product.value.id}`,
       quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
       amountSubtext: dailyEstimateLine.value,
@@ -713,7 +754,7 @@ function publishStickyCTA() {
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption,ownTrialClaim,ownTrialBlock,ownTrialOriginal],
   publishStickyCTA,
   { immediate: true },
 );

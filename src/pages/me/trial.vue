@@ -68,7 +68,7 @@
         <view v-if="originalPurchase || showDevicePicker" class="trial-select trial-rise trial-rise--3">
           <TrialOriginalPurchaseCard v-if="originalPurchase" :purchase="originalPurchase"
             :is-trial-device="originalPurchase.device.productNo === trialProductId" :now="serverNow" />
-          <TrialDevicePicker v-if="showDevicePicker" :options="purchaseOptionsView.options"
+          <TrialDevicePicker v-if="showDevicePicker" :options="devicePickerOptions"
             :selected-product-no="selectedProductNo" :status="purchaseOptionsView.status" :locked="!!originalPurchase"
             :estimates="purchaseEstimates" :condition-links="purchaseConditionLinks"
             @select="selectDevice" @open-conditions="openPurchaseConditions" />
@@ -217,7 +217,7 @@
           <view v-if="barNoteWarn" class="trial-bar__note trial-bar__note--warn nx-tray-note" role="status"><svg class="trial-bar__note-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg><text>{{ barNote }}</text></view>
           <text v-else-if="barNote" class="trial-bar__note nx-tray-note" role="status">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
-          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
+          <NxButton v-if="!originalConfirming" class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
             <!-- Reading the list keeps the label beside the spinner (board S6a); a press in progress uses the shared busy state. -->
             <view v-if="listLoading" class="trial-bar__spinner" aria-hidden="true" />
             <svg v-else-if="isActiveCycle && !originalPurchase && !trialBuyDisabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
@@ -294,7 +294,7 @@ import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { useTrialCheckout } from "@/store/trial-checkout";
-import { trialOrderResultKey, trialRefusalResultKey, useTrialPurchaseResult } from "@/store/trial-purchase-result";
+import { trialRefusalResultKey, useTrialPurchaseResult } from "@/store/trial-purchase-result";
 import { useLocaleStore } from "@/store/locale";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 import { useTrialCreditOptionsRead, useTrialPurchaseConfirmation } from "@/composables/use-trial-credit-option";
@@ -390,7 +390,7 @@ const optionsRead = useTrialCreditOptionsRead(() => pageVisible.value, () => {
 const purchaseClaim = computed(() => isActiveCycle.value ? displayState.value?.claimNo ?? null : null);
 const originalPurchase = computed(() => purchaseClaim.value ? checkout.originalPurchase : null);
 const purchaseConfirmation = useTrialPurchaseConfirmation();
-const trialResultConfirming = computed(() => (freeTrial.authorityResultUnknown && !freeTrial.startRetryable)
+const trialResultConfirming = computed(() => (freeTrial.authorityResultUnknown && (!freeTrial.startRetryable || !displayState.value))
   || (purchaseConfirmation.value && !originalPurchase.value));
 provide(TRIAL_PAYMENT_CARD_KEY, () => {
   const original = originalPurchase.value;
@@ -398,6 +398,11 @@ provide(TRIAL_PAYMENT_CARD_KEY, () => {
 });
 const hasScopedOptions = computed(() => purchaseClaim.value !== null && purchaseClaim.value === trialOptions.claimNo);
 const purchaseOptionsView = computed(() => hasScopedOptions.value ? trialOptions.current : { status: "idle" as const, options: [] });
+const devicePickerOptions = computed(() => purchaseOptionsView.value.options.map(option => {
+  if (option.imageUrl || productCatalogState.status !== "ready") return option;
+  const imageUrl = getProduct(option.productNo)?.imageUrl;
+  return imageUrl ? { ...option, imageUrl } : option;
+}));
 const waitingForReselection = computed(() => hasScopedOptions.value && !!trialOptions.current.invalidatedProductNo);
 const selectedOption = computed(() => hasScopedOptions.value && !waitingForReselection.value && trialOptions.selectedOption?.canBuy
   ? trialOptions.selectedOption : null);
@@ -563,6 +568,7 @@ const openingPurchase = ref(false);
 const trialBuyBusy = computed(() => openingPurchase.value || (originalPurchase.value ? false
   : usePurchaseOptions.value ? purchaseOptionLoading.value : trialCatalogLoading.value));
 const listLoading = computed(() => purchaseOptionLoading.value && !originalPurchase.value);
+const originalConfirming = computed(() => originalPurchase.value?.kind === "BALANCE" && originalPurchase.value.status !== "RESUMABLE");
 const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalPurchase.value ? false
   : usePurchaseOptions.value ? !selectedOption.value || !purchaseQuote.value
     : trialProductUnavailable.value && !trialCatalogLoading.value));
@@ -608,6 +614,7 @@ const barRetry = computed(() => (isActiveCycle.value || status.value === "ended"
   && !usePurchaseOptions.value && !originalPurchase.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
+  if (originalConfirming.value) return purchase.value.coConfirming;
   if (freeTrial.startRetryable) return t.value.trial.claimUnknownInline;
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
@@ -667,7 +674,7 @@ function checkoutHref(productNo: string, recovery?: { kind: "resume" | "refusal"
 }
 
 async function goCheckout() {
-  if (trialBuyDisabled.value || openingPurchase.value) return;
+  if (trialBuyDisabled.value || originalConfirming.value || openingPurchase.value) return;
   const original = originalPurchase.value;
   const productNo = usePurchaseOptions.value ? selectedProductNo.value : trialProductId.value;
   if (!original && !productNo) return;
@@ -685,8 +692,6 @@ async function goCheckout() {
       const legacy = freeTrial.pendingConversion(original.device.productNo)?.key === original.submissionNo;
       if (original.status === "RESUMABLE") await navTo(checkoutHref(original.device.productNo,
         legacy ? undefined : { kind: "resume", submissionNo: original.submissionNo }));
-      else if (legacy) await freeTrial.recoverLegacyConversion();
-      else await checkout.readSubmission();
     } else if (productNo) {
       if (usePurchaseOptions.value) {
         await trialOptions.refresh();
@@ -736,10 +741,10 @@ watch([pageVisible, originalPurchase, purchaseConfirmation], ([visible, original
 }, { flush: "post" });
 
 async function openTrialResult(orderNo: string) {
-  if (openingResult || !trialResults.consume(trialOrderResultKey(orderNo))) return;
+  if (openingResult) return;
   openingResult = true;
   try {
-    if (await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`)) {
+    if (await trialResults.deliverOrder(orderNo, () => navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`))) {
       checkout.clearSettled(orderNo);
       freeTrial.clearLegacyConversionResult(orderNo);
     }

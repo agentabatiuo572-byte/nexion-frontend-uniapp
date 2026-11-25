@@ -180,6 +180,9 @@ function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNet
 }
 export function createPurchasePaymentApi(client: ApiClient) {
   const base = '/api/app/purchase-payment';
+  const processing = { status: 'processing' } as const;
+  const creatingIntent = (error: unknown) => error instanceof ApiError && error.kind === 'http' && error.status === 409
+    && isApiRefusal(error, 409, 'PURCHASE_PAYMENT_INTENT_PROCESSING');
   function trialRequest<T>(request: ApiRequest, parse: (data: unknown) => T) {
     return client.request<T | TrialExternalRefusal>({
       ...request,
@@ -243,10 +246,14 @@ export function createPurchasePaymentApi(client: ApiClient) {
     async find(kind: PurchaseKind, commandKey: string) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents?kind=${encodeURIComponent(kind)}&commandKey=${encodeURIComponent(commandKey)}` })); }
       // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.
-      catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
+      catch (error) {
+        if (creatingIntent(error)) return processing;
+        if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null;
+        throw error;
+      }
     },
     async findTrial(commandKey: string, structuredRefusals: boolean): Promise<{
-      result: PurchasePaymentIntent | TrialExternalRefusal | null; notFoundAt?: number;
+      result: PurchasePaymentIntent | TrialExternalRefusal | typeof processing | null; notFoundAt?: number;
     }> {
       const request = { path: `${base}-intents?kind=TRIAL_CONVERT&commandKey=${encodeURIComponent(commandKey)}` };
       try {
@@ -254,6 +261,7 @@ export function createPurchasePaymentApi(client: ApiClient) {
           : parsePurchaseIntent(await client.request(request));
         return { result };
       } catch (error) {
+        if (creatingIntent(error)) return { result: processing };
         if (error instanceof ApiError && isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) {
           return { result: null, notFoundAt: error.responseDateMs };
         }

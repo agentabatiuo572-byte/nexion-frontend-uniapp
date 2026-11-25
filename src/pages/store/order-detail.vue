@@ -758,7 +758,7 @@ watch(() => purchasePaymentState.notice, notice => {
   if (notice === 'existing' && purchasePaymentState.orderNo === id.value) paymentLookupScope = null;
 });
 const heroImage = computed(() => order.value
-  ? getOrderProductMedia(order.value.productId, order.value.lineItems)?.src
+  ? order.value.imageUrl ?? getOrderProductMedia(order.value.productId, order.value.lineItems)?.src
   : undefined);
 
 // lucide outline paths per status (Clock / CheckCircle2 / Server / Cpu / XCircle)

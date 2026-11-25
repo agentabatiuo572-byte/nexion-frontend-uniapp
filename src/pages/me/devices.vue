@@ -805,7 +805,8 @@ async function handleCancelTrial() {
     else if (result.reason === "payment-in-progress") {
       const state = trial.displayState;
       if (state && state.claimNo === claimNo && !trial.originalPurchase) trialCancelConflict.value = state;
-    } else if (!result.ok && result.reason !== "confirming" && result.reason !== "not-executed") toast.warn(t.value.trial.cancelError);
+    } else if (result.reason === "storage-unavailable") toast.warn(t.value.errors.txNotSavedTitle);
+    else if (!result.ok && result.reason !== "confirming" && result.reason !== "not-executed") toast.warn(t.value.trial.cancelError);
   } finally {
     cancelTrialBusy.value = false;
   }

@@ -108,7 +108,7 @@ const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
 const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
   : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
-  ? !freeTrial.canStart() : !claimOpensAnotherPage.value && !trialView.actionsReady.value));
+  ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
 // View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
 // so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
 const claimFromRetry = ref(false);

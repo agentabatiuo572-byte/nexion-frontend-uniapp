@@ -465,7 +465,7 @@ const trialCopy = useTrialPurchaseCopy();
 const trial = useFreeTrial();
 const trialTerminalIntent = computed(() => active.value && s.open && s.intent?.kind === 'TRIAL_CONVERT' && s.intent.trialPurchaseOutcome
   ? s.intent.intentNo : null);
-const terminalAuthority = ref<string | null>(null);
+const terminalAuthority = ref<string | null | undefined>(null);
 async function readTerminalAuthority(intentNo: string) {
   const binding = app.accountBindingEpoch;
   const ready = await trial.refreshRemote();
@@ -473,9 +473,9 @@ async function readTerminalAuthority(intentNo: string) {
     terminalAuthority.value = ready ? intentNo : null;
 }
 watch(trialTerminalIntent, id => {
-  terminalAuthority.value = null;
+  terminalAuthority.value = id ? undefined : null;
   if (id) void readTerminalAuthority(id);
-});
+}, { flush: 'sync' });
 const terminalTrialExit = computed(() => {
   if (!trialTerminalIntent.value || trialTerminalIntent.value !== terminalAuthority.value || trial.authorityStatus !== 'ready') return null;
   const state = trial.displayState, claimNo = s.intent?.claimNo;
@@ -486,7 +486,7 @@ const terminalTrialExit = computed(() => {
     return { label: original.status === 'AWAITING_PAYMENT' ? copy.value.continuePay : copy.value.viewProgress,
       href: originalTrialCheckoutHref(original) };
   }
-  return state.status === 'active' || state.status === 'grace'
+  return trial.conversionWindowOpen
     ? { label: trialCopy.value.coChangeDevice, href: '/pages/me/trial' } : null;
 });
 async function openTerminalTrialExit() {
@@ -495,9 +495,13 @@ async function openTerminalTrialExit() {
   await readTerminalAuthority(id);
   const exit = terminalTrialExit.value;
   if (trialTerminalIntent.value === id && exit) {
+    if (exit.href === '/pages/me/trial' && payment.dismissRoutedTerminalTrialPayment()) return;
     payment.close();
     void navTo(exit.href);
   }
+}
+function dismissTerminalTrialResult() {
+  if (!payment.dismissRoutedTerminalTrialPayment()) payment.close();
 }
 function noticeFor(kind: PurchaseNotice): Notice | null {
   const c = copy.value, order = s.kind === 'ORDER_PAY' && !!s.orderNo;
@@ -507,8 +511,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     : { primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }) };
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
   const trialExit = { primary: terminalTrialExit.value?.label ?? c.close,
-    onPrimary: terminalTrialExit.value ? openTerminalTrialExit : payment.close,
-    onSecondary: payment.close, ...(terminalTrialExit.value ? { secondary: c.close } : {}) };
+    onPrimary: terminalTrialExit.value ? openTerminalTrialExit : dismissTerminalTrialResult,
+    onSecondary: dismissTerminalTrialResult, ...(terminalTrialExit.value ? { secondary: c.close } : {}) };
   switch (kind) {
     // The order exists but no payment started yet: it stays for later and the close still ends on the store home.
     case 'keepOrder': return { icon: 'info', tone: 'warning', title: c.keepOrderTitle, body: c.keepOrderBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leaveToStore };
@@ -533,8 +537,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       : { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     // Refunded to the original payment method (user 2026-11-24): the payment has ended, nothing is left to do here.
     case 'refunded': return { icon: 'info', tone: 'neutral', title: c.refundedTitle, body: c.refunded,
-      primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,
-      ...(order ? { secondary: c.close, onSecondary: payment.close } : { onSecondary: payment.close }) };
+      primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : dismissTerminalTrialResult,
+      ...(order ? { secondary: c.close } : {}), onSecondary: dismissTerminalTrialResult };
     case 'delivery': return { icon: 'alert', tone: 'warning', title: c.deliveryTitle, body: c.delivery, primary: c.support, onPrimary: payment.support, ...toOrder };
     case 'leave': return { icon: 'alert', tone: 'warning', title: networkPaused.value ? fill(c.networkPausedTitle, { network: networkName.value }) : c.leaveTitle,
       // Trial conversion, trade-in and capacity payments have no order page; they resume from Orders.
@@ -587,7 +591,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     default: return null;
   }
 }
-const notice = computed(() => noticeFor(s.notice));
+const notice = computed(() => s.notice === 'timeout' && trialTerminalIntent.value && terminalAuthority.value === undefined
+  ? null : noticeFor(s.notice));
 const TOAST_NOTICES: PurchaseNotice[] = ['timeout', 'gone', 'changed', 'orderMissing', 'networkPaused', 'quoteChanged', 'rejectTradeinBusy', 'rejectTradeinWalletOnly', 'rejectTradeinOwner',
   'rejectQuotaPaused', 'rejectQuotaMonthFull', 'rejectQuotaSoldOut', 'rejectCapacitySourceChanged', 'rejectCapacityPurchaseRetired', 'trialConversionClosed', 'trialNotConvertible'];
 const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary && TOAST_NOTICES.includes(s.notice));
@@ -621,7 +626,11 @@ function moveFocus(delta: number, choose = false) {
 }
 // The top close ends the payment on the store home; a payment already started asks first (user 2026-11-22).
 // A refunded payment has ended: nothing is in progress to warn about.
-function leavePage() { if (received.value || purchaseConclusion(s.intent) === 'refunded') leaveToStore(); else payment.notify('leave'); }
+function leavePage() {
+  if (payment.dismissRoutedTerminalTrialPayment()) return;
+  if (received.value || purchaseConclusion(s.intent) === 'refunded') leaveToStore();
+  else payment.notify('leave');
+}
 // The cashier closes before asking to leave the payment.
 // The question opens after the bank page has closed and handed focus back, so the question keeps focus.
 function leaveCashier() { payment.closeCashier(); void nextTick(() => payment.notify('leave')); }

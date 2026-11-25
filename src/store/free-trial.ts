@@ -3,17 +3,17 @@ import { hasExternalTrialPaymentRecord, TRIAL_CONVERT_COMMANDS_TABLE } from '@/l
 import { invalidateBeforePassiveTabRead, runForegroundStoreRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName } from "./trial-config";
 import { useTrialPurchaseResult } from "./trial-purchase-result";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
-import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, writeAccountRow } from "./account-scoped-storage";
+import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, removeAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { remoteApiEnabled, trialApi, apiClient, sessionVault } from "@/api/runtime";
 import { isTrialAuthorizationRefusal, parseTrialConvertReceipt, type TrialConvertReceipt } from "@/api/trial-api";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
-import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote } from "@/api/trial-api";
+import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote, TrialLifecycleKind, TrialLifecycleReceipt } from "@/api/trial-api";
 import { asApiError, isAmbiguousEnvelopeOutcome } from "@/api/errors";
 import {
   resolveTrialAt,
@@ -61,7 +61,7 @@ export type { TrialStatus } from "./trial-boundary";
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
-export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "read-failed" | "rejected" | "confirming";
+export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "read-failed" | "rejected" | "confirming" | "storage-unavailable";
 /** The service's settled "not now": the same claim cannot succeed by trying again. */
 export function isTrialStartDenied(reason: TrialStartFailure | undefined): boolean {
   return reason === "quota-exhausted" || reason === "phase-closed" || reason === "risk" || reason === "product-unavailable";
@@ -80,6 +80,28 @@ type LegacyConversion = {
 };
 type ConversionResult = { ok: boolean; reason?: TrialConversionFailure; orderNo?: string };
 type TrialReadStreak = { consecutiveReads: number; lastCountedAt?: number };
+const LIFECYCLE_COMMAND_KEY = "nexgrid-trial-lifecycle-commands-v1";
+type LifecycleCommand = { key: string; state: "pending" | "retry"; successfulClaimNo?: string } & (
+  { kind: "start"; previousClaimNo: string | null; deviceName: string }
+  | { kind: "cancel"; previousClaimNo: string });
+type PendingLifecycle = TrialReadStreak & {
+  command: LifecycleCommand;
+  writing?: boolean;
+  refusal?: TrialIneligibleReason;
+  authenticationRejected?: boolean;
+  lastFallbackState?: string;
+};
+type LifecycleStateRead = { pending: PendingLifecycle; mode: "succeeded" | "fallback" | "legacy" };
+type TrialCancelDenial = "not-cancellable" | "payment-in-progress" | "rejected";
+
+function readLifecycleCommand(accountKey: string, strict = false): LifecycleCommand | null {
+  const row = readAccountRow<LifecycleCommand>(LIFECYCLE_COMMAND_KEY, accountKey, strict);
+  if (!row || typeof row.key !== "string" || !row.key || !["pending", "retry"].includes(row.state)) return null;
+  if (row.kind === "start" && typeof row.deviceName === "string" && row.deviceName
+      && (row.previousClaimNo === null || typeof row.previousClaimNo === "string")) return row;
+  if (row.kind === "cancel" && typeof row.previousClaimNo === "string" && row.previousClaimNo) return row;
+  return null;
+}
 
 function confirmedByThreeReads(streak: TrialReadStreak, serverNow: number): boolean {
   if (streak.lastCountedAt !== undefined && serverNow - streak.lastCountedAt < 5_000) return false;
@@ -214,23 +236,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const authorityError = ref<string | null>(null);
   // Display only. A transient GET failure still clears the live command authority.
   const displayState = shallowRef<TrialAuthorityState | null>(null);
+  const checkoutState = shallowRef<TrialAuthorityState | null>(null);
   const originalPurchase = computed(() => displayState.value?.originalPurchase ?? null);
   const purchasedDevice = computed(() => displayState.value?.status === "converted"
     ? displayState.value.purchasedDevice ?? null : null);
-  const pendingStart = shallowRef<({
-    intent: { key: string; deviceName: string };
-    previousClaimNo: string | null;
-    claimNo: string | null;
-    readAfter: number;
-    refusal?: TrialIneligibleReason;
-  } & TrialReadStreak) | null>(null);
+  const pendingLifecycle = shallowRef<PendingLifecycle | null>(null);
+  const pendingStart = computed(() => pendingLifecycle.value?.command.kind === "start" ? pendingLifecycle.value : null);
+  const pendingCancel = computed(() => pendingLifecycle.value?.command.kind === "cancel" ? pendingLifecycle.value : null);
   const startRetryable = ref(false);
   const confirmedStartDenial = ref<TrialIneligibleReason | "rejected">();
   const confirmedStartClaimNo = ref<string | null>(null);
-  const pendingCancel = shallowRef<({
-    claimNo: string; key: string; readAfter: number; authenticationRejected: boolean;
-  } & TrialReadStreak) | null>(null);
   const confirmedCancelClaimNo = ref<string | null>(null);
+  const confirmedCancelDenial = ref<TrialCancelDenial>();
+  let lifecycleRead: Promise<void> | null = null;
+  let lifecycleReceiptsUnsupported = false;
   const legacyConversions = shallowRef<LegacyConversion[]>([]);
   const legacyClaimNo = ref<string | null>(null);
   const legacyResumableKey = ref<string | null>(null);
@@ -243,10 +262,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   let legacyConversionRead: Promise<void> | null = null;
   let legacyConversionWriting: string | null = null;
   let legacyStorageRead = false;
-  const authorityResultUnknown = computed(() => !!pendingStart.value || !!pendingCancel.value);
-  const lifecycleReadbackPending = computed(() =>
-    (pendingStart.value !== null && pendingStart.value.readAfter !== Infinity)
-    || (pendingCancel.value !== null && pendingCancel.value.readAfter !== Infinity));
+  const authorityResultUnknown = computed(() => !!pendingLifecycle.value);
+  const lifecycleReadbackPending = computed(() => !!pendingLifecycle.value && !pendingLifecycle.value.writing);
   const lastReadFailed = ref(false);
   const transientReadFailure = ref(false);
   const authoritativeShadowUSD = ref(0);
@@ -289,7 +306,6 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   let sampledServerTime = 0;
   let refreshInFlight: Promise<boolean> | null = null;
   let refreshInFlightAccount: string | null = null;
-  let startIntent: { key: string; deviceName: string } | null = null;
   let authorityRequestSequence = 0;
   let lastAppliedSequence = 0;
   let accountBindingEpoch = 0;
@@ -300,6 +316,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   function getBindingEpoch(): number { return accountBindingEpoch; }
   function serverTimeAt(localNow: number): number { return localNow + serverClockOffsetMs.value; }
+
+  const conversionWindowOpen = ref(false);
+  watch([displayState, serverClockOffsetMs], ([state], _, onCleanup) => {
+    const deadline = state?.status === "active" || state?.status === "grace"
+      ? state.serverState === "EXTENDED" ? state.extendedEndsAt : state.graceEndsAt : null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
+      const remaining = (deadline ?? 0) - serverTimeAt(Date.now());
+      conversionWindowOpen.value = remaining > 0;
+      if (remaining > 0) timer = setTimeout(update, Math.min(remaining, 2_147_483_647));
+    };
+    update();
+    onCleanup(() => clearTimeout(timer));
+  });
 
   function takeExpiryNotice(expectedEpoch: number): boolean {
     if (expectedEpoch !== accountBindingEpoch || authorityStatus.value !== "ready"
@@ -353,7 +383,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   function clearRemoteFacts(nextStatus: "unknown" | "error" = "unknown", error: string | null = null, retainDisplay = false) {
-    if (!retainDisplay) displayState.value = null;
+    if (!retainDisplay) {
+      displayState.value = null;
+      checkoutState.value = null;
+    }
     load({ ...INITIAL });
     authoritativeShadowUSD.value = 0;
     authoritativeShadowNEX.value = 0;
@@ -463,8 +496,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityStatus.value = "ready";
     authorityError.value = null;
     if (stateRead) {
-      settleStartRead(next, sequence);
-      settleCancelRead(next, sequence);
+      checkoutState.value = displayState.value;
       if (legacyClaimNo.value !== next.claimNo) {
         legacyClaimNo.value = next.claimNo;
         legacyResumableKey.value = null;
@@ -481,26 +513,41 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return true;
   }
 
-  async function refreshRemote(force = false): Promise<boolean> {
+  async function refreshRemote(force = false, lifecycle?: LifecycleStateRead): Promise<boolean> {
     invalidateBeforePassiveTabRead("trial-state");
     if (!remoteApiEnabled) return true;
     if (!force && refreshInFlight && refreshInFlightAccount === boundKey) return refreshInFlight;
     const requestedAccount = boundKey;
+    const requestedEpoch = accountBindingEpoch;
+    const lifecycleKey = pendingLifecycle.value?.command.key;
+    const currentLifecycle = () => lifecycleKey && pendingLifecycle.value?.command.key === lifecycleKey
+      ? pendingLifecycle.value : null;
     const sequence = ++authorityRequestSequence;
     authorityStatus.value = "loading";
     authorityError.value = null;
     let request!: Promise<boolean>;
     request = trialApi.state()
       .then((next) => {
-        if (requestedAccount !== boundKey) return false;
-        return applyAuthority(next, sequence, true);
+        if (requestedEpoch !== accountBindingEpoch) return false;
+        const applied = applyAuthority(next, sequence, true);
+        const pending = currentLifecycle();
+        if (pending) {
+          if (!applied || displayState.value !== next) resetLifecycleStreak(pending);
+          else {
+            const answer = JSON.stringify([next.claimNo, next.serverState, next.canStart, next.eligibilityReason]);
+            if (answer !== pending.lastFallbackState) resetLifecycleStreak(pending);
+            pending.lastFallbackState = answer;
+            if (lifecycle?.pending === pending) settleLifecycleState(next, lifecycle);
+          }
+        }
+        return applied;
       })
       .catch((error: unknown) => {
-        if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
+        if (requestedEpoch !== accountBindingEpoch) return false;
+        const pending = currentLifecycle();
+        if (pending) resetLifecycleStreak(pending);
+        if (sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
-          const start = pendingStart.value, cancel = pendingCancel.value;
-          if (start && sequence >= start.readAfter) start.consecutiveReads = 0;
-          if (cancel && sequence >= cancel.readAfter) cancel.consecutiveReads = 0;
           markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
         }
         return false;
@@ -546,15 +593,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   async function refreshEligibilityRemote(): Promise<boolean> {
     invalidateBeforePassiveTabRead("trial-eligibility");
     if (!remoteApiEnabled) return true;
-    const requestedAccount = boundKey;
+    const requestedEpoch = accountBindingEpoch;
     const sequence = ++authorityRequestSequence;
     authorityStatus.value = "loading";
     authorityError.value = null;
     try {
       const next = await trialApi.eligibility();
-      return requestedAccount === boundKey && applyAuthority(next, sequence);
+      return requestedEpoch === accountBindingEpoch && applyAuthority(next, sequence);
     } catch (error) {
-      if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
+      if (requestedEpoch === accountBindingEpoch && sequence >= lastAppliedSequence) {
         lastAppliedSequence = sequence;
         markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
       }
@@ -574,13 +621,14 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedHomeOffer.value = null;
       lastReadFailed.value = false;
       transientReadFailure.value = false;
-      pendingStart.value = null;
+      const savedCommand = readLifecycleCommand(boundKey);
+      pendingLifecycle.value = savedCommand?.state === "pending" ? { command: savedCommand, consecutiveReads: 0 } : null;
       startRetryable.value = false;
-      startIntent = null;
       confirmedStartDenial.value = undefined;
       confirmedStartClaimNo.value = null;
-      pendingCancel.value = null;
       confirmedCancelClaimNo.value = null;
+      confirmedCancelDenial.value = undefined;
+      lifecycleRead = null;
       legacyConversions.value = [];
       legacyClaimNo.value = null;
       legacyResumableKey.value = null;
@@ -627,6 +675,26 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return eligibility().ok;
   }
 
+  /** Only /state can establish the claim identity used by ordinary checkout. */
+  function canConfirmOrdinaryProduct(productNo: string): boolean {
+    const snapshot = checkoutState.value, latest = displayState.value;
+    if (!snapshot || !latest || !productNo || snapshot.claimNo !== latest.claimNo
+        || (lastReadFailed.value && !transientReadFailure.value) || pendingLifecycle.value
+        || legacyConversions.value.length) return false;
+    const snapshotLive = snapshot.status === "active" || snapshot.status === "grace";
+    const latestLive = latest.status === "active" || latest.status === "grace";
+    if (snapshotLive !== latestLive) return false;
+    if (snapshotLive) {
+      const sku = resolveTrialCheckoutProductId(snapshot.config.trialProductId);
+      if (!sku || sku !== resolveTrialCheckoutProductId(latest.config.trialProductId) || productNo === sku) return false;
+    }
+    try {
+      return !readLifecycleCommand(boundKey, true) && readLegacyConversions().length === 0;
+    } catch {
+      return false;
+    }
+  }
+
   function showPromo(): boolean {
     return remoteApiEnabled ? confirmedPromoVisible.value : canStart();
   }
@@ -671,30 +739,150 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return "checking";
   }
 
-  function settleStartRead(next: TrialAuthorityState, sequence: number) {
-    const pending = pendingStart.value;
-    if (!pending || sequence < pending.readAfter || (pending.claimNo && pending.claimNo !== next.claimNo)) return;
-    if ((next.status === "active" || next.status === "grace") && next.claimNo) {
-      if (!pending.claimNo && next.claimNo === pending.previousClaimNo) {
-        pending.consecutiveReads = 0;
-        startRetryable.value = false;
-        return;
-      }
-      confirmedStartClaimNo.value = next.claimNo;
-    } else {
-      const sameClaim = !pending.claimNo && pending.previousClaimNo === next.claimNo;
-      startRetryable.value = sameClaim && !pending.refusal && next.canStart;
-      const reason = pending.refusal ?? next.eligibilityReason;
-      if (!sameClaim || !reason || reason === "unknown" || startRetryable.value) {
-        pending.consecutiveReads = 0;
-        return;
-      }
-      if (!pending.refusal && !confirmedByThreeReads(pending, next.serverNow)) return;
-      confirmedStartDenial.value = reason;
+  function beginLifecycle(draft: LifecycleCommand): PendingLifecycle | null {
+    const saved = readLifecycleCommand(boundKey, true);
+    const retrying = startRetryable.value && pendingStart.value?.command.key === saved?.key;
+    if (saved?.state === "pending" && !retrying) {
+      pendingLifecycle.value = { command: saved, consecutiveReads: 0 };
+      return null;
     }
-    startIntent = null;
-    pendingStart.value = null;
+    // Reuse the whole request. Start's device name is part of the backend's idempotency hash.
+    const command = saved?.kind === draft.kind && saved.previousClaimNo === draft.previousClaimNo
+      ? { ...saved, state: "pending" as const } : draft;
+    if (!writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, command)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
+    const pending = { command, writing: true, consecutiveReads: 0 };
     startRetryable.value = false;
+    pendingLifecycle.value = pending;
+    return pending;
+  }
+
+  function finishLifecycle(pending: PendingLifecycle, retry = false) {
+    if (readLifecycleCommand(boundKey)?.key === pending.command.key) {
+      if (retry) writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, { ...pending.command, state: "retry" });
+      else removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey);
+    }
+    pendingLifecycle.value = null;
+    startRetryable.value = false;
+  }
+
+  function rememberLifecycleSuccess(pending: PendingLifecycle, claimNo: string) {
+    pending.command = { ...pending.command, successfulClaimNo: claimNo };
+    writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, pending.command);
+  }
+
+  async function rejectLifecycleStart(reason: TrialIneligibleReason) {
+    // In-flight eligibility started before the refusal cannot restore the old permission.
+    lastAppliedSequence = ++authorityRequestSequence;
+    remoteCanStart.value = false;
+    remoteEligibilityReason.value = reason;
+    confirmedPromoVisible.value = false;
+    confirmedHeroVisible.value = false;
+    confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
+    await refreshEligibilityRemote();
+  }
+
+  function resetLifecycleStreak(pending: PendingLifecycle) {
+    pending.consecutiveReads = 0;
+    pending.lastCountedAt = undefined;
+    pending.lastFallbackState = undefined;
+  }
+
+  function settleLifecycleState(next: TrialAuthorityState, { pending, mode }: LifecycleStateRead) {
+    const { kind, previousClaimNo, successfulClaimNo } = pending.command;
+    const active = next.status === "active" || next.status === "grace";
+    const cancelled = next.serverState === "CANCELLED" && next.endReason === "cancelled";
+    if (mode === "succeeded") {
+      if (kind === "cancel" && successfulClaimNo && successfulClaimNo !== previousClaimNo) {
+        finishLifecycle(pending);
+        if (cancelled && next.claimNo === previousClaimNo) confirmedCancelClaimNo.value = previousClaimNo;
+        return;
+      }
+      if (!successfulClaimNo || !next.claimNo
+          || (kind === "start" && next.claimNo === previousClaimNo && next.claimNo !== successfulClaimNo)
+          || (kind === "cancel" && next.claimNo === successfulClaimNo && !cancelled && active)) return;
+      finishLifecycle(pending);
+      if (kind === "start") confirmedStartClaimNo.value = successfulClaimNo;
+      else confirmedCancelClaimNo.value = successfulClaimNo;
+      return;
+    }
+    // B93 outages and indeterminate records use three matching state reads. The
+    // unsupported endpoint keeps the original clients' state-only behavior.
+    if (mode === "fallback" && !confirmedByThreeReads(pending, next.serverNow)) return;
+    if (kind === "cancel") {
+      if (next.claimNo !== previousClaimNo) {
+        resetLifecycleStreak(pending);
+        return;
+      }
+      if (mode === "legacy" && active && !pending.authenticationRejected && !confirmedByThreeReads(pending, next.serverNow)) return;
+      finishLifecycle(pending, active);
+      if (cancelled) confirmedCancelClaimNo.value = previousClaimNo;
+      return;
+    }
+    if (active && next.claimNo && next.claimNo !== previousClaimNo) {
+      finishLifecycle(pending);
+      confirmedStartClaimNo.value = next.claimNo;
+      return;
+    }
+    const sameClaim = next.claimNo === previousClaimNo;
+    startRetryable.value = !active && sameClaim && !pending.refusal && next.canStart;
+    const reason = pending.refusal ?? next.eligibilityReason;
+    if (active || !sameClaim || !reason || reason === "unknown" || startRetryable.value) {
+      resetLifecycleStreak(pending);
+      return;
+    }
+    if (mode === "legacy" && !pending.refusal && !confirmedByThreeReads(pending, next.serverNow)) return;
+    finishLifecycle(pending);
+    confirmedStartDenial.value = reason;
+  }
+
+  function recoverLifecycleCommand(): Promise<void> {
+    if (lifecycleRead) return lifecycleRead;
+    const pending = pendingLifecycle.value;
+    if (!pending || pending.writing || !canReadVisible()) return Promise.resolve();
+    const epoch = accountBindingEpoch;
+    const current = () => epoch === accountBindingEpoch && pending === pendingLifecycle.value;
+    const request = Promise.resolve().then(async () => {
+      if (!current()) return;
+      const { kind, key, successfulClaimNo } = pending.command;
+      if (successfulClaimNo) {
+        await refreshRemote(true, { pending, mode: "succeeded" });
+        return;
+      }
+      const receipt: TrialLifecycleReceipt | null = lifecycleReceiptsUnsupported ? { status: "unsupported" }
+        : await trialApi.command(kind, key).catch(() => null);
+      if (!current()) return;
+      switch (receipt?.status) {
+        case "SUCCEEDED":
+          rememberLifecycleSuccess(pending, receipt.claimNo);
+          await refreshRemote(true, { pending, mode: "succeeded" });
+          return;
+        case "REJECTED":
+          finishLifecycle(pending);
+          if (kind === "start") {
+            await rejectLifecycleStart(commandFailureReason(receipt.message));
+          } else {
+            confirmedCancelDenial.value = cancelDenial(receipt.message);
+            await refreshRemote(true);
+          }
+          return;
+        case "NOT_SEEN":
+          finishLifecycle(pending, true);
+          await refreshRemote(true);
+          return;
+        case "PROCESSING":
+          resetLifecycleStreak(pending);
+          startRetryable.value = false;
+          return;
+        case "unsupported":
+          lifecycleReceiptsUnsupported = true;
+          await refreshRemote(true, { pending, mode: "legacy" });
+          return;
+        default:
+          await refreshRemote(true, { pending, mode: "fallback" });
+      }
+    }).finally(() => { if (lifecycleRead === request) lifecycleRead = null; });
+    lifecycleRead = request;
+    return request;
   }
 
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
@@ -729,48 +917,47 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         markAuthorityReadFailure("TRIAL_CONFIG_RESPONSE_INVALID");
         return { ok: false, reason: "read-failed" };
       }
-      const intent = pendingStart.value?.intent ?? (startIntent ??= { key: commandKey("start"), deviceName });
-      const previousClaimNo = authorityClaimNo.value;
-      startRetryable.value = false;
-      pendingStart.value = { intent, previousClaimNo, claimNo: null, readAfter: Infinity, consecutiveReads: 0 };
-      let claimNo: string | null = null;
-      let refusal: TrialIneligibleReason | undefined;
+      let pending: PendingLifecycle | null;
+      try {
+        pending = beginLifecycle({ kind: "start", key: commandKey("start"), state: "pending",
+          previousClaimNo: authorityClaimNo.value, deviceName });
+      } catch { return { ok: false, reason: "storage-unavailable" }; }
+      if (!pending || pending.command.kind !== "start") return { ok: false, reason: "confirming" };
+      confirmedStartClaimNo.value = null;
+      const { key, deviceName: sentDeviceName } = pending.command;
       const authRevision = sessionVault.revision();
       try {
-        const receipt = await trialApi.start(intent.key, intent.deviceName);
+        const receipt = await trialApi.start(key, sentDeviceName);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
-        claimNo = receipt.claimNo;
+        if (receipt.claimNo) rememberLifecycleSuccess(pending, receipt.claimNo);
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         const failure = asApiError(error);
         // The shared write gate refuses before the trial command executes.
         // Preserve the original key, but do not reconcile this refusal as success.
-        if (failure.kind === "http" && failure.status === 428 && failure.code === 428) {
-          pendingStart.value = null;
-          if (failure.message === "USER_ONBOARDING_REQUIRED") return { ok: false, reason: "onboarding-required" };
-          if (failure.message === "LEGAL_TERMS_ACK_REQUIRED") return { ok: false, reason: "terms-required" };
+        if (failure.kind === "http" && failure.status === 428 && failure.code === 428
+            && (failure.message === "USER_ONBOARDING_REQUIRED" || failure.message === "LEGAL_TERMS_ACK_REQUIRED")) {
+          finishLifecycle(pending, true);
+          return { ok: false, reason: failure.message === "USER_ONBOARDING_REQUIRED" ? "onboarding-required" : "terms-required" };
         }
-        const reason = commandFailureReason(error);
+        const reason = commandFailureReason(failure.message);
         if (failure.kind === "http" && failure.status === 409 && failure.code === 409 && reason !== "unknown") {
-          refusal = reason;
+          pending.refusal = reason;
         } else if (failure.kind === "auth") {
           await apiClient.refreshSession(authRevision).catch(() => {});
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         } else if (!isAmbiguousEnvelopeOutcome(error)) {
-          pendingStart.value = null;
-          startIntent = null;
-          confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
+          finishLifecycle(pending);
+          await rejectLifecycleStart(reason);
+          if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
           return { ok: false, reason: confirmedStartDenial.value };
         }
       }
-      // Both a receipt and a lost response require a fresh read after this POST.
-      pendingStart.value = {
-        intent, previousClaimNo, claimNo, refusal, readAfter: authorityRequestSequence + 1, consecutiveReads: 0,
-      };
-      await refreshRemote(true);
+      pendingLifecycle.value = { ...pending, writing: false };
+      await recoverLifecycleCommand();
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
-      if (pendingStart.value) return { ok: false, reason: "confirming" };
-      return confirmedStartDenial.value ? { ok: false, reason: confirmedStartDenial.value } : { ok: true };
+      if (confirmedStartDenial.value) return { ok: false, reason: confirmedStartDenial.value };
+      return confirmedStartClaimNo.value ? { ok: true } : { ok: false, reason: "confirming" };
     }
     const elig = eligibility();
     if (!elig.ok) return { ok: false, reason: elig.reason };
@@ -988,23 +1175,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   // PRODUCTION: POST /api/trial/cancel. Spec ④: only `active →(用户主动取消)ended`
   // — grace has nothing left to cancel (production already stopped).
-  function settleCancelRead(next: TrialAuthorityState, sequence: number) {
-    const pending = pendingCancel.value;
-    if (!pending || sequence < pending.readAfter) return;
-    if (next.claimNo !== pending.claimNo) {
-      pending.consecutiveReads = 0;
-      return;
-    }
-    if (next.serverState === "CANCELLED" && next.endReason === "cancelled") {
-      confirmedCancelClaimNo.value = pending.claimNo;
-    } else if ((next.status === "active" || next.status === "grace") && !pending.authenticationRejected
-        && !confirmedByThreeReads(pending, next.serverNow)) {
-      return;
-    }
-    pendingCancel.value = null;
-  }
-
-  async function cancel(): Promise<{ ok: boolean; reason?: TrialIneligibleReason | "payment-in-progress" | "confirming" | "not-executed" }> {
+  async function cancel(): Promise<{ ok: boolean; reason?: TrialIneligibleReason | "payment-in-progress" | "confirming" | "not-executed" | "storage-unavailable" }> {
     if (remoteApiEnabled) {
       if (authorityResultUnknown.value) return { ok: false, reason: "confirming" };
       const requestedEpoch = accountBindingEpoch;
@@ -1015,18 +1186,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         return { ok: false, reason: "unknown" };
       }
       const claimNo = authorityClaimNo.value;
-      const key = `h2-cancel:${claimNo}`;
       const sequence = ++authorityRequestSequence;
-      pendingCancel.value = {
-        claimNo, key, readAfter: Infinity, authenticationRejected: false, consecutiveReads: 0,
-      };
-      let authenticationRejected = false;
+      let pending: PendingLifecycle | null;
+      try {
+        pending = beginLifecycle({ kind: "cancel", key: commandKey("cancel"), previousClaimNo: claimNo, state: "pending" });
+      } catch { return { ok: false, reason: "storage-unavailable" }; }
+      if (!pending) return { ok: false, reason: "confirming" };
+      confirmedCancelClaimNo.value = null;
+      confirmedCancelDenial.value = undefined;
       const authRevision = sessionVault.revision();
       try {
-        const receipt = await trialApi.cancel("explicit", key);
+        const receipt = await trialApi.cancel("explicit", pending.command.key);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         if (receipt.status === "payment-in-progress") {
-          pendingCancel.value = null;
+          finishLifecycle(pending);
           const state = displayState.value;
           if (state?.claimNo === claimNo && receipt.originalPurchase?.claimNo === claimNo
               && lastAppliedSequence <= sequence) {
@@ -1035,21 +1208,21 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           await refreshRemote(true);
           return requestedEpoch === accountBindingEpoch ? { ok: false, reason: "payment-in-progress" } : { ok: false, reason: "unknown" };
         }
+        if (receipt.state.claimNo) rememberLifecycleSuccess(pending, receipt.state.claimNo);
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
-        authenticationRejected = asApiError(error).kind === "auth";
-        if (authenticationRejected) {
+        const failure = asApiError(error);
+        pending.authenticationRejected = failure.kind === "auth";
+        if (pending.authenticationRejected) {
           await apiClient.refreshSession(authRevision).catch(() => {});
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         } else if (!isAmbiguousEnvelopeOutcome(error)) {
-          pendingCancel.value = null;
-          return { ok: false, reason: commandFailureReason(error) };
+          finishLifecycle(pending);
+          return { ok: false, reason: commandFailureReason(failure.message) };
         }
       }
-      pendingCancel.value = {
-        claimNo, key, authenticationRejected, readAfter: authorityRequestSequence + 1, consecutiveReads: 0,
-      };
-      await refreshRemote(true);
+      pendingLifecycle.value = { ...pending, writing: false };
+      await recoverLifecycleCommand();
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
       if (pendingCancel.value) return { ok: false, reason: "confirming" };
       return confirmedCancelClaimNo.value === claimNo ? { ok: true } : { ok: false, reason: "not-executed" };
@@ -1082,8 +1255,14 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return `h2-${operation}:${suffix}`;
   }
 
-  function commandFailureReason(error: unknown): TrialIneligibleReason {
-    switch (asApiError(error).message) {
+  function cancelDenial(message: string): TrialCancelDenial {
+    if (message === "TRIAL_BALANCE_SUBMISSION_IN_PROGRESS" || message === "TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS")
+      return "payment-in-progress";
+    return message === "TRIAL_NOT_CANCELLABLE" ? "not-cancellable" : "rejected";
+  }
+
+  function commandFailureReason(message: string): TrialIneligibleReason {
+    switch (message) {
       case "TRIAL_ALREADY_ACTIVE": return "in-progress";
       case "TRIAL_ALREADY_REDEEMED": return "converted";
       case "TRIAL_COOLDOWN_ACTIVE": return "used";
@@ -1106,12 +1285,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     deniedLegacyConversion, recoverLegacyConversion, clearLegacyConversionResult,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
-    displayState, originalPurchase, purchasedDevice, pendingStart, startRetryable, confirmedStartClaimNo, confirmedStartDenial,
-    pendingCancel, confirmedCancelClaimNo, lifecycleReadbackPending, confirmedHomeOffer,
+    displayState, conversionWindowOpen, originalPurchase, purchasedDevice, pendingStart, startRetryable, confirmedStartClaimNo, confirmedStartDenial,
+    pendingCancel, confirmedCancelClaimNo, confirmedCancelDenial, lifecycleReadbackPending, recoverLifecycleCommand, confirmedHomeOffer,
     authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
-    eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
+    eligibility, canStart, canConfirmOrdinaryProduct, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
     refreshRemote, refreshEligibilityRemote, refreshVisible, refreshAtBoundary, serverTimeAt,
