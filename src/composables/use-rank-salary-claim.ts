@@ -22,6 +22,7 @@ export function useRankSalaryClaim(options: {
   const phase = ref<SalaryClaimPhase>("idle");
   const pending = shallowRef<Attempt | null>(null);
   const shown = ref(false);
+  const receiptInFlight = ref(false);
   let working: Attempt | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const visible = () => shown.value && foregroundReadAllowed();
@@ -49,9 +50,16 @@ export function useRankSalaryClaim(options: {
     try {
       let receipt: RankSalaryReceipt | { status: "FAILED" };
       try {
-        receipt = write
-          ? await vRankApi.claimSalary(attempt.key, { month, amountUsdt })
-          : await vRankApi.salaryReceipt(attempt.key, month);
+        if (write) {
+          receipt = await vRankApi.claimSalary(attempt.key, { month, amountUsdt });
+        } else {
+          receiptInFlight.value = true;
+          try {
+            receipt = await vRankApi.salaryReceipt(attempt.key, month);
+          } finally {
+            if (working === attempt) receiptInFlight.value = false;
+          }
+        }
       } catch (error) {
         if (!current()) return;
         if (write && isApiRefusal(error, 409, "SALARY_NOT_CLAIMABLE", "IDEMPOTENCY_KEY_CONFLICT")) {
@@ -135,6 +143,7 @@ export function useRankSalaryClaim(options: {
 
   watch(options.account, () => {
     working = null;
+    receiptInFlight.value = false;
     pending.value = null;
     phase.value = "idle";
     resume();
@@ -147,5 +156,5 @@ export function useRankSalaryClaim(options: {
   onHide(hide);
   onBeforeUnmount(hide);
 
-  return { phase, pending, submit, resend };
+  return { phase, pending, receiptInFlight, submit, resend };
 }

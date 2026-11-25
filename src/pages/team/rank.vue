@@ -32,7 +32,7 @@
             </RankConditions>
           </view>
           <!-- 月薪卡（DESIGN 第 6 节，画板 C、D）：salary 字段存在且 months 不为空时显示；salary 为 null（读取失败）时金额「—」（D9）；没有 salary 字段时按 CA 构图。 -->
-          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :swap="salarySwap && !motion.still.value" :still="motion.still.value" />
+          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :swap="salarySwap && !motion.still.value" :still="motion.still.value || (salaryPhase === 'confirming' && !salaryReceiptInFlight)" />
           <!-- V8 会员页（H0）：月薪卡后是 V8 专享权益（大号）和「你现在的权益」。 -->
           <RankV8Perks v-if="identityKind === 'v8'" size="hero" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
           <view v-if="identityKind === 'v8' && currentBenefits.length" class="rank-section">
@@ -168,7 +168,7 @@
       <view v-else-if="salaryDock?.kind === 'tray'" class="rank-dock nx-glass-bar"><text class="nx-tray-copy rank-dock__copy">{{ salaryDock.copy }}</text><view class="nx-tray-text rank-dock__text" role="button" tabindex="0" @click="openSalaryPromo" @keydown.enter.prevent="openSalaryPromo" @keydown.space.prevent="openSalaryPromo"><text>{{ salaryDock.button }}</text></view></view>
       <view v-else-if="salaryDock?.kind === 'resend'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="resendSalaryClaim">{{ salaryDock.label }}</NxButton></view>
       <view v-else-if="salaryDock?.kind === 'busy'" class="rank-dock nx-glass-bar"><NxButton variant="primary" disabled><view class="rank-dock__spin" :class="{ 'is-still': motion.still.value }" aria-hidden="true" /><text>{{ salaryDock.label }}</text></NxButton></view>
-      <view v-else-if="salaryDock?.kind === 'status'" class="rank-dock nx-glass-bar"><view class="nx-tray-status rank-dock__status" role="status"><view class="rank-dock__spin" :class="{ 'is-still': motion.still.value }" aria-hidden="true" /><text>{{ salaryDock.label }}</text></view></view>
+      <view v-else-if="salaryDock?.kind === 'status'" class="rank-dock nx-glass-bar"><view class="nx-tray-status rank-dock__status" role="status"><view class="rank-dock__spin" :class="{ 'is-still': motion.still.value || !salaryReceiptInFlight }" aria-hidden="true" /><text>{{ salaryDock.label }}</text></view></view>
       <view v-else-if="!salaryDock && dockAction" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="go(dockAction.href)">{{ dockAction.label }}</NxButton></view>
       <!-- 确认框（03 §3.5 决定级）：D4b／D4d 晋升当天，D10 金额已变化；返回、Esc、点蒙层等同文字按钮。 -->
       <NxNoticeDialog :open="!!salaryDialogView" :title="salaryDialogView?.title ?? ''" :body="salaryDialogView?.body" :primary="salaryDialogView?.primary ?? ''" :secondary="salaryDialogView?.secondary" mask-secondary focus-title @primary="confirmSalaryDialog" @secondary="salaryDialog = null" />
@@ -332,8 +332,10 @@ const percentText = (rate: string | number | undefined) => formatRankPurchaseRat
 const sharedRate = (layer: 1 | 2) => remoteApiEnabled ? commission.config?.unilevelUsdt[layer] : commission.unilevelRate(layer);
 const l1Rate = (rank: VRankDef) => rank.purchaseL1Rate ?? sharedRate(1);
 const l2Rate = (rank: VRankDef) => rank.purchaseL2Rate ?? sharedRate(2);
-watch(() => rankAvailable.value && rankDefs.value.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined), missing => {
-  if (remoteApiEnabled && missing) void commission.ensureCanonicalConfig();
+const needsSharedRates = computed(() => remoteApiEnabled && rankAvailable.value
+  && rankDefs.value.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined));
+watch(needsSharedRates, missing => {
+  if (missing) void commission.ensureCanonicalConfig();
 }, { immediate: true });
 const uvtReward = (rank: VRankDef) => rank.rewards.reduce((sum, reward) => !isEntitlementVRankReward(reward) && reward.type === 'UVT' && Number.isFinite(reward.amount) ? sum + reward.amount : sum, 0);
 type Gain = { key: string; icon: NxIconName; tone: 'sky' | 'purple' | 'amber'; name: string; old?: string; value: string; unit?: string; hint?: string[] };
@@ -373,7 +375,7 @@ const reconfirm = ref<RankSalaryClaim | null>(null);
 const salaryAccount = () => auth.isAuthenticated && auth.accountId !== "default" ? auth.accountId : null;
 const salaryAmountText = (value: string) => visibility.mask(`${formatHowNumber(value, locale.code)}\u00A0USDT`);
 
-const { phase: salaryPhase, pending: salaryAttempt, submit: submitClaim, resend: resendClaim } = useRankSalaryClaim({
+const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryReceiptInFlight, submit: submitClaim, resend: resendClaim } = useRankSalaryClaim({
   account: salaryAccount,
   failed: () => toast.warn(t.value.myRank.toastFailTitle),
   async settled(result, attempt, isVisible) {
@@ -678,6 +680,10 @@ const conversations = useConversations();
 async function contactSupport() {
   go(await advisorChatRoute(conversations));
 }
+useAutoRecovery({
+  failed: () => needsSharedRates.value && commission.configStatus === 'error',
+  retry: () => commission.ensureCanonicalConfig(),
+});
 useAutoRecovery({
   failed: () => remoteApiEnabled && salaryPhase.value === "idle" && (!!vState.remoteError || vState.salary === null),
   retry: () => vState.refreshCanonicalVRank(),

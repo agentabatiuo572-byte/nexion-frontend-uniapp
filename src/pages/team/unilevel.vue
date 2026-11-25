@@ -62,7 +62,8 @@
         <!-- Settlement fold (DESIGN F2): the closed title states the conclusion; the three sentences open on tap. -->
         <view role="button" tabindex="0" class="nx-unilevel-focus nx-unilevel-details-toggle" :aria-expanded="showSettlementDetails" @click="showSettlementDetails = !showSettlementDetails" @keydown.enter.prevent="showSettlementDetails = !showSettlementDetails" @keydown.space.prevent="showSettlementDetails = !showSettlementDetails"><text>{{ detailsSummary }}</text><NxIcon :name="showSettlementDetails ? 'minus' : 'plus'" /></view>
         <view v-if="showSettlementDetails" class="nx-unilevel-details">
-          <text v-if="!devicePaused" class="block">{{ filter !== 'device_earning' ? rankCopy.f2Pays : deviceL2On ? rankCopy.f2DevPays : guideCopy.deviceBody }}</text>
+          <text v-if="filter === 'device_earning' && !devicePaused" class="block">{{ deviceL2On ? rankCopy.f2DevPays : guideCopy.deviceBody }}</text>
+          <text v-else-if="filter !== 'device_earning' && rankBasedPurchase" class="block">{{ rankCopy.f2Pays }}</text>
           <template v-if="(policyState === 'ready' || policyState === 'loading') && policy">
             <text class="block">{{ ruleDescription }}</text>
           </template>
@@ -212,8 +213,14 @@ const totals = computed(() => {
 });
 const remoteTotalUSDT = computed(() => totals.value.amountUSDT), remoteTotalNEX = computed(() => totals.value.amountNEX), remoteGroupCount = computed(() => totals.value.count);
 const currentRank = computed(() => vrank.remoteReady ? vrank.ladder[vrank.myRank] : undefined);
-watch(currentRank, rank => {
-  if (remoteApiEnabled && rank && (rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined)) void commission.ensureCanonicalConfig();
+const rankBasedPurchase = computed(() => policy.value?.sevenLayerReference?.purchaseBaseRateSource === "BENEFICIARY_RANK");
+const needsSharedRates = computed(() => {
+  const rank = currentRank.value;
+  return !!policy.value && filter.value !== 'device_earning'
+    && (!rankBasedPurchase.value || (rank && (rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined)));
+});
+watch(needsSharedRates, needed => {
+  if (remoteApiEnabled && needed) void commission.ensureCanonicalConfig();
 }, { immediate: true });
 const deviceL2On = computed(() => deviceLevel2On(policy.value));
 const devicePaused = computed(() => filter.value === "device_earning" && policy.value?.deviceEarning.enabled === false);
@@ -233,13 +240,15 @@ const ruleDescription = computed(() => {
   if (filter.value !== "device_earning") {
     const reference = p.sevenLayerReference;
     if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || !reference || reference.coolingDays === null
-      || (reference.purchaseBaseRateSource !== "BENEFICIARY_RANK" && reference.baseRatePct === null))) return t.value.directReferral.purchaseUnconfigured;
-    const current = currentRank.value;
-    const legacy = commission.config?.unilevelUsdt;
+      || (!rankBasedPurchase.value && reference.baseRatePct === null))) return t.value.directReferral.purchaseUnconfigured;
+    const current = rankBasedPurchase.value ? currentRank.value : undefined;
+    const shared = !rankBasedPurchase.value || current ? commission.config?.unilevelUsdt : undefined;
+    const a = formatRankPurchaseRate(current?.purchaseL1Rate ?? shared?.[1], dateLocale());
+    const b = formatRankPurchaseRate(current?.purchaseL2Rate ?? shared?.[2], dateLocale());
+    if (!rankBasedPurchase.value) return `${rankCopy.value.l1} ${a} · ${rankCopy.value.l2} ${b}`;
     return fmt(creditsAtOnce(purchaseDays.value) ? rankCopy.value.f2RuleNow : rankCopy.value.f2Rule, {
       r: visibility.mask(current ? `V${current.v}` : "—"),
-      a: formatRankPurchaseRate(current?.purchaseL1Rate ?? legacy?.[1], dateLocale()),
-      b: formatRankPurchaseRate(current?.purchaseL2Rate ?? legacy?.[2], dateLocale()),
+      a, b,
       d: purchaseDays.value ?? "—",
     });
   }

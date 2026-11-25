@@ -90,7 +90,10 @@
                   <text class="truncate" :style="{ fontSize: '14px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ eventTitle(e) }}</text>
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
-                <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
+                <template v-if="e.kind === 'vrank_salary'">
+                  <text v-if="e.salaryMonth && e.salaryRank" class="block" :style="eventMetaStyle">{{ salarySubtitle(e.salaryMonth, e.salaryRank) }}</text>
+                </template>
+                <text v-else class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
                 <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" /></view>
               </view>
               <view class="text-right" style="max-width: 48%; overflow-wrap: break-word">
@@ -160,6 +163,7 @@ import { useDataVisibility } from '@/store/data-visibility';
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
+import { salaryDates } from "@/lib/rank-salary-view";
 import { useCommission, type CommissionEvent, type CommissionKind } from "@/store/commission";
 import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
 import { uiLocale } from "@/i18n";
@@ -312,12 +316,15 @@ const noKindText = computed(() =>
   fmt(t.value.commissions.noKindEvents, { kind: t.value.commissions.kind[filter.value as CommissionKind] }),
 );
 
-// Monthly reward rows: the kind is the title and the rank is the subtitle; every other row leads with the person.
+// The monthly reward has no source user. Every other row leads with the person.
 function eventTitle(e: CommissionEvent): string {
   return e.kind === "vrank_salary" ? t.value.commissions.kind.vrank_salary : e.sourceUserName;
 }
+function salarySubtitle(month: string, rank: string): string {
+  const dates = salaryDates(locale.code);
+  return visibility.mask(dates.sentence(fmt(t.value.myRank.monthRank, { m: dates.month(month), r: rank })));
+}
 function eventMeta(e: CommissionEvent): string {
-  if (e.kind === "vrank_salary") return e.sourceUserName;
   const kindLabel = t.value.commissions.kind[e.kind];
   const order = !e.sourceRef && e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${visibility.mask(formatGroupedAmount(e.orderAmountUSD))}` : "";
   return `${kindLabel}${order}`;

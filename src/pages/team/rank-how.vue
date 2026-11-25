@@ -18,7 +18,7 @@
                 </view>
               </view>
             </scroll-view>
-            <text v-else class="how-caption">{{ content.copy.emptyLadder }}</text>
+            <text v-else-if="state.capabilities" class="how-caption">{{ content.copy.emptyLadder }}</text>
           </TeamRuleSection>
 
           <template v-for="group in ruleGroups" :key="group.id">
