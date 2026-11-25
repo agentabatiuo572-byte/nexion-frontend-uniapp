@@ -33,14 +33,26 @@ export const rankDeviceLevel2Options=[['off','设备收益二级为 0%'],['on','
 export const rankPresetDefaults={rankPreset:'follow',rankSalaryState:'present',rankSalaryClaimState:'success',rankReviewState:'required',rankPriorState:'met',rankCoolingState:'normal',rankDeviceLevel2State:'off'};
 export const usesRankPreset = state => !!state.rankPreset && state.rankPreset !== 'follow';
 
+const hour = 3_600_000;
+const day = 24 * hour;
+export const demoRewardNexUsdtPrice = .128;
+export const demoPurchaseNexPerUsdt = [50, 20, 10, 5, 2.5, 1, 1];
+
+export function demoPurchasePolicy(state) {
+  return {
+    enabled: state.dataState !== 'empty',
+    usdtSharePct: 60,
+    coolingDays: state.rankCoolingState === 'zero' ? 0 : 7,
+  };
+}
+
 export function rankDevicePolicies(state, at) {
-  const day = 86_400_000;
   const enabled = state.dataState !== 'empty' && state.rankDeviceLevel2State !== 'disabled';
   const previous = {policyVersion:2, effectiveAt:at-30*day, enabled:true, totalRatePct:5, level2RatePct:2, usdtSharePct:70, coolingDays:7};
   const current = {...previous, policyVersion:3, effectiveAt:at-8*day, enabled,
     totalRatePct:state.dataState==='empty'?0:5,
     level2RatePct:state.rankDeviceLevel2State==='on'?2:0,
-    coolingDays:state.rankPreset==='follow'||state.rankCoolingState==='zero'?0:7};
+    coolingDays:state.rankPreset==='follow'?0:demoPurchasePolicy(state).coolingDays};
   return {previous, current};
 }
 
@@ -48,7 +60,7 @@ const toward=(current,target)=>current+Math.floor((target-current)*.6);
 
 /** 预设 Vn 的当前值：数值条件按「门槛 + 60% 差距」，V{n}+ 人数先补足 V1–Vn 的要求，再朝下一级走 60%。
  *  prior 为 one-short 时（H5：一位好友降级）：本级要求的 V{n}+ 人数里多出来的和差的一位降一级，本级这一项正好差 1 人；V0、V1 没有这项，不变。 */
-export function rankPresetProgress(v,prior='met'){
+function rankPresetTargets(v,prior='met'){
   if(prior==='next-met'&&v!==7)prior='met';
   const own=RANK_RULES[v],next=RANK_RULES[v+1];
   const counts={};
@@ -59,6 +71,54 @@ export function rankPresetProgress(v,prior='met'){
   // next-met：朝下一级的数值条件全部停在下一级门槛（V7 数值全满足、等待 V8 审核，H7）。
   const value=index=>next?(prior==='next-met'?next[index]:toward(own[index],next[index])):own[index];
   return {selfComputePoints:value(1),teamComputePoints:value(2),directRefs:value(3),vDownlineCounts:Object.fromEntries(Object.entries(counts).filter(([,n])=>n>0).map(([r,n])=>[String(r),n]))};
+}
+
+function rankTargetsFor(state) {
+  return rankPresetTargets(Number(state.rankPreset.slice(1)),
+    state.rankPriorState === 'next-met' && state.rankReviewState === 'off' ? 'met' : state.rankPriorState);
+}
+
+// These paid orders also supply the named purchase-reward rows.
+const rankPurchaseSamples = [
+  ['p1', 'Lina', 1, 299, 1],
+  ['t1', 'Minh Anh', 2, 299, 2],
+  ['p2', 'Kai', 1, 149, 7 * 24 + 4],
+  ['t2', 'Rustam Abdullayev', 2, 149, 7 * 24 + 7],
+  ['p3', 'Omar', 1, 109, 7 * 24 + 6],
+];
+
+export function rankPresetTeamMembers(state, now) {
+  if (state.dataState === 'empty') return [];
+  const { directRefs: buyers, teamComputePoints, vDownlineCounts } = rankTargetsFor(state);
+  const ranks = Object.entries(vDownlineCounts).flatMap(([rank, count]) => Array(count).fill(Number(rank)));
+  const unranked = buyers - ranks.length;
+  const anchor = state.previewFactsAt ?? now;
+  const accountId = String(previewSelectedAccountId(state));
+  const joinedAt = new Date(anchor - 10 * day).toISOString();
+  const month = demoTeamBusinessDate(now).slice(0, 7);
+  // Give ranked buyers their own required points, then allocate the remaining team points.
+  const minimum = ranks.reduce((sum, rank) => sum + RANK_RULES[rank][1], 0);
+  const unrankedPoints = Math.min(RANK_RULES[1][1] - 1, Math.floor((teamComputePoints - minimum) / Math.max(buyers, 1)));
+  const remainder = teamComputePoints - minimum - unranked * unrankedPoints;
+  const perRanked = Math.floor(remainder / Math.max(ranks.length, 1));
+  const direct = [];
+  return Array.from({ length: buyers }, (_, index) => {
+    const id = String(100 + index);
+    const [rewardId, name, layer, amountUsdt, hoursAgo] = rankPurchaseSamples[index]
+      ?? [null, `Member ${index + 1}`, index % 12 === 0 ? 1 : 2, 100, 24];
+    const vRank = ranks[index - unranked] ?? 0;
+    const points = vRank > 0 ? RANK_RULES[vRank][1] + perRanked
+      + (index === buyers - 1 ? remainder % ranks.length : 0) : unrankedPoints;
+    const paidAt = anchor - hoursAgo * hour;
+    const paidOrders = [{ orderNo: rewardId ? `DEMO-RANK-${rewardId}` : `DEMO-RANK-MEMBER-${id}`, paidAt, amountUsdt, points, rewardId }];
+    const sponsor = layer === 1 ? null : direct[index % direct.length];
+    const member = { id, name, vRank, layer, avatarUrl: null, status: 'ACTIVE', joinedAt, region: null,
+      sponsorUserId: sponsor?.id ?? accountId, leg: sponsor?.leg ?? (direct.length % 2 ? 'B' : 'A'), paidOrders,
+      monthComputePoints: demoTeamBusinessDate(paidAt).startsWith(month) ? points : 0,
+      lifetimeComputePoints: points };
+    if (layer === 1) direct.push(member);
+    return member;
+  });
 }
 
 /** /api/team/rank 的 salary（6.1、6.5）：V2 起按状态给当月一项，业务日期按状态挪到月中、月末或 1 日；V0、V1 months 为空。
@@ -168,8 +228,15 @@ export function rankPresetResponse(pathname,base,state,now){
     })};
   }
   if(pathname==='/api/team/rank'){
-    const prior=state.rankPriorState==='next-met'&&state.rankReviewState==='off'?'met':state.rankPriorState;
-    const data={...base,rankCode:'V'+v,progress:{...base.progress,...rankPresetProgress(v,prior)}};
+    const members = rankPresetTeamMembers(state, now);
+    const firstTwoLayers = members.filter(member => member.layer <= 2);
+    const vDownlineCounts = {};
+    for (const { vRank } of firstTwoLayers) vDownlineCounts[vRank] = (vDownlineCounts[vRank] ?? 0) + 1;
+    const data={...base,rankCode:'V'+v,progress:{...base.progress,
+      selfComputePoints:rankTargetsFor(state).selfComputePoints,
+      teamComputePoints:members.reduce((sum, member) => sum + member.lifetimeComputePoints, 0),
+      directRefs:firstTwoLayers.filter(member => member.paidOrders.some(order => order.paidAt <= now)).length,
+      vDownlineCounts}};
     delete data.salary;delete data.salaryUnavailable;
     if(state.rankSalaryState==='unavailable')Object.assign(data,{salary:null,salaryUnavailable:true});
     else if(state.rankSalaryState!=='absent')data.salary=rankSalaryReadback(state,now);

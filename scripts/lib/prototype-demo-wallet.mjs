@@ -3,7 +3,10 @@ import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-acc
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoDeletionStake } from './prototype-demo-staking.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
-import { rankDevicePolicies, rankSalaryPaidFacts } from './prototype-demo-rank-presets.mjs';
+import {
+  demoPurchaseNexPerUsdt, demoPurchasePolicy, demoRewardNexUsdtPrice, RANK_RULES,
+  rankDevicePolicies, rankPresetTeamMembers, rankSalaryPaidFacts,
+} from './prototype-demo-rank-presets.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -85,30 +88,45 @@ export function demoCommissionGroups(state,at) {
 function demoRankPresetRewardRows(state,at) {
   const hour=3600000;
   const {current,previous}=rankDevicePolicies(state,at);
-  const row=(id,kind,name,layer,h,usdt,uvt,status,extra={})=>({id:'demo-rank-'+id,kind,sourceUserName:name,layer,
-    orderId:'DEMO-RANK-'+id,sourceRef:'DEMO-RANK-'+id,orderAmountUSD:299,amountUSDT:usdt,amountNEX:uvt,status,
-    ts:at-h*hour,unlockAt:status==='cooling'?at+20*day:at-h*hour,...extra});
+  const purchasePolicy = demoPurchasePolicy(state);
+  const [, , , , , , l1Rate, l2Rate] = RANK_RULES[Number(state.rankPreset.slice(1))];
+  const members = rankPresetTeamMembers(state, at);
+  const row = (id, kind, name, layer, basis, ts, unlockAt, amountUSDT, amountNEX, policyVersion) => ({
+    id: 'demo-rank-' + id, kind, sourceUserName: name, layer, orderId: 'DEMO-RANK-' + id,
+    sourceRef: 'DEMO-RANK-' + id, orderAmountUSD: basis, amountUSDT, amountNEX,
+    ts, unlockAt, status: unlockAt <= at ? 'unlocked' : 'cooling', policyVersion,
+  });
+  const purchases = members.flatMap(({ name, layer, paidOrders }) => paidOrders.filter(order => order.rewardId).map(order => {
+    const direct = layer === 1;
+    const budget = money(order.amountUsdt * (direct ? l1Rate : l2Rate));
+    const budgetMicros = Math.round(budget * 1e6);
+    const share = purchasePolicy.usdtSharePct;
+    const usdt = direct ? Math.floor(budgetMicros * share / 100) / 1e6 : budget;
+    const nex = direct
+      ? Math.floor(budgetMicros * (100 - share) * 10_000 / Math.round(demoRewardNexUsdtPrice * 1e6)) / 1e6
+      : money(budget * demoPurchaseNexPerUsdt[layer - 1]);
+    return row(order.rewardId, direct ? 'direct_purchase' : 'unilevel', name, layer, order.amountUsdt,
+      order.paidAt, order.paidAt + purchasePolicy.coolingDays * day, usdt, nex, current.policyVersion);
+  }));
   const device=(id,name,layer,sourceDeviceId,basis,ts,policy)=>{
     const rate=layer===1?policy.totalRatePct:policy.level2RatePct;
     const reward=basis*rate/100;
     const unlockAt=ts+policy.coolingDays*day;
     const usdt=money(reward*policy.usdtSharePct/100);
-    const nex=money(reward*(100-policy.usdtSharePct)/100/.128);
-    return row(id,'direct_device_earning',name,layer,0,usdt,nex,unlockAt<=at?'unlocked':'cooling',
-      {sourceDeviceId,orderAmountUSD:basis,ts,unlockAt,policyVersion:policy.policyVersion});
+    const nex=money(reward*(100-policy.usdtSharePct)/100/demoRewardNexUsdtPrice);
+    return {...row(id,'direct_device_earning',name,layer,basis,ts,unlockAt,usdt,nex,policy.policyVersion),sourceDeviceId};
   };
   const l1Policy=current.enabled?current:previous;
   const l2Policy=current.enabled&&current.level2RatePct>0?current:previous;
-  return [
-    row('p1','direct_purchase','Lina',1,1,13.16,2.6,'cooling'),
-    row('p2','direct_purchase','Kai',1,4,6.56,1.3,'unlocked'),
-    row('p3','direct_purchase','Omar',1,6,4.7,0,'unlocked'),
-    row('t1','unilevel','Minh Anh',2,2,6.58,1.3,'cooling'),
-    row('t2','unilevel','Rustam Abdullayev',2,7,3.28,0.66,'unlocked'),
+  const devices = [
     device('d1','Lina',1,'DEMO-LINA-S1',100,current.enabled?at-hour:current.effectiveAt-day-hour,l1Policy),
     device('d2','Minh Anh',2,'DEMO-MINH-S1',80,l2Policy===current?at-2*hour:current.effectiveAt-day-2*hour,l2Policy),
     device('d3','Kai',1,'DEMO-KAI-S1',40,current.enabled?current.effectiveAt+hour:current.effectiveAt-2*day,l1Policy),
     device('d4','Rustam Abdullayev',2,'DEMO-RUSTAM-S1',25,current.effectiveAt-2*day-hour,previous),
+  ].filter(row => members.some(member => member.name === row.sourceUserName));
+  return [
+    ...purchases,
+    ...devices,
     ...rankSalaryPaidFacts(state,Date.now()).map(item=>({
       id:item.claimNo, kind:'vrank_salary', sourceUserName:'System', layer:0,
       ...(!item.legacyProjection && {salaryMonth:item.month, salaryRank:item.rankCode}),

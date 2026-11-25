@@ -12,7 +12,7 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
-import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
+import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPresetTeamMembers, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo, demoCurrentTaskSample, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -1829,8 +1829,14 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso};
   }
   if(pathname==='/api/app/team/network') {
-    const members=demoTeamNetworkMembers(state,now);
-    return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
+    const preset=usesRankPreset(state);
+    const afterId=Number(url.searchParams.get('afterId')??0);
+    const available=preset?rankPresetTeamMembers(state,now).filter(member=>Number(member.id)>afterId):demoTeamNetworkMembers(state,now);
+    // Small preview pages exercise the same cursor contract without a larger synthetic network.
+    const pageSize=100;
+    const members=preset?available.slice(0,pageSize).map(({paidOrders,sponsorUserId,...member})=>member):available;
+    const nextCursor=available.length>members.length?members.at(-1).id:null;
+    return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor};
   }
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}));

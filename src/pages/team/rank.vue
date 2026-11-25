@@ -221,7 +221,8 @@ import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { RankSalary, RankSalaryAttempt, RankSalaryClaim } from "@/api/v-rank-api";
 import { useRankSalaryClaim } from "@/composables/use-rank-salary-claim";
-import { onShow } from "@dcloudio/uni-app";
+import { onHide, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const copy = useAuditUiCopy();
@@ -527,9 +528,18 @@ onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.
   if (remoteApiEnabled) void vState.ensureCanonicalVRank();
 });
+const rankReadFailed = () => remoteApiEnabled && salaryPhase.value === "idle" && (!!vState.remoteError || vState.salary === null);
+let releaseRankRefresh = () => {};
 onShow(() => {
-  if (remoteApiEnabled) void vState.ensureCanonicalVRank();
+  if (!remoteApiEnabled) return;
+  void vState.ensureCanonicalVRank();
+  releaseRankRefresh();
+  releaseRankRefresh = registerActivePageRefresh(() => {
+    if (salaryPhase.value === "idle" && !rankReadFailed()) return vState.ensureCanonicalVRank();
+  }, "pages/team/rank");
 });
+onHide(() => releaseRankRefresh());
+onUnmounted(() => releaseRankRefresh());
 
 function retryRank() {
   if (remoteApiEnabled) void vState.refreshCanonicalVRank();
@@ -689,9 +699,8 @@ useAutoRecovery({
   retry: () => commission.ensureCanonicalConfig(),
 });
 useAutoRecovery({
-  failed: () => remoteApiEnabled && salaryPhase.value === "idle" && (!!vState.remoteError || vState.salary === null),
+  failed: rankReadFailed,
   retry: () => vState.refreshCanonicalVRank(),
-  repeatMs: 30_000,
 });
 </script>
 
