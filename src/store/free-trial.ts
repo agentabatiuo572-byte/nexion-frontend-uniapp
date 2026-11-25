@@ -1,5 +1,5 @@
 import { isTransientReadFailure } from "@/lib/remote-read-failure";
-import { TRIAL_CONVERT_COMMANDS_TABLE } from '@/lib/purchase-caller-record';
+import { hasExternalTrialPaymentRecord, TRIAL_CONVERT_COMMANDS_TABLE } from '@/lib/purchase-caller-record';
 import { invalidateBeforePassiveTabRead, runForegroundStoreRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
@@ -731,7 +731,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         // The intent contains the original quote as well as the claim/SKU. A
         // lost response or App restart must replay that payload, not a new quote.
         const commands = readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, requestedAccount, true)?.commands ?? {};
-        const pending = Object.keys(commands);
+        const pending = legacyConversionIntents(commands, requestedProductNo);
         originalOutcomeUnknown = pending.length > 0;
         if (pending.length > 1) return { ok: false, reason: "unknown" };
         if (pending.length && (typeof commands[pending[0]!] !== "string" || !commands[pending[0]!]!.trim())) {
@@ -864,31 +864,21 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return { ok: true };
   }
 
-  function conversionPaymentKey(productNo: string, amount: number, quoteVersion?: string | null): string {
-    if (!remoteApiEnabled || !authorityClaimNo.value) throw new Error('TRIAL_CONVERT_CONTEXT_UNAVAILABLE');
-    const existing = readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, boundKey, true)?.commands ?? {};
-    const intents = Object.keys(existing);
-    const intent = JSON.stringify(quoteVersion ? [authorityClaimNo.value, productNo, amount, quoteVersion] : [authorityClaimNo.value, productNo, amount]);
-    if (intents.length && (intents.length !== 1 || intents[0] !== intent)) throw new Error('TRIAL_CONVERT_ORIGINAL_UNRESOLVED');
-    return acquireAccountCommandKey(CONVERT_COMMANDS_KEY, boundKey, intent, 'h2-convert');
+  function legacyConversionIntents(commands: Record<string, string>, productNo: string) {
+    return Object.keys(commands).filter(intent => {
+      const [claim, sku] = JSON.parse(intent);
+      return claim === authorityClaimNo.value && sku === productNo && !hasExternalTrialPaymentRecord(boundKey, commands[intent]!);
+    });
   }
   /** The unresolved original command: a replay keeps its amount and version. convert() validates and reports the row. */
-  function pendingConversion(): { amount: number | null; quoteVersion: string | null } | null {
-    if (!remoteApiEnabled) return null;
+  function pendingConversion(productNo: string): { amount: number | null; quoteVersion: string | null } | null {
+    if (!remoteApiEnabled || !authorityClaimNo.value || productNo !== authoritativeProductIdentity.value?.productNo) return null;
     try {
-      const intents = Object.keys(readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, boundKey, true)?.commands ?? {});
+      const intents = legacyConversionIntents(readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, boundKey, true)?.commands ?? {}, productNo);
       if (intents.length !== 1) return null;
       const original = JSON.parse(intents[0]!) as [string, string, number | null, string?];
       return { amount: original[2], quoteVersion: original[3] ?? null };
     } catch { return null; }
-  }
-  function hasPendingConversion(): boolean {
-    if (!remoteApiEnabled) return false;
-    try {
-      return Object.keys(readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, boundKey, true)?.commands ?? {}).length > 0;
-    } catch {
-      return true;
-    }
   }
 
   // PRODUCTION: POST /api/trial/cancel. Spec ④: only `active →(用户主动取消)ended`
@@ -973,7 +963,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   return {
-    status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
+    status, startedAt, expiresAt, graceEndsAt, finishedAt, pendingConversion,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
     displayState, originalPurchase, purchasedDevice, pendingStart, confirmedStartClaimNo, confirmedStartDenial, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,

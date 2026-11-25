@@ -21,7 +21,7 @@
       <!-- Topping up for a purchase, with a return action when an existing order is covered. -->
       <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': topupCovered }" role="status">
         <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ topupCovered ? payCopy.topupDone : orderTopup.orderNo ? payCopy.topupFor : payCopy.topupForPurchase }}</text></view>
-        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ orderTopup.orderNo ? payCopy.topupNeedTail : payCopy.topupNeedTailPurchase }}</text>
+        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d"><template v-if="trialReturn && orderTopupLeft < 0.01">{{ trialCopy.coShortTiny }}</template><template v-else>{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ orderTopup.orderNo ? payCopy.topupNeedTail : payCopy.topupNeedTailPurchase }}</template></text>
         <text v-else-if="topupCovered" class="topup-order__d">{{ fillCopy(orderTopup.orderNo ? payCopy.topupEnough : payCopy.topupEnoughPurchase, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
         <view v-if="!topupCovered && orderTopup.orderNo && orderCloseLeft !== null" class="topup-order__cd">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
@@ -73,7 +73,7 @@
 import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
 import { onHide, onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import { takeNavigationQuery, navTo, navReplace } from "@/lib/route";
-import { clearTrialTopup, markTrialTopupCheckout, readTrialTopup, trialTopupCheckoutHref } from "@/lib/trial-topup-return";
+import { checkTrialTopup, clearTrialTopup, markTrialTopupCheckout, readTrialTopup, trialTopupCheckoutHref } from "@/lib/trial-topup-return";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useApp } from "@/store/app";
@@ -88,7 +88,7 @@ import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import OrderUsdtTopup from "@/components/me/order-usdt-topup.vue";
 import { useT } from "@/i18n/use-t";
-import { remoteApiEnabled, sessionVault, trialApi } from "@/api/runtime";
+import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
 import { useAuth } from "@/store/auth";
@@ -155,13 +155,15 @@ const payCopy = computed(() => purchasePaymentCopy(locale.code));
 const trialCopy = useTrialPurchaseCopy();
 const ordinaryTopup = ref<{ orderNo: string | null; amount: number; shortfall: number | null; name: string; deadlineAt: number | null } | null>(null);
 const trialReturn = computed(() => sessionReady.value ? readTrialTopup(app.accountKey, trialTopupId.value) : null);
+const trialReview = ref<{ scope: string; amountUSD: number } | null>(null);
 const orderTopup = computed(() => {
   const target = trialReturn.value;
-  return target ? { orderNo: null, amount: target.amountUSD, shortfall: target.shortfallUSD, name: target.productName, deadlineAt: null }
-    : ordinaryTopup.value;
+  const review = trialReview.value;
+  if (!target) return ordinaryTopup.value;
+  return review && review.scope === trialFundingScope.value
+    ? { orderNo: null, amount: review.amountUSD, shortfall: null, name: target.productName, deadlineAt: null } : null;
 });
-const trialWalletFreshFor = ref("");
-const refreshingTrialWallet = ref(false);
+let trialFundingRead: Promise<boolean> | null = null;
 const returningToTrial = ref(false);
 let forwardingTrialReturn = false;
 // #ifdef APP-PLUS
@@ -173,17 +175,27 @@ const trialFundingScope = computed(() => {
   const target = trialReturn.value;
   return target ? `${app.accountBindingEpoch}:${target.id}` : "";
 });
-async function refreshTrialFunding(): Promise<boolean> {
-  const scope = trialFundingScope.value;
-  if (!scope || refreshingTrialWallet.value || !topupVisible.value || !foregroundReadAllowed()) return false;
-  refreshingTrialWallet.value = true;
-  try {
-    const ready = await app.refreshRemoteFleet(app.captureRemoteAccountRequest());
-    if (ready && scope === trialFundingScope.value) trialWalletFreshFor.value = scope;
-    return ready && scope === trialFundingScope.value;
-  } finally {
-    refreshingTrialWallet.value = false;
-  }
+function refreshTrialFunding(): Promise<boolean> {
+  const target = trialReturn.value, scope = trialFundingScope.value;
+  if (!target || !scope || !topupVisible.value || !foregroundReadAllowed()) return Promise.resolve(false);
+  if (trialFundingRead) return trialFundingRead;
+  const current = () => topupVisible.value && scope === trialFundingScope.value && !!readTrialTopup(target.accountKey, target.id);
+  const read = Promise.all([checkTrialTopup(target), app.refreshRemoteFleet(app.captureRemoteAccountRequest())])
+    .then(async ([review, walletReady]) => {
+      if (!current()) return false;
+      if (review.status === "redirect") {
+        trialReview.value = null;
+        clearTrialTopup(target.accountKey, target.id);
+        await navReplace(review.href);
+        return false;
+      }
+      trialReview.value = walletReady ? { scope, amountUSD: review.amountUSD } : null;
+      return walletReady;
+    })
+    .catch(() => { if (current()) trialReview.value = null; return false; })
+    .finally(() => { if (trialFundingRead === read) trialFundingRead = null; });
+  trialFundingRead = read;
+  return read;
 }
 const topupNow = ref(Date.now());
 useVisibleInterval(() => { if (orderTopup.value) topupNow.value = Date.now(); }, 1000);
@@ -191,9 +203,8 @@ const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app
 const orderTopupLeft = computed(() => {
   const topup = orderTopup.value;
   if (!topup) return null;
-  if (trialReturn.value) return trialWalletFreshFor.value === trialFundingScope.value && balanceKnown.value
-    ? Math.max(0, Math.round(topup.amount * 1_000_000) - Math.round(app.user.usdtBalance * 1_000_000)) / 1_000_000
-    : topup.shortfall;
+  if (trialReturn.value) return balanceKnown.value
+    ? Math.max(0, Math.round(topup.amount * 1_000_000) - Math.round(app.user.usdtBalance * 1_000_000)) / 1_000_000 : null;
   return balanceKnown.value ? Math.max(0, topup.amount - app.user.usdtBalance) : topup.shortfall;
 });
 // With no fresh balance, a carried shortfall larger than the purchase amount includes wallet debt.
@@ -209,40 +220,21 @@ const orderCloseLeft = computed(() => {
   return left === null ? null : `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
 });
 const orderFunded = computed(() => !!orderTopup.value?.orderNo && topupCovered.value);
-const trialFunded = computed(() => !!trialReturn.value && trialWalletFreshFor.value === trialFundingScope.value && topupCovered.value);
+const trialFunded = computed(() => !!trialReturn.value && topupCovered.value);
 async function backToOrder() {
   const target = trialReturn.value;
   if (target) {
     if (!trialFunded.value || returningToTrial.value) return;
-    const epoch = app.accountBindingEpoch;
-    const current = () => topupVisible.value && sessionReady.value && app.accountKey === target.accountKey
-      && epoch === app.accountBindingEpoch && trialReturn.value?.id === target.id;
+    const scope = trialFundingScope.value;
     returningToTrial.value = true;
     try {
-      const state = await trialApi.state();
-      if (!current()) return;
-      const live = state.claimNo === target.claimNo && (state.status === "active" || state.status === "grace");
-      const list = live ? await trialApi.purchaseOptions() : null;
-      if (!current()) return;
-      const option = list?.status === "ready" ? list.options.find(row => row.productNo === target.productNo) : undefined;
-      if (option?.reasonCode === "TRIAL_OPTION_QUOTE_UNAVAILABLE" || option?.reasonCode === "TRIAL_OPTION_DATA_UNAVAILABLE")
-        throw new Error("TRIAL_TOPUP_QUOTE_UNAVAILABLE");
-      const valid = list?.status === "ready" ? list.claimNo === target.claimNo && option?.canBuy === true
-        : list?.status === "unsupported" && state.config.trialProductId === target.productNo;
-      if (!valid) {
-        clearTrialTopup(target.accountKey, target.id);
-        if (live) toast.warn(trialCopy.value.coDeviceRemoved);
-        await navReplace("/pages/me/trial");
-        return;
-      }
+      if (!await refreshTrialFunding() || scope !== trialFundingScope.value || !trialFunded.value) return;
       if (!markTrialTopupCheckout(target)) {
         toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
         return;
       }
       forwardingTrialReturn = true;
       if (!await navReplace(trialTopupCheckoutHref(target))) forwardingTrialReturn = false;
-    } catch {
-      if (current()) toast.warn(t.value.topupChrome.depositOpFailedNote);
     } finally {
       returningToTrial.value = false;
     }
@@ -300,7 +292,7 @@ const sessionReady = computed(() => {
 watch([trialFundingScope, topupVisible, foregroundReadAllowed], ([scope, visible, allowed]) => {
   if (scope && visible && allowed) void refreshTrialFunding();
 }, { immediate: true, flush: "post" });
-useVisibleInterval(() => { if (!trialFunded.value) void refreshTrialFunding(); }, 10_000);
+useVisibleInterval(() => { void refreshTrialFunding(); }, 10_000, () => !!trialFundingScope.value);
 watch(() => dep.records.filter(record => record.status === "credited").map(record => record.depositId).join("|"),
   () => { void refreshTrialFunding(); });
 // The page reads the bank channel config itself, so a channel turned back on (or another account) shows again.

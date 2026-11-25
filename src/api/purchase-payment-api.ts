@@ -1,8 +1,9 @@
-import type { ApiClient } from './api-client';
+import type { ApiClient, ApiRequest } from './api-client';
 import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
+import { parseTrialConversionQuote, parseTrialOriginalPurchase, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
@@ -27,6 +28,10 @@ export type PurchaseQuote = {
 } & PurchaseFinancialSnapshot;
 export const purchasePaymentStatuses = ['CREATING', 'SUBMIT_UNKNOWN', 'AWAITING_PAYMENT', 'FUNDS_CONFIRMED', 'DELIVERED', 'MANUAL_REVIEW', 'EXPIRED'] as const;
 export type PurchasePaymentStatus = typeof purchasePaymentStatuses[number];
+export const TRIAL_LATE_RESELECT = 'LATE_REFUND_RESELECT_ALLOWED';
+export type TrialExternalRefusal =
+  | { status: 'refused'; reasonCode: 'TRIAL_EXISTING_PURCHASE'; originalPurchase: TrialOriginalPurchase }
+  | { status: 'refused'; reasonCode: 'TRIAL_QUOTE_CHANGED'; quote: TrialConversionQuote };
 export type PurchasePaymentIntent = {
   intentNo: string; commandKey: string; paymentQuoteId: string; kind: PurchaseKind; paymentMethod: ExternalPaymentMethod;
   network: string | null; status: PurchasePaymentStatus; subtotalUsdt: string; channelFeeUsdt: string;
@@ -36,6 +41,8 @@ export type PurchasePaymentIntent = {
   paymentAllowed?: boolean; expirationTime?: string; createdAt?: string;
   /** A refunded payment still reports MANUAL_REVIEW to user clients; refundStatus says it has ended. */
   refundStatus?: 'REFUNDED';
+  trialLateDisposition?: typeof TRIAL_LATE_RESELECT;
+  trialClaimNo?: string;
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
 const object = (raw: unknown): Record<string, unknown> => {
@@ -116,6 +123,9 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
     ...(raw.paymentAllowed !== undefined ? { paymentAllowed: raw.paymentAllowed as boolean } : {}),
     ...(createdAt ? { createdAt } : {}),
     ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT' && raw.status === 'MANUAL_REVIEW' && raw.trialLateDisposition === TRIAL_LATE_RESELECT
+      ? { trialLateDisposition: TRIAL_LATE_RESELECT } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT' && typeof raw.trialClaimNo === 'string' && raw.trialClaimNo.trim() ? { trialClaimNo: raw.trialClaimNo } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
 }
 function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNetwork): OrderUsdtTopupRead {
@@ -146,6 +156,21 @@ function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNet
 }
 export function createPurchasePaymentApi(client: ApiClient) {
   const base = '/api/app/purchase-payment';
+  function trialRequest<T>(request: ApiRequest, parse: (data: unknown) => T) {
+    return client.request<T | TrialExternalRefusal>({
+      ...request,
+      acceptedResponses: ['TRIAL_EXISTING_PURCHASE', 'TRIAL_QUOTE_CHANGED'].map(message => ({ status: 409, code: 409, message })),
+      parseResponseData(data, status) {
+        if (status !== 409) return parse(data);
+        const row = object(data);
+        if (row.reasonCode === 'TRIAL_EXISTING_PURCHASE')
+          return { status: 'refused', reasonCode: row.reasonCode, originalPurchase: parseTrialOriginalPurchase(row.originalPurchase) };
+        if (row.reasonCode === 'TRIAL_QUOTE_CHANGED')
+          return { status: 'refused', reasonCode: row.reasonCode, quote: parseTrialConversionQuote(row.quote) };
+        throw invalid();
+      },
+    });
+  }
   return {
     /** Which external channels operations have configured; unlisted channels count as unavailable. */
     async policy() {
@@ -164,8 +189,14 @@ export function createPurchasePaymentApi(client: ApiClient) {
     async quote(kind: PurchaseKind, paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
       return parsePurchaseQuote(await client.request({ method: 'POST', path: `${base}-quotes`, body: { kind, paymentMethod, payload } }));
     },
+    trialQuote(paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
+      return trialRequest({ method: 'POST', path: `${base}-quotes`, body: { kind: 'TRIAL_CONVERT', paymentMethod, payload } }, parsePurchaseQuote);
+    },
     async create(paymentQuoteId: string, commandKey: string) {
       return parsePurchaseIntent(await client.request({ method: 'POST', path: `${base}-intents`, body: { paymentQuoteId }, idempotencyKey: commandKey, retryAfterAuth: false }));
+    },
+    trialCreate(paymentQuoteId: string, commandKey: string) {
+      return trialRequest({ method: 'POST', path: `${base}-intents`, body: { paymentQuoteId }, idempotencyKey: commandKey, retryAfterAuth: false }, parsePurchaseIntent);
     },
     async get(intentNo: string) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); }
@@ -186,6 +217,14 @@ export function createPurchasePaymentApi(client: ApiClient) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents?kind=${encodeURIComponent(kind)}&commandKey=${encodeURIComponent(commandKey)}` })); }
       // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.
       catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
+    },
+    async findTrial(commandKey: string) {
+      try {
+        return await trialRequest({ path: `${base}-intents?kind=TRIAL_CONVERT&commandKey=${encodeURIComponent(commandKey)}` }, parsePurchaseIntent);
+      } catch (error) {
+        if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null;
+        throw error;
+      }
     },
   };
 }

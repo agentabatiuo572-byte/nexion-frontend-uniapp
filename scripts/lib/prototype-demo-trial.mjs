@@ -245,7 +245,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const current=snapshot(),body=request.postDataJSON(),paid=request.verifiedPayment;
     const deny=usesOptions?rejectPurchase:refuse;
     const purchase=originalPurchase();
-    if(!paid&&purchase&&!(purchase.kind==='BALANCE'&&purchase.status==='RESUMABLE'&&purchase.submissionNo===key))
+    if(!paid&&purchase&&!(purchase.kind==='BALANCE'&&purchase.submissionNo===key&&request.acceptedTrialSubmissionNo===key))
       deny('TRIAL_EXISTING_PURCHASE',{originalPurchase:purchase});
     if(!liveStates.includes(current.state))deny('TRIAL_NOT_CONVERTIBLE');
     if(usesOptions&&!paid&&!request.walletAuthorized)refuse('PAYMENT_PASSWORD_REQUIRED',null,422);

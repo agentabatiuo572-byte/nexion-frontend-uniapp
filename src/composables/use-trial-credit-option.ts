@@ -17,7 +17,7 @@ export function useTrialCreditOption(productNo: () => string | undefined) {
   const trial = useFreeTrial(), options = useTrialPurchaseOptions();
   return computed<TrialPurchaseOption | null>(() => {
     const state = trial.displayState;
-    if (!state?.claimNo || (state.status !== "active" && state.status !== "grace") || !trial.authorityClaimNo
+    if (trial.originalPurchase || !state?.claimNo || (state.status !== "active" && state.status !== "grace") || !trial.authorityClaimNo
         || options.claimNo !== state.claimNo || options.current.status !== "ready") return null;
     const no = productNo();
     return options.current.options.find((option) => option.productNo === no

@@ -11,6 +11,7 @@ import {
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { useApp } from "./app";
+import { useFreeTrial } from "./free-trial";
 
 type TrialBalancePurchase = Extract<TrialOriginalPurchase, { kind: "BALANCE" }>;
 type TrialRefusal = Extract<TrialPurchaseConvertResult, { status: "refused" }>;
@@ -31,14 +32,13 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
   const outcome = shallowRef<TrialCheckoutOutcome>({ status: "idle" });
   const authority = shallowRef<TrialAuthorityState | null>(null);
   const local = shallowRef<Submission | null>(null);
-  let authorityRead: Promise<TrialAuthorityState | null> | null = null;
   let commandRead: Promise<void> | null = null;
 
   watch(() => app.accountBindingEpoch, () => {
     outcome.value = { status: "idle" };
     authority.value = null;
     local.value = null;
-    authorityRead = commandRead = null;
+    commandRead = null;
   }, { flush: "sync" });
 
   function currentAccount() {
@@ -47,14 +47,19 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     return () => key === app.accountKey && epoch === app.accountBindingEpoch;
   }
 
-  function readLocal(claimNo: string | null): Submission | null {
+  function readStoredSubmission(): Submission | null {
     const value = readAccountRow<TrialCheckoutRow>(COMMANDS, app.accountKey, true)?.submission;
-    if (!value || value.claimNo !== claimNo) return null;
+    if (!value) return null;
     const parsed = parseTrialOriginalPurchase({
       ...value, status: "PROCESSING", confirmedAmountUsdt: value.confirmedAmountUSD,
     });
     if (parsed.kind !== "BALANCE") throw new Error("TRIAL_SUBMISSION_INVALID");
     return parsed;
+  }
+
+  function readLocal(claimNo: string | null): Submission | null {
+    const saved = readStoredSubmission();
+    return saved?.claimNo === claimNo ? saved : null;
   }
 
   function save(submission: Submission | null): boolean {
@@ -66,25 +71,28 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
   function adoptOriginal(purchase: TrialOriginalPurchase) {
     outcome.value = purchase.kind === "EXTERNAL"
       ? { status: "original", originalPurchase: purchase }
-      : { status: purchase.status === "RESUMABLE" ? "resumable" : "processing", submission: purchase };
+      : { status: "processing", submission: purchase };
   }
 
   function adoptAuthority(next: TrialAuthorityState) {
     if (authority.value && authority.value.claimNo !== next.claimNo) outcome.value = { status: "idle" };
     authority.value = next;
     try {
-      local.value = readLocal(next.claimNo);
+      const saved = readStoredSubmission();
+      if (saved && saved.claimNo !== next.claimNo && !release(saved)) throw new Error("TRIAL_SUBMISSION_STORAGE_UNAVAILABLE");
+      local.value = saved?.claimNo === next.claimNo ? saved : null;
     } catch {
       outcome.value = { status: "storage-error" };
       return;
     }
     const current = outcome.value, original = next.originalPurchase;
+    if (!original && next.status !== "active" && next.status !== "grace") {
+      outcome.value = { status: !local.value || release(local.value) ? "idle" : "storage-error" };
+      return;
+    }
     if (current.status === "submitting" || current.status === "settled") return;
     if (original) {
-      if (original.kind === "BALANCE" && (
-        current.status === "refused" && current.submissionNo === original.submissionNo
-        || current.status === "resumable" && current.submission.submissionNo === original.submissionNo
-      )) return;
+      if (original.kind === "BALANCE" && current.status === "refused" && current.submissionNo === original.submissionNo) return;
       adoptOriginal(original);
     } else if (local.value && current.status !== "resumable") {
       outcome.value = { status: "processing", submission: local.value };
@@ -93,20 +101,13 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     }
   }
 
-  function readAuthority(): Promise<TrialAuthorityState | null> {
-    if (authorityRead) return authorityRead;
-    const current = currentAccount();
-    const read = trialApi.state().then(next => {
-      if (!current()) return null;
-      adoptAuthority(next);
-      return next;
-    }).finally(() => { if (authorityRead === read) authorityRead = null; });
-    authorityRead = read;
-    return read;
-  }
-
   function release(submission: Submission): boolean {
-    return local.value?.submissionNo !== submission.submissionNo || save(null);
+    try {
+      const saved = readLocal(submission.claimNo);
+      return saved?.submissionNo !== submission.submissionNo || save(null);
+    } catch {
+      return false;
+    }
   }
 
   function finish(submission: Submission, result: TrialPurchaseConvertResult) {
@@ -151,16 +152,18 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     const current = currentAccount();
     let submission: Submission;
     try {
-      const saved = readLocal(input.claimNo);
+      const saved = readStoredSubmission();
+      if (saved && saved.claimNo !== input.claimNo) return;
       if (saved && (!resumed || saved.submissionNo !== before.submission.submissionNo)) {
         local.value = saved;
         outcome.value = { status: "processing", submission: saved };
         return;
       }
+      if (resumed && !saved) return;
       submission = resumed ? before.submission : {
         ...input, kind: "BALANCE", paymentMethod: "UVEL_USDT_WALLET", submissionNo: "trial-checkout:" + requireCryptoUuid(),
       };
-      if (!save(submission)) throw new Error("TRIAL_SUBMISSION_STORAGE_UNAVAILABLE");
+      if (!resumed && !save(submission)) throw new Error("TRIAL_SUBMISSION_STORAGE_UNAVAILABLE");
     } catch {
       outcome.value = { status: "storage-error" };
       return;
@@ -169,9 +172,9 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     try {
       const response = await trialApi.convertPurchase(submission.device.productNo, submission.confirmedAmountUSD,
         submission.quoteVersion, submission.submissionNo, authorization);
-      if (current()) finish(submission, response);
+      if (current() && workingSubmission.value?.submissionNo === submission.submissionNo) finish(submission, response);
     } catch (cause) {
-      if (!current()) return;
+      if (!current() || workingSubmission.value?.submissionNo !== submission.submissionNo) return;
       if (/^PAYMENT_PASSWORD_(INCORRECT|LOCKED|VERSION_CONFLICT|NOT_CONFIGURED|REQUIRED)$/.test(asApiError(cause).message)) {
         if (resumed || release(submission)) outcome.value = before;
         else outcome.value = { status: "storage-error" };
@@ -188,14 +191,20 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     if (state.status !== "processing") return Promise.resolve();
     const { submission } = state;
     const current = currentAccount();
-    const read = readPaymentCommand(apiClient, "trial-convert", submission.submissionNo).then(reply => {
+    const read = readPaymentCommand(apiClient, "trial-convert", submission.submissionNo).then(async reply => {
       if (!current() || workingSubmission.value?.submissionNo !== submission.submissionNo) return;
       if (reply.status === "SUCCEEDED") finish(submission, parseTrialPurchaseConvertResult(reply.receipt, 200));
       else if (reply.status === "REJECTED") {
         const refusal = reply.receipt ?? { reasonCode: reply.message };
         finish(submission, parseTrialPurchaseConvertResult(refusal, 409));
       } else if (reply.status === "NOT_SEEN" && reply.canResumeSameKey) {
-        outcome.value = { status: "resumable", submission };
+        const trial = useFreeTrial();
+        if (!await trial.refreshRemote() || !current() || workingSubmission.value?.submissionNo !== submission.submissionNo) return;
+        const next = trial.displayState;
+        if (next) adoptAuthority(next);
+        if (next?.claimNo === submission.claimNo && (next.status === "active" || next.status === "grace")
+          && !next.originalPurchase && readLocal(submission.claimNo)?.submissionNo === submission.submissionNo)
+          outcome.value = { status: "resumable", submission };
       }
     }).finally(() => { if (commandRead === read) commandRead = null; });
     commandRead = read;
@@ -207,10 +216,16 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     outcome.value = { status: "settled", claimNo, receipt };
   }
 
+  function rememberExternalQuoteChange(claimNo: string, productNo: string, commandKey: string, amount: number,
+    quote: NonNullable<TrialRefusal["quote"]>) {
+    outcome.value = { status: "refused", claimNo, productNo, submissionNo: commandKey, confirmedAmountUSD: amount,
+      refusal: { status: "refused", reasonCode: "TRIAL_QUOTE_CHANGED", quote } };
+  }
+
   function clearSettled(orderNo: string) {
     if (outcome.value.status === "settled" && outcome.value.receipt.orderNo === orderNo)
       outcome.value = { status: "idle" };
   }
 
-  return { authority, outcome, workingSubmission, adoptAuthority, readAuthority, readSubmission, submit, settleExternal, clearSettled };
+  return { authority, outcome, workingSubmission, adoptAuthority, adoptOriginal, readSubmission, submit, settleExternal, clearSettled, rememberExternalQuoteChange };
 });

@@ -360,7 +360,12 @@ const orderPaymentReadKeys = computed(() => new Set(paymentRecords.value.filter(
   if (isUnfinishedPurchaseRecord(row)) return isOrdersPurchaseRecord(row) || row.kind === "ORDER_PAY";
   // An expired order payment is read again for a late transfer even when it was only discovered (not opened) here:
   // a confirmation then shows the floating bar and keeps the expired order from being deleted.
-  if (row.kind !== "ORDER_PAY" || row.lastStatus !== "EXPIRED" || !row.intentNo || row.businessDelivered || row.validated) return false;
+  if (row.lastStatus !== "EXPIRED" || !row.intentNo || row.businessDelivered || row.validated) return false;
+  if (row.kind === "TRIAL_CONVERT") {
+    const deadline = orderPaymentDeadline(row) ?? row.startedAt;
+    return deadline !== undefined && nowSeconds.value * 1000 < deadline + latePaymentReadWindow;
+  }
+  if (row.kind !== "ORDER_PAY") return false;
   const { orderNo } = purchaseRecordPayload(row);
   if (typeof orderNo !== "string") return false;
   const order = orders.getById(orderNo);

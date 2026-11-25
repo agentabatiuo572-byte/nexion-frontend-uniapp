@@ -398,8 +398,14 @@ function runScheduledReads(route: string, reconnected = false) {
   // #ifdef APP-PLUS
   if (!nativeTrialTopupRestored) {
     nativeTrialTopupRestored = true;
-    const restartHref = route === "pages/index/index" ? pendingTrialTopupHref(app.accountKey) : null;
-    if (restartHref) { void navReplace(restartHref); return; }
+    if (route === "pages/index/index") {
+      const accountKey = app.accountKey, binding = app.accountBindingEpoch;
+      const current = () => app.accountKey === accountKey && app.accountBindingEpoch === binding
+        && readCurrentRoute() === "pages/index/index" && foregroundReadAllowed();
+      void pendingTrialTopupHref(accountKey, current).then(href => {
+        if (href && current()) void navReplace(href);
+      }).catch(() => {});
+    }
   }
   // #endif
   const binding = `${app.accountKey}:${app.accountBindingEpoch}`;

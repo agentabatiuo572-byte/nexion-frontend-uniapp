@@ -6,7 +6,7 @@ import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRe
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
-import { demoChainDepositAddress, demoChainDepositFee, initializeDemoWalletHistory, initializeLegacyStreakSavers, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, demoChainDepositFee, demoWalletUsdt, initializeDemoWalletHistory, initializeLegacyStreakSavers, postDemoWalletEntries, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
@@ -312,11 +312,17 @@ const server=http.createServer(async(req,res)=>{
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         const now=Date.now();
         // Preview-only provider callback for trial checkout funding without a store order.
-        if(Number.isSafeInteger(update.trialTopupDepositUsdt)&&update.trialTopupDepositUsdt>0&&update.trialTopupDepositUsdt<=1000000){
+        if(Number.isFinite(update.trialTopupDepositUsdt)&&Number(update.trialTopupDepositUsdt.toFixed(6))===update.trialTopupDepositUsdt
+          &&update.trialTopupDepositUsdt>0&&update.trialTopupDepositUsdt<=1000000){
           recordDemoChainDeposit(state,{network:'BEP20',
             grossAmountUsdt:(update.trialTopupDepositUsdt+Number(demoChainDepositFee)).toFixed(6),
             creditedUsdt:update.trialTopupDepositUsdt.toFixed(6),createdAt:now});
         }
+        if(Number.isSafeInteger(update.trialWalletDebitUsdt)&&update.trialWalletDebitUsdt>0&&update.trialWalletDebitUsdt<=demoWalletUsdt(state)){
+          postDemoWalletEntries(state,{bizNo:'TRIAL-PREVIEW-WALLET-'+now,bizType:'TRIAL_PREVIEW_WALLET',
+            asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
+        }
+        if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);

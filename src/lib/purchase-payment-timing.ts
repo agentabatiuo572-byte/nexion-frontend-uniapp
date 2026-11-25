@@ -1,11 +1,5 @@
 import type { PurchasePaymentIntent } from '@/api/purchase-payment-api';
 
-export function trialLateCanReselect(intent: PurchasePaymentIntent | null, now: number): boolean {
-  return intent?.kind === 'TRIAL_CONVERT' && intent.status === 'MANUAL_REVIEW'
-    && intent.reason === 'PAYMENT_LATE_REVIEW'
-    && !!intent.confirmationGraceEndsAt && now >= Date.parse(intent.confirmationGraceEndsAt);
-}
-
 /** The confirmation window never grants additional time to send a payment. */
 export function purchasePaymentTiming(intent: PurchasePaymentIntent | null, now: number, orderDeadline: number | null = null) {
   const ends = [intent?.expiresAt, intent?.deadlineAt, intent?.expirationTime].filter((value): value is string => !!value).map(Date.parse);

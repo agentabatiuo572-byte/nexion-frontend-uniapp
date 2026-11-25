@@ -271,14 +271,16 @@ import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
-import { purchasePaymentTiming, trialLateCanReselect } from '@/lib/purchase-payment-timing';
+import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
 import { toast } from '@/store/ui';
 import { navTo } from '@/lib/route';
-import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
+import { TRIAL_LATE_RESELECT, type ExternalPaymentMethod } from '@/api/purchase-payment-api';
+import { useFreeTrial } from '@/store/free-trial';
+import { originalTrialCheckoutHref } from '@/lib/trial-topup-return';
 import qrcode from 'qrcode-generator';
 const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale = useLocaleStore();
 // Orders and the order detail show their payments in place, so they hide the floating bar.
@@ -462,7 +464,43 @@ watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
 const dismiss = () => payment.notify('');
 const trialCopy = useTrialPurchaseCopy();
-const trialLateReleased = computed(() => trialLateCanReselect(s.intent, now.value));
+const trial = useFreeTrial();
+const markedLateIntent = computed(() => active.value && s.open && s.intent?.trialLateDisposition === TRIAL_LATE_RESELECT
+  ? s.intent.intentNo : null);
+const lateAuthority = ref<string | null>(null);
+async function readLateAuthority(intentNo: string) {
+  const binding = app.accountBindingEpoch;
+  const ready = await trial.refreshRemote();
+  if (app.accountBindingEpoch === binding && markedLateIntent.value === intentNo)
+    lateAuthority.value = ready ? intentNo : null;
+}
+watch(markedLateIntent, id => {
+  lateAuthority.value = null;
+  if (id) void readLateAuthority(id);
+});
+const lateTrialExit = computed(() => {
+  if (!markedLateIntent.value || markedLateIntent.value !== lateAuthority.value || trial.authorityStatus !== 'ready') return null;
+  const state = trial.displayState, claimNo = s.intent?.trialClaimNo ?? s.pending?.trialClaimNo;
+  if (!state || !claimNo || state.claimNo !== claimNo) return null;
+  if (state.originalPurchase) {
+    const original = state.originalPurchase;
+    if (original.kind === 'EXTERNAL' && original.paymentNo === markedLateIntent.value) return null;
+    return { label: original.status === 'AWAITING_PAYMENT' ? copy.value.continuePay : copy.value.viewProgress,
+      href: originalTrialCheckoutHref(original) };
+  }
+  return state.status === 'active' || state.status === 'grace'
+    ? { label: trialCopy.value.coChangeDevice, href: '/pages/me/trial' } : null;
+});
+async function openLateTrialExit() {
+  const id = markedLateIntent.value;
+  if (!id) return;
+  await readLateAuthority(id);
+  const exit = lateTrialExit.value;
+  if (markedLateIntent.value === id && exit) {
+    payment.close();
+    void navTo(exit.href);
+  }
+}
 function noticeFor(kind: PurchaseNotice): Notice | null {
   const c = copy.value, order = s.kind === 'ORDER_PAY' && !!s.orderNo;
   // A reloaded payment has no way to order again (PRD §6).
@@ -486,9 +524,10 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: order ? c.continuePay : c.ok, secondary: order ? c.viewOrder : c.close, onPrimary: order ? () => payment.restart('methods') : payment.close, onSecondary: order ? payment.openOrder : payment.close }
       : { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
-    case 'late': return trialLateReleased.value
+    case 'late': return markedLateIntent.value
       ? { icon: 'info', tone: 'warning', title: c.lateTitle, body: trialCopy.value.coLatePayment,
-        primary: trialCopy.value.coChangeDevice, onPrimary: payment.returnToTrial, ...toOrder }
+        primary: lateTrialExit.value?.label ?? c.close, onPrimary: lateTrialExit.value ? openLateTrialExit : payment.close,
+        onSecondary: payment.close, ...(lateTrialExit.value ? { secondary: c.close } : {}) }
       : { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     // Refunded to the original payment method (user 2026-11-24): the payment has ended, nothing is left to do here.
     case 'refunded': return { icon: 'info', tone: 'neutral', title: c.refundedTitle, body: c.refunded,

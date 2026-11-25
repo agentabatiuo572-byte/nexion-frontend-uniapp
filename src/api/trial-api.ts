@@ -244,8 +244,7 @@ export function parseTrialOriginalPurchase(value: unknown): TrialOriginalPurchas
   if (row.kind === "BALANCE") {
     const submissionNo = text(row.submissionNo);
     const quoteVersion = text(row.quoteVersion);
-    if (!submissionNo || !quoteVersion || row.paymentMethod !== "UVEL_USDT_WALLET"
-        || (row.status !== "PROCESSING" && row.status !== "RESUMABLE")) return invalid();
+    if (!submissionNo || !quoteVersion || row.paymentMethod !== "UVEL_USDT_WALLET" || row.status !== "PROCESSING") return invalid();
     return { ...snapshot, kind: row.kind, paymentMethod: row.paymentMethod, status: row.status, submissionNo, quoteVersion };
   }
   const paymentNo = text(row.paymentNo);

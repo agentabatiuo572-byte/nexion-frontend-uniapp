@@ -6,6 +6,22 @@ import { CAPACITY_COMMAND_TABLE } from './keep-command-recovery';
 import { PROMOTION_CHECKOUT_TABLE, withoutPromotionPayment, type PromotionCheckoutRecord } from './promotion-checkout-session';
 
 export const TRIAL_CONVERT_COMMANDS_TABLE = 'nexgrid-trial-convert-accounts-v1';
+export const PURCHASE_PAYMENT_RECORDS_TABLE = 'uvel-purchase-payment-accounts-v1';
+
+/** Older App builds used the same caller key for both external and wallet conversion. */
+export function hasExternalTrialPaymentRecord(accountKey: string, commandKey: string): boolean {
+  const row = readAccountRow<{ records: Record<string, { kind?: string }> }>(PURCHASE_PAYMENT_RECORDS_TABLE, accountKey, true);
+  return row?.records?.[commandKey]?.kind === 'TRIAL_CONVERT';
+}
+
+export function legacyTrialExternalMatches(accountKey: string, commandKey: string, claimNo: string, productNo: string): boolean {
+  const row = readAccountRow<{ commands: Record<string, string> }>(TRIAL_CONVERT_COMMANDS_TABLE, accountKey, true);
+  return Object.entries(row?.commands ?? {}).some(([intent, key]) => {
+    if (key !== commandKey) return false;
+    const [claim, sku] = JSON.parse(intent);
+    return claim === claimNo && sku === productNo;
+  });
+}
 
 /** Each purchase keeps its own recovery record under the payment's key. When the server no longer holds that payment the
  *  record goes too, from storage, so this works on any page and after a reload. Nothing here starts another payment. */
