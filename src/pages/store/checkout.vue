@@ -402,7 +402,7 @@ import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from 
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { executePaymentWithPassword } from "@/lib/authorized-payment";
-import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, resumeTrialPurchasePayment, unfinishedOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
+import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, refreshPendingPayments, refusedPurchasePayment, resumeTrialPurchasePayment, trialExternalCreatePending, unfinishedOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt, trialPriceChanged as trialPriceRefused, type TrialConversionQuote, type TrialPurchaseOption } from "@/api/trial-api";
@@ -1124,7 +1124,9 @@ const activeTrialOutcome = computed(() => {
   if (state.status === "refused" && state.claimNo !== trialCheckout.authority?.claimNo) return null;
   return multiTrialCheckout.value ? state : null;
 });
-const trialOriginalLocked = computed(() => ["original", "processing", "resumable", "submitting"].includes(activeTrialOutcome.value?.status ?? ""));
+const trialExternalConfirming = computed(() => trialExternalCreatePending(freeTrial.displayState?.claimNo ?? trialCheckout.authority?.claimNo));
+const trialOriginalLocked = computed(() => trialExternalConfirming.value
+  || ["original", "processing", "resumable", "submitting"].includes(activeTrialOutcome.value?.status ?? ""));
 const trialOriginal = computed(() => {
   const state = activeTrialOutcome.value;
   if (!state) return null;
@@ -1352,7 +1354,8 @@ const trialQuoteUnavailable = computed(() => multiTrialCheckout.value ? !trialRe
 // While trial authority is loading, keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
 // every action still waits on trialQuoteUnavailable.
-const trialQuoteScreenUnavailable = computed(() => !multiTrialCheckout.value && remoteApiEnabled && !hasOriginalCheckout.value && ((freeTrial.authorityStatus !== "ready"
+const trialQuoteScreenUnavailable = computed(() => !multiTrialCheckout.value && remoteApiEnabled && !hasOriginalCheckout.value
+  && !(trialRoute.value && pendingTrialPurchase.value) && ((freeTrial.authorityStatus !== "ready"
   && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null)) || trialQuoteIncomplete.value));
 const trialConversionMode = computed(() => trialView.value.applied);
 const purchaseSubtotal = computed(() => createdCheckoutOrder.value?.subtotalUsdt ?? pendingCheckoutCreate.value?.subtotal
@@ -1921,7 +1924,9 @@ const checkoutCapacityBlocked = computed(() => !hasOriginalCheckout.value
 const checkoutCapacityMessage = computed(() => checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
   : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
   : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value] : "");
-const checkoutTrayBlock = computed(() => checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
+const pendingTrialPurchase = computed(() => trialExternalConfirming.value || freeTrial.legacyConversionPending);
+const checkoutTrayBlock = computed(() => trialRoute.value && pendingTrialPurchase.value ? purchaseCopy.value.coConfirming
+  : checkoutOutOfStock.value || originalCheckoutOutOfStock.value ? t.value.store.temporarilyOutOfStock
   : checkoutEligibilityBlock.value || (checkoutCapacityBlocked.value ? checkoutCapacityMessage.value : ""));
 // Conversion order = the trial's own reserved slot converts into the real
 // device (slot exchange) — don't scare the user with a slots-full warning that
@@ -1975,7 +1980,7 @@ const shownTrialDiscounts = computed(() => {
   if (!quote) return { promo: promoDiscount.value, offset: trialOffsetView.value.offsetUSD, early: trialOffsetView.value.earlyDiscountUSD };
   return trialDiscountDisplay(quote);
 });
-const trialCheckoutWorking = computed(() => ["processing", "submitting"].includes(activeTrialOutcome.value?.status ?? ""));
+const trialCheckoutWorking = computed(() => pendingTrialPurchase.value || ["processing", "submitting"].includes(activeTrialOutcome.value?.status ?? ""));
 const trialCheckoutNotice = computed(() => {
   if (activeTrialOutcome.value?.status === "storage-error") return t.value.errors.txNotSavedTitle;
   if (trialCheckoutWorking.value) return t.value.store.coRecoverOriginalOrder;
@@ -2060,7 +2065,7 @@ const trialTrayWarning = computed(() => {
 const trialTrayNote = computed(() => {
   const status = activeTrialOutcome.value?.status;
   if (status === "storage-error" || trialNeedsTopup.value) return "";
-  if (status === "processing") return purchaseCopy.value.coConfirming;
+  if (status === "processing" || pendingTrialPurchase.value) return purchaseCopy.value.coConfirming;
   if (status === "resumable") return purchaseCopy.value.coUnfinished;
   return purchaseCopy.value.coTrialNotice;
 });
@@ -2092,6 +2097,7 @@ const stepLabels = computed(() => [
 ]);
 const stepDisplay = computed(() => ['confirmed','activating','live'].includes(step.value) ? 2 : ['pay-instructions','awaiting'].includes(step.value) ? 1 : 0);
 async function submitReview() {
+  if (trialRoute.value && pendingTrialPurchase.value) return;
   if (multiTrialCheckout.value) {
     await submitMultiTrialReview();
     return;
@@ -2216,6 +2222,7 @@ async function openTrialOrder(orderNo: string, scope: CheckoutRouteScope) {
     if (await navReplace({ url: `/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial` })) {
       clearTrialTopup(scope.accountKey, trialTopupId.value);
       trialCheckout.clearSettled(orderNo);
+      freeTrial.clearLegacyConversionResult(orderNo);
     }
   } finally {
     trialResultOpening = false;
@@ -2422,7 +2429,7 @@ async function submitMultiTrialReview() {
         await refreshMultiTrialReview(scope, true);
     }
   } catch {
-    if (routeCurrent()) toast.warn(t.value.store.coRecoverOriginalOrder);
+    if (routeCurrent() && !trialCheckoutWorking.value) toast.warn(t.value.store.coRecoverOriginalOrder);
   } finally {
     paymentFlowBusy.value = false;
   }
@@ -2564,7 +2571,7 @@ async function onConfirmPay() {
         if (conversion.reason === "insufficient-funds") {
           await offerWalletTopup(quotedTotal, confirmationScope);
         } else if (conversion.reason === "unknown" || (conversion.ok && !conversion.orderNo)) {
-          toast.warn(t.value.store.coRecoverOriginalOrder);
+          if (!pendingTrialPurchase.value) toast.warn(t.value.store.coRecoverOriginalOrder);
         } else if (conversion.reason === "storage-unavailable") {
           toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
         } else {
@@ -2576,8 +2583,10 @@ async function onConfirmPay() {
       orderId.value = conversion.orderNo;
       // Replace checkout with the canonical order URL. A browser refresh now
       // reloads the paid server order instead of reopening a fresh purchase.
-      if (await navReplace({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}&result=trial` }))
+      if (await navReplace({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}&result=trial` })) {
         clearTrialTopup(confirmationScope.accountKey, trialTopupId.value);
+        freeTrial.clearLegacyConversionResult(conversion.orderNo);
+      }
       return;
     }
     // Refresh the placement hint before a fresh order, after recovering possible originals.
@@ -3667,6 +3676,9 @@ function isTopCheckoutPage(): boolean {
   return !!checkoutPage && (top === checkoutPage || top?.$vm === checkoutPage);
 }
 const purchasePayment = usePurchasePayment();
+watch(() => freeTrial.confirmedLegacyConversion, result => {
+  if (result && trialRoute.value && !confirming && isTopCheckoutPage()) void openTrialOrder(result.orderNo, captureCheckoutRoute());
+});
 watch(() => trialCheckout.outcome, state => {
   if (!multiTrialCheckout.value || !pageVisible || !pageAlive || !isTopCheckoutPage()) return;
   const scope = captureCheckoutRoute();
@@ -3682,11 +3694,6 @@ useAutoRecovery({
     && !paymentFlowBusy.value && isTopCheckoutPage(),
   retry: () => refreshMultiTrialReview(captureCheckoutRoute()),
   repeatMs: 30_000,
-});
-useAutoRecovery({
-  failed: () => activeTrialOutcome.value?.status === "processing" && isTopCheckoutPage(),
-  retry: trialCheckout.readSubmission,
-  repeatMs: 15_000,
 });
 useAutoRecovery({
   failed: () => !!trialTopupId.value && !trialTopupWalletReady.value && !checkoutWalletRefreshing.value && isTopCheckoutPage(),

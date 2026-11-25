@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, shallowRef, watch } from "vue";
 import { apiClient, trialApi } from "@/api/runtime";
-import { asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
+import { asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { readPaymentCommand, type PaymentCommandReceipt } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import {
@@ -103,10 +103,6 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       return;
     }
     const current = outcome.value, original = next.originalPurchase;
-    if (!original && next.status !== "active" && next.status !== "grace") {
-      outcome.value = { status: !local.value || release(local.value) ? "idle" : "storage-error" };
-      return;
-    }
     if (current.status === "submitting" || current.status === "settled") return;
     if (original) {
       if (original.kind === "BALANCE" && current.status === "refused" && current.submissionNo === original.submissionNo) return;
@@ -217,7 +213,9 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
         else outcome.value = { status: "storage-error" };
         throw cause;
       }
-      if (isAmbiguousOutcome(cause)) outcome.value = { status: "processing", submission };
+      const failure = asApiError(cause);
+      if (isAmbiguousEnvelopeOutcome(cause) || /^(?:IDEMPOTENCY_|PAYMENT_COMMAND_)|(?:_UNKNOWN|_PROCESSING)$/.test(failure.message))
+        outcome.value = { status: "processing", submission };
       else finish(submission, { status: "refused", reasonCode: asApiError(cause).message });
     }
   }

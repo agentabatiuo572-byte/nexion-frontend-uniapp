@@ -31,18 +31,16 @@
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { remoteApiEnabled } from "@/api/runtime";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { computed, ref } from "vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
+import { useTrialPurchaseConfirmation } from "@/composables/use-trial-credit-option";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useT } from "@/i18n/use-t";
-import { formatTrialRemaining } from "@/i18n/trial-lifecycle";
+import { formatTrialRemaining, useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 
@@ -50,11 +48,16 @@ const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"
 const visibility = useDataVisibility();
 const hidePersonalData = computed(() => props.variant !== "inventory" && visibility.hidden);
 const emit = defineEmits<{ (event: "cancel"): void; (event: "toggle"): void }>();
-const presentation = useTrialPresentation();
+const trial = useFreeTrial();
+const purchaseConfirmation = useTrialPurchaseConfirmation();
+const trialConfirming = computed(() => !!trial.pendingCancel || purchaseConfirmation.value);
+const presentation = useTrialPresentation(undefined, {
+  retainWhileConfirming: () => props.variant === "inventory" && trialConfirming.value,
+});
 // The online dot pauses while this card is off-screen or its page is hidden.
 const loops = useLoopsInView(".trial-device-row");
 const loopRef = loops.elRef;
-useAutoRecovery({ failed: () => remoteApiEnabled && props.variant === "inventory" && !useTrialClaimSheet().open && useFreeTrial().authorityStatus === "error", retry: () => presentation.refresh() });
+const lifecycleCopy = useTrialLifecycleCopy();
 const copy = useTrialFleetCopy();
 // A payment for this trial is in progress: the cancel entry is replaced in place by a plain reverse-action line (04 §4.6 设备页试用行).
 const detailCopy = useTrialDetailCopy();
@@ -62,8 +65,9 @@ const t = useT();
 const localExpanded = ref(false);
 // The warehouse card is always open; Earn keeps its disclosure.
 const isExpanded = computed(() => props.variant === "inventory" || (props.expanded ?? localExpanded.value));
-const isOnline = computed(() => presentation.presentationReady.value && presentation.status.value === "active");
-const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
+const isOnline = computed(() => !trialConfirming.value && presentation.presentationReady.value && presentation.status.value === "active");
+const statusText = computed(() => trialConfirming.value ? lifecycleCopy.value.resultConfirming
+  : !presentation.presentationReady.value ? copy.value.statusUnknown
   : isOnline.value ? t.value.earn.online : copy.value.grace);
 // Cents render dimmer on the inventory card; masked values have no decimal part.
 const offsetParts = computed(() => { const text = money(presentation.offsetUSD.value); const at = /\.\d+$/.exec(text)?.index ?? text.length; return [text.slice(0, at), text.slice(at)]; });

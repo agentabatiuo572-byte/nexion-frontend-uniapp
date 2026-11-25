@@ -31,6 +31,9 @@ import {
   trialReservesSlotNow,
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
+import { useTrialCheckout } from "@/store/trial-checkout";
+import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
+import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 import { useBills } from "@/store/bills";
 import { postMoneyBill, postMoneyBillsOnce, postReceiptForAccount, type ReceiptDraft } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
@@ -506,6 +509,30 @@ function installForegroundReadSignals() {
 }
 
 if (remoteApiEnabled) {
+  const trial = useFreeTrial();
+  const trialCheckout = useTrialCheckout();
+  const trialPurchaseCopy = useTrialPurchaseCopy();
+  watch(() => trial.displayState, state => { if (state) trialCheckout.adoptAuthority(state); });
+  watch(() => trial.confirmedCancelClaimNo, claimNo => {
+    if (!claimNo) return;
+    toast.info(useT().value.trial.toastCancelled);
+    void useApp().refreshRemoteFleet();
+  });
+  useAutoRecovery({
+    failed: () => trial.lifecycleReadbackPending,
+    retry: () => trial.refreshRemote(),
+    repeatMs: 30_000,
+    quiet: true,
+  });
+  useAutoRecovery({
+    failed: () => trialCheckout.outcome.status === "processing" || trial.legacyConversionPending,
+    retry: () => trial.legacyConversionPending ? trial.recoverLegacyConversion() : trialCheckout.readSubmission(),
+    repeatMs: 15_000,
+    quiet: true,
+  });
+  watch(() => trial.deniedLegacyConversion, result => {
+    if (result) toast.warn(trialPurchaseReasonMessage(useT().value, result.reason) ?? trialPurchaseCopy.value.coPurchaseUnavailable);
+  });
   const repeatWithoutPull = () => !hasVisiblePullRefresh();
   useAutoRecovery({
     failed: () => productCatalogLanguageReadFailed.value,

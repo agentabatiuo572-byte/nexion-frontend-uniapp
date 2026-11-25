@@ -3,6 +3,7 @@ import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from '@/lib/usdt-networ
 import { cregisDepositApi as deposits, purchasePaymentApi as api, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
 import type { TrialPurchaseOutcome, ExternalPaymentMethod, OrderTopupIntent, PurchaseKind, PurchaseMethod, PurchasePaymentIntent, PurchaseQuote, TrialExternalRefusal } from '@/api/purchase-payment-api';
+import { parseTrialConvertReceipt } from '@/api/trial-api';
 import type { PaymentCommandReceipt } from '@/api/payment-command-api';
 import { useApp } from './app';
 import { useOrders, type Order } from './orders';
@@ -16,6 +17,7 @@ import { isTrialPaymentReviewPending, isUnpaidPaymentTerminal, purchasePaymentTi
 import { originalTrialCheckoutHref } from '@/lib/trial-topup-return';
 import { useTrialCheckout } from './trial-checkout';
 import { useTrialPurchaseOptions } from './trial-purchase-options';
+import { useFreeTrial } from './free-trial';
 import { orderTopupHref } from '@/lib/order-usdt-topup';
 import { appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { tradeinPaymentRejection, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
@@ -46,7 +48,8 @@ type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: st
   orderDeadlineAt?: number; hiddenOrder?: { sku: string; imageUrl?: string; total: Order['total']; placedAt?: number };
   lastStatus?: string; validated?: boolean; businessDelivered?: boolean;
   claimNo?: string; legacyTrialExpiry?: boolean; expiryConfirmed?: boolean;
-  structuredTrialRefusals?: boolean; trialPurchaseOutcome?: TrialPurchaseOutcome; trialCreateRefusal?: TrialExternalRefusal };
+  structuredTrialRefusals?: boolean; trialPurchaseOutcome?: TrialPurchaseOutcome; trialCreateRefusal?: TrialExternalRefusal;
+  createNotSeen?: boolean };
 type PendingRow = { records: Record<string, PendingExternal> };
 export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receipt: unknown; commandKey: string; accountKey: string };
 export type PurchaseStep = 'methods' | 'network' | 'bank';
@@ -238,6 +241,17 @@ export function unfinishedPurchasePayments(records = pendingPayments()) {
   return records.filter(isUnfinishedPurchaseRecord);
 }
 
+export function trialExternalCreatePending(claimNo: string | null | undefined): boolean {
+  return !!claimNo && pendingPayments().some(row => row.kind === 'TRIAL_CONVERT' && paymentRecordClaimNo(row) === claimNo
+    && isUnfinishedPurchaseRecord(row) && (!row.intentNo && !row.createNotSeen
+      || row.lastStatus === 'CREATING' || row.lastStatus === 'SUBMIT_UNKNOWN'));
+}
+
+export function trialExternalPaymentActive(claimNo: string): boolean {
+  return pendingPayments().some(row => row.kind === 'TRIAL_CONVERT' && paymentRecordClaimNo(row) === claimNo
+    && isUnfinishedPurchaseRecord(row) && (!!row.intentNo || !row.createNotSeen));
+}
+
 export function unfinishedOrderPayment(orderNo: string) {
   return unfinishedPurchasePayments().find(row => row.kind === 'ORDER_PAY' && purchaseRecordPayload(row).orderNo === orderNo);
 }
@@ -272,9 +286,24 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
   if (!records.length) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
     const expired = pending.lastStatus === 'EXPIRED';
-    const intent = pending.intentNo && (expired || pending.kind === 'TRIAL_CONVERT')
+    const result = pending.structuredTrialRefusals && !pending.intentNo ? await api.findTrial(pending.commandKey)
+      : pending.intentNo && (expired || pending.kind === 'TRIAL_CONVERT')
       ? await api.snapshot(pending.intentNo) : await readIntent(pending);
     if (!sameAccount() || !current() || state.open || !shouldRead(pending)) return;
+    if (pending.kind === 'TRIAL_CONVERT') {
+      if (result?.status === 'refused' || (!result && pending.trialCreateRefusal)) {
+        projectTrialRefusal(result?.status === 'refused' ? result : pending.trialCreateRefusal!, pending, accountKey);
+        return;
+      }
+      if (!result && !pending.intentNo && !pending.createNotSeen) save({ ...pending, createNotSeen: true }, accountKey);
+      if (result && (!pending.intentNo || (result.refundStatus === 'REFUNDED' ? 'REFUNDED' : result.status) !== pending.lastStatus
+          || result.trialPurchaseOutcome !== pending.trialPurchaseOutcome)) {
+        await useFreeTrial().refreshRemote();
+        if (!sameAccount() || !current() || state.open) return;
+      }
+    }
+    if (result?.status === 'refused') return;
+    const intent = result;
     if (expired && pending.kind !== 'TRIAL_CONVERT' && intent && intent.status !== 'MANUAL_REVIEW') return;
     const orderNo = projectPassivePayment(accountKey, pending, intent);
     if (orderNo) await useOrders().reconcileRemoteOrder(orderNo, () => sameAccount() && foregroundReadAllowed());
@@ -294,10 +323,12 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
   // A manual refund ends the payment, though user clients still receive MANUAL_REVIEW for it.
   const status = intent.refundStatus === 'REFUNDED' ? 'REFUNDED' : intent.status;
   const trialPurchaseOutcome = intent.trialPurchaseOutcome;
+  const discoveredTrialIntent = pending.kind === 'TRIAL_CONVERT' && !pending.intentNo;
   const legacyTrialExpiry = intent.claimNo === undefined && hasLegacyTrialExpiry(pending);
   const expiryConfirmed = !!isUnpaidPaymentTerminal(intent, legacyTrialExpiry);
-  if (!businessDelivered && ((status === pending.lastStatus && trialPurchaseOutcome === pending.trialPurchaseOutcome)
-      && expiryConfirmed === isExpiredPaymentRecord(pending) || !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
+  if (!discoveredTrialIntent && !businessDelivered && ((status === pending.lastStatus && trialPurchaseOutcome === pending.trialPurchaseOutcome)
+      && expiryConfirmed === isExpiredPaymentRecord(pending)
+      || pending.kind !== 'TRIAL_CONVERT' && !settled(intent) && intent.status !== 'FUNDS_CONFIRMED')) return;
   const orderDeadlineAt = pending.kind === 'ORDER_PAY' || pending.kind === 'TRIAL_CONVERT' ? Date.parse(intent.deadlineAt ?? intent.expiresAt) : undefined;
   if (expiryConfirmed) {
     saveExpiry(accountKey, pending.commandKey, pending.kind, { ...pending, intentNo: intent.intentNo,
@@ -308,6 +339,10 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
     if (businessDelivered || status === 'REFUNDED' || trialPurchaseOutcome) closeTrialPaymentCaller(pending, accountKey);
     save({ ...pending, intentNo: intent.intentNo, lastStatus: status, businessDelivered, trialPurchaseOutcome, legacyTrialExpiry, expiryConfirmed,
       claimNo: intent.claimNo ?? paymentRecordClaimNo(pending) }, accountKey);
+  }
+  if (businessDelivered && pending.kind === 'TRIAL_CONVERT') {
+    const claimNo = intent.claimNo ?? paymentRecordClaimNo(pending);
+    if (claimNo) useTrialCheckout().settleExternal(claimNo, parseTrialConvertReceipt(intent.receipt));
   }
   if (pending.kind === 'ORDER_PAY') return JSON.parse(pending.fingerprint)[1].orderNo;
 }
@@ -439,6 +474,22 @@ function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
   releaseListeners.forEach(listener => listener(accountKey, pending.commandKey));
   release(pending, accountKey, state.orderNo);
   Object.assign(state, { pending: null, quote: null, intent: null });
+}
+
+function projectTrialRefusal(refusal: TrialExternalRefusal, pending: PendingExternal, accountKey: string) {
+  const claimNo = paymentRecordClaimNo(pending);
+  const payload = purchaseRecordPayload(pending);
+  if (!claimNo || typeof payload.productNo !== 'string' || typeof payload.expectedAmountUsdt !== 'number') return;
+  if ((refusal.action === 'original' && refusal.originalPurchase.claimNo !== claimNo)
+      || (refusal.action === 'review' && (refusal.claimNo && refusal.claimNo !== claimNo || refusal.productNo && refusal.productNo !== payload.productNo))) return;
+  releasePurchaseCallerRecord(accountKey, pending.kind, pending.commandKey);
+  release(pending, accountKey, '');
+  const checkout = useTrialCheckout();
+  if (refusal.action === 'original') checkout.adoptOriginal(refusal.originalPurchase);
+  else checkout.rememberExternalRefusal(claimNo, payload.productNo, pending.commandKey, payload.expectedAmountUsdt, {
+    status: 'refused', reasonCode: refusal.action === 'wallet' ? 'ZERO_PAYMENT_REQUIRES_WALLET' : refusal.reasonCode,
+    ...(refusal.action === 'review' && refusal.quote ? { quote: refusal.quote } : {}),
+  });
 }
 function finishTrialRefusal(refusal: TrialExternalRefusal, pending?: PendingExternal) {
   const owner = context;
@@ -838,7 +889,14 @@ async function query(refreshTrialIntent = false) {
       conclude(pending.quotaRefusal);
     }
     else if (pending.intentNo || pending.lookupOnly) gone(pending, accountKey);
-    else state.canResubmit = true;
+    else {
+      if (pending.kind === 'TRIAL_CONVERT' && !pending.createNotSeen) {
+        const notSeen = { ...pending, createNotSeen: true };
+        save(notSeen);
+        state.pending = notSeen;
+      }
+      state.canResubmit = true;
+    }
   } catch {
     failed = true;
     if (owns(version, accountKey) && !state.concluded && pending?.quotaRefusal) conclude(pending.quotaRefusal);
@@ -858,10 +916,15 @@ function retryOriginal() {
 }
 /** Resubmits the original quote under the original key; the server applies it at most once. */
 async function submitOriginal() {
-  const pending = state.pending;
-  if (!pending || state.busy || state.reading || state.concluded) return;
-  if (state.originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal || pending.useOrderTopup) return query();
+  const original = state.pending;
+  if (!original || state.busy || state.reading || state.concluded) return;
+  if (state.originalRecovery || original.intentNo || original.lookupOnly || original.quotaRefusal || original.useOrderTopup) return query();
   const version = requestVersion, accountKey = state.accountKey;
+  const pending = original.kind === 'TRIAL_CONVERT' && original.createNotSeen ? { ...original, createNotSeen: false } : original;
+  if (pending !== original) {
+    save(pending);
+    state.pending = pending;
+  }
   let failed = false, requote = false, lookup = false;
   Object.assign(state, { busy: true, canResubmit: false, retryNotice: '' });
   try {
@@ -932,7 +995,8 @@ async function submitOriginal() {
         && (cause.status === 409 && ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_PRICING_CHANGED', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED', 'ORDER_NOT_PAYABLE', 'ORDER_PAYMENT_EXPIRED', ...TRIAL_REFUSALS].includes(cause.message)
           || cause.status === 404 && (cause.message === 'ORDER_NOT_FOUND'
             || pending.kind === 'TRIAL_CONVERT' && cause.message === 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'));
-      const definiteRefusal = !pending.intentNo && (paymentRefusal || rejectedQuote || cause.kind === 'business' && !/UNKNOWN|PROCESSING/.test(cause.message));
+      const definiteRefusal = !pending.intentNo && (paymentRefusal || rejectedQuote || cause.kind === 'business'
+        && !/^(?:IDEMPOTENCY_|PAYMENT_COMMAND_)|UNKNOWN|PROCESSING/.test(cause.message));
       if (definiteRefusal) {
         // These answers are final for this purchase: a new quote could only repeat them or fall back into retrying.
         // Another open payment ends every kind of purchase here; it must not fall back to quoting again.

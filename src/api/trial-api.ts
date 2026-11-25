@@ -378,6 +378,7 @@ export function parseTrialPurchaseConvertResult(value: unknown, code: number, re
 function isStructuredBalanceRefusal(cause: unknown): cause is ApiError {
   return cause instanceof ApiError && cause.kind === "http" && cause.code === cause.status
     && cause.message !== "PAYMENT_COMMAND_INPUT_CHANGED"
+    && !/^(?:IDEMPOTENCY_|PAYMENT_COMMAND_)|(?:_UNKNOWN|_PROCESSING)$/.test(cause.message)
     && !AUTHORIZATION_REFUSALS.test(cause.message)
     && ((cause.code === 503 && BALANCE_SERVICE_REFUSALS.some(message => message === cause.message))
       || (cause.code !== undefined && cause.code >= 400 && cause.code < 500 && ![408, 425, 429].includes(cause.code)));

@@ -104,7 +104,7 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
   "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
 const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
-const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.displayState?.canStart === true
+const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
   : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
   || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
@@ -116,8 +116,8 @@ const retryHeld = computed(() => claiming.value && claimFromRetry.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
-  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
-    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown || freeTrial.authorityIncomplete),
+  failed: () => remoteApiEnabled && !freeTrial.authorityResultUnknown && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityIncomplete),
   retry: () => freeTrial.refreshRemote(),
   repeatMs: 30_000,
 });
@@ -130,7 +130,8 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
-const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
+const claimErrorText = computed(() => freeTrial.pendingStart
+  ? freeTrial.startRetryable ? copy.value.claimRejected : t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : sheet.failureText(claimErrorReason.value));
