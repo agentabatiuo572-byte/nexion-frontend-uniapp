@@ -236,6 +236,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const authorityError = ref<string | null>(null);
   // Display only. A transient GET failure still clears the live command authority.
   const displayState = shallowRef<TrialAuthorityState | null>(null);
+  const checkoutState = shallowRef<TrialAuthorityState | null>(null);
   const originalPurchase = computed(() => displayState.value?.originalPurchase ?? null);
   const purchasedDevice = computed(() => displayState.value?.status === "converted"
     ? displayState.value.purchasedDevice ?? null : null);
@@ -384,7 +385,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   function clearRemoteFacts(nextStatus: "unknown" | "error" = "unknown", error: string | null = null, retainDisplay = false) {
-    if (!retainDisplay) displayState.value = null;
+    if (!retainDisplay) {
+      displayState.value = null;
+      checkoutState.value = null;
+    }
     load({ ...INITIAL });
     authoritativeShadowUSD.value = 0;
     authoritativeShadowNEX.value = 0;
@@ -496,6 +500,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityStatus.value = "ready";
     authorityError.value = null;
     if (stateRead) {
+      checkoutState.value = displayState.value;
       if (legacyClaimNo.value !== next.claimNo) {
         legacyClaimNo.value = next.claimNo;
         legacyResumableKey.value = null;
@@ -518,6 +523,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     if (!force && refreshInFlight && refreshInFlightAccount === boundKey) return refreshInFlight;
     const requestedAccount = boundKey;
     const requestedEpoch = accountBindingEpoch;
+    const lifecycleKey = pendingLifecycle.value?.command.key;
+    const currentLifecycle = () => lifecycleKey && pendingLifecycle.value?.command.key === lifecycleKey
+      ? pendingLifecycle.value : null;
     const sequence = ++authorityRequestSequence;
     authorityStatus.value = "loading";
     authorityError.value = null;
@@ -526,13 +534,24 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       .then((next) => {
         if (requestedEpoch !== accountBindingEpoch) return false;
         const applied = applyAuthority(next, sequence, true);
-        if (applied && lifecycle?.pending === pendingLifecycle.value) settleLifecycleState(next, lifecycle);
+        const pending = currentLifecycle();
+        if (pending) {
+          if (!applied || displayState.value !== next) resetLifecycleStreak(pending);
+          else {
+            const answer = JSON.stringify([next.claimNo, next.serverState, next.canStart, next.eligibilityReason]);
+            if (answer !== pending.lastFallbackState) resetLifecycleStreak(pending);
+            pending.lastFallbackState = answer;
+            if (lifecycle?.pending === pending) settleLifecycleState(next, lifecycle);
+          }
+        }
         return applied;
       })
       .catch((error: unknown) => {
-        if (requestedEpoch === accountBindingEpoch && sequence >= lastAppliedSequence) {
+        if (requestedEpoch !== accountBindingEpoch) return false;
+        const pending = currentLifecycle();
+        if (pending) resetLifecycleStreak(pending);
+        if (sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
-          if (lifecycle?.pending === pendingLifecycle.value) resetLifecycleStreak(lifecycle.pending);
           markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
         }
         return false;
@@ -660,6 +679,26 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return eligibility().ok;
   }
 
+  /** Only /state can establish the claim identity used by ordinary checkout. */
+  function canConfirmOrdinaryProduct(productNo: string): boolean {
+    const snapshot = checkoutState.value, latest = displayState.value;
+    if (!snapshot || !latest || !productNo || snapshot.claimNo !== latest.claimNo
+        || (lastReadFailed.value && !transientReadFailure.value) || pendingLifecycle.value
+        || legacyConversions.value.length) return false;
+    const snapshotLive = snapshot.status === "active" || snapshot.status === "grace";
+    const latestLive = latest.status === "active" || latest.status === "grace";
+    if (snapshotLive !== latestLive) return false;
+    if (snapshotLive) {
+      const sku = resolveTrialCheckoutProductId(snapshot.config.trialProductId);
+      if (!sku || sku !== resolveTrialCheckoutProductId(latest.config.trialProductId) || productNo === sku) return false;
+    }
+    try {
+      return !readLifecycleCommand(boundKey, true) && readLegacyConversions().length === 0;
+    } catch {
+      return false;
+    }
+  }
+
   function showPromo(): boolean {
     return remoteApiEnabled ? confirmedPromoVisible.value : canStart();
   }
@@ -735,6 +774,17 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, pending.command);
   }
 
+  async function rejectLifecycleStart(reason: TrialIneligibleReason) {
+    // In-flight eligibility started before the refusal cannot restore the old permission.
+    lastAppliedSequence = ++authorityRequestSequence;
+    remoteCanStart.value = false;
+    remoteEligibilityReason.value = reason;
+    confirmedPromoVisible.value = false;
+    confirmedHeroVisible.value = false;
+    confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
+    await refreshEligibilityRemote();
+  }
+
   function resetLifecycleStreak(pending: PendingLifecycle) {
     pending.consecutiveReads = 0;
     pending.lastCountedAt = undefined;
@@ -746,6 +796,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const active = next.status === "active" || next.status === "grace";
     const cancelled = next.serverState === "CANCELLED" && next.endReason === "cancelled";
     if (mode === "succeeded") {
+      if (kind === "cancel" && successfulClaimNo && successfulClaimNo !== previousClaimNo) {
+        finishLifecycle(pending);
+        if (cancelled && next.claimNo === previousClaimNo) confirmedCancelClaimNo.value = previousClaimNo;
+        return;
+      }
       if (!successfulClaimNo || !next.claimNo
           || (kind === "start" && next.claimNo === previousClaimNo && next.claimNo !== successfulClaimNo)
           || (kind === "cancel" && next.claimNo === successfulClaimNo && !cancelled && active)) return;
@@ -756,12 +811,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     }
     // B93 outages and indeterminate records use three matching state reads. The
     // unsupported endpoint keeps the original clients' state-only behavior.
-    if (mode === "fallback") {
-      const answer = JSON.stringify([next.claimNo, next.serverState, next.canStart, next.eligibilityReason]);
-      if (answer !== pending.lastFallbackState) resetLifecycleStreak(pending);
-      pending.lastFallbackState = answer;
-      if (!confirmedByThreeReads(pending, next.serverNow)) return;
-    }
+    if (mode === "fallback" && !confirmedByThreeReads(pending, next.serverNow)) return;
     if (kind === "cancel") {
       if (next.claimNo !== previousClaimNo) {
         resetLifecycleStreak(pending);
@@ -797,7 +847,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const current = () => epoch === accountBindingEpoch && pending === pendingLifecycle.value;
     const request = Promise.resolve().then(async () => {
       if (!current()) return;
-      const { kind, key, previousClaimNo, successfulClaimNo } = pending.command;
+      const { kind, key, successfulClaimNo } = pending.command;
       if (successfulClaimNo) {
         await refreshRemote(true, { pending, mode: "succeeded" });
         return;
@@ -807,15 +857,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       if (!current()) return;
       switch (receipt?.status) {
         case "SUCCEEDED":
-          if (kind === "cancel" && receipt.claimNo !== previousClaimNo) return;
           rememberLifecycleSuccess(pending, receipt.claimNo);
           await refreshRemote(true, { pending, mode: "succeeded" });
           return;
         case "REJECTED":
           finishLifecycle(pending);
           if (kind === "start") {
-            const reason = commandFailureReason(receipt.message);
-            confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
+            await rejectLifecycleStart(commandFailureReason(receipt.message));
           } else {
             confirmedCancelDenial.value = cancelDenial(receipt.message);
             await refreshRemote(true);
@@ -904,7 +952,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         } else if (!isAmbiguousEnvelopeOutcome(error)) {
           finishLifecycle(pending);
-          confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
+          await rejectLifecycleStart(reason);
+          if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
           return { ok: false, reason: confirmedStartDenial.value };
         }
       }
@@ -1163,7 +1212,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           await refreshRemote(true);
           return requestedEpoch === accountBindingEpoch ? { ok: false, reason: "payment-in-progress" } : { ok: false, reason: "unknown" };
         }
-        if (receipt.state.claimNo === claimNo) rememberLifecycleSuccess(pending, claimNo);
+        if (receipt.state.claimNo) rememberLifecycleSuccess(pending, receipt.state.claimNo);
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         const failure = asApiError(error);
@@ -1245,7 +1294,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
-    eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,
+    eligibility, canStart, canConfirmOrdinaryProduct, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
     refreshRemote, refreshEligibilityRemote, refreshVisible, refreshAtBoundary, serverTimeAt,

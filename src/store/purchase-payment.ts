@@ -116,7 +116,7 @@ if (typeof window !== 'undefined') window.addEventListener('storage', event => {
 // #endif
 let context: PurchasePaymentContext | null = null;
 let reviewedQuote: PurchaseQuote | null = null, confirmedQuote: PurchaseQuote | null = null;
-let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void; onExpired?: () => void } | null = null;
+let activeChoice: { promise: Promise<PurchaseChoice | null>; resolve: (result: PurchaseChoice | null) => void; onExpired?: () => void; onTerminalDismiss?: () => void } | null = null;
 let requestVersion = 0, quoteFailures = 0, pollFailures = 0, paused = false, openCashierOnReady = false;
 let activeTrialRefreshPending = false;
 let policyVersion = 0;
@@ -251,7 +251,17 @@ export function unfinishedPurchasePayments(records = pendingPayments()) {
 
 export function trialExternalCreatePending(claimNo: string | null | undefined): boolean {
   return !!claimNo && pendingPayments().some(row => row.kind === 'TRIAL_CONVERT' && paymentRecordClaimNo(row) === claimNo
-    && isUnfinishedPurchaseRecord(row) && (!row.intentNo || row.lastStatus === 'CREATING' || row.lastStatus === 'SUBMIT_UNKNOWN'));
+    && unsettledTrialExternalCreate(row));
+}
+
+function unsettledTrialExternalCreate(row: PendingExternal): boolean {
+  return isUnfinishedPurchaseRecord(row) && (!row.intentNo || row.lastStatus === 'CREATING' || row.lastStatus === 'SUBMIT_UNKNOWN');
+}
+
+export function hasUnsettledTrialExternalSubmission(): boolean {
+  void state.revision;
+  try { return Object.values(rows().records).some(row => row.kind === 'TRIAL_CONVERT' && unsettledTrialExternalCreate(row)); }
+  catch { return true; }
 }
 
 export function trialExternalPaymentActive(claimNo: string): boolean {
@@ -557,11 +567,19 @@ function finish(result: PurchaseChoice | null) {
   const choice = activeChoice; activeChoice = null; context = null; choice?.resolve(result);
   if (expired) choice?.onExpired?.();
 }
-function waitForChoice(onExpired?: () => void): Promise<PurchaseChoice | null> {
+function waitForChoice(onExpired?: () => void, onTerminalDismiss?: () => void): Promise<PurchaseChoice | null> {
   let resolve!: (result: PurchaseChoice | null) => void;
   const promise = new Promise<PurchaseChoice | null>(done => { resolve = done; });
-  activeChoice = { promise, resolve, onExpired };
+  activeChoice = { promise, resolve, onExpired, onTerminalDismiss };
   return promise;
+}
+
+function dismissRoutedTerminalTrialPayment(): boolean {
+  const dismiss = activeChoice?.onTerminalDismiss;
+  if (!dismiss) return false;
+  finish(null);
+  dismiss();
+  return true;
 }
 
 /** Replace the expired page's unsubmitted choice, or let its original intent finish in the existing layer. */
@@ -1214,12 +1232,12 @@ export function requestPurchasePayment(value: PurchasePaymentContext): Promise<P
 }
 type DeliveredPayment = Extract<PurchaseChoice, { method: 'EXTERNAL' }>;
 type CheckoutCapacityResume = { onDelivered: (result: DeliveredPayment) => void; onExpired: () => void };
-async function resume(pending: PendingExternal, checkout?: CheckoutCapacityResume, refreshed?: PurchasePaymentIntent) {
+async function resume(pending: PendingExternal, checkout?: CheckoutCapacityResume, refreshed?: PurchasePaymentIntent, onTerminalDismiss?: () => void) {
   if (state.open || !isVisiblePayment(pending)) return;
   context = null;
   const payload = JSON.parse(pending.fingerprint)[1] as Record<string, unknown>;
   open({ summary: pending.summary, kind: pending.kind, payload, orderNo: pending.kind === 'ORDER_PAY' && typeof payload.orderNo === 'string' ? payload.orderNo : undefined }, pending);
-  waitForResumedChoice(checkout);
+  waitForResumedChoice(checkout, onTerminalDismiss);
   if (refreshed) {
     accept(refreshed, pending);
     schedule(requestVersion, state.accountKey, false);
@@ -1234,10 +1252,10 @@ function openOrderTopupIntent(orderNo: string, summary: string, intent: OrderTop
   state.orderTopupIntent = intent;
   void query();
 }
-function waitForResumedChoice(checkout?: CheckoutCapacityResume) {
+function waitForResumedChoice(checkout?: CheckoutCapacityResume, onTerminalDismiss?: () => void) {
   // No active purchase callback after reload. A delivered intent returns to the original order.
   const trial = state.kind === 'TRIAL_CONVERT';
-  void waitForChoice(checkout?.onExpired).then(result => {
+  void waitForChoice(checkout?.onExpired, onTerminalDismiss).then(result => {
     if (result?.method !== 'EXTERNAL' || !result.receipt || typeof result.receipt !== 'object') return;
     acknowledgePurchasePayment(result);
     if (checkout) { checkout.onDelivered(result); return; }
@@ -1280,21 +1298,21 @@ export async function readTrialPurchasePayment(paymentNo: string, claimNo: strin
   return intent?.intentNo === paymentNo && intent.kind === 'TRIAL_CONVERT' && intent.claimNo === claimNo ? intent : null;
 }
 
-export async function showTerminalTrialPurchasePayment(intent: PurchasePaymentIntent, claimNo: string, productNo: string, summary: string) {
+export async function showTerminalTrialPurchasePayment(intent: PurchasePaymentIntent, claimNo: string, productNo: string, summary: string, onDismiss: () => void) {
   if (state.open || !isVisiblePayment(intent)
       || (!intent.trialPurchaseOutcome && intent.refundStatus !== 'REFUNDED')) return false;
-  await resumeTrialIntent(intent, claimNo, productNo, summary);
+  await resumeTrialIntent(intent, claimNo, productNo, summary, undefined, onDismiss);
   return true;
 }
 
-async function resumeTrialIntent(intent: PurchasePaymentIntent, claimNo: string, productNo: string, summary: string, checkout?: CheckoutCapacityResume) {
+async function resumeTrialIntent(intent: PurchasePaymentIntent, claimNo: string, productNo: string, summary: string, checkout?: CheckoutCapacityResume, onTerminalDismiss?: () => void) {
   const paymentNo = intent.intentNo;
   const existing = rows(account()).records[intent.commandKey];
   await resume(existing?.kind === 'TRIAL_CONVERT' && (!existing.intentNo || existing.intentNo === paymentNo) ? { ...existing, intentNo: paymentNo } : {
     fingerprint: JSON.stringify(['TRIAL_CONVERT', { productNo, expectedAmountUsdt: intent.subtotalUsdt }, claimNo]),
     kind: intent.kind, commandKey: intent.commandKey, paymentQuoteId: intent.paymentQuoteId,
     intentNo: paymentNo, paymentMethod: intent.paymentMethod, network: intent.network, summary, claimNo, lookupOnly: true,
-  }, checkout, intent);
+  }, checkout, intent, onTerminalDismiss);
 }
 // The App runtime keeps a page's query on $page.options; H5 also sets options.
 function pageQuery(page: unknown) {
@@ -1306,7 +1324,7 @@ function onOrderPage(orderNo: string) {
   return top?.route === 'pages/store/order-detail' && pageQuery(top)?.id === orderNo;
 }
 export function usePurchasePayment() {
-  return { state, select, choose, proceed, confirm, query, retryOriginal, restart, choosePaymentMethodAgain, loadPolicy, close: () => finish(null),
+  return { state, select, choose, proceed, confirm, query, retryOriginal, restart, choosePaymentMethodAgain, loadPolicy, close: () => finish(null), dismissRoutedTerminalTrialPayment,
     back: () => choose('WALLET'), available, goOrderTopup, openOrderTopupIntent,
     notify: (notice: PurchaseNotice) => { state.notice = notice; },
     openCashier: () => { if (state.intent?.paymentUrl && purchasePaymentTiming(state.intent, Date.now(), state.deadlineAt).canPay) state.cashier = true; },

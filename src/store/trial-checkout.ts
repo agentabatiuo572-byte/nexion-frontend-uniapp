@@ -186,6 +186,12 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     } catch { return null; }
   });
 
+  function hasUnsettledBalanceSubmission(): boolean {
+    if (workingSubmission.value || originalPurchase.value?.kind === "BALANCE") return true;
+    try { return !!readStoredSubmission(); }
+    catch { return true; }
+  }
+
   async function submit(input: Omit<ConfirmedSubmission, "submissionNo" | "kind" | "paymentMethod">, authorization: PaymentPasswordAuthorization) {
     const before = outcome.value;
     if (["submitting", "processing", "original", "settled", "storage-error"].includes(before.status)
@@ -317,5 +323,5 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       outcome.value = { status: "idle" };
   }
 
-  return { authority, outcome, workingSubmission, originalPurchase, adoptAuthority, adoptOriginal, readSubmission, readRoutedResult, submit, settleExternal, clearSettled, rememberExternalRefusal };
+  return { authority, outcome, workingSubmission, originalPurchase, hasUnsettledBalanceSubmission, adoptAuthority, adoptOriginal, readSubmission, readRoutedResult, submit, settleExternal, clearSettled, rememberExternalRefusal };
 });
