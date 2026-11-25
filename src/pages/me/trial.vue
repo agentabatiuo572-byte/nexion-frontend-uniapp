@@ -60,9 +60,9 @@
         <!-- FEAT-TRIAL05: every amount below is the server quote convert() will settle. -->
         <view v-if="purchaseQuote" class="trial-ticket trial-rise trial-rise--3" data-testid="trial-credit-summary">
           <view class="trial-ticket__body">
-            <NxTag v-if="earlyQuote" class="trial-ticket__tag" tone="brand"><svg class="trial-ticket__tag-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>{{ detail.earlyTag }}</NxTag>
+            <NxTag v-if="earlySaving" class="trial-ticket__tag" tone="brand"><svg class="trial-ticket__tag-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>{{ detail.earlyTag }}</NxTag>
             <text class="trial-ticket__title" data-testid="trial-buy-title">{{ buyTitle }}</text>
-            <text v-if="earlyQuote" class="trial-ticket__subtitle">{{ detail.earlySubtitle }}<text class="trial-ticket__estimate">{{ detail.earlyEstimate }}</text></text>
+            <text v-if="earlySaving" class="trial-ticket__subtitle">{{ detail.earlySubtitle }}<text class="trial-ticket__estimate">{{ detail.earlyEstimate }}</text></text>
 
             <view class="trial-total">
               <text class="trial-total__breakdown">{{ totalBreakdown }}</text>
@@ -76,10 +76,10 @@
             </view>
 
             <view class="trial-rows" role="group" :aria-label="purchase.payGroup">
-              <view class="trial-row"><text class="trial-row__label">{{ detail.unitPrice }}</text><text class="trial-row__value">{{ usd(purchaseQuote.priceUSD) }}</text></view>
-              <view v-if="purchaseQuote.promoDiscountUSD > 0" class="trial-row"><view class="trial-row__label">{{ promoLabel }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ usd(purchaseQuote.promoDiscountUSD) }}</text></view>
-              <view v-if="earlyQuote && earlyQuote.earlyDiscountUSD > 0" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ usd(earlyQuote.earlyDiscountUSD) }}</text></view>
-              <view v-if="purchaseQuote.offsetUSD > 0" class="trial-row"><view class="trial-row__label">{{ fmt(detail.offsetRow, { amount: visibility.mask(formatGroupedAmount(purchaseQuote.offsetUSD)) }) }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">{{ visibility.mask(`−${usd(purchaseQuote.offsetUSD)}`) }}</text></view>
+              <view class="trial-row"><text class="trial-row__label">{{ selectedOption && !selectedOption.isTrialProduct ? ticketDeviceName : detail.unitPrice }}</text><text class="trial-row__value">{{ usd(purchaseQuote.priceUSD) }}</text></view>
+              <view v-if="ticketDiscounts.promo > 0" class="trial-row"><view class="trial-row__label">{{ promoLabel }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ usd(ticketDiscounts.promo) }}</text></view>
+              <view v-if="ticketDiscounts.early > 0" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ usd(ticketDiscounts.early) }}</text></view>
+              <view v-if="ticketDiscounts.offset > 0" class="trial-row"><view class="trial-row__label">{{ detail.offsetRow }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">{{ visibility.mask(`−${usd(ticketDiscounts.offset)}`) }}</text></view>
             </view>
             <view class="trial-sum">
               <view class="trial-sum__row"><text class="trial-sum__label">{{ detail.discountTotal }}</text><text class="trial-sum__discount">{{ visibility.mask(`−${usd(discountTotal)}`) }}</text></view>
@@ -105,7 +105,7 @@
           </template>
         </view>
         <!-- Older servers without a quote keep the accrued-only presentation. -->
-        <view v-else class="trial-ticket trial-ticket__body trial-rise trial-rise--3" data-testid="trial-credit-summary">
+        <view v-else-if="!usePurchaseOptions && !originalPurchase" class="trial-ticket trial-ticket__body trial-rise trial-rise--3" data-testid="trial-credit-summary">
           <view class="trial-sum__row">
             <text class="trial-row__label">{{ lifecycle.availableOffsetLabel }}</text>
             <text class="trial-sum__discount">{{ visibility.mask(usd(trialOffset.offsetUSD)) }}</text>
@@ -158,7 +158,7 @@
       <view v-else-if="conversionRefunded" class="trial-state trial-state--terminal" data-testid="trial-refunded">
         <view class="trial-ring trial-ring--terminal trial-ring--muted trial-rise">
           <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true"><circle class="trial-ring__track" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg>
-          <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-refunded" />
+          <CatalogMachineImage class="trial-ring__machine" :sku="terminalProductNo" :image-url="terminalImageUrl" scope-key="trial-refunded" />
           <view class="trial-ring__badge" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-15-6.7L3 13" /></svg></view>
         </view>
         <view class="trial-terminal-copy trial-rise trial-rise--2">
@@ -173,7 +173,7 @@
         <view class="trial-glow trial-glow--owned" aria-hidden="true" />
         <view class="trial-ring trial-ring--terminal trial-ring--owned trial-rise">
           <svg class="trial-ring__svg" width="208" height="208" viewBox="0 0 208 208" aria-hidden="true"><circle class="trial-ring__full" cx="104" cy="104" r="96" fill="none" stroke-width="6" /></svg>
-          <CatalogMachineImage class="trial-ring__machine" :sku="trialProductId" :image-url="trialImageUrl" scope-key="trial-owned" />
+          <CatalogMachineImage class="trial-ring__machine" :sku="terminalProductNo" :image-url="terminalImageUrl" scope-key="trial-owned" />
           <view class="trial-ring__check" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view>
         </view>
         <view class="trial-terminal-copy trial-rise trial-rise--2">
@@ -196,7 +196,7 @@
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
           <text v-if="barNote" class="trial-bar__note nx-tray-note">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
-          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="authorityUnavailable || (trialProductUnavailable && !trialCatalogLoading)" :busy="trialCatalogLoading" @click="goCheckout">
+          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy" @click="goCheckout">
             <svg v-if="isActiveCycle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text>{{ trialBuyCtaText }}</text>
           </NxButton>
@@ -244,15 +244,15 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
-import { computed, ref, onMounted, type CSSProperties } from "vue";
-import { onShow } from "@dcloudio/uni-app";
+import { computed, ref, onMounted, watch, type CSSProperties } from "vue";
+import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import { appDeviceOffline } from "@/lib/foreground-read";
-import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
+import { appDeviceOffline, foregroundReadAllowed } from "@/lib/foreground-read";
+import { hasVisiblePullRefresh, registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDeadline } from "@/lib/trial-date";
@@ -263,7 +263,7 @@ import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { getProduct } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
-import { navTo } from "@/lib/route";
+import { navReplace, navTo, takeNavigationParameters } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useViewCountUp } from "@/composables/use-count-up";
 import TrialCountAmount from "@/components/me/trial-count-amount.vue";
@@ -271,16 +271,30 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
+import { useTrialFleetCopy } from "@/i18n/trial-fleet";
+import { useApp } from "@/store/app";
+import { toast } from "@/store/ui";
+import { useTrialCheckout } from "@/store/trial-checkout";
+import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
+import { useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { parseTrialConvertReceipt, trialPriceChanged } from "@/api/trial-api";
+import { resumeTrialPurchasePayment, usePurchasePayment } from "@/store/purchase-payment";
+import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialDiscountDisplay } from "@/lib/trial-discount-display";
 
 const t = useT();
+const app = useApp();
 const freeTrial = useFreeTrial();
 const claimSheet = useTrialClaimSheet();
-onShow(() => { void freeTrial.refreshVisible(); });
+const pageVisible = ref(false);
+onShow(() => { pageVisible.value = true; void freeTrial.refreshVisible(); });
+onHide(() => { pageVisible.value = false; });
 const trialConfig = useTrialConfig();
 const visibility = useDataVisibility();
 const lifecycle = useTrialLifecycleCopy();
 const purchase = useTrialPurchaseCopy();
 const detail = useTrialDetailCopy();
+const fleetCopy = useTrialFleetCopy();
 const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || freeTrial.authorityIncomplete));
 // The last complete snapshot belongs to this account and only supplies display values.
 const displayState = computed(() => freeTrial.displayState);
@@ -302,6 +316,8 @@ onMounted(() => { void refreshProductCatalog(true); });
 const isActiveCycle = computed(() => status.value === "active" || status.value === "grace");
 const isGrace = computed(() => status.value === "grace");
 const trialProductId = computed(() => resolveTrialCheckoutProductId(cfg.value.trialProductId));
+const terminalProductNo = computed(() => displayState.value?.purchasedDevice?.productNo ?? trialProductId.value);
+const terminalImageUrl = computed(() => displayState.value?.purchasedDevice ? displayState.value.purchasedDevice.imageUrl : trialImageUrl.value);
 // The catalogue array is not reactive: read it only once a read has settled, so the lookup re-runs per read.
 const trialProduct = computed(() => (productCatalogState.status === "ready" && trialProductId.value ? getProduct(trialProductId.value) : undefined));
 const trialImageUrl = computed(() => trialProduct.value?.imageUrl);
@@ -328,21 +344,65 @@ const trialOffset = computed(() => remoteApiEnabled
   : computeTrialOffset(cfg.value, shadowUSD.value));
 const estimatedOffsetUSD = computed(() => cfg.value.shadowDailyUSD === null
   ? null : computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays).offsetUSD);
-// FEAT-TRIAL05: the server quote convert() will settle. An early quote is shown only while
-// the original term is still running. App's boundary read supplies the next quote.
+const trialOptions = useTrialPurchaseOptions();
+const checkout = useTrialCheckout();
+const entryProductNo = ref<string>();
+let entryAccountEpoch: number | null = null;
+onLoad(query => {
+  const from = takeNavigationParameters("/pages/me/trial", ["product"]).get("product");
+  const product = from ?? query?.product;
+  if (product) {
+    entryProductNo.value = product;
+    entryAccountEpoch = app.accountKey.startsWith("user:") ? app.accountBindingEpoch : null;
+  }
+});
+const optionsRead = useTrialCreditOptionsRead(() => pageVisible.value, () => {
+  const product = entryProductNo.value;
+  entryProductNo.value = undefined;
+  return product;
+});
+const purchaseClaim = computed(() => isActiveCycle.value ? displayState.value?.claimNo ?? null : null);
+const originalPurchase = computed(() => purchaseClaim.value ? checkout.originalPurchase : null);
+const hasScopedOptions = computed(() => purchaseClaim.value !== null && purchaseClaim.value === trialOptions.claimNo);
+const purchaseOptionsView = computed(() => hasScopedOptions.value ? trialOptions.current : { status: "idle" as const, options: [] });
+const waitingForReselection = computed(() => hasScopedOptions.value && !!trialOptions.current.invalidatedProductNo);
+const selectedOption = computed(() => hasScopedOptions.value && !waitingForReselection.value && trialOptions.selectedOption?.canBuy
+  ? trialOptions.selectedOption : null);
+const selectedProductNo = computed(() => originalPurchase.value ? null : selectedOption.value?.productNo ?? null);
+const usePurchaseOptions = computed(() => remoteApiEnabled && isActiveCycle.value && purchaseOptionsView.value.status !== "unsupported");
+const purchaseOptionLoading = computed(() => usePurchaseOptions.value && !purchaseOptionsView.value.options.length
+  && ["idle", "loading"].includes(purchaseOptionsView.value.status));
+// Only the first read: a later failure keeps the rows, the selection and the ticket it already has.
+const purchaseOptionsFailed = computed(() => usePurchaseOptions.value && purchaseOptionsView.value.status === "failed"
+  && !purchaseOptionsView.value.options.length);
+const noBuyableDevices = computed(() => usePurchaseOptions.value
+  && (purchaseOptionsView.value.status === "ready" || purchaseOptionsView.value.options.length > 0)
+  && !purchaseOptionsView.value.options.some(option => option.canBuy));
+const ticketQuote = computed(() => {
+  if (originalPurchase.value || !isActiveCycle.value) return null;
+  if (!usePurchaseOptions.value) return displayState.value?.quote ?? null;
+  if (waitingForReselection.value) return null;
+  if (purchaseOptionLoading.value || purchaseOptionsFailed.value) {
+    const requested = entryProductNo.value ?? (hasScopedOptions.value ? trialOptions.remembered.productNo : null);
+    return !requested || requested === trialProductId.value ? displayState.value?.quote ?? null : null;
+  }
+  return selectedOption.value?.quote ?? null;
+});
 const earlyQuoteLapsed = computed(() => {
-  const quote = displayState.value?.quote;
+  const quote = ticketQuote.value;
   return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && freeTrial.serverTimeAt(now.value) >= quote.earlyEndsAt;
 });
 const purchaseQuote = computed(() => remoteApiEnabled && isActiveCycle.value && !earlyQuoteLapsed.value
-  ? displayState.value?.quote : null);
+  ? ticketQuote.value : null);
+watch(() => pageVisible.value && usePurchaseOptions.value && earlyQuoteLapsed.value && foregroundReadAllowed(), lapsed => {
+  if (lapsed) void optionsRead.refresh().catch(() => {});
+});
 const earlyQuote = computed(() => status.value === "active" && purchaseQuote.value?.earlyPurchase ? purchaseQuote.value : null);
 
 // Prices and discounts are dollars; earnings and credit are USDT (a quote counts 1 USDT as $1).
 const usd = (value: number) => `$${formatGroupedAmount(value)}`;
 // Caps and the headline discount read as whole dollars when they are ("$50", "$10").
 const usdShort = (value: number) => (Number.isInteger(value) ? `$${value}` : usd(value));
-const cents = (value: number) => Math.round(value * 100) / 100;
 /** Integer and decimal digits of a grouped amount, so the decimals can take the secondary colour. */
 function amountParts(value: number): [string, string] {
   const [whole, fraction = ""] = formatGroupedAmount(value).split(".");
@@ -383,18 +443,27 @@ const earnedCount = useViewCountUp(earnedSource, "grouped", { follow: true });
 const earnedParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(earnedSource.value ?? 0)));
 
 // ── Quote ticket ──
-const discountTotal = computed(() => {
+const ticketDiscounts = computed(() => {
   const quote = purchaseQuote.value;
-  return quote ? cents(quote.promoDiscountUSD + quote.earlyDiscountUSD + quote.offsetUSD) : 0;
+  if (!quote) return { promo: 0, early: 0, offset: 0, total: 0 };
+  const { promoDiscountUSD: promo, earlyDiscountUSD: early, offsetUSD: offset } = quote;
+  if (!usePurchaseOptions.value) return { promo, early, offset, total: Number(formatAmount(promo + early + offset)) };
+  return trialDiscountDisplay(quote);
 });
+const discountTotal = computed(() => ticketDiscounts.value.total);
 const totalSource = computed(() => (purchaseQuote.value && !authorityScreenUnavailable.value
-  ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null));
+  ? Number(formatAmount(discountTotal.value + purchaseQuote.value.remainderUSD)) : null));
 const totalCount = useViewCountUp(totalSource, "grouped", { follow: true });
 const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalSource.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
+// The discount this order really gets, at the two decimals its row shows.
+const earlySaving = computed(() => !!earlyQuote.value && ticketDiscounts.value.early > 0);
+const ticketDeviceName = computed(() => (selectedOption.value?.productName ?? trialDeviceName.value).replace(/ /g, "\u00A0"));
 const buyTitle = computed(() => {
-  if (earlyQuote.value) return fmt(detail.value.earlyTitle, { device: trialDeviceName.value, amount: usdShort(earlyQuote.value.earlyDiscountUSD) });
-  return isGrace.value ? detail.value.graceTitle : purchase.value.accruedTitle;
+  if (earlySaving.value) return fmt(selectedOption.value && !selectedOption.value.isTrialProduct ? detail.value.earlyTitleOther : detail.value.earlyTitle, {
+    device: ticketDeviceName.value, amount: usdShort(ticketDiscounts.value.early),
+  });
+  return isGrace.value ? detail.value.graceTitle : "";
 });
 // What arrives after purchase: USDT when there is some, otherwise the UVT (amounts never split across lines).
 // Both figures carry the trial earnings, so the data-visibility mask hides them like the hero.
@@ -418,14 +487,29 @@ const w = computed(() => t.value.trial);
 // B53: the header, claim title and owned note name the confirmed trial product: the current
 // offer while claimable, the claimed product once running or bought. Nothing shows before the
 // first confirmed read, so the boot default never flashes in; local mock keeps its own config.
-const trialDeviceName = computed(() => (!remoteApiEnabled || displayState.value ? cfg.value.trialProductName : ""));
+const trialDeviceName = computed(() => (!remoteApiEnabled || displayState.value
+  ? displayState.value?.purchasedDevice?.productName ?? cfg.value.trialProductName : ""));
 // Inside sentences the name never splits across lines ("UVELBox / Pro v2").
 const trialDeviceNameKept = computed(() => trialDeviceName.value.replace(/ /g, "\u00A0"));
 const idleBody = computed(() => !remoteApiEnabled || displayState.value
   ? fmt(w.value.idleBody, { n: String(cfg.value.trialDays) })
   : "");
 const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: visibility.mask(formatAmount(trialOffset.value.remainderUSD)) }));
+const openingPurchase = ref(false);
+const trialBuyBusy = computed(() => openingPurchase.value || (originalPurchase.value ? false
+  : usePurchaseOptions.value ? purchaseOptionLoading.value : trialCatalogLoading.value));
+const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalPurchase.value ? false
+  : usePurchaseOptions.value ? !selectedOption.value || !purchaseQuote.value
+    : trialProductUnavailable.value && !trialCatalogLoading.value));
 const trialBuyCtaText = computed(() => {
+  const original = originalPurchase.value;
+  if (original) return original.status === "AWAITING_PAYMENT" || original.status === "RESUMABLE"
+    ? t.value.orders.pendingContinue : detail.value.viewProgress;
+  if (usePurchaseOptions.value) {
+    if (waitingForReselection.value) return detail.value.chooseDevice;
+    return selectedOption.value && purchaseQuote.value
+      ? fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
+  }
   if (productCatalogState.status === "error") return t.value.store.catalogErrorTitle;
   if (trialCatalogLoading.value) return w.value.buyCtaPlain;
   if (trialProductUnavailable.value) return t.value.store.temporarilyOutOfStock;
@@ -451,22 +535,37 @@ const ineligibleReasonText = computed(() => {
   if (r === "in-progress") return w.value.eligReasonInProgress;
   if (r === "risk") return w.value.eligReasonRisk;
   if (r === "quota-exhausted") return w.value.eligReasonQuota;
-  if (r === "product-unavailable") return t.value.store.trialProductUnavailable;
+  if (r === "product-unavailable") return lifecycle.value.deviceUnclaimable;
   if (r === "capacity-full") return lifecycle.value.capacityFull;
   return w.value.eligReasonClosed;
 });
-const barRetry = computed(() => (isActiveCycle.value || status.value === "ended") && !claimVisible.value && productCatalogState.status === "error");
+const barRetry = computed(() => (isActiveCycle.value || status.value === "ended") && !claimVisible.value
+  && !usePurchaseOptions.value && !originalPurchase.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
   if (freeTrial.pendingStart) return t.value.trial.claimUnknownInline;
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
+  if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? purchase.value.coUnfinished : "";
+  if (usePurchaseOptions.value) {
+    const only = purchaseOptionsView.value.options[0];
+    if (noBuyableDevices.value && purchaseOptionsView.value.options.length === 1 && only?.isTrialProduct) {
+      return trialOptionReadFailed(only) ? detail.value.quoteFailed
+        : trialPurchaseReasonMessage(t.value, only.reasonCode) ?? detail.value.optionUnavailable;
+    }
+    if (waitingForReselection.value) return "";
+    if (purchaseOptionsFailed.value) return detail.value.listFailed;
+    if (purchaseOptionsView.value.status === "not-convertible") return detail.value.optionUnavailable;
+    if (noBuyableDevices.value) return isGrace.value ? detail.value.noneBuyableGrace : detail.value.noneBuyable;
+    return purchaseOptionsView.value.status === "failed" ? t.value.exchange.staleSnapshot : "";
+  }
   if ((isActiveCycle.value || status.value === "ended") && trialProductUnavailable.value && productCatalogState.status === "ready") {
     return t.value.store.trialProductUnavailable;
   }
   return "";
 });
+
 
 // Rules sheet (spec ⑥: pre-purchase offset / no cash-out / post-purchase
 // remainder → balance / expiry).
@@ -476,27 +575,156 @@ const rulesLines = computed(() => [
     : fmt(w.value.rulesBefore, { cap: formatGroupedAmount(cfg.value.trialOffsetCapUSD) }),
   w.value.rulesNoCash,
   w.value.rulesAfter,
-  ...(earlyQuote.value ? [
-    fmt(lifecycle.value.rulesEarly, { discount: formatGroupedAmount(earlyQuote.value.earlyDiscountConfiguredUSD) }),
-    lifecycle.value.rulesRefund,
-  ] : []),
+  ...(earlyQuote.value && earlyQuote.value.earlyDiscountConfiguredUSD > 0 ? [fmt(
+    earlyQuote.value.settlementPolicy === "FULL_TERM_ON_CONVERSION" ? detail.value.rulesEarlyFull : detail.value.rulesEarly,
+    { discount: usdShort(earlyQuote.value.earlyDiscountConfiguredUSD) },
+  )] : []),
+  lifecycle.value.rulesRefund,
   w.value.rulesExpiry,
 ]);
+
+const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
+
 
 function claim() {
   if (!canStartNow.value) return; // disabled CTA — reason line explains why
   claimSheet.show();
 }
 
-// Conversion CTA → checkout. Trial pricing still derives from authoritative
-// state (status ∈ active|grace ∧ product = trialProductId); the URL marker only
-// controls safe return copy when the canonical catalogue omits the trial SKU.
-function goCheckout() {
-  if (authorityUnavailable.value || trialProductUnavailable.value) return;
-  const productId = trialProductId.value;
-  if (!productId) return; // applyAuthoritative already rejects unknown policy ids
-  navTo(`/pages/store/checkout?product=${productId}&source=trial`);
+function purchaseVisit(claimNo = displayState.value?.claimNo) {
+  const binding = app.accountBindingEpoch;
+  const sameClaim = () => binding === app.accountBindingEpoch && claimNo === displayState.value?.claimNo;
+  return { sameClaim, current: () => pageVisible.value && sameClaim() };
 }
+
+function checkoutHref(productNo: string, recovery?: { kind: "resume" | "refusal"; submissionNo: string }) {
+  const query = new URLSearchParams({ product: productNo, source: "trial" });
+  if (recovery) query.set(recovery.kind === "resume" ? "trialResume" : "trialRefusal", recovery.submissionNo);
+  return `/pages/store/checkout?${query}`;
+}
+
+async function goCheckout() {
+  if (trialBuyDisabled.value || openingPurchase.value) return;
+  const original = originalPurchase.value;
+  const productNo = usePurchaseOptions.value ? selectedProductNo.value : trialProductId.value;
+  if (!original && !productNo) return;
+  const visit = purchaseVisit();
+  openingPurchase.value = true;
+  try {
+    if (original?.kind === "EXTERNAL") {
+      await resumeTrialPurchasePayment(original.paymentNo, original.claimNo, original.device.productNo, original.device.productName, visit.current, {
+        onDelivered: completion => {
+          if (visit.current()) checkout.settleExternal(original.claimNo, parseTrialConvertReceipt(completion.receipt));
+        },
+        onExpired: () => { if (visit.current()) void freeTrial.refreshRemote(); },
+      });
+    } else if (original?.kind === "BALANCE") {
+      if (original.status === "RESUMABLE") await navTo(checkoutHref(original.device.productNo, { kind: "resume", submissionNo: original.submissionNo }));
+      else await readOriginalBalance();
+    } else if (productNo) {
+      if (usePurchaseOptions.value) {
+        await trialOptions.refresh();
+        if (!visit.current() || originalPurchase.value || authorityUnavailable.value) return;
+        const options = trialOptions.current;
+        if (options.status === "unsupported") {
+          if (productNo !== trialProductId.value) toast.warn(detail.value.deviceGone);
+          else if (!trialProductUnavailable.value) await navTo(checkoutHref(productNo));
+          return;
+        }
+        if (options.status !== "ready" || options.selectedProductNo !== productNo || !purchaseQuote.value) return;
+      }
+      if (visit.current()) await navTo(checkoutHref(productNo));
+    }
+  } catch {
+    if (!visit.current()) return;
+    if (original?.kind === "EXTERNAL") toast.warn(purchase.value.coPurchaseUnavailable);
+    else if (!original) toast.warn(detail.value.listFailed);
+  } finally {
+    if (visit.sameClaim()) openingPurchase.value = false;
+  }
+}
+
+watch(() => app.accountBindingEpoch, (epoch) => {
+  if (entryAccountEpoch !== null && entryAccountEpoch !== epoch) entryProductNo.value = undefined;
+}, { flush: "sync" });
+let observedOriginalClaim: string | null = null;
+let handledRefusal: string | null = null;
+let openingResult = false;
+watch([() => app.accountBindingEpoch, () => displayState.value?.claimNo], () => {
+  observedOriginalClaim = handledRefusal = null;
+  openingPurchase.value = false;
+}, { flush: "sync" });
+watch([pageVisible, displayState, authorityUnavailable], ([visible, state, unavailable]) => {
+  if (visible && state && !unavailable) checkout.adoptAuthority(state);
+});
+watch(() => hasScopedOptions.value ? trialOptions.current.invalidatedProductNo : null, (invalidated) => {
+  if (invalidated && pageVisible.value && !originalPurchase.value) toast.warn(detail.value.deviceGone);
+}, { flush: "post" });
+watch([pageVisible, originalPurchase], ([visible, original]) => {
+  if (visible && original) observedOriginalClaim = original.claimNo;
+}, { flush: "post" });
+
+async function openTrialResult(orderNo: string) {
+  if (openingResult) return;
+  openingResult = true;
+  try {
+    if (await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`)) checkout.clearSettled(orderNo);
+  } finally {
+    openingResult = false;
+  }
+}
+
+async function readOriginalBalance() {
+  if (!pageVisible.value || !foregroundReadAllowed() || checkout.outcome.status !== "processing") return;
+  await checkout.readSubmission();
+}
+const pendingBalanceSubmission = computed(() => {
+  const original = originalPurchase.value;
+  return original?.kind === "BALANCE" && original.status === "PROCESSING" ? original.submissionNo : null;
+});
+watch([pageVisible, pendingBalanceSubmission, foregroundReadAllowed], ([visible, submissionNo, allowed]) => {
+  if (visible && submissionNo && allowed) void readOriginalBalance().catch(() => {});
+});
+useAutoRecovery({
+  active: () => pageVisible.value, failed: () => !!pendingBalanceSubmission.value,
+  retry: readOriginalBalance, repeatMs: 15_000, quiet: true,
+});
+const payment = usePurchasePayment();
+useVisibleInterval(() => { if (foregroundReadAllowed()) void freeTrial.refreshRemote(); }, 15_000,
+  () => originalPurchase.value?.kind === "EXTERNAL" && !payment.state.open);
+
+watch([pageVisible, displayState, () => checkout.outcome], ([visible, state, outcome]) => {
+  if (!visible || !state?.claimNo || observedOriginalClaim !== state.claimNo) return;
+  if (outcome.status === "settled" && outcome.claimNo === state.claimNo) {
+    void openTrialResult(outcome.receipt.orderNo);
+  } else if (state.status === "converted" && state.conversion?.orderNo && !state.conversion.refunded) {
+    void openTrialResult(state.conversion.orderNo);
+  } else if (outcome.status === "refused" && outcome.claimNo === state.claimNo && handledRefusal !== outcome.submissionNo) {
+    handledRefusal = outcome.submissionNo;
+    const reason = outcome.refusal.reasonCode;
+    if (trialDeviceNeedsReselection(reason)) {
+      if (trialOptions.claimNo === state.claimNo) trialOptions.invalidateSelection(outcome.productNo);
+      void optionsRead.refresh().catch(() => {});
+    } else if (reason === "TRIAL_NOT_CONVERTIBLE") {
+      void freeTrial.refreshRemote();
+    } else if (reason === "TRIAL_WALLET_INSUFFICIENT" || trialPriceChanged(reason) || reason === "TRIAL_PRODUCT_NOT_AVAILABLE") {
+      void navTo(checkoutHref(outcome.productNo, { kind: "refusal", submissionNo: outcome.submissionNo }));
+    } else {
+      toast.warn(reason === "ORDER_MONTHLY_QUOTA_UNAVAILABLE" ? purchase.value.coPurchaseUnavailable
+        : trialPurchaseReasonMessage(t.value, reason) ?? purchase.value.coPurchaseUnavailable);
+      void optionsRead.refresh().catch(() => {});
+    }
+  }
+}, { flush: "post" });
+watch(pageVisible, (visible, _, onCleanup) => {
+  if (visible) onCleanup(registerActivePageRefresh(async () => {
+    if (purchaseClaim.value) {
+      await freeTrial.refreshRemote();
+      await optionsRead.refresh();
+    }
+  }, "pages/me/trial"));
+});
+
 useAutoRecovery({
   active: () => !claimSheet.open,
   failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
@@ -523,8 +751,6 @@ function goRefundedOrder() {
   const orderNo = displayState.value?.conversion?.orderNo;
   if (orderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
 }
-
-const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
 
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。

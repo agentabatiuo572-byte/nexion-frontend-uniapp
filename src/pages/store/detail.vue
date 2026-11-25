@@ -216,7 +216,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange, productDailyUvtRange } from "@/lib/product-estimates";
 import { estimateRangeParts } from "@/lib/estimate-display";
-import { navTo, takeNavigationQuery } from "@/lib/route";
+import { navTo, takeNavigationParameters } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -307,8 +307,8 @@ async function refreshDetailFacts(): Promise<void> {
 
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
-  const fallback = new URLSearchParams(takeNavigationQuery("/pages/store/detail"));
-  id.value = (o.id || fallback.get('id') || "").trim();
+  const fallback = takeNavigationParameters("/pages/store/detail", ["id"]);
+  id.value = (fallback.get('id') || o.id || "").trim();
   activityId.value=(o.activityId||fallback.get('activityId')||'').trim();
   voucherContext.value=voucherEntryContext({voucherId:o.voucherId||fallback.get('voucherId')||undefined,upgradeActivityId:o.upgradeActivityId||fallback.get('upgradeActivityId')||undefined});
   if(voucherContext.value.voucherId)activityId.value='';

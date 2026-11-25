@@ -17,11 +17,11 @@
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view class="trial-device-row__actions">
-        <view v-if="variant === 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
+        <view v-if="variant === 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy && !cancelLocked ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy && !cancelLocked ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy || cancelLocked" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelLocked ? detailCopy.cancelLocked : cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
         <view class="trial-device-row__details" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails" @keydown.enter.stop.prevent="goDetails" @keydown.space.stop.prevent="goDetails"><text>{{ copy.detailsAction }}</text></view>
         <view class="trial-device-row__buy" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy" @keydown.enter.stop.prevent="goBuy" @keydown.space.stop.prevent="goBuy"><text>{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text><NxIcon name="arrow-right" /></view>
       </view>
-      <view v-if="variant !== 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
+      <view v-if="variant !== 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy && !cancelLocked ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy && !cancelLocked ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy || cancelLocked" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelLocked ? detailCopy.cancelLocked : cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
     </view>
   </view>
 </template>
@@ -38,13 +38,14 @@ import { computed, ref } from "vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
+import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useT } from "@/i18n/use-t";
 import { formatTrialRemaining } from "@/i18n/trial-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { getProductMedia } from "@/lib/product-media";
 
-const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"; expanded?: boolean; showCancel?: boolean; cancelBusy?: boolean }>(), { variant: "earn", expanded: undefined });
+const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"; expanded?: boolean; showCancel?: boolean; cancelBusy?: boolean; cancelLocked?: boolean }>(), { variant: "earn", expanded: undefined, cancelLocked: false });
 const visibility = useDataVisibility();
 const hidePersonalData = computed(() => props.variant !== "inventory" && visibility.hidden);
 const emit = defineEmits<{ (event: "cancel"): void; (event: "toggle"): void }>();
@@ -54,6 +55,8 @@ const loops = useLoopsInView(".trial-device-row");
 const loopRef = loops.elRef;
 useAutoRecovery({ failed: () => remoteApiEnabled && props.variant === "inventory" && !useTrialClaimSheet().open && useFreeTrial().authorityStatus === "error", retry: () => presentation.refresh() });
 const copy = useTrialFleetCopy();
+// A payment for this trial is in progress: the cancel entry is replaced in place by a plain reverse-action line (04 §4.6 设备页试用行).
+const detailCopy = useTrialDetailCopy();
 const t = useT();
 const localExpanded = ref(false);
 // The warehouse card is always open; Earn keeps its disclosure.

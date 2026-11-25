@@ -23,7 +23,7 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { contentOptions, demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
-import { trialDemo } from './prototype-demo-trial.mjs';
+import { trialDemo, trialPurchaseOptionSku } from './prototype-demo-trial.mjs';
 import { demoBinaryLegMembers, demoH4Account, demoH4CheckInBonus, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers, wheelVoucherId } from './prototype-demo-events.mjs';
 import { demoCommissionGroups, demoStreakMilestones, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
@@ -112,6 +112,10 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
 export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+Object.assign(demoDefaults,{
+  trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
+  trialPurchaseReadState:'normal',trialPurchasePriceState:'normal',trialOriginalPurchaseState:'none',trialPurchaseWindow:'follow',
+});
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
@@ -125,9 +129,16 @@ export const demoOptions = {
   setupGateState:[['open','正常写入'],['setup-required','服务端拒绝：需完成初始设置（试用领取 / 首日浏览商店任务 / 课程开始）']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
+  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
   trialReadState:[['normal','正常读取'],['error','试用读取失败']],
+  trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share']],
+  trialPurchaseOptionTarget:[['rack-p1','UVELRack P1'],['trial-device','本人试用设备']],
+  trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架']],
+  trialPurchaseReadState:[['normal','正常读取'],['loading','清单慢速读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
+  trialPurchasePriceState:[['normal','正常价格'],['trial-up','试用设备商城价上涨'],['trial-down','试用设备商城价下调'],['extra-up','Rack P1 涨价']],
+  trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-expired','试用设备 · 过期仍确认中（先从页面发起外部付款再切）'],['external-unpaid-terminal','试用设备 · 未付款终结（先从页面发起外部付款再切）'],['external-late','试用设备 · 迟付允许重选（先从页面发起外部付款再切）'],['external-late-unmarked','试用设备 · 迟付仍进行中（先从页面发起外部付款再切）'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-ready','Rack P1 · 余额已受理可继续'],['balance-resumable','下一次余额提交不送达'],['balance-hold-next','下一次余额提交已受理 · 丢响应'],['balance-settled','原余额付款出结果'],['external-quote-conflict','下次试用外部报价遇到 Rack P1 原提交']],
+  trialPurchaseWindow:[['follow','按领取单时间'],['grace','可抵扣期']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（自动按原键核对）'],['timeout','确认超时（15 秒转待确认）']],
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读'],['transferred','已转接 · 只读旧会话待核对'],['transferred-restart','已转接 · 无当前会话 · 重新发起']],
@@ -215,17 +226,23 @@ function demoDailyUsdt(monthlyTarget, percent = 100) {
 }
 
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
+  const trialSku=state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku);
+  const optionTarget=trialPurchaseOptionSku(state);
   const inventory=(id,index,share)=>{
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
-    const outOfStock=state.outOfStockProductNo===id||(state.catalogState==='outofstock'&&id==='stellarbox-s1');
+    const outOfStock=(id===optionTarget&&state.trialPurchaseOptionState==='sold-out')||state.outOfStockProductNo===id||(state.catalogState==='outofstock'&&id==='stellarbox-s1');
     const stock=share?null:outOfStock?0:
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     return {stock,sold:42+index*13+bought,purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null};
   };
   const products=skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
-    const price=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
+    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
+    const priceChange=state.trialPurchasePriceState==='extra-up'&&id==='stellarrack-p1'?100:
+      id===trialSku?({ 'trial-up':100,'trial-down':-100 })[state.trialPurchasePriceState]??0:0;
+    const price=priceChange?Math.max(0.01,Number((basePrice+priceChange).toFixed(6))):basePrice;
+    const optionState=id===optionTarget?state.trialPurchaseOptionState:'normal';
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     const dailyEarn=demoDailyUsdt(monthlyEstimateUsdt),b=demoBandPct/100;
     // AppProductCatalogService projects release and stock gates independently.
@@ -235,9 +252,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',...inventory(id,index,share),
-      features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
-      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
-      purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
+      features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:optionState==='unlisted'?'legacy':'active',
+      available:!upcoming&&optionState!=='unlisted',
+      releaseState:upcoming?'E1_PHASE_NOT_REACHED':optionState==='unlisted'?'PRODUCT_NOT_RELEASED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
+      purchaseGate:optionState==='ineligible'||(state.catalogState==='restricted'&&id==='stellarbox-s1')?{mode:'all',enforce:true,rankMin:8}:null,
       // B75 USDT follows the backend's six-decimal HALF_UP projection. UVT remains simulated (B75-BE-02).
       dailyEstimateLowUsdt:demoDailyUsdt(monthlyEstimateUsdt,100-demoBandPct),dailyEstimateHighUsdt:demoDailyUsdt(monthlyEstimateUsdt,100+demoBandPct),
       dailyEstimateLowNex:Math.round(dailyEarnNEX*(100-demoBandPct)*10_000)/1e6,
@@ -286,8 +304,8 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available&&remaining>0};
 }
 
-function demoE1PurchaseRule(state,product,now,checkLiveQuota=true) {
-  const required=product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
+function demoE1PurchaseRule(state,product,now,checkLiveQuota=true,skipPurchaseGate=false) {
+  const required=!skipPurchaseGate&&product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
   const current=required?demoH4Account(state,now).rank:0;
   const gap=Math.max(0,required-current);
   const soldOut=checkLiveQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
@@ -298,8 +316,8 @@ function demoE1PurchaseRule(state,product,now,checkLiveQuota=true) {
   return {policy:'E1',eligible:decisionCode==='ELIGIBLE',decisionCode,mode:'ALL',conditions};
 }
 
-function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota=true) {
-  const e1=demoE1PurchaseRule(state,product,now,checkLiveQuota);
+function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota=true,skipPurchaseGate=false) {
+  const e1=demoE1PurchaseRule(state,product,now,checkLiveQuota,skipPurchaseGate);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
   if(checkLiveQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku(state)){
     const quota=demoHardwareQuota(product,state,points,now);
@@ -310,6 +328,10 @@ function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota
       {kind:'monthlyQuota',required:quota.monthlyStock,current:quota.usedThisMonth,gap:remaining,met:remaining>=quantity}];
     f4b.eligible=gap===0&&remaining>=quantity;
     f4b.decisionCode=remaining<quantity?'F4B_MONTHLY_QUOTA_EXHAUSTED':gap>0?'F4B_REQUIREMENTS_NOT_MET':'ELIGIBLE';
+  }
+  if(checkLiveQuota&&state.trialPurchaseOptionState==='quota-exhausted'&&product.id===trialPurchaseOptionSku(state)){
+    Object.assign(f4b,{eligible:false,decisionCode:'F4B_MONTHLY_QUOTA_EXHAUSTED',
+      conditions:[{kind:'monthlyQuota',required:1,current:1,gap:0,met:false}]});
   }
   const stocked=product.stock==null||product.stock>=quantity;
   return {eligible:e1.eligible&&f4b.eligible&&stocked,
@@ -392,7 +414,7 @@ export function validateDemoOrderItems(items, bundle = false) {
   return quantity;
 }
 
-export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null) {
+export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null,skipPurchaseGate=false) {
   const points=quotaHold ? 0 : demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
   const quantities=new Map();
   for(const item of items){
@@ -403,7 +425,7 @@ export function requireDemoPurchase(state,products,items,now,settlement=false,qu
   for(const [sku,quantity] of quantities){
     const product=products.find(item=>item.id===sku);
     if(!product||state.dataState==='empty')throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
-    const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity,!quotaHold);
+    const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity,!quotaHold,skipPurchaseGate);
     if(settlement&&policies[0].eligible)requireDemoMonthlyQuota(state,policies[1]);
     if(!eligible)refuse(decisionCode);
     if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
@@ -609,9 +631,12 @@ export function demoPurchasedOrderDevices(state, orders, products, template) {
     const inInventory = order.inventoryDeviceIds?.includes(id) ?? order.canonicalStatus === 'inventory';
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
-    const name=order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name;
+    const name=order.trialPurchasedDevice?.name??(order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name);
     devices.push({...template,id,instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
       activatedAt:inInventory ? null : (order.activatedAt ?? order.inventoryUsedAt),purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
+      ...(order.trialPurchasedDevice&&{imageUrl:order.trialPurchasedDevice.imageUrl,deviceType:product.productType,
+        gpuModel:product.gpu,vramTotalGb:Number.parseInt(product.vram,10)||0,basePowerW:Number.parseInt(product.power,10)||0,
+        location:product.datacenter||template.location,sourceOrderNo:order.orderNo}),
       ...(inInventory&&{status:'INACTIVE',runtimeStatus:'OFFLINE'}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
   }
   return devices;
@@ -811,7 +836,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
-      productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true,request.verifiedPayment?.quotaHold));
+      (productNo,isTrialProduct)=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true,request.verifiedPayment?.quotaHold,isTrialProduct));
   }
   const deactivation=pathname.match(/^\/api\/device\/(\d+)\/deactivate$/);
   if((deactivation||pathname==='/api/devices/activate')&&request.method()==='POST'){

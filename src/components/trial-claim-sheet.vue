@@ -59,7 +59,7 @@ import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
-import { useFreeTrial, type TrialStartFailure } from "@/store/free-trial";
+import { isTrialStartDenied, useFreeTrial, type TrialStartFailure } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -94,9 +94,11 @@ const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
 const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
   "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
+// The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
+const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
 const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.displayState?.canStart === true
-  : claimError.value && !claimOpensAnotherPage.value);
-const claimDisabled = computed(() => claiming.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
+  : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
+const claimDisabled = computed(() => claiming.value || claimDenied.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
   || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
@@ -117,22 +119,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
 const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
-  : claimErrorReason.value === 'capacity-full' ? copy.value.capacityFull
-  : claimErrorReason.value === "rejected" ? t.value.weeklyQuest.claimFailed
-  : reasonText(claimErrorReason.value));
-
-function reasonText(reason: TrialStartFailure | undefined): string {
-  const w = t.value.trial;
-  if (reason === 'capacity-full') return copy.value.capacityFull;
-  if (reason === "converted") return w.eligReasonConverted;
-  if (reason === "used") return w.eligReasonUsed;
-  if (reason === "in-progress") return w.eligReasonInProgress;
-  if (reason === "quota-exhausted") return w.eligReasonQuota;
-  if (reason === "risk") return w.eligReasonRisk;
-  if (reason === "product-unavailable") return t.value.store.trialProductUnavailable;
-  if (reason === "unknown") return w.eligReasonUnknown;
-  return w.eligReasonClosed;
-}
+  : sheet.failureText(claimErrorReason.value));
 
 function hide() {
   claimError.value = false;

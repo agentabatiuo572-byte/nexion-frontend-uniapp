@@ -68,7 +68,7 @@ export interface ApiRequest {
     code: number;
     message: string;
   }>;
-  parseResponseData?: (data: unknown, status: number) => unknown;
+  parseResponseData?: (data: unknown, status: number, envelope: { code: number; message: string }) => unknown;
   /** A rejected secret-bearing command must ask the user again after authentication. */
   retryAfterAuth?: boolean;
   beforeAuthRetry?: () => void;
@@ -279,7 +279,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       });
     }
     if (businessWrite(request)) { invalidatePassiveTabReads(); invalidateTabSnapshots(undefined, snapshotWrite); }
-    return (parseResponseData ? parseResponseData(envelope.data, response.status) : envelope.data) as T;
+    return (parseResponseData ? parseResponseData(envelope.data, response.status, envelope) : envelope.data) as T;
   }
 
   async function terminateSession(

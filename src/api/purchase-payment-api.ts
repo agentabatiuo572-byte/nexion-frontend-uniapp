@@ -1,8 +1,9 @@
-import type { ApiClient } from './api-client';
+import type { ApiClient, ApiRequest } from './api-client';
 import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
+import { parseTrialChangedQuote, parseTrialOriginalPurchase, TRIAL_DEVICE_RESELECTION_CODES, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
@@ -27,15 +28,44 @@ export type PurchaseQuote = {
 } & PurchaseFinancialSnapshot;
 export const purchasePaymentStatuses = ['CREATING', 'SUBMIT_UNKNOWN', 'AWAITING_PAYMENT', 'FUNDS_CONFIRMED', 'DELIVERED', 'MANUAL_REVIEW', 'EXPIRED'] as const;
 export type PurchasePaymentStatus = typeof purchasePaymentStatuses[number];
+export type TrialPurchaseOutcome = 'UNPAID_TERMINAL' | 'LATE_PAYMENT_REVIEW';
+const trialOriginalCodes = ['TRIAL_BALANCE_SUBMISSION_IN_PROGRESS', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'] as const;
+const trialRequoteCodes = ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_PRICING_CHANGED',
+  'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED', 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'] as const;
+const trialRefusalCodes = {
+  403: ['PURCHASE_PAYMENT_USER_UNAVAILABLE'],
+  404: ['PURCHASE_PAYMENT_QUOTE_NOT_FOUND'],
+  409: [...trialOriginalCodes, ...TRIAL_PRICE_CHANGES, ...trialRequoteCodes.filter(code => code !== 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'),
+    ...TRIAL_DEVICE_RESELECTION_CODES, 'ZERO_PAYMENT_REQUIRES_WALLET', 'TRIAL_NOT_CONVERTIBLE', 'ORDER_PAYMENT_EXPIRED',
+    'TRIAL_PRODUCT_NOT_AVAILABLE', 'TRIAL_KILL_SWITCH_DISABLED', 'TRIAL_EXTERNAL_PAYMENT_METHOD_UNSUPPORTED', 'TRIAL_AMOUNT_INVALID',
+    'PRODUCT_OUT_OF_STOCK', 'PRODUCT_INVENTORY_MODE_INVALID', 'PRODUCT_SPECS_UNAVAILABLE', 'TRIAL_DAILY_YIELD_INVALID',
+    'ORDER_MONTHLY_QUOTA_CONFLICT', 'ORDER_MONTHLY_QUOTA_EXHAUSTED', 'ORDER_MONTHLY_QUOTA_PAUSED', 'ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET',
+    'CREGIS_DIRECT_PAYMENT_PAUSED', 'CREGIS_DIRECT_ADDRESS_REQUIRES_REVIEW', 'CREGIS_DIRECT_ADDRESS_ALLOCATION_RETRY'],
+  422: ['B1_COVERAGE_REDLINE_BLOCKED', 'PURCHASE_PAYMENT_KIND_INVALID', 'EXTERNAL_PAYMENT_CREDENTIAL_FORBIDDEN',
+    'PURCHASE_PAYMENT_METHOD_INVALID', 'TRIAL_PRODUCT_REQUIRED', 'IDEMPOTENCY_KEY_REQUIRED'],
+  503: ['ORDER_MONTHLY_QUOTA_UNAVAILABLE', 'TEST_CLOUD_RESOURCE_CAPACITY_UNAVAILABLE', 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED',
+    'HDPAY_CONFIGURATION_INCOMPLETE', 'CREGIS_DIRECT_PAYMENT_UNAVAILABLE', 'CREGIS_DIRECT_PAYMENT_ASSET_UNAVAILABLE', 'FX_QUOTE_UNAVAILABLE',
+    'CREGIS_DIRECT_ADDRESS_POOL_UNAVAILABLE', 'CREGIS_DIRECT_ALLOCATION_ANCHOR_INVALID'],
+};
+export function trialExternalRequote(message: string): boolean {
+  return trialRequoteCodes.some(code => code === message);
+}
+export type TrialExternalRefusal =
+  | { status: 'refused'; action: 'original'; originalPurchase: TrialOriginalPurchase }
+  | { status: 'refused'; action: 'review'; reasonCode: string; quote?: TrialConversionQuote; claimNo?: string; productNo?: string }
+  | { status: 'refused'; action: 'wallet' }
+  | { status: 'refused'; action: 'unavailable'; reasonCode: string };
 export type PurchasePaymentIntent = {
   intentNo: string; commandKey: string; paymentQuoteId: string; kind: PurchaseKind; paymentMethod: ExternalPaymentMethod;
   network: string | null; status: PurchasePaymentStatus; subtotalUsdt: string; channelFeeUsdt: string;
   networkConfirmFeeUsdt: string; totalUsdt: string; amountVnd: string | null; paymentUrl: string | null;
   address: string | null; expiresAt: string; reason: string | null; receipt: unknown;
-  fulfilmentStatus?: 'DELIVERED';
+  fulfilmentStatus?: 'DELIVERED' | 'NOT_DELIVERED';
   paymentAllowed?: boolean; expirationTime?: string; createdAt?: string;
   /** A refunded payment still reports MANUAL_REVIEW to user clients; refundStatus says it has ended. */
   refundStatus?: 'REFUNDED';
+  trialPurchaseOutcome?: TrialPurchaseOutcome;
+  claimNo?: string | null;
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
 const object = (raw: unknown): Record<string, unknown> => {
@@ -112,10 +142,14 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
   if (expirationTime && fields.paymentMethod !== 'HDPAY_BANK') throw invalid();
   return { ...fields, intentNo: text(raw.intentNo), commandKey: text(raw.commandKey), status: raw.status as PurchasePaymentStatus,
     paymentUrl, address, reason: raw.reason == null || typeof raw.reason === 'string' && !raw.reason.trim() ? null : text(raw.reason), receipt: raw.receipt ?? null,
-    ...(raw.fulfilmentStatus === 'DELIVERED' ? { fulfilmentStatus: 'DELIVERED' as const } : {}),
+    ...(raw.fulfilmentStatus === 'DELIVERED' || raw.fulfilmentStatus === 'NOT_DELIVERED' ? { fulfilmentStatus: raw.fulfilmentStatus } : {}),
     ...(raw.paymentAllowed !== undefined ? { paymentAllowed: raw.paymentAllowed as boolean } : {}),
     ...(createdAt ? { createdAt } : {}),
     ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT' && (raw.claimNo === null || typeof raw.claimNo === 'string') ? { claimNo: raw.claimNo } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT'
+      && (raw.status === 'MANUAL_REVIEW' && raw.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW'
+        || raw.status === 'EXPIRED' && raw.trialPurchaseOutcome === 'UNPAID_TERMINAL') ? { trialPurchaseOutcome: raw.trialPurchaseOutcome } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
 }
 function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNetwork): OrderUsdtTopupRead {
@@ -146,6 +180,22 @@ function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNet
 }
 export function createPurchasePaymentApi(client: ApiClient) {
   const base = '/api/app/purchase-payment';
+  function trialRequest<T>(request: ApiRequest, parse: (data: unknown) => T) {
+    return client.request<T | TrialExternalRefusal>({
+      ...request,
+      acceptedResponses: Object.entries(trialRefusalCodes).flatMap(([code, messages]) =>
+        messages.map(message => ({ status: Number(code), code: Number(code), message }))),
+      parseResponseData(data, _, { code, message }): T | TrialExternalRefusal {
+        if (code === 0) return parse(data);
+        if (trialOriginalCodes.some(value => value === message))
+          return { status: 'refused', action: 'original', originalPurchase: parseTrialOriginalPurchase(data) };
+        if (trialPriceChanged(message)) return { status: 'refused', action: 'review', reasonCode: message, ...parseTrialChangedQuote(data) };
+        if (trialExternalRequote(message)) return { status: 'refused', action: 'review', reasonCode: message };
+        if (message === 'ZERO_PAYMENT_REQUIRES_WALLET') return { status: 'refused', action: 'wallet' };
+        return { status: 'refused', action: 'unavailable', reasonCode: message };
+      },
+    });
+  }
   return {
     /** Which external channels operations have configured; unlisted channels count as unavailable. */
     async policy() {
@@ -164,8 +214,16 @@ export function createPurchasePaymentApi(client: ApiClient) {
     async quote(kind: PurchaseKind, paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
       return parsePurchaseQuote(await client.request({ method: 'POST', path: `${base}-quotes`, body: { kind, paymentMethod, payload } }));
     },
+    trialQuote(paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
+      if (typeof payload.quoteVersion !== 'string' || !payload.quoteVersion.trim())
+        return Promise.reject(new ApiError({ kind: 'protocol', message: 'TRIAL_QUOTE_VERSION_REQUIRED' }));
+      return trialRequest({ method: 'POST', path: `${base}-quotes`, body: { kind: 'TRIAL_CONVERT', paymentMethod, payload } }, parsePurchaseQuote);
+    },
     async create(paymentQuoteId: string, commandKey: string) {
       return parsePurchaseIntent(await client.request({ method: 'POST', path: `${base}-intents`, body: { paymentQuoteId }, idempotencyKey: commandKey, retryAfterAuth: false }));
+    },
+    trialCreate(paymentQuoteId: string, commandKey: string) {
+      return trialRequest({ method: 'POST', path: `${base}-intents`, body: { paymentQuoteId }, idempotencyKey: commandKey, retryAfterAuth: false }, parsePurchaseIntent);
     },
     async get(intentNo: string) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents/${encodeURIComponent(intentNo)}` })); }
@@ -186,6 +244,14 @@ export function createPurchasePaymentApi(client: ApiClient) {
       try { return parsePurchaseIntent(await client.request({ path: `${base}-intents?kind=${encodeURIComponent(kind)}&commandKey=${encodeURIComponent(commandKey)}` })); }
       // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.
       catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
+    },
+    async findTrial(commandKey: string) {
+      try {
+        return await trialRequest({ path: `${base}-intents?kind=TRIAL_CONVERT&commandKey=${encodeURIComponent(commandKey)}` }, parsePurchaseIntent);
+      } catch (error) {
+        if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null;
+        throw error;
+      }
     },
   };
 }
