@@ -37,7 +37,7 @@
       <view v-else-if="resultOrder && resultShown" class="order-payment-result" data-testid="trial-purchase-result">
         <!-- The trial purchase's 「… 已在 … 开始运行」 takes the product line's place once the head reaches 设备已激活, and 共节省
              sits beside the paid amount (board A). Its exits are in the bottom bar below (#pageFixed). -->
-        <CheckoutResult ref="paymentResult" :order-no="resultOrder.id" :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :inventory-fallback-device-id="resultOrder.status === 'inventory' ? resultOrder.deviceId : undefined" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="resultExactAmount ?? paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :amount-precision="resultExactAmount ? 'full' : undefined" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" :complete-line="showTrialResult && paymentResultState === 'activated' ? resultRunningText : undefined" :saved="showTrialResult && orderSaved > 0 ? orderSaved : undefined" @devices="goDevices" @support="contactOrderSupport" @order="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false">
+        <CheckoutResult ref="paymentResult" :order-no="resultOrder.id" :state="paymentResultState" :delivery="resultOrder.deviceDelivery ?? paymentResultReceipt?.deviceDelivery" :inventory-fallback-device-id="resultOrder.status === 'inventory' ? resultOrder.deviceId : undefined" :payment-confirmed="!!paymentResultAmount" :product-name="commerceOrderTitle(resultOrder,locale.code)" :product-image="resultOrder.imageUrl" :amount="resultExactAmount ?? paymentResultAmount?.value" :currency="paymentResultAmount?.currency" :amount-precision="resultExactAmount ? 'full' : undefined" :amount-below-cent="!resultExactAmount && subCentTrialWalletPaid !== undefined" :error="paymentResultState === 'error' ? t.orders.walletPaymentConfirmedRefreshPending : ''" :complete-line="showTrialResult && paymentResultState === 'activated' ? resultRunningText : undefined" :saved="showTrialResult && orderSaved > 0 ? orderSaved : undefined" @devices="goDevices" @support="contactOrderSupport" @order="showTrialResult = false; showInventoryResult = false; paymentResultVisible = false">
         <!-- Credited trial rewards: the one tinted card of the screen, amber for rewards (01 §1.1.2). -->
         <view v-if="showTrialResult && resultOrder.trialReward && (resultOrder.trialReward.usdt > 0 || resultOrder.trialReward.nex > 0)" class="trial-result-credit nx-tint" role="group" :aria-label="purchaseCopy.resultCredited">
           <text class="trial-result-credit-label">{{ purchaseCopy.resultCredited }}</text>
@@ -101,7 +101,7 @@
           <text class="order-summary__title">{{ t.orders.orderSummary }}</text>
           <view class="order-summary__total">
             <text class="order-summary__total-label">{{ summaryPaid ? purchaseCopy.orderPaid : paymentCopy.payable }}</text>
-            <CheckoutAmount class="order-summary__amount" v-bind="commerceOrderAmount(order)" />
+            <CheckoutAmount class="order-summary__amount" :value="orderSummaryAmount?.value" :currency="orderSummaryAmount?.currency" :below-cent="subCentTrialWalletPaid !== undefined" />
           </view>
           <DetailRow :label="t.orders.quantity" :value="`${orderQuantity}`" />
           <view v-if="order.lineItems?.length" class="order-summary__lines">
@@ -448,6 +448,18 @@ watch(liveOrder, value => {
 // Runtime invalidation still clears the shared store and every command uses liveOrder.
 const order = computed(() => orderEnvironmentInvalidated.value ? undefined : liveOrder.value ?? orderPresentation.value ?? undefined);
 const summaryPaid = computed(() => !!order.value && commerceOrderHasPayment(order.value));
+const subCentTrialWalletPaid = computed(() => {
+  const current = order.value;
+  if (!current?.trialReward || !summaryPaid.value) return;
+  // Paid trial wallet orders without a payment record are projected as PENDING.
+  if (!['PENDING', 'WALLET', 'UVEL_WALLET', 'USDT_WALLET', 'UVEL_USDT_WALLET'].includes(current.paymentMethod.toUpperCase())) return;
+  const amount = Number(current.total);
+  if (amount > 0 && amount < 0.01) return { value: amount, currency: 'USDT' as const };
+});
+const orderSummaryAmount = computed(() => {
+  const current = order.value;
+  return current ? subCentTrialWalletPaid.value ?? commerceOrderAmount(current) : undefined;
+});
 const paymentCopy = computed(() => purchasePaymentCopy(locale.code));
 const orderQuantity = computed(() => order.value?.lineItems?.reduce((total, item) => total + item.quantity, 0) ?? order.value?.quantity ?? 0);
 const refundChannelLabel = computed(() => order.value?.refundChannel === "WALLET"
@@ -542,7 +554,7 @@ const showTrialResult = computed({
 });
 const paymentResultAmount = computed<{ value: Order['total']; currency: 'USD' | 'USDT' } | undefined>(() => {
   const current = order.value;
-  if (current && commerceOrderIsPaid(current)) return commercePaidOrderAmount(current);
+  if (current && commerceOrderIsPaid(current)) return subCentTrialWalletPaid.value ?? commercePaidOrderAmount(current);
   const receipt = paymentResultReceipt.value;
   if (receipt) return {
     value: receipt.paidTotalUsdt ?? receipt.amountUsdt,
