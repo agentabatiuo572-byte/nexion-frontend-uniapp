@@ -4914,7 +4914,7 @@ export const kk: Messages = {
     formula: "Тапсырыс көлемі аз топтан {rate}%, {freq} төленеді",
     blocked: "Сыйақы тоқтатылды",
     settlementPending: "Шарт орындалды, төлем күні күтілуде",
-    settlesOnPayoutDay: "Төлем күні есептеледі",
+    settlesOnPayoutDay: "Төлем күні",
     settlementUnavailable: "Төлем қолжетімсіз",
     blockedDetail: "{side} тобы әлі қажетті көлемге жеткен жоқ.",
     blockReasons: {

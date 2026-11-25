@@ -4914,7 +4914,7 @@ export const ms: Messages = {
     formula: "{rate}% nilai pesanan terendah antara dua kumpulan, dibayar {freq}",
     blocked: "Ganjaran dijeda",
     settlementPending: "Sudah layak, menunggu hari bayaran",
-    settlesOnPayoutDay: "Dikira pada hari bayaran",
+    settlesOnPayoutDay: "Pada hari bayaran",
     settlementUnavailable: "Bayaran tidak tersedia",
     blockedDetail: "Nilai pesanan Kumpulan {side} belum mencapai syarat minimum.",
     blockReasons: {

@@ -4914,7 +4914,7 @@ export const ru: Messages = {
     formula: "{rate}% от меньшего объёма заказов двух групп, выплата {freq}",
     blocked: "Награды приостановлены",
     settlementPending: "Условия выполнены, ждём дня выплаты",
-    settlesOnPayoutDay: "Расчёт в день выплаты",
+    settlesOnPayoutDay: "В день выплаты",
     settlementUnavailable: "Выплата недоступна",
     blockedDetail: "Группа {side} пока не набрала нужный объём заказов.",
     blockReasons: {

@@ -4494,7 +4494,7 @@ timeHoursAgo: "{n} giờ",
     formula: "Tính {rate}% doanh số của nhóm nhỏ hơn, chi trả {freq}",
     blocked: "Tạm dừng chi trả thưởng",
     settlementPending: "Đã đạt mức, chờ đến ngày chi trả",
-    settlesOnPayoutDay: "Quyết toán vào ngày chi trả",
+    settlesOnPayoutDay: "Vào ngày chi trả",
     settlementUnavailable: "Tạm thời chưa thể chi trả",
     blockedDetail:
       "Doanh số nhóm {side} chưa đạt mức yêu cầu.",

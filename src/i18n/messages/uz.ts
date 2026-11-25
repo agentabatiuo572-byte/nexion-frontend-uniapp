@@ -4914,7 +4914,7 @@ export const uz: Messages = {
     formula: "Buyurtmalar hajmi kamroq guruh summasidan {rate}% · {freq} toʻlanadi",
     blocked: "Mukofotlar toʻxtatilgan",
     settlementPending: "Shart bajarildi, toʻlov kuni kutilmoqda",
-    settlesOnPayoutDay: "Toʻlov kunida hisoblanadi",
+    settlesOnPayoutDay: "Toʻlov kunida",
     settlementUnavailable: "Hozircha toʻlab boʻlmaydi",
     blockedDetail: "{side} guruhining buyurtmalar hajmi hali yetarli emas.",
     blockReasons: {
