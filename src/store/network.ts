@@ -258,6 +258,9 @@ export const useNetwork = defineStore("network", () => {
     environmentInvalidated = true; accountEpoch += 1; inFlight = null; clearRemoteNetwork();
   }, { flush: "sync" });
 
+  // A rate-limited read holds the next one back; page recovery waits for it instead of spending retries (03 §3.5.2).
+  const retryNotBefore = () => retryAt;
+
   function invalidateReadOwner(): void {
     invalidatePassiveTabRead("network");
 
@@ -348,6 +351,6 @@ export const useNetwork = defineStore("network", () => {
   return {
     members, totalMembers, totalMonthVolumeUSD, totalAllTimeVolumeUSD, totalMonthComputePoints, totalLifetimeComputePoints,
     byLayer, byBinary, leftVolumeMonth, rightVolumeMonth,
-    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, remoteRateLimited, remoteTransientFailure, hasRemoteSnapshot, refreshCanonicalNetwork, ensureCanonicalNetwork, invalidateReadOwner, bindAccount,
+    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, remoteRateLimited, remoteTransientFailure, hasRemoteSnapshot, retryNotBefore, refreshCanonicalNetwork, ensureCanonicalNetwork, invalidateReadOwner, bindAccount,
   };
 });

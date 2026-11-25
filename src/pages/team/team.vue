@@ -628,7 +628,7 @@ watch([pendingShareIntent, invitePageVisible, inviteCard, () => referralRewards.
 const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus : "ready");
 // Shared card and sheet readers recover once per source on the Team page.
 const recoveryConfig = useConfig();
-useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
+useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork(), retryNotBefore: network.retryNotBefore });
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.binaryStatus === "error", retry: () => commission.refreshCanonicalBinary() });
 // Every card here waits for a current catalogue proof; a cold failure must recover it, or recovered reads never show.
