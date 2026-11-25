@@ -58,6 +58,11 @@
       </view>
     </view>
   </view>
+  <!-- #ifdef APP-PLUS -->
+  <!-- uni injects the renderjs module into template scope. -->
+  <!-- @vue-ignore -->
+  <view style="display: none" aria-hidden="true" :pin-open="open" :change:pin-open="pinViewportView.track" />
+  <!-- #endif -->
 </template>
 <script setup lang="ts">
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
@@ -84,7 +89,15 @@ useAutoRecovery({
   failed: () => open.value && ui.stage === "pending" && !!ui.pendingOperation && !ui.busy && !ui.reading,
   retry: () => pin.query(() => active.value), repeatMs: 15_000,
 });
-const viewportStyle = usePaymentPinViewport(open);
+// App: the renderjs below reports the WebView's visual viewport while the layer is open (the logic layer has no window).
+const appViewport = ref<{ height: number; offsetTop: number }>();
+watch(open, visible => { if (!visible) appViewport.value = undefined; }, { flush: "sync" });
+defineOptions({ methods: {
+  // App-Plus callMethod resolves vm.proxy, which does not expose script-setup bindings.
+  onPinViewport(this: { $: { exposed: { receivePinViewport(value: { height: number; offsetTop: number }): void } | null } }, value: { height: number; offsetTop: number }) { this.$.exposed?.receivePinViewport(value); },
+} });
+defineExpose({ receivePinViewport(value: { height: number; offsetTop: number }) { if (open.value) appViewport.value = value; } });
+const viewportStyle = usePaymentPinViewport(open, appViewport);
 const confirming = computed(() => ui.stage === "confirm" || ui.stage === "reset-confirm");
 const completePin = computed(() => validPaymentPassword(password.value));
 const canContinue = computed(() => !ui.busy && completePin.value && (confirming.value || !simplePaymentPassword(password.value)));
@@ -122,13 +135,19 @@ onMounted(() => { if (typeof document !== "undefined") document.addEventListener
 onUnmounted(() => { if (typeof document !== "undefined") document.removeEventListener("visibilitychange", visibility); });
 useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 </script>
+<script module="pinViewportView" lang="renderjs">
+import { paymentPinViewportView } from "@/lib/payment-pin-viewport-view";
+// @ts-expect-error vue-tsc treats uni's renderjs custom block as a second normal script.
+export default paymentPinViewportView;
+</script>
 <style scoped>
 /* A phone-width sheet sits flush on the screen bottom on the shared floating material. The bottom inset lives inside the scrolling body,
    so content scrolls to the screen edge and the last action rests above the Home Indicator. */
 .payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) 0 0; background: var(--v5-bg-color-mask); }
 .payment-pin-sheet { display: flex; flex-direction: column; width: 100%; max-width: 440px; max-height: 100%; min-height: 0; overflow: hidden; padding: var(--v5-space-5) var(--v5-space-5) 0; background: var(--nx-glass-fill); color: var(--v5-ink); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); }
 .payment-pin-header { flex: none; display: flex; align-items: flex-start; gap: var(--v5-space-3); margin-bottom: var(--v5-space-4); }
-.payment-pin-title { flex: 1; min-width: 0; font-size: var(--ui-type-section); font-weight: var(--ui-type-section-weight); line-height: var(--ui-type-section-lh); overflow-wrap: break-word; }
+/* Sheet title: overview title role (03 §3.9). */
+.payment-pin-title { flex: 1; min-width: 0; font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); line-height: var(--ui-type-hero-title-lh); overflow-wrap: break-word; }
 .payment-pin-close { width: 44px; min-height: 44px; flex: 0 0 44px; margin-top: -10px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); }
 .payment-pin-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--v5-space-2)); padding-inline: var(--v5-space-2); padding-bottom: var(--nx-overlay-bottom); display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .payment-pin-body > * { flex-shrink: 0; }
@@ -136,7 +155,8 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-note--important { color: var(--v5-ink); }
 .payment-pin-step { color: var(--v5-ink-3); font-size: var(--ui-type-meta); margin-top: var(--v5-space-2); }
 .payment-pin-summary { padding: var(--v5-space-3) 0; margin-bottom: var(--v5-space-1); border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
-.payment-pin-summary__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-type-list-subtitle); }
+/* The name cannot be opened from here, so it wraps in full (03 §3.6.1). */
+.payment-pin-summary__name { display: block; overflow-wrap: break-word; font-size: var(--ui-type-list-subtitle); }
 .payment-pin-summary__amount { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-2); margin-top:var(--v5-space-2); font-weight:500; font-size:var(--ui-type-card-title); }
 /* Field name and value (01 §1.1.1): the label is secondary ink at regular weight, the amount stays main ink. */
 .payment-pin-summary__label { color:var(--v5-ink-3); font-weight:400; }
@@ -144,8 +164,9 @@ useDialogA11y(open, ".payment-pin-mask", requestClose, true, 5);
 .payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); }
 .payment-pin-primary.nx-button { padding:0; background:none; }
 .payment-pin-primary:not(.nx-button)[aria-disabled="true"] { opacity: .45; }
-.payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
-.payment-pin-link--muted { color: var(--v5-ink-2); }
+/* Text buttons: 500 (01 §1.2); the quiet exit uses secondary ink, since body ink is for paragraphs only (01 §1.1.1). */
+.payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); font-weight: var(--ui-type-text-link-weight); text-align: center; }
+.payment-pin-link--muted { color: var(--v5-ink-3); }
 .payment-pin-link[aria-disabled="true"] { opacity: .5; }
 /* While the PIN is submitting the exits are held: say so to assistive tech and show it (03 §3.1 disabled 50%). */
 .payment-pin-close[aria-disabled="true"] { opacity: .5; }
