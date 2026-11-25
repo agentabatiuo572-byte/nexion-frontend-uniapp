@@ -2,13 +2,15 @@ import { computed, onScopeDispose, ref, watch, type CSSProperties, type Ref } fr
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 
 /** Own the PIN viewport so Android's input auto-pan cannot move its heading under the status bar. */
-export function usePaymentPinViewport(open: Ref<boolean>) {
+export function usePaymentPinViewport(open: Ref<boolean>, appViewport?: Ref<{ height: number; offsetTop: number } | undefined>) {
   const height = ref<number>(), top = ref(0), statusBar = ref(0);
   let fullHeight = 0, width = 0, keyboard = 0, resizedForKeyboard = false, restoring = false, lastHeight = 0;
   let detach = () => {};
   function measure() {
     const info = uni.getSystemInfoSync();
-    const viewport = typeof window === 'undefined' ? undefined : window.visualViewport;
+    // App: the logic layer has no window, so the dialog's view layer reports the WebView's visual viewport. The WebView
+    // shrinks it above the keyboard and pans it to the focused PIN input while the fixed mask stays on the layout viewport.
+    const viewport = appViewport?.value ?? (typeof window === 'undefined' ? undefined : window.visualViewport);
     if (width !== info.windowWidth) {
       fullHeight = info.windowHeight + (keyboard > 0 && resizedForKeyboard ? keyboard : 0); restoring = false;
     } else if (restoring && info.windowHeight > lastHeight) {
@@ -57,6 +59,7 @@ export function usePaymentPinViewport(open: Ref<boolean>) {
       if (typeof window !== 'undefined') window.removeEventListener('resize', measure);
     };
   }, { immediate: true, flush: 'sync' });
+  if (appViewport) watch(appViewport, measure);
   onScopeDispose(() => {
     stop();
     // #ifdef APP-PLUS

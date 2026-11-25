@@ -48,6 +48,7 @@ export const ms: Messages = {
     autoConfirm: "Melengkapkan PIN akan mengesahkan pembelian atau tukar beli ini.",
     details: "Tunjuk butiran",
     hideDetails: "Sembunyi butiran",
+    detailsAmount: "Jumlah ({unit})",
     readFailed: "Status PIN pembayaran tidak dapat dibaca. Sila cuba lagi.",
     failed: "Tindakan ini tidak dapat diselesaikan. Sila cuba lagi.",
     mismatch: "Kedua-dua PIN baharu tidak sepadan. Sila masukkan semula.",

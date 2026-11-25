@@ -48,6 +48,7 @@ export const uz: Messages = {
     autoConfirm: "PIN-kod kiritilishi bilan xarid yoki almashtirish tasdiqlanadi.",
     details: "Tafsilotlar",
     hideDetails: "Yashirish",
+    detailsAmount: "Summa ({unit})",
     readFailed: "Toʻlov PIN-kodi holatini yuklab boʻlmadi. Qayta urining.",
     failed: "Amalni bajarib boʻlmadi. Qayta urining.",
     mismatch: "Ikki yangi PIN-kod mos emas. Qayta kiriting.",
