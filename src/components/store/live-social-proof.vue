@@ -250,14 +250,15 @@ function dotStyle(color: string): CSSProperties {
 function numStyle(color: string): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontWeight: 600,
+    fontWeight: 500, // 14px and smaller stop at 500 (01 §1.2)
     fontSize: "13px",
     color,
     letterSpacing: "-0.005em",
   };
 }
+// Interface font: no monospace on marketing labels (06 §6.3).
 const labelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
