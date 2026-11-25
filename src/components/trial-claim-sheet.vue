@@ -106,8 +106,8 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
 const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
 const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
   : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
-const claimDisabled = computed(() => claiming.value || claimDenied.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
-  || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
+const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
+  ? !freeTrial.canStart() : !claimOpensAnotherPage.value && !trialView.actionsReady.value));
 // View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
 // so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
 const claimFromRetry = ref(false);
@@ -130,8 +130,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
-const claimErrorText = computed(() => freeTrial.pendingStart
-  ? freeTrial.startRetryable ? copy.value.claimRejected : t.value.trial.claimUnknownInline
+const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : sheet.failureText(claimErrorReason.value));

@@ -268,6 +268,7 @@ const server=http.createServer(async(req,res)=>{
         const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||state.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
         if(scenarioChange){
+          delete state.trialLifecycleAdvanceDays;
           delete state.trialBalancePurchase;
           delete state.trialBalanceCanResume;
           delete state.trialAccrualReductionUsdt;
@@ -275,6 +276,8 @@ const server=http.createServer(async(req,res)=>{
           delete state.trialDropNextExternalRefusal;
           state.trialOriginalPurchaseState='none';
         }
+        if(Number.isInteger(update.trialLifecycleAdvanceDays)&&update.trialLifecycleAdvanceDays>=0&&update.trialLifecycleAdvanceDays<=90)
+          state.trialLifecycleAdvanceDays=update.trialLifecycleAdvanceDays;
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;

@@ -5,6 +5,7 @@ import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef } from "vue";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName } from "./trial-config";
+import { useTrialPurchaseResult } from "./trial-purchase-result";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { acquireAccountCommandKey, readAccountRow, releaseAccountCommandKey, writeAccountRow } from "./account-scoped-storage";
@@ -65,7 +66,8 @@ export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | 
 export function isTrialStartDenied(reason: TrialStartFailure | undefined): boolean {
   return reason === "quota-exhausted" || reason === "phase-closed" || reason === "risk" || reason === "product-unavailable";
 }
-type TrialConversionFailure = TrialIneligibleReason | "insufficient-funds" | "quote-changed" | "rejected" | "storage-unavailable" | "payment-required";
+type TrialConversionFailure = TrialIneligibleReason | "insufficient-funds" | "quote-changed" | "rejected"
+  | "refusal-readback" | "storage-unavailable" | "payment-required";
 const CONVERT_COMMANDS_KEY = TRIAL_CONVERT_COMMANDS_TABLE;
 type ConversionCommands = { commands: Record<string, string> };
 type LegacyConversion = {
@@ -213,23 +215,31 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     previousClaimNo: string | null;
     claimNo: string | null;
     readAfter: number;
+    consecutiveIneligible: number;
     refusal?: TrialIneligibleReason;
   } | null>(null);
   const startRetryable = ref(false);
   const confirmedStartDenial = ref<TrialIneligibleReason | "rejected">();
   const confirmedStartClaimNo = ref<string | null>(null);
-  const pendingCancel = shallowRef<{ claimNo: string; key: string; readAfter: number; acknowledged: boolean } | null>(null);
+  const pendingCancel = shallowRef<{
+    claimNo: string; key: string; readAfter: number; acknowledged: boolean; authenticationRejected: boolean; consecutiveActive: number;
+  } | null>(null);
   const confirmedCancelClaimNo = ref<string | null>(null);
-  const legacyConversion = shallowRef<LegacyConversion | null>(null);
-  const legacyConversionResumable = ref(false);
+  const legacyConversions = shallowRef<LegacyConversion[]>([]);
+  const legacyClaimNo = ref<string | null>(null);
+  const legacyResumableKey = ref<string | null>(null);
+  const legacyConversion = computed(() => legacyConversions.value.find(command => command.claimNo === legacyClaimNo.value) ?? null);
+  const legacyConversionResumable = computed(() => !!legacyConversion.value && legacyConversion.value.key === legacyResumableKey.value);
   const legacyConversionPending = computed(() => !!legacyConversion.value && !legacyConversionResumable.value);
-  const confirmedLegacyConversion = shallowRef<{ claimNo: string; orderNo: string } | null>(null);
-  const deniedLegacyConversion = shallowRef<{ reason: string } | null>(null);
+  const legacyReadbackPending = computed(() => legacyConversions.value.some(command => command.key !== legacyResumableKey.value));
+  const confirmedLegacyConversion = shallowRef<{ claimNo: string; orderNo: string; productNo: string } | null>(null);
+  const deniedLegacyConversion = shallowRef<{ claimNo: string; key: string; reason: string } | null>(null);
   let legacyConversionRead: Promise<void> | null = null;
-  let legacyConversionWriting = false;
-  const authorityResultUnknown = computed(() => (!!pendingStart.value && !startRetryable.value) || !!pendingCancel.value);
+  let legacyConversionWriting: string | null = null;
+  let legacyStorageRead = false;
+  const authorityResultUnknown = computed(() => !!pendingStart.value || !!pendingCancel.value);
   const lifecycleReadbackPending = computed(() =>
-    (pendingStart.value !== null && !startRetryable.value && pendingStart.value.readAfter !== Infinity)
+    (pendingStart.value !== null && pendingStart.value.readAfter !== Infinity)
     || (pendingCancel.value !== null && pendingCancel.value.readAfter !== Infinity));
   const lastReadFailed = ref(false);
   const transientReadFailure = ref(false);
@@ -453,9 +463,14 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     if (stateRead) {
       settleStartRead(next, sequence);
       settleCancelRead(next, sequence);
-      if (!legacyConversion.value && next.claimNo && authoritativeProductIdentity.value) {
+      if (legacyClaimNo.value !== next.claimNo) {
+        legacyClaimNo.value = next.claimNo;
+        legacyResumableKey.value = null;
+      }
+      if (!legacyStorageRead) {
+        legacyStorageRead = true;
         try {
-          legacyConversion.value = readLegacyConversion(next.claimNo, authoritativeProductIdentity.value.productNo);
+          legacyConversions.value = readLegacyConversions();
         } catch { /* The payment entry point reports unreadable command storage. */ }
       }
     }
@@ -481,6 +496,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       .catch((error: unknown) => {
         if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
+          const start = pendingStart.value, cancel = pendingCancel.value;
+          if (start && sequence >= start.readAfter) start.consecutiveIneligible = 0;
+          if (cancel && sequence >= cancel.readAfter) cancel.consecutiveActive = 0;
           markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
         }
         return false;
@@ -561,12 +579,14 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       confirmedStartClaimNo.value = null;
       pendingCancel.value = null;
       confirmedCancelClaimNo.value = null;
-      legacyConversion.value = null;
-      legacyConversionResumable.value = false;
+      legacyConversions.value = [];
+      legacyClaimNo.value = null;
+      legacyResumableKey.value = null;
+      legacyStorageRead = false;
       confirmedLegacyConversion.value = null;
       deniedLegacyConversion.value = null;
       legacyConversionRead = null;
-      legacyConversionWriting = false;
+      legacyConversionWriting = null;
       confirmedLifecycle = null;
       pendingExpiryClaim = null;
       announcedExpiryClaims.clear();
@@ -585,7 +605,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // 内存状态推进前就按真实时点判 —— 真 ended 的行拿 "used" 而不是 "in-progress"。
   function eligibility(): { ok: boolean; reason?: TrialIneligibleReason } {
     if (remoteApiEnabled) {
-      if (authorityStatus.value !== "ready" || authorityResultUnknown.value) return { ok: false, reason: "unknown" };
+      if (authorityStatus.value !== "ready" || pendingCancel.value || (pendingStart.value && !startRetryable.value))
+        return { ok: false, reason: "unknown" };
       return remoteCanStart.value
         ? { ok: true }
         : { ok: false, reason: remoteEligibilityReason.value };
@@ -652,15 +673,21 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const pending = pendingStart.value;
     if (!pending || sequence < pending.readAfter || (pending.claimNo && pending.claimNo !== next.claimNo)) return;
     if ((next.status === "active" || next.status === "grace") && next.claimNo) {
-      confirmedStartClaimNo.value = next.claimNo;
-    } else {
-      if (pending.claimNo || pending.previousClaimNo !== next.claimNo) return;
-      if (!pending.refusal && next.canStart) {
-        startRetryable.value = true;
+      if (!pending.claimNo && next.claimNo === pending.previousClaimNo) {
+        pending.consecutiveIneligible = 0;
+        startRetryable.value = false;
         return;
       }
+      confirmedStartClaimNo.value = next.claimNo;
+    } else {
+      const sameClaim = !pending.claimNo && pending.previousClaimNo === next.claimNo;
+      startRetryable.value = sameClaim && !pending.refusal && next.canStart;
       const reason = pending.refusal ?? next.eligibilityReason;
-      if (!reason || reason === "unknown") return;
+      if (!sameClaim || !reason || reason === "unknown" || startRetryable.value) {
+        pending.consecutiveIneligible = 0;
+        return;
+      }
+      if (!pending.refusal && ++pending.consecutiveIneligible < 3) return;
       confirmedStartDenial.value = reason;
     }
     startIntent = null;
@@ -673,7 +700,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // trial per account, concurrent taps produce exactly one).
   async function start(): Promise<{ ok: boolean; reason?: TrialStartFailure }> {
     if (remoteApiEnabled) {
-      if (authorityResultUnknown.value) return { ok: false, reason: "confirming" };
+      if (pendingCancel.value || (pendingStart.value && !startRetryable.value)) return { ok: false, reason: "confirming" };
+      const retry = pendingStart.value;
       const requestedEpoch = accountBindingEpoch;
       // Each submit reports its own refusal, also the same one twice.
       confirmedStartDenial.value = undefined;
@@ -681,10 +709,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
       // A newer state read may have answered first; its answer decides this claim.
       if (!answered && authorityStatus.value !== "ready") return { ok: false, reason: "read-failed" };
-      if (authorityResultUnknown.value) return { ok: false, reason: "confirming" };
       if (confirmedStartClaimNo.value && (status.value === "active" || status.value === "grace")) return { ok: true };
+      if (pendingCancel.value || (pendingStart.value && !startRetryable.value)
+          || (retry && retry !== pendingStart.value)) return { ok: false, reason: "confirming" };
       const remoteEligibility = eligibility();
       if (!remoteEligibility.ok) {
+        if (pendingStart.value) {
+          startRetryable.value = false;
+          return { ok: false, reason: "confirming" };
+        }
         if (remoteEligibility.reason !== "unknown") confirmedStartDenial.value = remoteEligibility.reason;
         return { ok: false, reason: remoteEligibility.reason };
       }
@@ -697,9 +730,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const intent = pendingStart.value?.intent ?? (startIntent ??= { key: commandKey("start"), deviceName });
       const previousClaimNo = authorityClaimNo.value;
       startRetryable.value = false;
-      pendingStart.value = { intent, previousClaimNo, claimNo: null, readAfter: Infinity };
+      pendingStart.value = { intent, previousClaimNo, claimNo: null, readAfter: Infinity, consecutiveIneligible: 0 };
       let claimNo: string | null = null;
       let refusal: TrialIneligibleReason | undefined;
+      const authRevision = sessionVault.revision();
       try {
         const receipt = await trialApi.start(intent.key, intent.deviceName);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
@@ -717,6 +751,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         const reason = commandFailureReason(error);
         if (failure.kind === "http" && failure.status === 409 && failure.code === 409 && reason !== "unknown") {
           refusal = reason;
+        } else if (failure.kind === "auth") {
+          await apiClient.refreshSession(authRevision).catch(() => {});
+          if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         } else if (!isAmbiguousEnvelopeOutcome(error)) {
           pendingStart.value = null;
           startIntent = null;
@@ -725,7 +762,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         }
       }
       // Both a receipt and a lost response require a fresh read after this POST.
-      pendingStart.value = { intent, previousClaimNo, claimNo, refusal, readAfter: authorityRequestSequence + 1 };
+      pendingStart.value = {
+        intent, previousClaimNo, claimNo, refusal, readAfter: authorityRequestSequence + 1, consecutiveIneligible: 0,
+      };
       await refreshRemote(true);
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
       if (pendingStart.value) return { ok: false, reason: "confirming" };
@@ -771,19 +810,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const claimNo = authorityClaimNo.value;
       let pending: LegacyConversion | null;
       try {
-        pending = legacyConversion.value ?? readLegacyConversion(claimNo, requestedProductNo);
+        pending = legacyConversion.value ?? readLegacyConversions().find(command =>
+          command.claimNo === claimNo && command.productNo === requestedProductNo) ?? null;
       } catch {
         return { ok: false, reason: "storage-unavailable" };
       }
       if (pending) {
         if (pending.claimNo !== claimNo || pending.productNo !== requestedProductNo) return { ok: false, reason: "unknown" };
-        legacyConversion.value = pending;
+        if (!legacyConversion.value) legacyConversions.value = [...legacyConversions.value, pending];
         if (!legacyConversionResumable.value) {
           await recoverLegacyConversion().catch(() => {});
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
           const settled = confirmedLegacyConversion.value;
           if (settled?.claimNo === claimNo) return { ok: true, orderNo: settled.orderNo };
-          if (!legacyConversion.value) return { ok: false, reason: "rejected" };
+          if (!legacyConversion.value) return { ok: false, reason: "refusal-readback" };
           if (!legacyConversionResumable.value) return { ok: false, reason: "unknown" };
         }
         if (pending.amount !== expectedAmountUsdt || pending.quoteVersion !== (quoteVersion ?? null))
@@ -807,9 +847,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       // Keep the key from dispatch onward. The recovery owner can only read it.
       const submission = pending;
       if (submission.amount === null) return { ok: false, reason: "unknown" };
-      legacyConversionResumable.value = false;
-      legacyConversion.value = submission;
-      legacyConversionWriting = true;
+      legacyResumableKey.value = null;
+      if (!resuming) legacyConversions.value = [...legacyConversions.value, submission];
+      legacyConversionWriting = submission.key;
       try {
         const receipt = await trialApi.convert(submission.productNo, submission.amount, submission.quoteVersion, submission.key, authorization);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
@@ -817,7 +857,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         if (isTrialAuthorizationRefusal(asApiError(error).message)) {
-          if (resuming) legacyConversionResumable.value = true;
+          if (resuming) legacyResumableKey.value = submission.key;
           else releaseLegacyConversion(submission);
           throw error;
         }
@@ -827,7 +867,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           return { ok: false, reason: releaseLegacyConversion(submission) ? refusal : "storage-unavailable" };
         }
       } finally {
-        if (requestedEpoch === accountBindingEpoch) legacyConversionWriting = false;
+        if (requestedEpoch === accountBindingEpoch && legacyConversionWriting === submission.key) legacyConversionWriting = null;
       }
       return { ok: false, reason: "unknown" };
     }
@@ -848,71 +888,96 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return { ok: true };
   }
 
-  function readLegacyConversion(claimNo: string, productNo: string): LegacyConversion | null {
+  function readLegacyConversions(): LegacyConversion[] {
     const commands = readAccountRow<ConversionCommands>(CONVERT_COMMANDS_KEY, boundKey, true)?.commands ?? {};
-    const matches = Object.entries(commands).filter(([intent, key]) => {
-      const [claim, sku] = JSON.parse(intent);
-      return claim === claimNo && sku === productNo && !hasExternalTrialPaymentRecord(boundKey, key);
-    });
-    if (matches.length === 0) return null;
-    if (matches.length !== 1) throw new Error("TRIAL_CONVERSION_INTENT_INVALID");
-    const [intent, key] = matches[0]!;
-    const original: unknown = JSON.parse(intent);
-    if (typeof key !== "string" || !key.trim()
-        || !Array.isArray(original) || (original.length !== 3 && original.length !== 4)
-        || (original[2] !== null && (typeof original[2] !== "number" || !Number.isFinite(original[2]) || original[2] < 0))
-        || (original.length === 4 && (typeof original[3] !== "string" || !original[3]))) {
-      throw new Error("TRIAL_CONVERSION_INTENT_INVALID");
+    const byClaim = new Map<string, LegacyConversion>();
+    for (const [intent, key] of Object.entries(commands)) {
+      if (hasExternalTrialPaymentRecord(boundKey, key)) continue;
+      const original: unknown = JSON.parse(intent);
+      if (typeof key !== "string" || !key.trim()
+          || !Array.isArray(original) || (original.length !== 3 && original.length !== 4)
+          || typeof original[0] !== "string" || !original[0] || byClaim.has(original[0])
+          || typeof original[1] !== "string" || !original[1]
+          || (original[2] !== null && (typeof original[2] !== "number" || !Number.isFinite(original[2]) || original[2] < 0))
+          || (original.length === 4 && (typeof original[3] !== "string" || !original[3]))) {
+        throw new Error("TRIAL_CONVERSION_INTENT_INVALID");
+      }
+      const [claimNo, productNo, amount, quoteVersion] = original;
+      byClaim.set(claimNo, { claimNo, productNo, intent, key, amount, quoteVersion: quoteVersion ?? null });
     }
-    return { claimNo, productNo, intent, key, amount: original[2], quoteVersion: original[3] ?? null };
+    return [...byClaim.values()];
   }
 
   /** Used by legacy checkout to authorize exactly the original amount and version. */
   function pendingConversion(productNo: string) {
     const submission = legacyConversion.value;
-    return submission?.productNo === productNo ? { amount: submission.amount, quoteVersion: submission.quoteVersion } : null;
+    return submission?.productNo === productNo
+      ? { key: submission.key, amount: submission.amount, quoteVersion: submission.quoteVersion } : null;
   }
 
   function releaseLegacyConversion(submission: LegacyConversion): boolean {
     if (!releaseAccountCommandKey(CONVERT_COMMANDS_KEY, boundKey, submission.intent, submission.key)) return false;
-    legacyConversion.value = null;
-    legacyConversionResumable.value = false;
+    legacyConversions.value = legacyConversions.value.filter(command => command !== submission);
+    if (legacyResumableKey.value === submission.key) legacyResumableKey.value = null;
     return true;
   }
 
   async function confirmLegacyConversion(submission: LegacyConversion, receipt: TrialConvertReceipt, epoch: number, force = false) {
     if (receipt.productNo !== submission.productNo || (receipt.claimNo && receipt.claimNo !== submission.claimNo)) return false;
-    if (!await refreshRemote(force) || epoch !== accountBindingEpoch || authorityClaimNo.value !== submission.claimNo
-        || status.value !== "converted") return false;
-    const stateOrderNo = authoritativeConversion.value?.orderNo;
-    if (stateOrderNo && stateOrderNo !== receipt.orderNo) return false;
-    confirmedLegacyConversion.value = { claimNo: submission.claimNo, orderNo: receipt.orderNo };
+    if (legacyClaimNo.value === submission.claimNo) {
+      if (!await refreshRemote(force) || epoch !== accountBindingEpoch) return false;
+      if (legacyClaimNo.value === submission.claimNo) {
+        const stateOrderNo = authoritativeConversion.value?.orderNo;
+        if (status.value !== "converted" || (stateOrderNo && stateOrderNo !== receipt.orderNo)) return false;
+      }
+    }
+    confirmedLegacyConversion.value = { claimNo: submission.claimNo, productNo: submission.productNo, orderNo: receipt.orderNo };
+    useTrialPurchaseResult().publish({ status: "settled", claimNo: submission.claimNo, orderNo: receipt.orderNo });
     releaseLegacyConversion(submission);
     return true;
   }
 
   function recoverLegacyConversion(): Promise<void> {
     if (legacyConversionRead) return legacyConversionRead;
-    const submission = legacyConversion.value;
-    if (!submission || legacyConversionWriting || legacyConversionResumable.value) return Promise.resolve();
     const epoch = accountBindingEpoch;
-    const read = readPaymentCommand(apiClient, "trial-convert", submission.key).then(async command => {
-      if (epoch !== accountBindingEpoch || legacyConversion.value !== submission
-          || (command.claimNo && command.claimNo !== submission.claimNo)
-          || (command.paymentMethod && command.paymentMethod !== "WALLET")) return;
-      if (command.status === "SUCCEEDED") {
-        await confirmLegacyConversion(submission, parseTrialConvertReceipt(command.receipt), epoch);
-      } else if (command.status === "REJECTED") {
-        if (releaseLegacyConversion(submission)) deniedLegacyConversion.value = { reason: command.message ?? "" };
-      } else if (command.status === "NOT_SEEN" && command.canResumeSameKey && submission.amount !== null) {
-        if (await refreshRemote() && epoch === accountBindingEpoch && authorityClaimNo.value === submission.claimNo
-            && (status.value === "active" || status.value === "grace") && !originalPurchase.value) {
-          legacyConversionResumable.value = true;
-        }
+    const pending = legacyConversions.value.filter(command =>
+      command.key !== legacyConversionWriting && command.key !== legacyResumableKey.value);
+    if (!pending.length) return Promise.resolve();
+    const read = (async () => {
+      for (const submission of pending) {
+        if (epoch !== accountBindingEpoch) return;
+        await readLegacyResult(submission, epoch).catch(() => {});
       }
-    }).finally(() => { if (legacyConversionRead === read) legacyConversionRead = null; });
+    })().finally(() => { if (legacyConversionRead === read) legacyConversionRead = null; });
     legacyConversionRead = read;
     return read;
+  }
+
+  async function readLegacyResult(submission: LegacyConversion, epoch: number) {
+    const command = await readPaymentCommand(apiClient, "trial-convert", submission.key);
+    if (epoch !== accountBindingEpoch || !legacyConversions.value.includes(submission)
+        || (command.claimNo && command.claimNo !== submission.claimNo)
+        || (command.paymentMethod && command.paymentMethod !== "WALLET")) return;
+    if (command.status === "SUCCEEDED") {
+      await confirmLegacyConversion(submission, parseTrialConvertReceipt(command.receipt), epoch);
+    } else if (command.status === "REJECTED") {
+      if (releaseLegacyConversion(submission)) {
+        const denial = { claimNo: submission.claimNo, key: submission.key, reason: command.message ?? "" };
+        deniedLegacyConversion.value = denial;
+        useTrialPurchaseResult().publish({ status: "refused", ...denial });
+      }
+    } else if (legacyConversion.value === submission && command.canResumeSameKey && submission.amount !== null
+        && (command.status === "NOT_SEEN" || command.status === "PROCESSING")) {
+      if (!await refreshRemote() || epoch !== accountBindingEpoch || legacyConversion.value !== submission
+          || (status.value !== "active" && status.value !== "grace")) return;
+      const original = originalPurchase.value;
+      const canResume = command.status === "NOT_SEEN" ? !original : !!submission.quoteVersion
+        && original?.kind === "BALANCE" && original.claimNo === submission.claimNo && original.submissionNo === submission.key
+        && original.device.productNo === submission.productNo
+        && (original.confirmedAmountUSD === null || original.confirmedAmountUSD === submission.amount)
+        && (original.quoteVersion === null || original.quoteVersion === submission.quoteVersion);
+      if (canResume) legacyResumableKey.value = submission.key;
+    }
   }
 
   function clearLegacyConversionResult(orderNo: string) {
@@ -923,9 +988,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // — grace has nothing left to cancel (production already stopped).
   function settleCancelRead(next: TrialAuthorityState, sequence: number) {
     const pending = pendingCancel.value;
-    if (!pending || sequence < pending.readAfter || next.claimNo !== pending.claimNo) return;
-    if (next.serverState === "CANCELLED") confirmedCancelClaimNo.value = pending.claimNo;
-    else if (pending.acknowledged) return;
+    if (!pending || sequence < pending.readAfter) return;
+    if (next.claimNo !== pending.claimNo) {
+      pending.consecutiveActive = 0;
+      return;
+    }
+    if (next.serverState === "CANCELLED" && next.endReason === "cancelled") {
+      confirmedCancelClaimNo.value = pending.claimNo;
+    } else if (next.endReason !== "expired") {
+      if (next.serverState !== "ACTIVE") {
+        pending.consecutiveActive = 0;
+        return;
+      }
+      if (pending.acknowledged || (!pending.authenticationRejected && ++pending.consecutiveActive < 3)) return;
+    }
     pendingCancel.value = null;
   }
 
@@ -942,8 +1018,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const claimNo = authorityClaimNo.value;
       const key = `h2-cancel:${claimNo}`;
       const sequence = ++authorityRequestSequence;
-      pendingCancel.value = { claimNo, key, readAfter: Infinity, acknowledged: false };
+      pendingCancel.value = {
+        claimNo, key, readAfter: Infinity, acknowledged: false, authenticationRejected: false, consecutiveActive: 0,
+      };
       let acknowledged = false;
+      let authenticationRejected = false;
+      const authRevision = sessionVault.revision();
       try {
         const receipt = await trialApi.cancel("explicit", key);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
@@ -960,12 +1040,18 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         acknowledged = receipt.state.claimNo === claimNo && receipt.state.serverState === "CANCELLED";
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
-        if (!isAmbiguousEnvelopeOutcome(error)) {
+        authenticationRejected = asApiError(error).kind === "auth";
+        if (authenticationRejected) {
+          await apiClient.refreshSession(authRevision).catch(() => {});
+          if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
+        } else if (!isAmbiguousEnvelopeOutcome(error)) {
           pendingCancel.value = null;
           return { ok: false, reason: commandFailureReason(error) };
         }
       }
-      pendingCancel.value = { claimNo, key, acknowledged, readAfter: authorityRequestSequence + 1 };
+      pendingCancel.value = {
+        claimNo, key, acknowledged, authenticationRejected, readAfter: authorityRequestSequence + 1, consecutiveActive: 0,
+      };
       await refreshRemote(true);
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
       if (pendingCancel.value) return { ok: false, reason: "confirming" };
@@ -1018,7 +1104,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   return {
-    status, startedAt, expiresAt, graceEndsAt, finishedAt, pendingConversion, legacyConversionPending, confirmedLegacyConversion,
+    status, startedAt, expiresAt, graceEndsAt, finishedAt, pendingConversion, legacyConversionPending, legacyConversionResumable,
+    legacyReadbackPending, confirmedLegacyConversion,
     deniedLegacyConversion, recoverLegacyConversion, clearLegacyConversionResult,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,

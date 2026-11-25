@@ -32,12 +32,13 @@ import {
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialCheckout } from "@/store/trial-checkout";
+import { useTrialPurchaseResult } from "@/store/trial-purchase-result";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 import { useBills } from "@/store/bills";
 import { postMoneyBill, postMoneyBillsOnce, postReceiptForAccount, type ReceiptDraft } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
-import { tickOrders } from "@/store/orders";
+import { tickOrders, useOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
 import { hasPersistedServerAuthenticatedAccountTrace, readPersistedServerAuthenticatedAccountId, useAuth } from "@/store/auth";
@@ -511,6 +512,7 @@ function installForegroundReadSignals() {
 if (remoteApiEnabled) {
   const trial = useFreeTrial();
   const trialCheckout = useTrialCheckout();
+  const trialResults = useTrialPurchaseResult();
   const trialPurchaseCopy = useTrialPurchaseCopy();
   watch(() => trial.displayState, state => { if (state) trialCheckout.adoptAuthority(state); });
   watch(() => trial.confirmedCancelClaimNo, claimNo => {
@@ -525,14 +527,24 @@ if (remoteApiEnabled) {
     quiet: true,
   });
   useAutoRecovery({
-    failed: () => trialCheckout.outcome.status === "processing" || trial.legacyConversionPending,
-    retry: () => trial.legacyConversionPending ? trial.recoverLegacyConversion() : trialCheckout.readSubmission(),
+    failed: () => trialCheckout.outcome.status === "processing" || trial.legacyReadbackPending,
+    retry: () => Promise.all([trial.recoverLegacyConversion(), trialCheckout.readSubmission()]),
     repeatMs: 15_000,
     quiet: true,
   });
-  watch(() => trial.deniedLegacyConversion, result => {
-    if (result) toast.warn(trialPurchaseReasonMessage(useT().value, result.reason) ?? trialPurchaseCopy.value.coPurchaseUnavailable);
-  });
+  watch(() => trialResults.outsidePage, results => {
+    const app = useApp(), epoch = app.accountBindingEpoch;
+    for (const result of results) {
+      if (!trialResults.consume(trialResults.resultKey(result))) continue;
+      if (result.status === "settled") {
+        toast.success(trialPurchaseCopy.value.resultTitle);
+        void useOrders().reconcileRemoteOrder(result.orderNo, () => app.accountBindingEpoch === epoch).catch(() => {});
+      } else {
+        const reason = trialPurchaseReasonMessage(useT().value, result.reason, useLocaleStore().code);
+        if (reason) toast.warn(reason);
+      }
+    }
+  }, { flush: "post" });
   const repeatWithoutPull = () => !hasVisiblePullRefresh();
   useAutoRecovery({
     failed: () => productCatalogLanguageReadFailed.value,

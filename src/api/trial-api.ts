@@ -584,6 +584,7 @@ export function createTrialApi(client: ApiClient): TrialApi {
       path: "/api/trial/start",
       body: { deviceName },
       idempotencyKey,
+      retryAfterAuth: false,
     }),
     convert: async (...args) => parseTrialConvertReceipt(await client.request(convertRequest(...args))),
     async convertPurchase(...args) {
@@ -604,6 +605,7 @@ export function createTrialApi(client: ApiClient): TrialApi {
       path: "/api/trial/cancel",
       body: { reason },
       idempotencyKey,
+      retryAfterAuth: false,
       acceptedResponses: BALANCE_ORIGINAL_CODES.map(message => ({ status: 409, code: 409, message })),
       parseResponseData: (data, _, { code, message }): TrialCancelResult => code === 0
         ? { status: "cancelled", state: parseTrialAuthorityState(data) }

@@ -128,7 +128,8 @@ const showRestartOffer = computed(() => confirmedOffer.value?.status === 'ended'
 const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value && trial.status === "none"
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || showCapacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
-const trialOfferEnabled = computed(() => trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
+const trialOfferEnabled = computed(() => trial.startRetryable ? eligibility.value.ok
+  : trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
 // B53: only the confirmed trial product is named; until then the card shows the same "—" as its unknown amounts, never a default S1.
 const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '—');
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);

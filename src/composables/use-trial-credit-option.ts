@@ -47,6 +47,7 @@ export function useTrialCreditOption(productNo: () => string | undefined, forCon
 export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProduct?: () => string | undefined) {
   const trial = useFreeTrial();
   const options = useTrialPurchaseOptions();
+  const confirming = useTrialPurchaseConfirmation();
   const claim = computed(() => {
     const state = trial.displayState;
     return state?.claimNo === trial.authorityClaimNo && (state?.status === "active" || state?.status === "grace")
@@ -60,7 +61,7 @@ export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProdu
         && options.current.status !== "unsupported" && options.current.status !== "not-convertible") await options.refresh();
   }
   const recovery = useAutoRecovery({
-    active, failed, retry: read, quiet: false, repeatMs: 30_000,
+    active, failed, retry: read, quiet: () => trial.authorityResultUnknown || confirming.value, repeatMs: 30_000,
     repeatWhile: () => !hasVisiblePullRefresh(),
   });
   watch([visible, claim, foregroundReadAllowed], ([shown, claimNo, allowed]) => {
