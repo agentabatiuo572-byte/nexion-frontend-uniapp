@@ -152,7 +152,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
           <text>{{ fill(urgent ? (isBank ? copy.urgentBank : copy.urgent) : (isBank ? copy.payWithinBank : copy.payWithin), { t: clock(payLeft) }) }}</text>
         </view>
-        <text v-if="confirming" class="pp-note" role="status">{{ copy.confirmWait }}</text>
+        <text v-if="confirming && !trialReviewPending" class="pp-note" role="status">{{ copy.confirmWait }}</text>
         <text class="pp-hero__meta">{{ s.summary }}<template v-if="s.orderNo"> · {{ copy.orderNo }} <text class="pp-mono">{{ s.orderNo }}</text></template></text>
       </view>
 
@@ -242,7 +242,7 @@
       <text class="pp-cashier__note nx-tray-note">{{ copy.autoReturn }}</text>
       <view class="pp-cashier__row2">
         <NxButton v-if="canSaveCashierImage" variant="secondary" :label="copy.cashierSaveQr" :busy="savingQr" @click="saveQr" />
-        <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.closeCashier" />
+        <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.confirmCashierPayment" />
       </view>
     </view>
   </view>
@@ -271,11 +271,12 @@ import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
-import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { isTrialPaymentReviewPending, purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
+import { useTrialDetailCopy } from '@/i18n/trial-detail';
 import { toast } from '@/store/ui';
 import { navTo } from '@/lib/route';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
@@ -436,7 +437,9 @@ useVisibleInterval(() => { now.value = Date.now(); }, 1000, () => active.value &
 const deadlineLeft = computed(() => s.deadlineAt === null ? null : Math.max(0, s.deadlineAt - now.value));
 const quoteLeft = computed(() => s.quote ? Math.max(0, Date.parse(s.quote.expiresAt) - now.value) : null);
 // The payment page counts to whichever closes first: the intent or the order.
-const timing = computed(() => purchasePaymentTiming(s.intent, now.value, s.deadlineAt));
+const timing = computed(() => purchasePaymentTiming(s.intent, now.value, s.deadlineAt, payment.legacyTrialExpiry()));
+const trialReviewPending = computed(() => isTrialPaymentReviewPending(s.intent));
+const trialDetail = useTrialDetailCopy();
 const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
@@ -456,6 +459,7 @@ const waitTitle = computed(() => {
   if (s.canResubmit) return c.originalPaymentNotFoundRetry;
   if (s.busy && !s.intent) return c.creating;
   if (retryMessage.value) return retryMessage.value;
+  if (trialReviewPending.value) return trialDetail.value.origConfirming;
   if (confirming.value) return c.confirming;
   return ready.value ? c.waiting : c.checkingOriginalPayment;
 });

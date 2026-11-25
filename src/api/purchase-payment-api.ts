@@ -3,7 +3,7 @@ import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
-import { parseTrialChangedQuote, parseTrialOriginalPurchase, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
+import { parseTrialChangedQuote, parseTrialOriginalPurchase, TRIAL_DEVICE_RESELECTION_CODES, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
@@ -31,7 +31,22 @@ export type PurchasePaymentStatus = typeof purchasePaymentStatuses[number];
 export type TrialPurchaseOutcome = 'UNPAID_TERMINAL' | 'LATE_PAYMENT_REVIEW';
 const trialOriginalCodes = ['TRIAL_BALANCE_SUBMISSION_IN_PROGRESS', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'] as const;
 const trialRequoteCodes = ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_PRICING_CHANGED',
-  'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED'] as const;
+  'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED', 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'] as const;
+const trialRefusalCodes = {
+  403: ['PURCHASE_PAYMENT_USER_UNAVAILABLE'],
+  404: ['PURCHASE_PAYMENT_QUOTE_NOT_FOUND'],
+  409: [...trialOriginalCodes, ...TRIAL_PRICE_CHANGES, ...trialRequoteCodes.filter(code => code !== 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'),
+    ...TRIAL_DEVICE_RESELECTION_CODES, 'ZERO_PAYMENT_REQUIRES_WALLET', 'TRIAL_NOT_CONVERTIBLE', 'ORDER_PAYMENT_EXPIRED',
+    'TRIAL_PRODUCT_NOT_AVAILABLE', 'TRIAL_KILL_SWITCH_DISABLED', 'TRIAL_EXTERNAL_PAYMENT_METHOD_UNSUPPORTED', 'TRIAL_AMOUNT_INVALID',
+    'PRODUCT_OUT_OF_STOCK', 'PRODUCT_INVENTORY_MODE_INVALID', 'PRODUCT_SPECS_UNAVAILABLE', 'TRIAL_DAILY_YIELD_INVALID',
+    'ORDER_MONTHLY_QUOTA_CONFLICT', 'ORDER_MONTHLY_QUOTA_EXHAUSTED', 'ORDER_MONTHLY_QUOTA_PAUSED', 'ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET',
+    'CREGIS_DIRECT_PAYMENT_PAUSED', 'CREGIS_DIRECT_ADDRESS_REQUIRES_REVIEW', 'CREGIS_DIRECT_ADDRESS_ALLOCATION_RETRY'],
+  422: ['B1_COVERAGE_REDLINE_BLOCKED', 'PURCHASE_PAYMENT_KIND_INVALID', 'EXTERNAL_PAYMENT_CREDENTIAL_FORBIDDEN',
+    'PURCHASE_PAYMENT_METHOD_INVALID', 'TRIAL_PRODUCT_REQUIRED', 'IDEMPOTENCY_KEY_REQUIRED'],
+  503: ['ORDER_MONTHLY_QUOTA_UNAVAILABLE', 'TEST_CLOUD_RESOURCE_CAPACITY_UNAVAILABLE', 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED',
+    'HDPAY_CONFIGURATION_INCOMPLETE', 'CREGIS_DIRECT_PAYMENT_UNAVAILABLE', 'CREGIS_DIRECT_PAYMENT_ASSET_UNAVAILABLE', 'FX_QUOTE_UNAVAILABLE',
+    'CREGIS_DIRECT_ADDRESS_POOL_UNAVAILABLE', 'CREGIS_DIRECT_ALLOCATION_ANCHOR_INVALID'],
+};
 export function trialExternalRequote(message: string): boolean {
   return trialRequoteCodes.some(code => code === message);
 }
@@ -132,7 +147,7 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
     ...(createdAt ? { createdAt } : {}),
     ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
     ...(fields.kind === 'TRIAL_CONVERT' && (raw.claimNo === null || typeof raw.claimNo === 'string') ? { claimNo: raw.claimNo } : {}),
-    ...(fields.kind === 'TRIAL_CONVERT' && typeof raw.claimNo === 'string' && raw.claimNo.trim()
+    ...(fields.kind === 'TRIAL_CONVERT'
       && (raw.status === 'MANUAL_REVIEW' && raw.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW'
         || raw.status === 'EXPIRED' && raw.trialPurchaseOutcome === 'UNPAID_TERMINAL') ? { trialPurchaseOutcome: raw.trialPurchaseOutcome } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
@@ -168,13 +183,8 @@ export function createPurchasePaymentApi(client: ApiClient) {
   function trialRequest<T>(request: ApiRequest, parse: (data: unknown) => T) {
     return client.request<T | TrialExternalRefusal>({
       ...request,
-      acceptedResponses: [
-        ...[...trialOriginalCodes, ...TRIAL_PRICE_CHANGES, ...trialRequoteCodes, 'ZERO_PAYMENT_REQUIRES_WALLET',
-          'TRIAL_NOT_CONVERTIBLE', 'TRIAL_PRODUCT_NOT_AVAILABLE', 'TRIAL_KILL_SWITCH_DISABLED', 'TRIAL_EXTERNAL_PAYMENT_METHOD_UNSUPPORTED',
-          'PRODUCT_OUT_OF_STOCK', 'PRODUCT_NOT_AVAILABLE'].map(message => ({ status: 409, code: 409, message })),
-        ...['ORDER_MONTHLY_QUOTA_UNAVAILABLE', 'TEST_CLOUD_RESOURCE_CAPACITY_UNAVAILABLE'].map(message => ({ status: 503, code: 503, message })),
-        { status: 422, code: 422, message: 'B1_COVERAGE_REDLINE_BLOCKED' },
-      ],
+      acceptedResponses: Object.entries(trialRefusalCodes).flatMap(([code, messages]) =>
+        messages.map(message => ({ status: Number(code), code: Number(code), message }))),
       parseResponseData(data, _, { code, message }): T | TrialExternalRefusal {
         if (code === 0) return parse(data);
         if (trialOriginalCodes.some(value => value === message))

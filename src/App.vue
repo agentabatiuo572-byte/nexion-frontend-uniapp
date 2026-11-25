@@ -379,6 +379,7 @@ let lastTrialNoticeEpoch = -1;
 let lastTrialNoticeStatus: ReturnType<typeof useFreeTrial>["status"] = "none";
 // #ifdef APP-PLUS
 let nativeTrialTopupRestored = false;
+let nativeTrialTopupReadPending = false;
 // #endif
 
 function refreshVisibleResource(route: string) {
@@ -395,21 +396,24 @@ function runScheduledReads(route: string, reconnected = false) {
   const app = useApp();
   const auth = useAuth();
   if (!canRefreshRemoteAccount(auth) || app.accountKey !== auth.accountId) return;
-  // #ifdef APP-PLUS
-  if (!nativeTrialTopupRestored) {
-    nativeTrialTopupRestored = true;
-    if (route === "pages/index/index") {
-      const accountKey = app.accountKey, binding = app.accountBindingEpoch;
-      const current = () => app.accountKey === accountKey && app.accountBindingEpoch === binding
-        && readCurrentRoute() === "pages/index/index" && foregroundReadAllowed();
-      void pendingTrialTopupHref(accountKey, current).then(href => {
-        if (href && current()) void navReplace(href);
-      }).catch(() => {});
-    }
-  }
-  // #endif
   const binding = `${app.accountKey}:${app.accountBindingEpoch}`;
   const resumed = binding !== scheduledReadBinding;
+  // #ifdef APP-PLUS
+  if (route !== "pages/index/index") nativeTrialTopupRestored = true;
+  if (!nativeTrialTopupRestored && !nativeTrialTopupReadPending && (resumed || reconnected)) {
+    nativeTrialTopupReadPending = true;
+    const accountKey = app.accountKey, accountEpoch = app.accountBindingEpoch;
+    const current = () => !nativeTrialTopupRestored && app.accountKey === accountKey && app.accountBindingEpoch === accountEpoch
+      && readCurrentRoute() === "pages/index/index" && foregroundReadAllowed();
+    void pendingTrialTopupHref(accountKey, current).then(href => {
+      if (!current()) return;
+      nativeTrialTopupRestored = true;
+      if (href) void navReplace(href);
+    }).catch(() => {
+      // The next foreground or reconnect read can recover this saved return.
+    }).finally(() => { nativeTrialTopupReadPending = false; });
+  }
+  // #endif
   const now = Date.now();
   if (resumed) {
     let hash = 2166136261;

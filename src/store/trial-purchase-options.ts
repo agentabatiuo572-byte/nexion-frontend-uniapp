@@ -79,8 +79,7 @@ export const useTrialPurchaseOptions = defineStore("trial-purchase-options", () 
   function select(productNo: string): boolean {
     const key = scopeKey.value;
     const view = current.value;
-    if (key === null || claimNo.value === null || view.status !== "ready"
-        || !view.options.some(option => option.productNo === productNo && option.canBuy)) return false;
+    if (key === null || claimNo.value === null || !view.options.some(option => option.productNo === productNo && option.canBuy)) return false;
     preselected.delete(key);
     claims.set(key, { ...view, selectedProductNo: productNo, invalidatedProductNo: null });
     remember(app.accountKey, claimNo.value, productNo);

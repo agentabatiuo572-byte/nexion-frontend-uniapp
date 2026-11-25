@@ -223,8 +223,18 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     return Object.assign(intent, {status: 'EXPIRED', reason,
       ...(intent.kind==='TRIAL_CONVERT'&&{trialPurchaseOutcome:'UNPAID_TERMINAL',reconciliationStatus:'PROVIDER_FAILED'})});
   }
-  function lateArrival(intent, now) {
-    return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW', paidAt: now});
+  function lateArrival(intent, paidAt, confirmedAt = paidAt) {
+    Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW', paidAt});
+    if (intent.kind === 'TRIAL_CONVERT') {
+      Object.assign(intent, {confirmedAt, reconciliationStatus: 'REVIEW'});
+      delete intent.trialPurchaseOutcome;
+      const cutoff = Math.min(intent.deadline, intent.expirationTime ? Date.parse(intent.expirationTime) : Infinity);
+      if (paidAt >= cutoff && confirmedAt >= graceEnd(intent.paymentMethod, intent.deadline)) {
+        intent.trialPurchaseOutcome = 'LATE_PAYMENT_REVIEW';
+        removeDemoPaymentQuotaHold(state, intent.quotaHold);
+      }
+    }
+    return intent;
   }
   const deliveryPaths = {
     TRIAL_CONVERT: '/api/trial/convert',
@@ -259,6 +269,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const noProviderSuccess = [...waitingModes, 'expired', 'mismatch'];
   // The intent advances by elapsed time according to the preview panel's 外部付款结果.
   function advance(intent, now) {
+    if (intent.unpaidTerminalSample) return intent;
     // Ordinary provider outcomes do not advance the independently seeded B84 stories.
     const age = now - intent.createdAt, scenario = intent.topupSample||intent.trialSample ? 'waiting' : paymentMode();
     const bank = intent.paymentMethod === 'HDPAY_BANK';
@@ -295,7 +306,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     if (noProviderSuccess.includes(scenario) || (bank && scenario === 'bank-failed')) return intent;
     if (intent.status === 'AWAITING_PAYMENT') {
       intent.paidAt = intent.createdAt + ARRIVE_AFTER;
-      if (graceOver) return lateArrival(intent, now);
+      if (graceOver) return lateArrival(intent, intent.kind === 'TRIAL_CONVERT' ? intent.paidAt : now, now);
       if (intent.paidAt >= intent.deadline) return lateArrival(intent, intent.paidAt);
       intent.status = 'FUNDS_CONFIRMED';
     }
@@ -328,7 +339,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialSample, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialSample, unpaidTerminalSample, ...row} = intent, open = Date.now() < deadline;
+    if (row.kind === 'TRIAL_CONVERT' && !trialPurchaseOptionsEnabled(state)) {
+      delete row.claimNo;
+      delete row.trialPurchaseOutcome;
+    }
     const networkEnabled = networkOpen(row.paymentMethod);
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -432,7 +447,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(body.paymentMethod, deadline)).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null,
         ...(trial&&{currency:bank?'VND':'USDT',channelFeeRatePct:'1.25',channelFeeFixed:'0.50',paymentFeesConfigured:true,
-          trialOffsetBasis:'ACCRUED_B90',...(bank&&{fxVersion:1})})};
+          trialOffsetBasis:trialPurchaseOptionsEnabled(state)?'ACCRUED_B90':'ACCRUED',...(bank&&{fxVersion:1})})};
       const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
       quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote, trialDeviceSnapshot});
       return {status: 200, message: 'OK', data: quote};
@@ -542,21 +557,23 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const intent=[...intents.values()].findLast(row=>sameSubject(row,subject)&&!row.trialSample
         &&(['AWAITING_PAYMENT','EXPIRED'].includes(row.status)||row.reason==='PAYMENT_LATE_REVIEW'));
       if (!intent) return refused(409,'TRIAL_PREVIEW_START_PAYMENT_FIRST');
+      const noPaymentFacts=transition==='external-expired'||transition==='external-unpaid-terminal';
+      if (noPaymentFacts&&(intent.paidAt!=null||intent.confirmedAt!=null)) return refused(409,'TRIAL_PREVIEW_PAYMENT_ALREADY_OBSERVED');
       const now=Date.now(), deadline=now-graceEnd(intent.paymentMethod,0)-60000;
+      const pricingAt=deadline-paymentWindow;
       Object.assign(intent,{deadline,expiresAt:new Date(deadline).toISOString(),deadlineAt:new Date(deadline).toISOString(),
+        createdAt:pricingAt,pricingAt,pricingAsOf:new Date(pricingAt).toISOString(),
         confirmationGraceEndsAt:new Date(graceEnd(intent.paymentMethod,deadline)).toISOString()});
       delete intent.trialPurchaseOutcome;
-      if (transition==='external-expired') {
+      delete intent.unpaidTerminalSample;
+      if (transition==='external-expired'&&trialPurchaseOptionsEnabled(state)) {
         Object.assign(intent,{status:'EXPIRED',reason:'PAYMENT_TIMEOUT',reconciliationStatus:'QUERY_UNKNOWN'});
-      } else if (transition==='external-unpaid-terminal') {
+      } else if (noPaymentFacts) {
         expire(intent,'PAYMENT_TIMEOUT');
+        intent.unpaidTerminalSample=true;
       } else {
-        lateArrival(intent,now);
-        Object.assign(intent,{confirmedAt:now,reconciliationStatus:'REVIEW'});
-        if (transition==='external-late') {
-          intent.trialPurchaseOutcome='LATE_PAYMENT_REVIEW';
-          removeDemoPaymentQuotaHold(state,intent.quotaHold);
-        }
+        // In the unmarked case the customer sent the funds on time, but the provider confirmed them after grace.
+        lateArrival(intent,transition==='external-late'?now:deadline-1000,now);
       }
       return {status:200};
     }

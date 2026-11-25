@@ -193,13 +193,14 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     }
     if (state.trialNextWalletRefusal==='price-change') state.trialPurchasePriceState='extra-up';
     if (state.trialNextWalletRefusal==='amount-mismatch') state.trialAccrualReductionUsdt=1;
+    if (state.trialNextWalletRefusal==='product-unlisted') state.trialPurchaseOptionState='unlisted';
     delete state.trialNextWalletRefusal;
     return settleTrialWallet(url,request,key,sameKey,sameKey);
   }
   let trialSampleSequence=0;
   function setTrialPurchaseSample(origin, mode) {
     syncScenario();
-    if (mode===state.trialOriginalPurchaseState&&originalTrialPurchase()) return {status:200};
+    if (mode===state.trialOriginalPurchaseState&&originalTrialPurchase()&&!mode.startsWith('external-')) return {status:200};
     if (mode==='none') {
       external.setTrialExternalSample(origin,false);
       const original=state.trialBalancePurchase;

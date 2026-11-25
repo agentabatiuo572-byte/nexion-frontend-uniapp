@@ -327,7 +327,7 @@ const server=http.createServer(async(req,res)=>{
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
-        if(['price-change','amount-mismatch'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
+        if(['price-change','amount-mismatch','product-unlisted'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);

@@ -169,6 +169,12 @@ export interface TrialConvertReceipt {
 }
 
 export const TRIAL_PRICE_CHANGES = ["TRIAL_QUOTE_CHANGED", "TRIAL_AMOUNT_MISMATCH"] as const;
+export const TRIAL_DEVICE_RESELECTION_CODES = [
+  "TRIAL_PRODUCT_NOT_ELIGIBLE", "TRIAL_PRODUCT_NOT_RELEASED", "PRODUCT_NOT_AVAILABLE", "PRODUCT_NOT_RELEASED",
+  "PRODUCT_PRICE_INVALID", "PRODUCT_TYPE_UNSUPPORTED", "H1_RHYTHM_UNAVAILABLE", "E1_PHASE_CONFIG_UNAVAILABLE",
+  "E1_UNLOCK_PHASE_REQUIRED", "E1_GENERATION_ELIGIBILITY_REQUIRED", "E1_GENERATION_PHASE_NOT_REACHED",
+  "E1_GENERATION_PHASE_MISMATCH", "E1_GENERATION_RELEASE_MONTH_NOT_REACHED", "E1_UNLOCK_PHASE_INVALID", "E1_PHASE_NOT_REACHED",
+] as const;
 const BALANCE_ORIGINAL_CODES = ["TRIAL_BALANCE_SUBMISSION_IN_PROGRESS", "TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS"] as const;
 const BALANCE_SERVICE_REFUSALS = ["ORDER_MONTHLY_QUOTA_UNAVAILABLE", "TEST_CLOUD_RESOURCE_CAPACITY_UNAVAILABLE"] as const;
 const AUTHORIZATION_REFUSALS = /^PAYMENT_PASSWORD_(?:REQUIRED|INVALID|INCORRECT|ATTEMPT_CONFLICT|ATTEMPT_ALREADY_USED|NOT_CONFIGURED|VERSION_CONFLICT|LOCKED|UNAVAILABLE)$/;
@@ -371,6 +377,7 @@ export function parseTrialPurchaseConvertResult(value: unknown, code: number, re
 
 function isStructuredBalanceRefusal(cause: unknown): cause is ApiError {
   return cause instanceof ApiError && cause.kind === "http" && cause.code === cause.status
+    && cause.message !== "PAYMENT_COMMAND_INPUT_CHANGED"
     && !AUTHORIZATION_REFUSALS.test(cause.message)
     && ((cause.code === 503 && BALANCE_SERVICE_REFUSALS.some(message => message === cause.message))
       || (cause.code !== undefined && cause.code >= 400 && cause.code < 500 && ![408, 425, 429].includes(cause.code)));

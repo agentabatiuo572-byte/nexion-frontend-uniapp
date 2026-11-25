@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, shallowRef, watch } from "vue";
 import { apiClient, trialApi } from "@/api/runtime";
-import { asApiError, isAmbiguousOutcome } from "@/api/errors";
+import { asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import {
@@ -154,6 +154,24 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     return "submission" in state ? state.submission : null;
   });
 
+  const originalPurchase = computed<TrialOriginalPurchase | null>(() => {
+    const trial = useFreeTrial();
+    const claimNo = trial.displayState?.claimNo;
+    if (!claimNo) return null;
+    const current = outcome.value, snapshot = trial.originalPurchase;
+    if (current.status === "settled" && current.claimNo === claimNo) return null;
+    if (current.status === "refused" && current.claimNo === claimNo && snapshot?.kind === "BALANCE"
+        && snapshot.submissionNo === current.submissionNo) return null;
+    if ("submission" in current && current.submission.claimNo === claimNo)
+      return { ...current.submission, status: current.status === "resumable" ? "RESUMABLE" : "PROCESSING" };
+    if (current.status === "original" && current.originalPurchase.claimNo === claimNo) return current.originalPurchase;
+    if (snapshot?.claimNo === claimNo) return snapshot;
+    try {
+      const saved = readLocal(claimNo);
+      return saved ? { ...saved, status: "PROCESSING" } : null;
+    } catch { return null; }
+  });
+
   async function submit(input: Omit<ConfirmedSubmission, "submissionNo" | "kind" | "paymentMethod">, authorization: PaymentPasswordAuthorization) {
     const before = outcome.value;
     if (["submitting", "processing", "original", "settled", "storage-error"].includes(before.status)
@@ -188,6 +206,11 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       if (current() && workingSubmission.value?.submissionNo === submission.submissionNo) finish(submission, response);
     } catch (cause) {
       if (!current() || workingSubmission.value?.submissionNo !== submission.submissionNo) return;
+      if (isApiRefusal(cause, 409, "PAYMENT_COMMAND_INPUT_CHANGED", "PAYMENT_PASSWORD_VERSION_CONFLICT")) {
+        outcome.value = { status: "processing", submission };
+        await readSubmission().catch(() => {});
+        return;
+      }
       if (isTrialAuthorizationRefusal(asApiError(cause).message)) {
         if (resumed || release(submission)) outcome.value = before;
         else outcome.value = { status: "storage-error" };
@@ -248,5 +271,5 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       outcome.value = { status: "idle" };
   }
 
-  return { authority, outcome, workingSubmission, adoptAuthority, adoptOriginal, readSubmission, submit, settleExternal, clearSettled, rememberExternalRefusal };
+  return { authority, outcome, workingSubmission, originalPurchase, adoptAuthority, adoptOriginal, readSubmission, submit, settleExternal, clearSettled, rememberExternalRefusal };
 });

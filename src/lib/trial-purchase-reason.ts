@@ -1,4 +1,9 @@
 import type { Messages } from "@/i18n/messages/en";
+import { TRIAL_DEVICE_RESELECTION_CODES } from "@/api/trial-api";
+
+export function trialDeviceNeedsReselection(reason?: string): boolean {
+  return TRIAL_DEVICE_RESELECTION_CODES.some(code => code === reason);
+}
 
 export function trialPurchaseReasonMessage(t: Messages, reason?: string): string | undefined {
   switch (reason) {

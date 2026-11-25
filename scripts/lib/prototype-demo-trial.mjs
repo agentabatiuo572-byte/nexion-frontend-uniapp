@@ -51,6 +51,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   // settled earnings are paid out after purchase and use the same catalog rate as a default claim.
   const precision=['precision','half-cent','precision-repriced'].includes(pricing);
   if(!['default','historical-cap'].includes(pricing))Object.assign(unclaimedConfig,{trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
+  if(pricing==='cloud-share-half-cent')unclaimedConfig.trialOffsetCapUSD='6.34';
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')unclaimedConfig.discountCapUSD='49.999999';
   const scenario=!available?'available':mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
@@ -61,7 +62,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const duration=Number(claimConfig.trialDays)*day,grace=Number(claimConfig.graceDays)*day;
     const cooldown=scenario==='eligible-again'?30*day:0;
     const ended=['ended','eligible-again'].includes(scenario);
-    const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:ended?duration+grace+cooldown+day:day);
+    const activeAge=pricing==='cloud-share-half-cent'?2*day:day;
+    const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:ended?duration+grace+cooldown+day:activeAge);
     state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE':ended?'FAILED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt};
     if(cooldown)state.trialRow.cooldownUntil=startedAt+duration+grace+cooldown;
     // B13: this preset was claimed under the former 50 USDT cap; new claims use today's null cap.
@@ -157,9 +159,13 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     return {...option,canPurchase:!reasonCode,unavailableReason:reasonCode,quoteVersion:quote.quoteVersion,quote};
   }
 
-  function extraProducts() {
+  function extraProductNos() {
     const extraCount=state.trialPurchaseListState==='five'?4:state.trialPurchaseListState==='two'?1:0;
-    return optionSku.filter(sku=>sku!==cfg.trialProductId).slice(0,extraCount)
+    return optionSku.filter(sku=>sku!==cfg.trialProductId).slice(0,extraCount);
+  }
+
+  function extraProducts() {
+    return extraProductNos()
       .map(sku=>products.find(item=>item.id===sku))
       .filter(item=>item?.available&&item.status==='active'&&item.price>0)
       .sort((a,b)=>a.price-b.price);
@@ -248,8 +254,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       refuse('REQUEST_BODY_INVALID',null,400);
     if(body.voucherId||body.promotionQuoteId||body.replacementDeviceId||(body.quantity!=null&&body.quantity!==1))
       refuse('TRIAL_KILL_SWITCH_DISABLED');
-    const selectedProduct=isTrialProduct?trialProduct():extraProducts().find(item=>item.id===body.productNo);
-    if(usesOptions&&!isTrialProduct&&!selectedProduct)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
+    if(usesOptions&&!isTrialProduct&&!extraProductNos().includes(body.productNo))refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
+    const selectedProduct=products.find(item=>item.id===body.productNo);
+    if(!isTrialProduct&&!selectedProduct)refuse('PRODUCT_NOT_AVAILABLE');
     const option=usesOptions&&!paid?purchaseOption(selectedProduct,isTrialProduct,current):null;
     if(option&&!option.canPurchase) {
       const reason=option.unavailableReason;

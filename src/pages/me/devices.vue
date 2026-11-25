@@ -216,7 +216,7 @@ import { useMeEntrySeen } from "@/store/me-entry-seen";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app';
-import { computed, nextTick, ref, watch, onUnmounted } from "vue";
+import { computed, nextTick, ref, shallowRef, watch, onUnmounted } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -305,7 +305,7 @@ onUnmounted(() => { inventoryPageVisible.value = false; });
 const trialPresentation = useTrialPresentation();
 const trialCopy = useTrialFleetCopy();
 const cancelTrialBusy = ref(false);
-const trialCancelConflict = ref<{ claimNo: string; version: number } | null>(null);
+const trialCancelConflict = shallowRef<ReturnType<typeof useFreeTrial>["displayState"]>(null);
 const trialCancelLocked = computed(() => {
   const state = trial.displayState;
   if (!state?.claimNo) return false;
@@ -314,11 +314,10 @@ const trialCancelLocked = computed(() => {
   return original?.kind === "EXTERNAL" || original?.status === "PROCESSING"
     || ((current.status === "processing" || current.status === "submitting" || current.status === "resumable" && current.accepted)
       && current.submission.claimNo === state.claimNo)
-    || (state.claimNo === trialCancelConflict.value?.claimNo && state.version === trialCancelConflict.value.version);
+    || state === trialCancelConflict.value;
 });
 watch(() => trial.displayState, state => {
-  if (state && (state.originalPurchase !== undefined || state.claimNo !== trialCancelConflict.value?.claimNo
-      || state.version !== trialCancelConflict.value.version)) trialCancelConflict.value = null;
+  if (state && state !== trialCancelConflict.value) trialCancelConflict.value = null;
 });
 const quoteInfoDeviceId = ref<string | null>(null);
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
@@ -637,7 +636,6 @@ async function handleCancelTrial() {
     if (!ok || accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch
       || trialCancelLocked.value || !trialPresentation.actionsReady.value || trial.status !== "active") return;
     const claimNo = trial.authorityClaimNo;
-    const version = trial.authorityVersion;
     const result = await trial.cancel();
     if (accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
     if (result.ok) {
@@ -645,7 +643,8 @@ async function handleCancelTrial() {
       if (remoteApiEnabled) void app.refreshRemoteFleet();
     }
     else if (result.reason === "payment-in-progress") {
-      if (!trial.originalPurchase && claimNo) trialCancelConflict.value = { claimNo, version };
+      const state = trial.displayState;
+      if (state && state.claimNo === claimNo && !trial.originalPurchase) trialCancelConflict.value = state;
     } else toast.warn(t.value.trial.cancelError);
   } finally {
     cancelTrialBusy.value = false;

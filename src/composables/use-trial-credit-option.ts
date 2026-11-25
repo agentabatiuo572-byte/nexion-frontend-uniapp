@@ -4,6 +4,7 @@ import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useFreeTrial } from "@/store/free-trial";
+import { useTrialCheckout } from "@/store/trial-checkout";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 
 /**
@@ -14,11 +15,11 @@ import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-pu
  * reads exactly as it does without the feature.
  */
 export function useTrialCreditOption(productNo: () => string | undefined) {
-  const trial = useFreeTrial(), options = useTrialPurchaseOptions();
+  const trial = useFreeTrial(), options = useTrialPurchaseOptions(), checkout = useTrialCheckout();
   return computed<TrialPurchaseOption | null>(() => {
     const state = trial.displayState;
-    if (trial.originalPurchase || !state?.claimNo || (state.status !== "active" && state.status !== "grace") || !trial.authorityClaimNo
-        || options.claimNo !== state.claimNo || options.current.status !== "ready") return null;
+    if (!state?.claimNo || (state.status !== "active" && state.status !== "grace") || state.claimNo !== trial.authorityClaimNo
+        || options.claimNo !== state.claimNo || options.current.status !== "ready" || checkout.originalPurchase) return null;
     const no = productNo();
     return options.current.options.find((option) => option.productNo === no
       && option.canBuy && !option.isTrialProduct && option.quote !== undefined) ?? null;

@@ -406,7 +406,8 @@ import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, ma
 import { paidOrderReceipt } from "@/api/order-api";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt, trialPriceChanged as trialPriceRefused, type TrialConversionQuote, type TrialPurchaseOption } from "@/api/trial-api";
-import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialDiscountDisplay } from "@/lib/trial-discount-display";
 import { landingCopy } from "@/i18n/promotion-landing";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
 import { beginOrderAction, clearOrderAction, markOrderActionPaid, readOrderAction } from "@/lib/order-command-fence";
@@ -1225,8 +1226,9 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
     if (trialOptionReadFailed(option)) throw new Error("TRIAL_PRODUCT_QUOTE_UNAVAILABLE");
     if (!option?.canBuy || !option.quote) {
       const reason = option?.reasonCode;
-      if (!option) trialOptions.invalidateSelection(scope.productNo);
-      leaveTrialReview(!option ? trialDetailCopy.value.deviceGone : trialRefusalCopy(reason));
+      const reselect = !option || trialDeviceNeedsReselection(reason);
+      if (reselect) trialOptions.invalidateSelection(scope.productNo);
+      leaveTrialReview(reselect ? trialDetailCopy.value.deviceGone : trialRefusalCopy(reason));
       return true;
     }
     trialReviewOption.value = option;
@@ -1949,11 +1951,7 @@ const shownConfirmationTotal = computed(() => trialOriginal.value?.confirmedAmou
 const shownTrialDiscounts = computed(() => {
   const quote = trialReviewQuote.value;
   if (!quote) return { promo: promoDiscount.value, offset: trialOffsetView.value.offsetUSD, early: trialOffsetView.value.earlyDiscountUSD };
-  const cents = (amount: number) => Math.round(Number(formatPlainAmount(amount)) * 100);
-  const totalDiscount = cents(quote.priceUSD) - cents(quote.amountUSD);
-  const early = cents(quote.earlyDiscountUSD);
-  const promo = quote.offsetUSD > 0 ? cents(quote.promoDiscountUSD) : totalDiscount - early;
-  return { promo: promo / 100, early: early / 100, offset: (totalDiscount - promo - early) / 100 };
+  return trialDiscountDisplay(quote);
 });
 const trialCheckoutWorking = computed(() => ["processing", "submitting"].includes(activeTrialOutcome.value?.status ?? ""));
 const trialCheckoutNotice = computed(() => {
@@ -2215,7 +2213,7 @@ function applyTrialCheckoutOutcome(scope: CheckoutRouteScope) {
     void navReplace(`/pages/store/checkout?product=${encodeURIComponent(state.productNo)}&source=trial&trialRefusal=${encodeURIComponent(state.submissionNo)}`);
     return;
   }
-  if (trialReviewStatus.value !== "ready" && reasonCode !== "TRIAL_PRODUCT_NOT_ELIGIBLE" && reasonCode !== "TRIAL_NOT_CONVERTIBLE") {
+  if (trialReviewStatus.value !== "ready" && !trialDeviceNeedsReselection(reasonCode) && reasonCode !== "TRIAL_NOT_CONVERTIBLE") {
     if (trialRefusalNo !== state.submissionNo) {
       trialRefusalNo = state.submissionNo;
       trialResumeNo = undefined;
@@ -2232,9 +2230,8 @@ function applyTrialCheckoutOutcome(scope: CheckoutRouteScope) {
     void refreshMultiTrialReview(scope, true);
     return;
   }
-  if (reasonCode === "TRIAL_PRODUCT_NOT_ELIGIBLE") {
-    if (trialOptions.claimNo === state.claimNo) trialOptions.invalidateSelection(state.productNo);
-    leaveTrialReview();
+  if (trialDeviceNeedsReselection(reasonCode)) {
+    reselectTrialDevice(scope);
     return;
   }
   if (reasonCode === "TRIAL_WALLET_INSUFFICIENT") {
@@ -2253,6 +2250,11 @@ function applyTrialCheckoutOutcome(scope: CheckoutRouteScope) {
     return;
   }
   toast.warn(trialRefusalCopy(reasonCode));
+}
+
+function reselectTrialDevice(scope: CheckoutRouteScope) {
+  if (trialOptions.claimNo === trialCheckout.authority?.claimNo) trialOptions.invalidateSelection(scope.productNo);
+  leaveTrialReview();
 }
 
 async function reloadTrialRefusal(scope: CheckoutRouteScope, reason: string, amount: number | null) {
@@ -2370,7 +2372,9 @@ async function submitMultiTrialReview() {
             return;
           }
           if (refusal.action === "unavailable") {
-            if (refusal.reasonCode === "TRIAL_PRODUCT_NOT_AVAILABLE" || refusal.reasonCode === "TRIAL_NOT_CONVERTIBLE")
+            if (trialDeviceNeedsReselection(refusal.reasonCode)) reselectTrialDevice(scope);
+            else if (refusal.reasonCode === "TRIAL_PRODUCT_NOT_AVAILABLE" || refusal.reasonCode === "TRIAL_NOT_CONVERTIBLE"
+                || refusal.reasonCode === "ORDER_PAYMENT_EXPIRED")
               void reloadTrialRefusal(scope, refusal.reasonCode, confirmedAmountUSD);
             else toast.warn(trialRefusalCopy(refusal.reasonCode));
             return;
@@ -2524,6 +2528,7 @@ async function onConfirmPay() {
           },
           paymentCurrent,
           {kind:'TRIAL_CONVERT',claimNo: freeTrial.authorityClaimNo ?? undefined,payload:{productNo:p.id,expectedAmountUsdt:originalAmount,quoteVersion:originalVersion},
+            legacyTrialExpiry: trialOptions.claimNo === freeTrial.authorityClaimNo && trialOptions.current.status === 'unsupported',
             topupHref: shortfall => checkoutTrialTopupHref(confirmationScope, freeTrial.authoritativeQuote?.amountUSD ?? originalAmount, shortfall),
             walletOnly: !!replay,
             parseReceipt: raw => ({ ok: true, orderNo: parseTrialConvertReceipt(raw).orderNo })});

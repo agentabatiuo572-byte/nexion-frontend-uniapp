@@ -296,12 +296,13 @@ import { toast } from "@/store/ui";
 import { useTrialCheckout } from "@/store/trial-checkout";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 import { useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
-import { parseTrialConvertReceipt, trialPriceChanged, type TrialOriginalPurchase } from "@/api/trial-api";
+import { parseTrialConvertReceipt, trialPriceChanged } from "@/api/trial-api";
 import { resumeTrialPurchasePayment, TRIAL_PAYMENT_CARD_KEY, usePurchasePayment } from "@/store/purchase-payment";
 import TrialDevicePicker from "@/components/trial/trial-device-picker.vue";
 import TrialOriginalPurchaseCard from "@/components/trial/trial-original-purchase-card.vue";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
-import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialDiscountDisplay } from "@/lib/trial-discount-display";
 
 const t = useT();
 const app = useApp();
@@ -384,20 +385,7 @@ const optionsRead = useTrialCreditOptionsRead(() => pageVisible.value, () => {
   return product;
 });
 const purchaseClaim = computed(() => isActiveCycle.value ? displayState.value?.claimNo ?? null : null);
-const originalPurchase = computed<TrialOriginalPurchase | null>(() => {
-  const claimNo = purchaseClaim.value;
-  if (!claimNo) return null;
-  const outcome = checkout.outcome;
-  const snapshot = freeTrial.originalPurchase;
-  if (outcome.status === "settled" && outcome.claimNo === claimNo) return null;
-  if (outcome.status === "refused" && outcome.claimNo === claimNo && snapshot?.kind === "BALANCE"
-      && snapshot.submissionNo === outcome.submissionNo) return null;
-  if ("submission" in outcome && outcome.submission.claimNo === claimNo) {
-    return { ...outcome.submission, status: outcome.status === "resumable" ? "RESUMABLE" : "PROCESSING" };
-  }
-  if (outcome.status === "original" && outcome.originalPurchase.claimNo === claimNo) return outcome.originalPurchase;
-  return snapshot?.claimNo === claimNo ? snapshot : null;
-});
+const originalPurchase = computed(() => purchaseClaim.value ? checkout.originalPurchase : null);
 provide(TRIAL_PAYMENT_CARD_KEY, () => {
   const original = originalPurchase.value;
   return pageVisible.value && !authorityScreenUnavailable.value && original?.kind === "EXTERNAL" ? original.paymentNo : null;
@@ -465,7 +453,6 @@ const earlyQuote = computed(() => status.value === "active" && purchaseQuote.val
 const usd = (value: number) => `$${formatGroupedAmount(value)}`;
 // Caps and the headline discount read as whole dollars when they are ("$50", "$10").
 const usdShort = (value: number) => (Number.isInteger(value) ? `$${value}` : usd(value));
-const cents = (value: number) => Math.round(value * 100) / 100;
 /** Integer and decimal digits of a grouped amount, so the decimals can take the secondary colour. */
 function amountParts(value: number): [string, string] {
   const [whole, fraction = ""] = formatGroupedAmount(value).split(".");
@@ -510,14 +497,12 @@ const ticketDiscounts = computed(() => {
   const quote = purchaseQuote.value;
   if (!quote) return { promo: 0, early: 0, offset: 0, total: 0 };
   const { promoDiscountUSD: promo, earlyDiscountUSD: early, offsetUSD: offset } = quote;
-  if (!usePurchaseOptions.value) return { promo, early, offset, total: cents(promo + early + offset) };
-  const total = cents(cents(quote.priceUSD) - cents(quote.amountUSD));
-  const shownPromo = offset > 0 ? cents(promo) : cents(total - cents(early));
-  return { promo: shownPromo, early: cents(early), offset: cents(total - shownPromo - cents(early)), total };
+  if (!usePurchaseOptions.value) return { promo, early, offset, total: Number(formatAmount(promo + early + offset)) };
+  return trialDiscountDisplay(quote);
 });
 const discountTotal = computed(() => ticketDiscounts.value.total);
 const totalSource = computed(() => (purchaseQuote.value && !authorityScreenUnavailable.value
-  ? cents(discountTotal.value + purchaseQuote.value.remainderUSD) : null));
+  ? Number(formatAmount(discountTotal.value + purchaseQuote.value.remainderUSD)) : null));
 const totalCount = useViewCountUp(totalSource, "grouped", { follow: true });
 const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalSource.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
@@ -771,7 +756,7 @@ watch([pageVisible, displayState, () => checkout.outcome], ([visible, state, out
   } else if (outcome.status === "refused" && outcome.claimNo === state.claimNo && handledRefusal !== outcome.submissionNo) {
     handledRefusal = outcome.submissionNo;
     const reason = outcome.refusal.reasonCode;
-    if (reason === "TRIAL_PRODUCT_NOT_ELIGIBLE") {
+    if (trialDeviceNeedsReselection(reason)) {
       if (trialOptions.claimNo === state.claimNo) trialOptions.invalidateSelection(outcome.productNo);
       void optionsRead.refresh().catch(() => {});
     } else if (reason === "TRIAL_NOT_CONVERTIBLE") {
