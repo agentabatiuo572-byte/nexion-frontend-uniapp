@@ -320,7 +320,7 @@
       </view>
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && (!trialQuoteScreenUnavailable || trialWaitLoading) && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && (!trialQuoteScreenUnavailable || trialWaitLoading) && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar" :class="{ 'checkout-sticky--single': ownTrialOrderExit }">
         <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the tray holds only its status line. -->
         <view v-if="trialProgressOnly" class="nx-tray-status checkout-tray-status" role="status"><text>{{ purchaseCopy.coConfirming }}</text></view>
         <template v-else>
@@ -329,8 +329,10 @@
             <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
           </template>
           <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
-          <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
-          <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || trialWaitLoading || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
+          <!-- An unpaid full-price order for the device now on trial (R13): no total to pay here; the way on is the trial credit. -->
+          <NxButton v-if="ownTrialOrderExit" variant="primary" :label="t.store.buyWithTrialCredit" @click="openOwnTrialPurchase"><text>{{ t.store.buyWithTrialCredit }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
+          <view v-if="!ownTrialOrderExit" class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
+          <NxButton v-if="!ownTrialOrderExit" variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || trialWaitLoading || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
         </template>
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
@@ -1471,7 +1473,12 @@ const trialWaitLoading = computed(() => !multiTrialCheckout.value && trialQuoteU
 // An order already created keeps its page; its disabled tray says why (03 §3.1, §3.4).
 const trialWaitNote = computed(() => multiTrialCheckout.value || !hasOriginalCheckout.value || !trialQuoteUnavailable.value
   || trialWaitReason.value === "loading" ? ""
-  : trialWaitReason.value === "confirming" ? trialCopy.value.resultConfirming : purchaseCopy.value.coLoadFailed);
+  : trialWaitReason.value === "confirming" ? trialCopy.value.resultConfirming
+  : trialWaitReason.value === "ownTrialDeviceOrder" ? purchaseCopy.value.coOwnTrialOrder : purchaseCopy.value.coLoadFailed);
+// The same order's way on: buy this device with the trial credit, the trial detail preselecting it (04 普通结算与本人试用设备).
+const ownTrialOrderExit = computed(() => !multiTrialCheckout.value && hasOriginalCheckout.value && trialQuoteUnavailable.value
+  && trialWaitReason.value === "ownTrialDeviceOrder");
+function openOwnTrialPurchase() { navTo('/pages/me/trial?product=' + encodeURIComponent(productId.value)); }
 useAutoRecovery({
   failed: () => remoteApiEnabled && !multiTrialCheckout.value && !useTrialClaimSheet().open
     && (freeTrial.authorityStatus === "error" || trialQuoteUnavailable.value && trialWaitReason.value === "failed"),

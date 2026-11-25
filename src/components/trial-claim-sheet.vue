@@ -91,8 +91,8 @@ const stateReadFailed = trialView.readFailedWithoutData;
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
 const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '—' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
-// While a start is being confirmed the status line below says what is going on; the estimate is catalog information (03 §3.4).
-const estimateNote = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value && !freeTrial.pendingStart ? t.value.exchange.staleSnapshot : trialView.config.value
+// The estimate card holds catalog information only (03 §3.4); a failed refresh is said on the status line by the button.
+const estimateNote = computed(() => trialView.config.value
   ? trialView.config.value.shadowDailyUSD === null ? '' : fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
@@ -133,9 +133,13 @@ const retryHeld = computed(() => claiming.value && claimFromRetry.value);
 // A start found not to have run offers 重新领取, so its line says it did not start (a hint), not that it is confirming (03 §3.5.2).
 const startNotRun = computed(() => !!freeTrial.pendingStart && freeTrial.startRetryable);
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
-const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value);
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
-const reasonLine = computed(() => !!freeTrial.pendingStart || claimError.value || retryHeld.value || !!standingReason.value);
+// A refresh that failed over the shown data holds the claim: that is why 「免费激活」 is off, said as a status line beside it
+// while recovery reads again on its own (03 §3.1 禁用要有原因, §3.5.2).
+const staleRead = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value && !freeTrial.pendingStart
+  && !activated.value && !claiming.value && !claimError.value && !standingReason.value);
+const reasonLine = computed(() => !!freeTrial.pendingStart || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value);
 // Nothing left to decide once the claim is refused for now: the exit closes the sheet instead of 「我再想想」.
 const dismissLabel = computed(() => activated.value || claimDenied.value ? copy.value.close : t.value.trial.sheetDismissCta);
 useAutoRecovery({
@@ -155,6 +159,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
 const claimErrorText = computed(() => freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
+  : staleRead.value ? t.value.exchange.staleSnapshot
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : sheet.failureText(shownReason.value));
