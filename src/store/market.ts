@@ -26,8 +26,6 @@ export const useMarket = defineStore("market", () => {
   const low24h = ref(isMockMode ? 0.139 : 0);
   const change24hPct = ref(isMockMode ? 20.4 : 0);
   const change24hAvailable = ref(isMockMode);
-  // The G3 endpoint does not authorise volume/supply. Zero means unavailable,
-  // not a client estimate.
   const volume24hUSDT = ref(0);
   const circulating = ref(0);
   const costBasis = ref(isMockMode ? 0.085 : 0);
@@ -64,6 +62,7 @@ export const useMarket = defineStore("market", () => {
     const summary = market24hSummary(snapshot.history, snapshot.currentPrice);
     nexPriceUSDT.value = snapshot.currentPrice;
     costBasis.value = snapshot.costBasis;
+    volume24hUSDT.value = snapshot.volume24hUsdt;
     open24h.value = summary?.open ?? 0;
     high24h.value = summary?.high ?? 0;
     low24h.value = summary?.low ?? 0;
