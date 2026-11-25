@@ -1,5 +1,5 @@
 // Local frontend acceptance only. Never imported by src or deployed as a payment service.
-import {createHash} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoAccountOrders,demoFixture,demoOrderPaymentDeadline,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
@@ -197,7 +197,6 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     delete state.trialNextWalletRefusal;
     return settleTrialWallet(url,request,key,sameKey,sameKey);
   }
-  let trialSampleSequence=0;
   function setTrialPurchaseSample(origin, mode) {
     syncScenario();
     if (mode===state.trialOriginalPurchaseState&&originalTrialPurchase()&&!mode.startsWith('external-')) return {status:200};
@@ -249,7 +248,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     const confirmedCents=(BigInt(option.quote.amountUsdt.replace('.',''))+5000n)/10000n;
     state.trialBalancePurchase={
       kind:'BALANCE',claimNo:read.claimNo,productNo,name,imageUrl,productType,
-      paymentMethod:'WALLET',commandKey:key??'trial-balance-preview-'+(++trialSampleSequence),
+      paymentMethod:'WALLET',commandKey:key??'trial-checkout:'+randomUUID(),
       expectedAmountUsdt:String(amount??Number(confirmedCents)/100),quoteVersion:version??option.quoteVersion,
       status:'PROCESSING',
     };

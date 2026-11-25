@@ -349,7 +349,7 @@ import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
 import { orderTopupNetwork, trialExternalRequote, type OrderTopupNetwork } from '@/api/purchase-payment-api';
 import { capacityPaymentKind, readCapacityPending } from '@/lib/capacity-command-recovery';
 import { checkoutCreateBlock, checkoutQuoteBlock, validatePromotionItems, type PromotionItem } from '@/api/promotion-api';
-import { takeNavigationQuery } from '@/lib/route';
+import { takeNavigationParameters } from '@/lib/route';
 import { promotionCheckoutHref,promotionStoreHref,voucherEntryContext,type VoucherEntryContext } from '@/lib/promotion-entry';
 import AppChassis from "@/components/app-chassis.vue";
 import CheckoutRow from "@/components/store/checkout-row.vue";
@@ -895,9 +895,12 @@ function recoverCapacityBeforePurchase(targets: string[], explicit = false, resu
 }
 
 onLoad(async (options) => {
-  const pendingQuery=new URLSearchParams(takeNavigationQuery('/pages/store/checkout').replace(/^\?/,''));
-  const navigationQuery:Record<string,string>={};pendingQuery.forEach((value,key)=>{navigationQuery[key]=value;});
-  const o = { ...navigationQuery, ...(options || {}) } as Record<string, string>;
+  const identifiers = ["trialResume", "trialRefusal", "trialPayment", "trialTopup", "product", "id", "orderNo"];
+  const query = takeNavigationParameters("/pages/store/checkout", identifiers);
+  const o: Record<string, string | undefined> = { ...options };
+  query.forEach((value, key) => {
+    if (identifiers.includes(key) || o[key] === undefined) o[key] = value;
+  });
   trialTopupId.value = o.trialTopup || null;
   trialResumeNo = o.trialResume;
   trialRefusalNo = o.trialRefusal;
@@ -943,7 +946,9 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
     await Promise.all([
       read,
       refreshServerProductPhase(true),
-      freeTrial.refreshVisible(),
+      // Recovery links must observe a purchase that may have ended since the
+      // previous screen. A passive read can reuse that screen's active state.
+      trialResumeNo || trialRefusalNo || trialPaymentNo ? freeTrial.refreshRemote(true) : freeTrial.refreshVisible(),
     ]);
     if (!isCurrentCheckoutRoute(routeScope)) return;
     // A retry may have replaced the failed read while phase and trial were still loading.
@@ -1170,6 +1175,33 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
         return true;
       }
     }
+    const routedKey = trialResumeNo ?? trialRefusalNo;
+    if (routedKey) {
+      const submission = trialCheckout.workingSubmission;
+      if (trialResumeNo && submission?.submissionNo === routedKey && submission.device.productNo === scope.productNo
+          && trialOriginalLocked.value) return true;
+      let outcome = activeTrialOutcome.value;
+      if (outcome?.status !== "refused" || outcome.submissionNo !== routedKey) {
+        if (!state.claimNo || state.originalPurchase || (!trialsCanConvert(state.status) && state.status !== "converted")) {
+          leaveTrialReview(null);
+          return true;
+        }
+        const amount = "submission" in before && before.submission.submissionNo === routedKey ? before.submission.confirmedAmountUSD : null;
+        const result = await trialCheckout.readRoutedResult(state.claimNo, scope.productNo, routedKey, amount);
+        if (!isCurrentCheckoutRoute(scope)) return true;
+        outcome = activeTrialOutcome.value;
+        if (result?.status === "settled") {
+          await openTrialOrder(result.receipt.orderNo, scope);
+          return true;
+        }
+        if (!result || outcome?.status !== "refused" || outcome.submissionNo !== routedKey) {
+          leaveTrialReview(null);
+          return true;
+        }
+      }
+      trialRefusalNo = routedKey;
+      trialResumeNo = undefined;
+    }
     if (before.status === "settled" && before.claimNo === state.claimNo) {
       await openTrialOrder(state.conversion?.orderNo ?? before.receipt.orderNo, scope);
       return true;
@@ -1181,18 +1213,6 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
     if (trialPaymentNo && (state.originalPurchase?.kind !== "EXTERNAL" || state.originalPurchase.paymentNo !== trialPaymentNo)) {
       leaveTrialReview(null);
       return true;
-    }
-    if (trialResumeNo) {
-      const outcome = activeTrialOutcome.value;
-      const original = trialCheckout.workingSubmission;
-      if (original?.submissionNo === trialResumeNo && original.device.productNo === scope.productNo && trialOriginalLocked.value) return true;
-      if (outcome?.status === "refused" && outcome.submissionNo === trialResumeNo) {
-        trialRefusalNo = trialResumeNo;
-        trialResumeNo = undefined;
-      } else if (state.status !== "converted") {
-        leaveTrialReview(null);
-        return true;
-      }
     }
     if (trialOriginalLocked.value) return true;
     if (!scope.productNo || !state.claimNo || !trialsCanConvert(state.status)) {
@@ -3651,7 +3671,7 @@ watch(() => trialCheckout.outcome, state => {
   if (state.status === "processing" && foregroundReadAllowed()) void trialCheckout.readSubmission().catch(() => {});
 }, { flush: "post" });
 watch(() => trialCheckout.authority, state => {
-  if (state && !state.originalPurchase && !trialsCanConvert(state.status) && multiTrialCheckout.value && isTopCheckoutPage())
+  if (!activeCheckoutLoad && state && !state.originalPurchase && !trialsCanConvert(state.status) && multiTrialCheckout.value && isTopCheckoutPage())
     void refreshMultiTrialReview(captureCheckoutRoute(), true, true);
 });
 useAutoRecovery({

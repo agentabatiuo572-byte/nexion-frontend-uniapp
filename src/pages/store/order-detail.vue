@@ -228,7 +228,7 @@ import { useAuth } from "@/store/auth";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
-import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
+import { navReset, navTo, takeNavigationParameters } from "@/lib/route";
 import { apiClient,orderApi,purchaseEligibilityApi, purchasePaymentApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
 import { orderTopupNetwork, type OrderTopupNetwork } from "@/api/purchase-payment-api";
 import { confirmOrderTopupPayment, hasUsdt, orderTopupHref, orderTopupPayable, orderTopupPaymentChanged } from "@/lib/order-usdt-topup";
@@ -295,7 +295,7 @@ function isCurrentDetailScope(scope: DetailRequestScope): boolean {
 
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
-  const query = new URLSearchParams(takeNavigationQuery("/pages/store/order-detail"));
+  const query = takeNavigationParameters("/pages/store/order-detail", ["id"]);
   const queryIds = query.getAll("id");
   id.value = o.id || (queryIds.length === 1 ? queryIds[0] : "");
   const queryMatchesOrder = Boolean(id.value) && queryIds.length === 1 && queryIds[0] === id.value;

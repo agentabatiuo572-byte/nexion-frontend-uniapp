@@ -72,7 +72,7 @@
 <script setup lang="ts">
 import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
 import { onHide, onLoad, onShow, onUnload } from "@dcloudio/uni-app";
-import { takeNavigationQuery, navTo, navReplace } from "@/lib/route";
+import { takeNavigationParameters, navTo, navReplace } from "@/lib/route";
 import { checkTrialTopup, clearTrialTopup, markTrialTopupCheckout, readTrialTopup, trialTopupCheckoutHref } from "@/lib/trial-topup-return";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import NxButton from "@/components/ui/nx-button.vue";
@@ -106,19 +106,18 @@ const segments = remoteApiEnabled ? SEGMENTS.filter((item) => item.id !== "card"
 const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
 const trialTopupId = ref<string | null>(null);
 onLoad((query) => {
-  const pending = new URLSearchParams(takeNavigationQuery('/pages/me/wallet-topup'));
+  const pending = takeNavigationParameters('/pages/me/wallet-topup', ['orderNo', 'trialTopup']);
   const network = orderTopupNetwork(query?.network ?? pending.get('network'));
-  const orderNoForNet = query?.orderNo ?? pending.get('orderNo');
-  if (orderNoForNet && network) {
-    orderNet.value = { orderNo: orderNoForNet, network, name: query?.name ?? pending.get('name') ?? '' };
+  const orderNo = pending.get('orderNo') ?? query?.orderNo ?? null;
+  if (orderNo && network) {
+    orderNet.value = { orderNo, network, name: query?.name ?? pending.get('name') ?? '' };
     return;
   }
   const channel = query?.channel ?? pending.get('channel');
   const allowed = visibleSegments.value.find(item => item.id === channel);
   if (allowed) seg.value = allowed.id;
-  trialTopupId.value = query?.trialTopup ?? pending.get('trialTopup');
+  trialTopupId.value = pending.get('trialTopup') ?? query?.trialTopup ?? null;
   if (trialTopupId.value) return;
-  const orderNo = query?.orderNo ?? pending.get('orderNo');
   const amount = Number(query?.amount ?? pending.get('amount'));
   const deadline = Number(query?.deadline ?? pending.get('deadline'));
   const candidate = Number(query?.shortfall ?? pending.get('shortfall'));

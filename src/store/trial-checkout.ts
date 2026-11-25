@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, shallowRef, watch } from "vue";
 import { apiClient, trialApi } from "@/api/runtime";
 import { asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
-import { readPaymentCommand } from "@/api/payment-command-api";
+import { readPaymentCommand, type PaymentCommandReceipt } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import {
   isTrialAuthorizationRefusal, parseTrialOriginalPurchase, parseTrialPurchaseConvertResult,
@@ -16,6 +16,7 @@ import { useFreeTrial } from "./free-trial";
 type TrialBalancePurchase = Extract<TrialOriginalPurchase, { kind: "BALANCE" }>;
 type TrialRefusal = Extract<TrialPurchaseConvertResult, { status: "refused" }>;
 type Submission = Omit<TrialBalancePurchase, "status">;
+type SubmissionResultTarget = Pick<Submission, "claimNo" | "submissionNo" | "confirmedAmountUSD"> & { device: Pick<Submission["device"], "productNo"> };
 type ConfirmedSubmission = Submission & { confirmedAmountUSD: number; quoteVersion: string };
 
 type TrialCheckoutOutcome =
@@ -117,7 +118,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     }
   }
 
-  function release(submission: Submission): boolean {
+  function release(submission: Pick<Submission, "claimNo" | "submissionNo">): boolean {
     try {
       const saved = readLocal(submission.claimNo);
       return saved?.submissionNo !== submission.submissionNo || save(null);
@@ -126,7 +127,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     }
   }
 
-  function finish(submission: Submission, result: TrialPurchaseConvertResult) {
+  function finish(submission: SubmissionResultTarget, result: TrialPurchaseConvertResult) {
     if (result.status === "settled") {
       if (result.receipt.productNo !== submission.device.productNo || (result.receipt.claimNo && result.receipt.claimNo !== submission.claimNo))
         throw new Error("TRIAL_SUBMISSION_MISMATCH");
@@ -221,6 +222,28 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     }
   }
 
+  function terminalResult(reply: PaymentCommandReceipt) {
+    if (reply.status === "SUCCEEDED") return parseTrialPurchaseConvertResult(reply.receipt, 0);
+    if (reply.status === "REJECTED" && reply.code && reply.message)
+      return parseTrialPurchaseConvertResult(reply.receipt, reply.code, reply.message);
+    return null;
+  }
+
+  // The original disappears from trial/state once it settles or is refused.
+  // A cold checkout then has only the route identity to read its final receipt.
+  async function readRoutedResult(claimNo: string, productNo: string, submissionNo: string, amount: number | null) {
+    const current = currentAccount();
+    const reply = await readPaymentCommand(apiClient, "trial-convert", submissionNo);
+    if (!current() || authority.value?.claimNo !== claimNo || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
+    const result = terminalResult(reply);
+    if (!result) return;
+    const receiptClaim = result.status === "settled" ? result.receipt.claimNo : result.claimNo;
+    if ((reply.claimNo ?? receiptClaim) !== claimNo) return;
+    if (result.status === "settled" && result.receipt.productNo !== productNo) return;
+    finish({ claimNo, submissionNo, confirmedAmountUSD: amount, device: { productNo } }, result);
+    return result;
+  }
+
   function readSubmission(): Promise<void> {
     if (commandRead) return commandRead;
     const state = outcome.value;
@@ -230,10 +253,9 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     const read = readPaymentCommand(apiClient, "trial-convert", submission.submissionNo).then(async reply => {
       if (!current() || workingSubmission.value?.submissionNo !== submission.submissionNo
           || (reply.claimNo && reply.claimNo !== submission.claimNo) || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
-      if (reply.status === "SUCCEEDED") finish(submission, parseTrialPurchaseConvertResult(reply.receipt, 0));
-      else if (reply.status === "REJECTED") {
-        if (reply.code && reply.message) finish(submission, parseTrialPurchaseConvertResult(reply.receipt, reply.code, reply.message));
-      } else if (reply.canResumeSameKey && (reply.status === "PROCESSING" || reply.status === "NOT_SEEN")) {
+      const result = terminalResult(reply);
+      if (result) finish(submission, result);
+      else if (reply.canResumeSameKey && (reply.status === "PROCESSING" || reply.status === "NOT_SEEN")) {
         const trial = useFreeTrial();
         if (!await trial.refreshRemote() || !current() || workingSubmission.value?.submissionNo !== submission.submissionNo) return;
         const next = trial.displayState;
@@ -271,5 +293,5 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       outcome.value = { status: "idle" };
   }
 
-  return { authority, outcome, workingSubmission, originalPurchase, adoptAuthority, adoptOriginal, readSubmission, submit, settleExternal, clearSettled, rememberExternalRefusal };
+  return { authority, outcome, workingSubmission, originalPurchase, adoptAuthority, adoptOriginal, readSubmission, readRoutedResult, submit, settleExternal, clearSettled, rememberExternalRefusal };
 });

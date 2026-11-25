@@ -282,7 +282,7 @@ import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { getProduct } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
-import { navReplace, navTo, takeNavigationQuery } from "@/lib/route";
+import { navReplace, navTo, takeNavigationParameters } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useViewCountUp } from "@/composables/use-count-up";
 import TrialCountAmount from "@/components/me/trial-count-amount.vue";
@@ -372,8 +372,8 @@ const checkout = useTrialCheckout();
 const entryProductNo = ref<string>();
 let entryAccountEpoch: number | null = null;
 onLoad(query => {
-  const from = new URLSearchParams(takeNavigationQuery("/pages/me/trial")).get("product");
-  const product = query?.product ?? from;
+  const from = takeNavigationParameters("/pages/me/trial", ["product"]).get("product");
+  const product = from ?? query?.product;
   if (product) {
     entryProductNo.value = product;
     entryAccountEpoch = app.accountKey.startsWith("user:") ? app.accountBindingEpoch : null;
