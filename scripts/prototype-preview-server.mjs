@@ -68,7 +68,15 @@ const fixtureFor=(url,request)=>{
     ...request,originalTrialPurchase:checkoutFlow?.originalTrialPurchase,
   }),state);
 };
-const trialLifecycle=createTrialLifecyclePreview(state,fixtureFor);
+const trialLifecycle=createTrialLifecyclePreview(state,(url,request,mode)=>{
+  if(state.trialReadState==='user-not-found')throw Object.assign(new Error('USER_NOT_FOUND'),{status:404});
+  if(mode==='rejected'){
+    if(url.pathname==='/api/trial/start')state.trialStartPhaseClosed=true;
+    else if(state.trialRow?.state==='ACTIVE'&&!checkoutFlow?.originalTrialPurchase())
+      checkoutFlow?.setTrialPurchaseSample(url.origin,'external');
+  }
+  return fixtureFor(url,request);
+});
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
 await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push(()=>{
@@ -279,6 +287,7 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','slotReplacements','slotReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
         if(scenarioChange){
           delete state.trialLifecycleAdvanceDays;
+          delete state.trialStartPhaseClosed;
           delete state.trialBalancePurchase;
           delete state.trialBalanceCanResume;
           delete state.trialAccrualReductionUsdt;
@@ -312,6 +321,7 @@ const server=http.createServer(async(req,res)=>{
           delete state.tradeinRecoveryState;
         }
         if(update.trialStartReceiptState==='normal')trialLifecycle.release('start');
+        if(update.trialStartReceiptState&&update.trialStartReceiptState!=='rejected')delete state.trialStartPhaseClosed;
         if(update.trialCancelReceiptState==='normal')trialLifecycle.release('cancel');
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
@@ -430,6 +440,9 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
+      if(state.trialReadState==='user-not-found'&&/^\/api\/trial\/(?:state|eligibility|start|cancel|convert|purchase-options|commands\/[^/]+)$/.test(url.pathname)
+          &&previewAccountId(state,req.headers))
+        return sendJson(res,{code:404,message:'USER_NOT_FOUND',data:null},404);
       if(req.method==='GET'&&url.pathname==='/api/deposits/policy'&&state.orderTopupState==='policy-loading')
         await new Promise(resolve=>setTimeout(resolve,2500));
       if(req.method==='GET'&&url.pathname==='/api/trial/purchase-options'&&state.trialPurchaseReadState==='loading')
@@ -490,8 +503,6 @@ const server=http.createServer(async(req,res)=>{
       if(req.method!=='GET'&&!securityRevoke&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='error')
         return sendJson(res,{code:503,message:'TRIAL_STATE_UNAVAILABLE',data:null},503);
-      if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='user-not-found')
-        return sendJson(res,{code:404,message:'USER_NOT_FOUND',data:null},404);
       if(req.method==='GET'&&url.pathname==='/api/notifications'&&url.searchParams.has('cursor')&&state.notificationPageState==='error')
         return sendJson(res,{code:503,message:'NOTIFICATION_PAGE_UNAVAILABLE',data:null},503);
       const tradeinQuoteRead=req.method==='POST'&&url.pathname==='/api/app/trade-in/quote';

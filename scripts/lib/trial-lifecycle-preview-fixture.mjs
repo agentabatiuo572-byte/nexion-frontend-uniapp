@@ -24,17 +24,11 @@ export function createTrialLifecyclePreview(state, execute) {
   const scope = (account, kind, key) => JSON.stringify([account, kind, key]);
 
   function finish(command) {
-    const { kind, mode, run } = command;
     let result;
-    if (mode === 'rejected') {
-      // Both errors are retained by the production lifecycle idempotency scope.
-      result = response(409, kind === 'start' ? 'TRIAL_KILL_SWITCH_DISABLED' : 'TRIAL_CANCEL_CONFLICT');
-    } else {
-      try { result = success(run()); }
-      catch (error) {
-        if (!Number.isInteger(error.status)) throw error;
-        result = response(error.status, error.message, error.data ?? null);
-      }
+    try { result = success(command.run()); }
+    catch (error) {
+      if (!Number.isInteger(error.status)) throw error;
+      result = response(error.status, error.message, error.data ?? null);
     }
     command.result = result;
     delete command.run;
@@ -74,7 +68,9 @@ export function createTrialLifecyclePreview(state, execute) {
       const previous = commands.get(scopedKey);
       if (previous) {
         if (identity !== previous.identity) return response(409, 'IDEMPOTENCY_KEY_CONFLICT');
-        return previous.result ?? response(409, 'IDEMPOTENCY_REQUEST_IN_PROGRESS');
+        // The first activation preset rolls back before writing a claim.
+        if (previous.result?.status !== 503 || previous.result.body.message !== 'TRIAL_QUOTA_STATE_UNAVAILABLE')
+          return previous.result ?? response(409, 'IDEMPOTENCY_REQUEST_IN_PROGRESS');
       }
       const mode = state[setting[kind]] ?? 'normal';
       if (mode === 'not-seen') {
@@ -82,9 +78,9 @@ export function createTrialLifecyclePreview(state, execute) {
         return unavailable();
       }
       const command = {
-        kind, mode, identity,
+        kind, identity,
         receipt: { status: mode === 'indeterminate' ? 'INDETERMINATE' : 'PROCESSING' },
-        run: () => execute(url, { method: () => 'POST', headers: () => headers, postDataJSON: () => body }),
+        run: () => execute(url, { method: () => 'POST', headers: () => headers, postDataJSON: () => body }, mode),
       };
       commands.set(scopedKey, command);
       if (mode === 'indeterminate') {

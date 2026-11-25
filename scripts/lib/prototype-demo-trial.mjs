@@ -18,6 +18,10 @@ const liveStates=['ACTIVE','GRACE','EXTENDED'];
 const day=86400000,proof={sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const newClaimNo=()=>`TRIAL-${randomUUID().replaceAll('-','').toUpperCase()}`;
 const refuse=(message,data,status=409)=>{throw Object.assign(new Error(message),{status,data});};
+const originalPaymentReaders=new WeakMap();
+export function registerTrialOriginalPayment(state,read){
+  originalPaymentReaders.set(state,read);
+}
 const optionSku=['stellarrack-p1','cloud-share','stellarbox-pro','stellarbox-pro-v2','stellarbox-s1','stellarrack-p2'];
 export const trialPurchaseOptionSku=state=>state.trialPurchaseOptionTarget==='trial-device'
   ? state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku) : 'stellarrack-p1';
@@ -38,6 +42,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const hasYield=product?.dailyEarn>0&&product.dailyEarnNEX>0;
   const available=hasYield&&product.available&&product.productType==='DEVICE'&&product.inventoryMode==='FINITE'&&product.stock>0;
   const unclaimedConfig=Object.assign(data.config,product&&previewTrialProductConfig(product));
+  if(state.trialStartPhaseClosed)unclaimedConfig.phaseOpen=false;
   if(!hasYield){
     unclaimedConfig.shadowDailyUSD=null;
     unclaimedConfig.shadowDailyNEX=null;
@@ -88,10 +93,11 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   let duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
   const usesOptions=trialPurchaseOptionsEnabled(state);
   const trialProduct=()=>products.find(item=>item.id===cfg.trialProductId);
+  const conversionDeadline=()=>row.startedAt+duration+grace;
   const atTrialClock=at=>at+(state.trialPurchaseWindow==='grace'&&liveStates.includes(row.state)
     ? row.startedAt+duration+day-now : 0);
   const originalPurchase=()=>{
-    const purchase=request.originalTrialPurchase?.()??state.trialBalancePurchase;
+    const purchase=request.originalTrialPurchase?.()??originalPaymentReaders.get(state)?.()??state.trialBalancePurchase;
     return purchase?.claimNo===row.claimNo?purchase:null;
   };
   const trialDevice=()=>trialPurchaseDevice(trialProduct()??{
@@ -104,8 +110,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   }
   const snapshot=()=>{
     if(row.state==='ACTIVE'&&now>=row.startedAt+duration)row.state='GRACE';
-    if(row.state==='GRACE'&&now>=row.startedAt+duration+grace){
-      const finishedAt=row.startedAt+duration+grace;
+    if(row.state==='GRACE'&&now>=conversionDeadline()&&originalPurchase()?.kind!=='EXTERNAL'){
+      const finishedAt=conversionDeadline();
       Object.assign(row,{state:'CANCELLED',endReason:'expired',finishedAt,cooldownUntil:finishedAt+cooldown,version:(row.version??0)+1});
     }
     const trialNow=atTrialClock(now);
@@ -115,12 +121,12 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const {shadow,nex}=claimed&&row.state!=='CANCELLED'?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
     const eligible=!claimed||(['FAILED','CANCELLED'].includes(row.state)&&row.cooldownUntil!=null&&row.cooldownUntil<=now);
     // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
-    const canStart=eligible&&available&&!capacityFull;
+    const canStart=eligible&&available&&!capacityFull&&!state.trialStartPhaseClosed;
     const quote=live?quoteFor(shadow,nex,reportedState==='ACTIVE'):undefined;
     const purchase=live&&usesOptions?originalPurchase():null;
     const purchaseSnapshot=purchase?.kind==='EXTERNAL'
       ? {...purchase,deadlineAt:new Date(atTrialClock(Date.parse(purchase.deadlineAt))).toISOString()} : purchase;
-    return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
+    return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:state.trialStartPhaseClosed?'phase-closed':eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?row.claimNo:null,version:row.version??0,serverNowEpochMs:trialNow,endReason:row.endReason??null,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,
       graceEndsAtEpochMs:live?row.startedAt+duration+grace:null,
@@ -223,6 +229,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(url.pathname==='/api/trial/convert'&&request.method()==='POST'&&key&&state.trialCommands?.[key])return structuredClone(state.trialCommands[key]);
   const remember=value=>{if(key){state.trialCommands??={};state.trialCommands[key]=structuredClone(value);}return value;};
   if(url.pathname==='/api/trial/start'){
+    if(state.trialStartPhaseClosed)refuse('TRIAL_PHASE_CLOSED');
     const current=snapshot();
     if(!current.canStart){
       if(current.eligibilityReason==='product-unavailable'){
@@ -248,7 +255,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(url.pathname==='/api/trial/cancel'){
     const purchase=originalPurchase();
     if(row.state!=='ACTIVE')refuse('TRIAL_NOT_CANCELLABLE');
-    if(purchase?.kind==='EXTERNAL')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS');
+    if(purchase?.kind==='EXTERNAL')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS',purchase);
     if(purchase?.kind==='BALANCE')refuse('TRIAL_BALANCE_SUBMISSION_IN_PROGRESS',purchase);
     Object.assign(row,{state:'CANCELLED',endReason:'cancelled',finishedAt:now,cooldownUntil:now+cooldown,version:(row.version??0)+1});
     return snapshot();
@@ -257,7 +264,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if(!usesOptions)refuse('RESOURCE_NOT_FOUND',null,404);
     if(state.trialPurchaseReadState==='error'&&!request.trialPurchaseSample)refuse('TRIAL_PURCHASE_OPTIONS_UNAVAILABLE',null,503);
     const current=snapshot();
-    if(!liveStates.includes(current.state)||!current.claimNo)refuse('TRIAL_NOT_CONVERTIBLE');
+    if(!liveStates.includes(current.state)||!current.claimNo||current.serverNowEpochMs>=conversionDeadline())refuse('TRIAL_NOT_CONVERTIBLE');
     const options=[purchaseOption(trialProduct(),true,current),...extraProducts().map(item=>purchaseOption(item,false,current))]
       .map(option=>option.quote?{...option,quote:wireTrialQuote(option.quote)}:option);
     return {claimNo:current.claimNo,serverTime:new Date(current.serverNowEpochMs).toISOString(),options};
@@ -269,6 +276,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if(!paid&&purchase&&!(purchase.kind==='BALANCE'&&purchase.commandKey===key&&request.acceptedTrialSubmissionNo===key))
       refuse(purchase.kind==='BALANCE'?'TRIAL_BALANCE_SUBMISSION_IN_PROGRESS':'TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS',purchase);
     if(!liveStates.includes(current.state))refuse('TRIAL_NOT_CONVERTIBLE');
+    const paidAt=paid?atTrialClock(paid.paidAt):current.serverNowEpochMs;
+    if((paid&&paid.claimNo!==current.claimNo)||!Number.isFinite(paidAt)||paidAt>=conversionDeadline())refuse('TRIAL_NOT_CONVERTIBLE');
     if(usesOptions&&!paid&&!request.walletAuthorized)refuse('PAYMENT_PASSWORD_REQUIRED',null,422);
     const isTrialProduct=body.productNo===cfg.trialProductId;
     if(!usesOptions&&!isTrialProduct)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');

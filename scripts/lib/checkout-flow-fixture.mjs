@@ -4,7 +4,7 @@ import {createPaymentPinFlowFixture} from './payment-pin-flow-fixture.mjs';
 import {demoAccountOrders,demoFixture,demoOrderPaymentDeadline,demoOrderTimedOut,demoTimedOutOrder,paymentWindow} from './prototype-demo-data.mjs';
 import {createPurchasePaymentPreviewFixture} from './purchase-payment-preview-fixture.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
-import {trialPurchaseOptionsEnabled} from './prototype-demo-trial.mjs';
+import {registerTrialOriginalPayment,trialPurchaseOptionsEnabled} from './prototype-demo-trial.mjs';
 
 export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeOrders) {
   const pin = createPaymentPinFlowFixture();
@@ -22,6 +22,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   const ok = data => ({status:200,message:'OK',data});
   const unavailableReceipt = {status:503,message:'ORDER_RECEIPT_UNAVAILABLE',data:null};
   const external = createPurchasePaymentPreviewFixture(state, locale);
+  registerTrialOriginalPayment(state,external.originalTrialPurchase);
   const tradeinCommands = new Map([
     ['/api/app/trade-in/submit', 'trade-in'],
     ['/api/app/trade-in/capacity-replace', 'capacity-replace'],
