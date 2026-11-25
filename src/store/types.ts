@@ -1,4 +1,4 @@
-import type { PendingDeviceReplacement } from "@/api/device-e3-api";
+import type { PendingDeviceReplacement, SlotReplacementTiming } from "@/api/device-e3-api";
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
 import type { EntrySurface } from "@/lib/entry-surface";
 import type { TaskExecutionMetadata } from "@/api/task-assignment-api";
@@ -142,6 +142,7 @@ export interface Device {
   // Cleared by activateDevice() and by tick() after auto-deactivation fires.
   pendingDeactivate?: boolean;
   replacement?: PendingDeviceReplacement;
+  slotReplacementTiming?: SlotReplacementTiming;
   status: DeviceStatus;
   // Live simulation state
   gpuUsage: number; // 0-100

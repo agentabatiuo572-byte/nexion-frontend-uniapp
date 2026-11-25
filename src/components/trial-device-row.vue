@@ -17,11 +17,13 @@
       <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view class="trial-device-row__actions">
-        <view v-if="variant === 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
+        <view v-if="variant === 'inventory' && showCancel && cancelLocked && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action"><text>{{ detailCopy.cancelLocked }}</text></view>
+        <view v-if="variant === 'inventory' && showCancel && !cancelLocked && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
         <view class="trial-device-row__details" role="button" tabindex="0" :aria-label="copy.details" @click="goDetails" @keydown.enter.stop.prevent="goDetails" @keydown.space.stop.prevent="goDetails"><text>{{ copy.detailsAction }}</text></view>
-        <view class="trial-device-row__buy" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy" @keydown.enter.stop.prevent="goBuy" @keydown.space.stop.prevent="goBuy"><text>{{ presentation.status.value === 'grace' ? copy.buy : copy.buyEarly }}</text><NxIcon name="arrow-right" /></view>
+        <view class="trial-device-row__buy" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value ? 0 : -1" :aria-disabled="!presentation.actionsReady.value" @click="goBuy" @keydown.enter.stop.prevent="goBuy" @keydown.space.stop.prevent="goBuy"><text>{{ copy.buy }}</text><NxIcon name="arrow-right" /></view>
       </view>
-      <view v-if="variant !== 'inventory' && showCancel && presentation.status.value === 'active'" class="trial-device-row__cancel" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
+      <view v-if="variant !== 'inventory' && showCancel && cancelLocked && presentation.status.value === 'active'" class="trial-device-row__cancel"><text>{{ detailCopy.cancelLocked }}</text></view>
+      <view v-if="variant !== 'inventory' && showCancel && !cancelLocked && presentation.status.value === 'active'" class="trial-device-row__cancel" :style="{ opacity: presentation.presentationReady.value && !presentation.actionsReady.value && !cancelBusy ? 1 : undefined }" role="button" :tabindex="presentation.actionsReady.value && !cancelBusy ? 0 : -1" :aria-disabled="!presentation.actionsReady.value || cancelBusy" @click="requestCancel" @keydown.enter.stop.prevent="requestCancel" @keydown.space.stop.prevent="requestCancel"><text>{{ cancelBusy ? copy.cancelBusy : copy.cancel }}</text></view>
     </view>
   </view>
 </template>
@@ -29,38 +31,45 @@
 <script setup lang="ts">
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { remoteApiEnabled } from "@/api/runtime";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { computed, ref } from "vue";
 import { useTrialPresentation } from "@/composables/use-trial-presentation";
+import { useTrialPurchaseConfirmation } from "@/composables/use-trial-credit-option";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
+import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useT } from "@/i18n/use-t";
-import { formatTrialRemaining } from "@/i18n/trial-lifecycle";
+import { formatTrialRemaining, useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { formatAmount } from "@/lib/amount-display";
 import { navTo } from "@/lib/route";
 import { getProductMedia } from "@/lib/product-media";
 
-const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"; expanded?: boolean; showCancel?: boolean; cancelBusy?: boolean }>(), { variant: "earn", expanded: undefined });
+const props = withDefaults(defineProps<{ variant?: "home" | "earn" | "inventory"; expanded?: boolean; showCancel?: boolean; cancelBusy?: boolean; cancelLocked?: boolean }>(), { variant: "earn", expanded: undefined, cancelLocked: false });
 const visibility = useDataVisibility();
 const hidePersonalData = computed(() => props.variant !== "inventory" && visibility.hidden);
 const emit = defineEmits<{ (event: "cancel"): void; (event: "toggle"): void }>();
-const presentation = useTrialPresentation();
+const trial = useFreeTrial();
+const purchaseConfirmation = useTrialPurchaseConfirmation();
+const trialConfirming = computed(() => !!trial.pendingCancel || purchaseConfirmation.value);
+const presentation = useTrialPresentation(undefined, {
+  retainWhileConfirming: () => props.variant === "inventory" && trialConfirming.value,
+});
 // The online dot pauses while this card is off-screen or its page is hidden.
 const loops = useLoopsInView(".trial-device-row");
 const loopRef = loops.elRef;
-useAutoRecovery({ failed: () => remoteApiEnabled && props.variant === "inventory" && !useTrialClaimSheet().open && useFreeTrial().authorityStatus === "error", retry: () => presentation.refresh() });
+const lifecycleCopy = useTrialLifecycleCopy();
 const copy = useTrialFleetCopy();
+// A payment for this trial is in progress: the cancel entry is replaced in place by a plain reverse-action line (04 §4.6 设备页试用行).
+const detailCopy = useTrialDetailCopy();
 const t = useT();
 const localExpanded = ref(false);
 // The warehouse card is always open; Earn keeps its disclosure.
 const isExpanded = computed(() => props.variant === "inventory" || (props.expanded ?? localExpanded.value));
 const productMedia = computed(() => getProductMedia(presentation.productId.value));
-const isOnline = computed(() => presentation.presentationReady.value && presentation.status.value === "active");
-const statusText = computed(() => !presentation.presentationReady.value ? copy.value.statusUnknown
+const isOnline = computed(() => !trialConfirming.value && presentation.presentationReady.value && presentation.status.value === "active");
+const statusText = computed(() => trialConfirming.value ? lifecycleCopy.value.resultConfirming
+  : !presentation.presentationReady.value ? copy.value.statusUnknown
   : isOnline.value ? t.value.earn.online : copy.value.grace);
 // Cents render dimmer on the inventory card; masked values have no decimal part.
 const offsetParts = computed(() => { const text = money(presentation.offsetUSD.value); const at = /\.\d+$/.exec(text)?.index ?? text.length; return [text.slice(0, at), text.slice(at)]; });

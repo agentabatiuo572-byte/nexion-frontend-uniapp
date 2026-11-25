@@ -116,6 +116,7 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from '@/store/app';
 import { useAuth } from '@/store/auth';
 import { captureAccountScope, isCurrentAccountScope } from '@/lib/account-scope';
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { useLocaleStore } from "@/store/locale";
 import { networkReauditCopy } from "@/i18n/network-reaudit";
 import { apiClient, apiRuntimeConfig, expectedApiEnvironment, howContentApi, vRankApi } from "@/api/runtime";
@@ -152,26 +153,33 @@ function makeResource() {
   const owner = captureAccountScope(), language = locale.code;
   resourceOwner = owner;
   return createCommissionsHowResource({
-  async read(language) {
-    const [document, directPolicy, guide, ladder] = await Promise.all([
-      howContentApi.published("team-commissions-how", serverLanguage(language)),
-      directReferralApi.policy().catch(() => null), commissionGuideApi.read().catch(() => null), vRankApi.ladder().catch(() => null),
-    ]);
-    const needsRates = ladder && directPolicy && directPolicy.sevenLayerReference?.purchaseBaseRateSource !== "BENEFICIARY_RANK";
-    const rates = needsRates ? await commissionGuideApi.rates().catch(() => undefined) : undefined;
-    return { document, directPolicy, guide, ranks: ladder?.ranks ?? null, rates, ratesFailed: !!needsRates && !rates };
-  },
-  apply: next => {
-    if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
-    if (next.loading && state.value.snapshot) { state.value = { ...state.value, loading: true, error: false }; return; }
-    // 重读整体失败：已读到的说明照常显示，继续按失败恢复。
-    rereadFailed.value = next.error && !!state.value.snapshot;
-    if (rereadFailed.value) { state.value = { ...state.value, loading: false, error: false }; return; }
-    // 同一账户和环境里已读到的比例，重读失败时保留，同时按失败继续恢复。
-    const kept = next.snapshot?.ratesFailed ? state.value.snapshot?.rates : undefined;
-    state.value = next.snapshot && kept ? { ...next, snapshot: { ...next.snapshot, rates: kept } } : next;
-  },
-});
+    async read(language) {
+      const previous = state.value.snapshot;
+      let sectionsFailed = false;
+      async function readSection<T>(request: Promise<T>, fallback: T | undefined) {
+        try { return await request; }
+        catch (cause) {
+          sectionsFailed = true;
+          return isTransientReadFailure(cause) ? fallback : undefined;
+        }
+      }
+      const [document, directPolicy, guide, ranks] = await Promise.all([
+        howContentApi.published("team-commissions-how", serverLanguage(language)),
+        readSection(directReferralApi.policy(), previous?.directPolicy ?? undefined),
+        readSection(commissionGuideApi.read(), previous?.guide ?? undefined),
+        readSection(vRankApi.ladder().then(ladder => ladder.ranks), previous?.ranks ?? undefined),
+      ]);
+      const needsRates = ranks && directPolicy && directPolicy.sevenLayerReference?.purchaseBaseRateSource !== "BENEFICIARY_RANK";
+      const rates = needsRates ? await readSection(commissionGuideApi.rates(), previous?.rates) : undefined;
+      return { document, directPolicy: directPolicy ?? null, guide: guide ?? null, ranks: ranks ?? null, rates, sectionsFailed };
+    },
+    apply: next => {
+      if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
+      if (next.loading && state.value.snapshot) { state.value = { ...state.value, loading: true, error: false }; return; }
+      rereadFailed.value = next.transientFailure === true && !!state.value.snapshot;
+      state.value = rereadFailed.value ? { ...state.value, loading: false, error: false } : next;
+    },
+  });
 }
 let resource = makeResource();
 const rankCopy = computed(() => t.value.myRank);
@@ -284,15 +292,19 @@ const exampleRows = computed(() => {
   });
 });
 function reload() {
-  if (!isCurrentAccountScope(resourceOwner)) { resource.dispose(); resource = makeResource(); }
+  if (!isCurrentAccountScope(resourceOwner)) resetResource();
   return environmentCurrent() && auth.isAuthenticated ? resource.load(locale.code) : Promise.resolve();
 }
 onShow(reload);
 onHide(() => { resource.dispose(); resource = makeResource(); });
 const resourceInputs = () => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
-watch(resourceInputs, () => {
-  resource.dispose(); state.value = { loading: true, error: false, snapshot: null }; resource = makeResource();
-}, { flush: 'sync' });
+function resetResource() {
+  resource.dispose();
+  state.value = { loading: true, error: false, snapshot: null };
+  rereadFailed.value = false;
+  resource = makeResource();
+}
+watch(resourceInputs, resetResource, { flush: 'sync' });
 // Revoke the old body immediately; reload captures the owner after account binding settles.
 watch(resourceInputs, reload);
 onUnmounted(() => resource.dispose());
@@ -302,7 +314,7 @@ function goBack() {
 }
 useAutoRecovery({ failed: () => {
   const { loading, error, snapshot } = state.value;
-  return !loading && (error || rereadFailed.value || (snapshot !== null && (!snapshot.directPolicy || !snapshot.guide || !snapshot.ranks || snapshot.ratesFailed)));
+  return !loading && (error || rereadFailed.value || !!snapshot?.sectionsFailed);
 }, retry: reload });
 </script>
 <style scoped>

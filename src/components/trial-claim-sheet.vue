@@ -18,7 +18,7 @@
 
       <view class="tcs-device">
         <CatalogMachineImage class="tcs-device-art" :sku="trialView.productId.value" :image-url="getProductMedia(trialView.productId.value)?.src" scope-key="trial-claim" />
-        <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '-' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
+        <view class="tcs-device-meta"><text class="tcs-device-caption">{{ copy.productLabel }}</text><text class="tcs-device-name">{{ trialView.deviceName.value ?? '—' }}</text><text class="tcs-device-duration">{{ durationText }}</text></view>
       </view>
 
       <view v-if="activated" class="tcs-success" role="status" aria-live="polite">
@@ -34,15 +34,21 @@
         </view>
       </template>
 
-      <view v-if="claimError" class="tcs-error" role="alert"><text class="tcs-error-t">{{ claimErrorText }}</text></view>
-      <view v-else-if="!activated && freeTrial.authorityStatus === 'error'" class="tcs-error" role="status"><text class="tcs-error-t">{{ copy.unavailable }}</text></view>
+      <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary. -->
+      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" role="alert"><text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
+      <!-- A failed read recovers on its own (03 §3.5.2, 04.5): warning icon, the result and the retry line, no button. -->
+      <view v-else-if="!activated && !claiming && stateReadFailed" class="tcs-read-state" role="status">
+        <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
+        <text class="tcs-read-state__title">{{ copy.pageUnavailable }}</text>
+        <text class="tcs-read-state__hint">{{ copy.autoRetrying }}</text>
+      </view>
 
       <view class="tcs-ctas">
         <template v-if="activated">
-          <view class="tcs-claim" role="button" tabindex="0" :aria-label="copy.viewDevices" @click.stop="goDevices" @keydown.enter.stop.prevent="goDevices" @keydown.space.stop.prevent="goDevices"><text class="tcs-claim-t">{{ copy.viewDevices }}</text></view>
-          <view class="tcs-secondary" role="button" tabindex="0" :aria-label="copy.buyEarly" @click.stop="goTrial" @keydown.enter.stop.prevent="goTrial" @keydown.space.stop.prevent="goTrial"><text>{{ copy.buyEarly }}</text></view>
+          <NxButton variant="primary" :label="copy.viewDevices" @click="goDevices" />
+          <NxButton variant="secondary" :label="fleetCopy.buy" @click="goTrial" />
         </template>
-        <view v-else class="tcs-claim" :class="{ 'tcs-claim--busy': claiming }" role="button" :tabindex="claiming ? -1 : 0" :aria-label="claimCtaLabel" :aria-disabled="claiming ? 'true' : 'false'" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim" @keydown.enter.stop.prevent="onClaim" @keydown.space.stop.prevent="onClaim"><text class="tcs-claim-t">{{ claimCtaLabel }}</text></view>
+        <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" />
         <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
       </view>
     </view>
@@ -51,73 +57,84 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
-import { useFreeTrial, type TrialStartFailure } from "@/store/free-trial";
+import { isTrialStartDenied, useFreeTrial, type TrialStartFailure } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useTrialPresentation } from '@/composables/use-trial-presentation';
 import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecycle';
+import { useTrialFleetCopy } from '@/i18n/trial-fleet';
 
 const sheet = useTrialClaimSheet();
 const freeTrial = useFreeTrial();
-useAutoRecovery({ failed: () => remoteApiEnabled && sheet.open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
-const trialView = useTrialPresentation(() => sheet.open);
+const trialView = useTrialPresentation(() => sheet.open, { retainOnReadFailure: true });
 const app = useApp();
 const t = useT();
 const copy = useTrialLifecycleCopy();
+const fleetCopy = useTrialFleetCopy();
 
-const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '-');
-const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
+// The result stays up while recovery re-reads, so a retry does not blink it away.
+const stateReadFailed = trialView.readFailedWithoutData;
+const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
+const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '—' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
-const estimateNote = computed(() => trialView.config.value
+const estimateNote = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value ? t.value.exchange.staleSnapshot : trialView.config.value
   ? trialView.config.value.shadowDailyUSD === null ? '' : fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
-}) : freeTrial.authorityStatus === 'error' ? copy.value.unavailable : copy.value.loading);
-const remainingText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
+}) : stateReadFailed.value ? '' : copy.value.loading);
+const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
 
 // Claim submission — loading guard against double taps (异常3; the store's
 // start() is idempotent underneath, this just keeps the UI honest) + inline
 // error with retry (spec ⑤: failure is never silent).
 const claiming = ref(false);
-const activated = ref(false);
+const { activated } = storeToRefs(sheet);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
+const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
+  "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
+// The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
+const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
+const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
+  : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
+const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
+  ? !freeTrial.canStart() : !claimOpensAnotherPage.value && !trialView.actionsReady.value));
+// View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
+// so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
+const claimFromRetry = ref(false);
+const heldReasonText = ref("");
+const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
+useAutoRecovery({
+  active: () => sheet.open && !claiming.value,
+  failed: () => remoteApiEnabled && !freeTrial.authorityResultUnknown && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityIncomplete),
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+});
 let claimSequence = 0;
 const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === 'capacity-full' ? copy.value.manageDevices
   : claimErrorReason.value === 'converted' ? copy.value.viewDevices
   : claimErrorReason.value === 'in-progress' ? copy.value.viewTrial
   : claimErrorReason.value === 'used' ? copy.value.buyDevice
-  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
-  : claimError.value || freeTrial.authorityStatus === 'error' ? t.value.trial.claimRetryCta : copy.value.activateCta);
-const claimErrorText = computed(() => claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
+  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
+  : copy.value.activateCta);
+const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
-  : claimErrorReason.value === 'capacity-full' ? copy.value.capacityFull
-  : claimErrorReason.value === "unknown"
-  ? t.value.trial.claimUnknownInline
-  : reasonText(claimErrorReason.value));
-
-function reasonText(reason: TrialStartFailure | undefined): string {
-  const w = t.value.trial;
-  if (reason === 'capacity-full') return copy.value.capacityFull;
-  if (reason === "converted") return w.eligReasonConverted;
-  if (reason === "used") return w.eligReasonUsed;
-  if (reason === "in-progress") return w.eligReasonInProgress;
-  if (reason === "quota-exhausted") return w.eligReasonQuota;
-  if (reason === "risk") return w.eligReasonRisk;
-  if (reason === "product-unavailable") return t.value.store.trialProductUnavailable;
-  if (reason === "unknown") return w.eligReasonUnknown;
-  return w.eligReasonClosed;
-}
+  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
+  : sheet.failureText(claimErrorReason.value));
 
 function hide() {
   claimError.value = false;
@@ -127,7 +144,7 @@ function hide() {
 function goDevices() { hide(); navTo('/pages/me/devices'); }
 function goTrial() { hide(); navTo('/pages/me/trial'); }
 async function onClaim() {
-  if (claiming.value || !sheet.open || activated.value) return;
+  if (claimDisabled.value || !sheet.open || activated.value) return;
   if (claimErrorReason.value === 'capacity-full' || claimErrorReason.value === 'converted') { goDevices(); return; }
   if (claimErrorReason.value === 'in-progress' || claimErrorReason.value === 'used') { goTrial(); return; }
   if (claimErrorReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
@@ -135,28 +152,34 @@ async function onClaim() {
   if (claimErrorReason.value === "onboarding-required") { hide(); navTo("/pages/support/messages"); return; }
   const requestedEpoch = app.accountBindingEpoch;
   const requestedSequence = ++claimSequence;
+  claimFromRetry.value = claimRetryable.value;
+  heldReasonText.value = claimErrorText.value;
   claiming.value = true;
   claimError.value = false;
+  claimErrorReason.value = undefined;
   // Remote start first refreshes GET /api/trial/eligibility, then posts the
   // idempotent command and performs an authoritative readback.
   const r = await freeTrial.start();
   if (requestedSequence !== claimSequence) return;
   claiming.value = false;
   if (requestedEpoch !== app.accountBindingEpoch) return;
-  // A confirmed claim holds a slot even if the sheet was closed meanwhile; the count must follow it.
-  if (r.ok && remoteApiEnabled) void app.refreshRemoteFleet();
   if (!sheet.open) return;
   if (!r.ok) {
+    if (r.reason === "read-failed" || r.reason === "confirming") return;
     claimErrorReason.value = r.reason;
     claimError.value = true; // inline error + retry CTA, stay in the sheet
     return;
   }
   claimError.value = false;
   claimErrorReason.value = undefined;
-  // start() only resolves ok after the authoritative state readback succeeds.
-  activated.value = true;
+  if (!remoteApiEnabled) activated.value = true; // Local claims have no server claim number.
 }
 
+watch(() => freeTrial.confirmedStartDenial, reason => {
+  if (!sheet.open || !reason) return;
+  claimErrorReason.value = reason;
+  claimError.value = true;
+});
 watch(() => app.accountBindingEpoch, () => {
   claimSequence++;
   claiming.value = false;
@@ -169,10 +192,8 @@ watch(() => sheet.open, open => {
   if (!open) return;
   claimError.value = false;
   claimErrorReason.value = undefined;
-  activated.value = !claiming.value && freeTrial.authorityStatus === 'ready'
-    && (freeTrial.status === 'active' || freeTrial.status === 'grace');
+  activated.value = !claiming.value && !freeTrial.pendingStart && trialView.displayReady.value && trialView.active.value;
 });
-
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
@@ -212,18 +233,19 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-success-body { display:block;font:400 var(--ui-type-list-subtitle)/1.65 var(--font-v5);color:var(--v5-ink-2); }
 .tcs-success-time { display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-top:14px;font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .tcs-success-time > text:last-child { font-size:22px;font-weight:500;color:var(--v5-brand); }
-.tcs-error { margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--v5-warning) 10%,transparent); }
-.tcs-error-t { display:block;font:400 12px/1.65 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+.tcs-error { display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px 16px;margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--v5-warning) 10%,transparent); }
+.tcs-error-t { display:block;flex:1 1 12em;min-width:0;font:400 12px/1.65 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+/* Read failure in the sheet: the receipt sheet's result block (03 §3.5.2, 04.5), centred, no button. */
+.tcs-read-state { display:flex;flex-direction:column;align-items:center;padding:20px 24px 0;text-align:center; }
+.tcs-read-state__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-warning-ink);background:var(--v5-warning-soft); }
+.tcs-read-state__title { display:block;margin-top:12px;color:var(--v5-ink);font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:break-word; }
+.tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);overflow-wrap:break-word; }
+.tcs-retry { margin-left:auto;align-self:flex-end;flex-shrink:0; }
 .tcs-ctas { margin-top:20px;display:flex;flex-direction:column;gap:8px; }
-.tcs-claim { box-sizing:border-box;width:100%;min-height:48px;padding:12px 16px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--v5-brand);box-shadow:0 0 24px color-mix(in srgb,var(--v5-brand) 18%,transparent);transition:transform .12s ease; }
-.tcs-claim:active { transform:scale(.98); }
-.tcs-claim--busy { opacity:.7;pointer-events:none; }
-.tcs-claim-t { font:600 13px/1.5 var(--font-v5);color:var(--v5-on-brand);text-align:center;overflow-wrap:break-word; }
-.tcs-secondary { box-sizing:border-box;min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--v5-border);display:flex;align-items:center;justify-content:center;font:500 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-ink);text-align:center;overflow-wrap:break-word; }
 .tcs-dismiss { width:100%;min-height:44px;display:flex;align-items:center;justify-content:center; }
 .tcs-dismiss:active { opacity:.7; }
-.tcs-dismiss-t { font:400 var(--ui-type-list-subtitle)/1.5 var(--font-v5);color:var(--v5-ink-3);text-align:center; }
-.tcs-claim:focus-visible,.tcs-secondary:focus-visible,.tcs-close:focus-visible,.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
+.tcs-dismiss-t { font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);color:var(--v5-brand);text-align:center; }
+.tcs-close:focus-visible,.tcs-dismiss:focus-visible { outline:2px solid var(--v5-brand);outline-offset:3px; }
 @media(max-width:350px) { .tcs-device-art { width:160px;height:160px; }.tcs-device-name {font-size:17px;}.tcs-title {font-size:16px;} }
-@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-spark-box--success { animation:none; }.tcs-claim { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-spark-box--success { animation:none; } }
 </style>

@@ -21,7 +21,7 @@
       <!-- Topping up for a purchase, with a return action when an existing order is covered. -->
       <view v-if="orderTopup" class="topup-order nx-tint" :class="{ 'is-done': topupCovered }" role="status">
         <view class="topup-order__t"><view class="topup-order__dot" aria-hidden="true" /><text>{{ topupCovered ? payCopy.topupDone : orderTopup.orderNo ? payCopy.topupFor : payCopy.topupForPurchase }}</text></view>
-        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d">{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ orderTopup.orderNo ? payCopy.topupNeedTail : payCopy.topupNeedTailPurchase }}</text>
+        <text v-if="orderTopupLeft !== null && orderTopupLeft > 0" class="topup-order__d"><template v-if="trialReturn && orderTopupLeft < 0.01">{{ trialCopy.coShortTiny }}</template><template v-else>{{ fillCopy(payCopy.topupNeed, { name: orderTopup.name }) }}<text class="topup-order__b">{{ formatGroupedAmount(orderTopupLeft, shortfallPrecision) }} USDT</text>{{ orderTopup.orderNo ? payCopy.topupNeedTail : payCopy.topupNeedTailPurchase }}</template></text>
         <text v-else-if="topupCovered" class="topup-order__d">{{ fillCopy(orderTopup.orderNo ? payCopy.topupEnough : payCopy.topupEnoughPurchase, { amt: formatGroupedAmount(app.user.usdtBalance) }) }}</text>
         <view v-if="!topupCovered && orderTopup.orderNo && orderCloseLeft !== null" class="topup-order__cd">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
@@ -44,7 +44,7 @@
       <DepositUsdtPane v-if="seg === 'crypto'" :bank-available="visibleSegments.some((item) => item.id === 'bank')" @use-bank="useBankChannel" />
       <DepositBankPane v-else-if="seg === 'bank'" ref="bankPane" />
       <TopupCardForm v-else @change-channel="seg = 'crypto'" />
-      <view v-if="orderFunded || bankAction" style="height: 120px" />
+      <view v-if="orderFunded || trialFunded || bankAction" style="height: 120px" />
       </template>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30): back to the order once it is covered, otherwise the bank pane's create action. -->
@@ -54,7 +54,7 @@
         <text v-if="orderBar.note" class="nx-tray-note">{{ orderBar.note }}</text>
         <NxButton class="topup-sticky__btn" variant="primary" :label="orderBar.label" :disabled="!orderBar.enabled" @click="orderBar.run()" />
       </view>
-      <view v-else-if="orderFunded" class="topup-sticky nx-glass-bar"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" @click="backToOrder" /></view>
+      <view v-else-if="orderFunded || trialFunded" class="topup-sticky nx-glass-bar"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" :busy="returningToTrial" @click="backToOrder" /></view>
       <view v-else-if="bankAction" class="topup-sticky nx-glass-bar">
         <NxButton v-if="bankSecondary" :class="['topup-sticky__btn', bankSecondary.className]" variant="secondary" :label="bankSecondary.label" @click="bankSecondary.run()" />
         <NxButton :class="['topup-sticky__btn', bankAction.className]" variant="primary" :label="bankAction.label" :disabled="!bankAction.enabled" @click="bankAction.run()">
@@ -72,7 +72,9 @@
 <script setup lang="ts">
 import { ref, nextTick, type CSSProperties, computed, watch } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
-import { takeNavigationQuery, navTo } from "@/lib/route";
+import { takeNavigationParameters, navTo, navReplace } from "@/lib/route";
+import { checkTrialTopup, clearTrialTopup, markTrialTopupCheckout, readTrialTopup, trialTopupCheckoutHref } from "@/lib/trial-topup-return";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import NxButton from "@/components/ui/nx-button.vue";
 import { useApp } from "@/store/app";
 import { useLocaleStore } from "@/store/locale";
@@ -94,30 +96,34 @@ import { binarySessionReady } from "@/lib/binary-session-ready";
 import { findResumablePaymentIntent } from "@/lib/hosted-payment";
 import { orderTopupNetwork, type OrderTopupIntent, type OrderTopupNetwork } from "@/api/purchase-payment-api";
 import { replaceWithOrder, usePurchasePayment } from "@/store/purchase-payment";
+import { toast } from "@/store/ui";
+import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
 const SEGMENTS: { id: Seg }[] = [{ id: "bank" }, { id: "crypto" }, { id: "card" }];
 const segments = remoteApiEnabled ? SEGMENTS.filter((item) => item.id !== "card") : SEGMENTS;
 const seg = ref<Seg>(remoteApiEnabled ? "bank" : "crypto");
+const trialTopupId = ref<string | null>(null);
 onLoad((query) => {
-  const pending = new URLSearchParams(takeNavigationQuery('/pages/me/wallet-topup'));
+  const pending = takeNavigationParameters('/pages/me/wallet-topup', ['orderNo', 'trialTopup']);
   const network = orderTopupNetwork(query?.network ?? pending.get('network'));
-  const orderNoForNet = query?.orderNo ?? pending.get('orderNo');
-  if (orderNoForNet && network) {
-    orderNet.value = { orderNo: orderNoForNet, network, name: query?.name ?? pending.get('name') ?? '' };
+  const orderNo = pending.get('orderNo') ?? query?.orderNo ?? null;
+  if (orderNo && network) {
+    orderNet.value = { orderNo, network, name: query?.name ?? pending.get('name') ?? '' };
     return;
   }
   const channel = query?.channel ?? pending.get('channel');
   const allowed = visibleSegments.value.find(item => item.id === channel);
   if (allowed) seg.value = allowed.id;
-  const orderNo = query?.orderNo ?? pending.get('orderNo');
+  trialTopupId.value = pending.get('trialTopup') ?? query?.trialTopup ?? null;
+  if (trialTopupId.value) return;
   const amount = Number(query?.amount ?? pending.get('amount'));
   const deadline = Number(query?.deadline ?? pending.get('deadline'));
   const candidate = Number(query?.shortfall ?? pending.get('shortfall'));
   const shortfall = Number.isFinite(candidate) && candidate > 0 ? candidate : null;
   if (Number.isFinite(amount) && amount > 0 && (orderNo || shortfall !== null)) {
-    orderTopup.value = {
+    ordinaryTopup.value = {
       orderNo, amount, shortfall, name: query?.name ?? pending.get('name') ?? '',
       deadlineAt: Number.isFinite(deadline) && deadline > 0 ? deadline : null,
     };
@@ -145,13 +151,53 @@ function openOrder() { if (orderNet.value) void navTo(orderHref()); }
 function returnToOrder() { if (orderNet.value) void replaceWithOrder(orderHref()); }
 function openSupport() { void navTo('/pages/support/messages'); }
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
-const orderTopup = ref<{ orderNo: string | null; amount: number; shortfall: number | null; name: string; deadlineAt: number | null } | null>(null);
+const trialCopy = useTrialPurchaseCopy();
+const ordinaryTopup = ref<{ orderNo: string | null; amount: number; shortfall: number | null; name: string; deadlineAt: number | null } | null>(null);
+const trialReturn = computed(() => sessionReady.value ? readTrialTopup(app.accountKey, trialTopupId.value) : null);
+const trialReview = ref<{ scope: string; amountUSD: number } | null>(null);
+const orderTopup = computed(() => {
+  const target = trialReturn.value;
+  const review = trialReview.value;
+  if (!target) return ordinaryTopup.value;
+  return review && review.scope === trialFundingScope.value
+    ? { orderNo: null, amount: review.amountUSD, shortfall: null, name: target.productName, deadlineAt: null } : null;
+});
+let trialFundingRead: Promise<boolean> | null = null;
+const returningToTrial = ref(false);
+const trialFundingScope = computed(() => {
+  const target = trialReturn.value;
+  return target ? `${app.accountBindingEpoch}:${target.id}` : "";
+});
+function refreshTrialFunding(): Promise<boolean> {
+  const target = trialReturn.value, scope = trialFundingScope.value;
+  if (!target || !scope || !topupVisible.value || !foregroundReadAllowed()) return Promise.resolve(false);
+  if (trialFundingRead) return trialFundingRead;
+  const current = () => topupVisible.value && scope === trialFundingScope.value && !!readTrialTopup(target.accountKey, target.id);
+  const read = Promise.all([checkTrialTopup(target), app.refreshRemoteFleet(app.captureRemoteAccountRequest())])
+    .then(async ([review, walletReady]) => {
+      if (!current()) return false;
+      if (review.status === "redirect") {
+        trialReview.value = null;
+        clearTrialTopup(target.accountKey, target.id);
+        await navReplace(review.href);
+        return false;
+      }
+      trialReview.value = walletReady ? { scope, amountUSD: review.amountUSD } : null;
+      return walletReady;
+    })
+    .catch(() => { if (current()) trialReview.value = null; return false; })
+    .finally(() => { if (trialFundingRead === read) trialFundingRead = null; });
+  trialFundingRead = read;
+  return read;
+}
 const topupNow = ref(Date.now());
 useVisibleInterval(() => { if (orderTopup.value) topupNow.value = Date.now(); }, 1000);
 const balanceKnown = computed(() => Number.isFinite(app.user.usdtBalance) && app.remoteFleetHasSnapshot);
 const orderTopupLeft = computed(() => {
   const topup = orderTopup.value;
   if (!topup) return null;
+  if (trialReturn.value) return balanceKnown.value
+    ? Math.max(0, Math.round(topup.amount * 1_000_000) - Math.round(app.user.usdtBalance * 1_000_000)) / 1_000_000 : null;
   return balanceKnown.value ? Math.max(0, topup.amount - app.user.usdtBalance) : topup.shortfall;
 });
 // With no fresh balance, a carried shortfall larger than the purchase amount includes wallet debt.
@@ -167,7 +213,25 @@ const orderCloseLeft = computed(() => {
   return left === null ? null : `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
 });
 const orderFunded = computed(() => !!orderTopup.value?.orderNo && topupCovered.value);
-function backToOrder() {
+const trialFunded = computed(() => !!trialReturn.value && topupCovered.value);
+async function backToOrder() {
+  const target = trialReturn.value;
+  if (target) {
+    if (!trialFunded.value || returningToTrial.value) return;
+    const scope = trialFundingScope.value;
+    returningToTrial.value = true;
+    try {
+      if (!await refreshTrialFunding() || scope !== trialFundingScope.value || !trialFunded.value) return;
+      if (!markTrialTopupCheckout(target)) {
+        toast.error(t.value.errors.txNotSavedTitle, t.value.errors.txNotSavedMsg);
+        return;
+      }
+      await navReplace(trialTopupCheckoutHref(target));
+    } finally {
+      returningToTrial.value = false;
+    }
+    return;
+  }
   const orderNo = orderTopup.value?.orderNo;
   if (orderNo && orderFunded.value) void navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&pay=1`);
 }
@@ -217,6 +281,12 @@ const sessionReady = computed(() => {
     sessionUserId: sessionVault.read()?.user.userId ?? null,
   });
 });
+watch([trialFundingScope, topupVisible, foregroundReadAllowed], ([scope, visible, allowed]) => {
+  if (scope && visible && allowed) void refreshTrialFunding();
+}, { immediate: true, flush: "post" });
+useVisibleInterval(() => { void refreshTrialFunding(); }, 10_000, () => !!trialFundingScope.value);
+watch(() => dep.records.filter(record => record.status === "credited").map(record => record.depositId).join("|"),
+  () => { void refreshTrialFunding(); });
 // The page reads the bank channel config itself, so a channel turned back on (or another account) shows again.
 watch([sessionReady, () => app.accountKey, () => app.accountBindingEpoch], ([ready]) => { if (ready) void fx.load(); }, { immediate: true });
 onShow(() => { if (sessionReady.value) void fx.load(); });

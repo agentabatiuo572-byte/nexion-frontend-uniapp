@@ -1,5 +1,10 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { useFreeTrial, type TrialStartFailure } from "./free-trial";
+import { useApp } from "./app";
+import { toast } from "./ui";
+import { getT } from "@/i18n/use-t";
+import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { mockServerNow } from "./server-time";
 
 /**
@@ -24,6 +29,34 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
   }
 
   const open = ref(false);
+  const activated = ref(false);
+  const trial = useFreeTrial();
+  const copy = useTrialLifecycleCopy();
+  // Both the immediate and the delayed state read confirm the same claim here,
+  // even if its original page or sheet has since been closed.
+  watch(() => trial.confirmedStartClaimNo, claimNo => {
+    if (!claimNo) return;
+    void useApp().refreshRemoteFleet();
+    if (open.value) activated.value = true;
+    else toast.success(copy.value.activationSuccessTitle);
+  });
+  // Refused at once or only by a later read, the reason reaches the user even with the sheet closed.
+  watch(() => trial.confirmedStartDenial, reason => {
+    if (reason && !open.value) toast.error(failureText(reason));
+  });
+  function failureText(reason: TrialStartFailure | undefined): string {
+    const t = getT();
+    if (reason === "rejected") return copy.value.claimRejected;
+    if (reason === "capacity-full") return copy.value.capacityFull;
+    if (reason === "converted") return t.trial.eligReasonConverted;
+    if (reason === "used") return t.trial.eligReasonUsed;
+    if (reason === "in-progress") return t.trial.eligReasonInProgress;
+    if (reason === "quota-exhausted") return t.trial.eligReasonQuota;
+    if (reason === "risk") return t.trial.eligReasonRisk;
+    if (reason === "product-unavailable") return copy.value.deviceUnclaimable;
+    if (reason === "unknown") return t.trial.eligReasonUnknown;
+    return t.trial.eligReasonClosed;
+  }
   const lastClosedAt = ref(hydrateLastClosedAt());
   const sessionShownCount = ref(0);
 
@@ -67,5 +100,5 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     persist();
   }
 
-  return { open, lastClosedAt, sessionShownCount, show, tryAutoPush, hide, closeTransient, resetCooldown };
+  return { open, activated, lastClosedAt, sessionShownCount, failureText, show, tryAutoPush, hide, closeTransient, resetCooldown };
 });

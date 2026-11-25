@@ -41,15 +41,15 @@
               <text class="block" :style="memberSinceStyle">{{ memberSinceText }}</text>
             </view>
             <view class="shrink-0">
-              <VBadge v-if="myRank !== null" :v="myRank" size="md" />
-              <text v-else class="font-mono-tabular" :style="miniValueStyle">V—</text>
+              <VBadge v-if="myRank !== null && !visibility.hidden" :v="myRank" size="md" />
+              <text v-else class="font-mono-tabular" :style="miniValueStyle">{{ visibility.hidden ? visibility.mask("") : "V—" }}</text>
             </view>
           </view>
 
           <!-- variant hero stat -->
           <view v-if="variant === 'earnings'" style="margin-top: var(--ui-space-inset)">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand)')">{{ t.proof.totalEarned }}</text>
-            <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotalText }}</text>
+            <text class="block font-display tabular-nums" :style="heroBigStyle">{{ visibility.hidden ? "" : "$" }}{{ visibility.mask(earningsTotalText) }}</text>
           </view>
           <view v-else-if="variant === 'streak'" style="margin-top: var(--ui-space-inset)">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.longestStreak }}</text>
@@ -63,7 +63,7 @@
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.teamReach }}</text>
             <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              <text class="font-display tabular-nums" :style="heroBigInlineStyle">{{ totalMembers === null ? "—" : totalMembers }}</text>
+              <text class="font-display tabular-nums" :style="heroBigInlineStyle">{{ visibility.mask(totalMembers === null ? "—" : totalMembers) }}</text>
             </view>
           </view>
 
@@ -79,7 +79,7 @@
             </view>
             <view :style="miniStatStyle">
               <text class="block" :style="miniLabelStyle">{{ topPctLabel }}</text>
-              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">{{ topPctText }}</text>
+              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">{{ visibility.mask(topPctText) }}</text>
             </view>
           </view>
 
@@ -87,7 +87,7 @@
           <view style="margin-top: var(--ui-space-inline)">
             <text class="block font-mono-tabular" :style="chipsLabelStyle">{{ t.proof.achievementsRow }}</text>
             <view class="flex" style="gap: 6px; flex-wrap: wrap">
-              <text class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand)')">{{ vRankChip }}</text>
+              <text class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand)')">{{ visibility.mask(vRankChip) }}</text>
               <text v-if="longestOrCurrent !== null && longestOrCurrent > 0" class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand-2)')">{{ streakChip }}</text>
               <text v-if="onlineDevices !== null && onlineDevices > 0" class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-tech-cyan)')">{{ devicesChip }}</text>
               <text class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-warning)')">{{ daysActiveChip }}</text>
@@ -204,6 +204,7 @@ import { buildShareLink, copyText as copyToClipboard } from "@/lib/share";
 import { displayNickname } from "@/lib/brand-copy";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank } from "@/store/v-rank";
+import { useDataVisibility } from "@/store/data-visibility";
 import { rankTitle } from "@/lib/v-rank-copy";
 import { useLocaleStore } from "@/store/locale";
 import { useConfig } from "@/store/config";
@@ -226,6 +227,7 @@ const t = useT();
 const app = useApp();
 const profile = useProfile();
 const vRank = useVRank();
+const visibility = useDataVisibility();
 const locale = useLocaleStore();
 const config = useConfig();
 const recoveryCopy = computed(() => proofRecoveryCopyFor(locale.code));
@@ -390,7 +392,7 @@ const shareText = computed(() => {
 
 // ── derived labels ──
 const memberSinceText = computed(() => fmt(t.value.proof.memberSince, { m: joined.value }));
-const topPctLabel = computed(() => topPct.value === null ? t.value.proof.topPctUnavailable : t.value.proof.topPct.replace("{n}", String(topPct.value)));
+const topPctLabel = computed(() => topPct.value === null || visibility.hidden ? t.value.proof.topPctUnavailable : t.value.proof.topPct.replace("{n}", String(topPct.value)));
 const vRankChip = computed(() => myRank.value === null ? "V—" : fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: rankTitle(myRank.value, locale.code, vRank.ladder) }));
 const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(longestOrCurrent.value ?? "—") }));
 const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value ?? "—") }));

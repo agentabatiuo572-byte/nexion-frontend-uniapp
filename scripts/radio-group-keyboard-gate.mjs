@@ -20,14 +20,15 @@
  * 「少扫了也报绿」是本仓吃过亏的老坑。
  *
  * 【已知的合理豁免】
- * 只有一个成员的组无需 roving tabindex(没有可移动的目标),但**仍需**方向键?不需要 ——
- * 单成员组方向键无意义,故仅豁免 R1,不豁免 R2 的前提是组成员数 > 1。
+ * 只有一个静态成员的组无需 roving tabindex 或方向键。试用设备选择器的循环成员按多成员组检查。
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parse } from "@vue/compiler-sfc";
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, "src");
+const TRIAL_PICKER = "src/components/trial/trial-device-picker.vue";
 
 /** 组数下界:低于它就说明解析器漏扫(而不是仓里真没有组)。2026-09 实测 29 个。 */
 const GROUP_FLOOR = 24;
@@ -66,8 +67,27 @@ function matchClose(src, openEnd, tag = "view") {
   return src.length;
 }
 
+function repeatedRadioGroups(src, filename) {
+  if (!src.includes("v-for") || !src.includes('role="radiogroup"')) return new Set();
+  const groups = new Set();
+  const template = parse(src, { filename }).descriptor.template?.ast;
+  function walkGroup(node, group, repeated) {
+    const role = node.props?.find(prop => prop.type === 6 && prop.name === "role")?.value?.content;
+    if (role === "radiogroup") {
+      group = node.loc.start.offset;
+      repeated = false;
+    }
+    repeated ||= node.props?.some(prop => prop.type === 7 && prop.name === "for");
+    if (group !== undefined && role === "radio" && repeated) groups.add(group);
+    for (const child of node.children ?? []) walkGroup(child, group, repeated);
+  }
+  if (template) walkGroup(template, undefined, false);
+  return groups;
+}
+
 const violations = [];
 let groups = 0;
+let trialPickerChecked = false;
 const files = walk(SRC);
 const sharedSegments = readFileSync(join(SRC, "components", "glass-segments.vue"), "utf8");
 // The visual refresh moves these groups into one shared control. Count each
@@ -83,6 +103,7 @@ const sharedKeyboardReady = /:tabindex="[^\"]*option\.value === modelValue/.test
 for (const file of files) {
   const src = readFileSync(file, "utf8");
   const rel = relative(ROOT, file).replace(/\\/g, "/");
+  const repeatedGroups = rel === TRIAL_PICKER ? repeatedRadioGroups(src, file) : new Set();
   for (const control of src.matchAll(/<GlassSegments\b[^>]*>/g)) {
     if (/variant="navigation"/.test(control[0])) continue;
     groups++;
@@ -105,6 +126,9 @@ for (const file of files) {
 
     const members = [...body.matchAll(new RegExp(`<view\\b[^>]*\\brole="${memberRole}"`, "g"))]
       .map((r) => body.slice(r.index, tagEnd(body, r.index)));
+    const repeated = repeatedGroups.has(m.index);
+    if (repeated) trialPickerChecked = members.length > 0;
+    const multipleMembers = members.length > 1 || repeated;
 
     // 组级方向键(写在组容器上)或成员级方向键(写在每个成员上)都算数 ——
     // 本仓两种写法都有(earn.vue 写在成员上,marketplace 的 tab 写在成员上)。
@@ -112,7 +136,7 @@ for (const file of files) {
     const memberArrows = members.filter((t) => /keydown\.(left|right|up|down)\b/.test(t)).length;
 
     // R2:组内完全没有方向键。
-    if (members.length > 1 && !groupArrows && memberArrows === 0) {
+    if (multipleMembers && !groupArrows && memberArrows === 0) {
       violations.push({
         file: rel, line, rule: "R2",
         detail: `${members.length} 个 ${memberRole} 成员,组与成员都没有方向键处理 —— 键盘用户无法在组内移动`,
@@ -121,7 +145,7 @@ for (const file of files) {
 
     // R1:成员缺 roving tabindex。判据看「有没有把 tabindex 绑定到选中态」,
     // 而不是看有没有出现字面量 0 —— 绑定写法可以是 :tabindex="… ? 0 : -1"。
-    if (members.length > 1) {
+    if (multipleMembers) {
       const notRoving = members.filter((t) => !/:tabindex=/.test(t));
       if (notRoving.length > 0) {
         violations.push({
@@ -142,6 +166,10 @@ if (groups < GROUP_FLOOR) {
 }
 if (files.length === 0) {
   console.error("✖ 一个 .vue 文件都没扫到 —— src/ 路径或遍历逻辑失效");
+  process.exit(2);
+}
+if (!trialPickerChecked) {
+  console.error(`✖ 没有检查到试用设备选择器的循环单选行: ${TRIAL_PICKER}`);
   process.exit(2);
 }
 

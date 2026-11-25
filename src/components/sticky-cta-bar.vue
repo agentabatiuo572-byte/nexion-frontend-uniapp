@@ -161,4 +161,7 @@ function onTap() {
 @media(max-width:350px) { .scb-cta { flex:1 1 100%; } }
 </style>
 
-<style scoped>.scb-quantity { display:flex;align-items:center;gap:12px;color:var(--v5-ink);font:500 15px/20px var(--font-metric);font-variant-numeric:tabular-nums; }.scb-quantity :deep(.nx-button) { font:inherit; }.scb-quantity :deep(.nx-button__surface) { width:44px;min-height:36px;padding:0; }.scb-bar:has(.scb-quantity) { flex-wrap:wrap;gap:12px 8px; }.scb-bar:has(.scb-quantity) .scb-info { flex:1;min-width:110px; }.scb-bar:has(.scb-quantity) .scb-cta { width:100%; }</style>
+<style scoped>.scb-quantity { display:flex;align-items:center;gap:12px;color:var(--v5-ink);font:500 15px/20px var(--font-metric);font-variant-numeric:tabular-nums; }.scb-quantity :deep(.nx-button) { font:inherit; }.scb-quantity :deep(.nx-button__surface) { width:44px;min-height:36px;padding:0; }.scb-bar:has(.scb-quantity) { flex-wrap:wrap;gap:12px 8px; }.scb-bar:has(.scb-quantity) .scb-info { flex:1;min-width:110px; }.scb-bar:has(.scb-quantity) .scb-cta { width:100%; }
+/* With a quantity row the note sits between that row and the full-width button, 8 above the button (04 §4.0 .nx-tray-note). */
+.scb-bar:has(.scb-quantity) .scb-note { order:1; padding-top:0; margin-bottom:-4px; }
+.scb-bar:has(.scb-quantity) .scb-cta { order:2; }</style>

@@ -198,6 +198,22 @@ export function takeNavigationQuery(path: string): string {
   return query;
 }
 
+// Forwarded navigation carries the caller's query. On a cold H5 entry the hash
+// also carries Vue Router's transport escaping. Mirror uni's decodedQuery for
+// identifiers from the hash only. Native onLoad already receives parsed values.
+export function takeNavigationParameters(path: string, identifiers: readonly string[]): URLSearchParams {
+  const forwarded = pendingNavigationQuery?.path === path;
+  const params = new URLSearchParams(takeNavigationQuery(path));
+  if (!forwarded) {
+    for (const name of identifiers) {
+      const values = params.getAll(name);
+      if (values.length !== 1 || !values[0].includes("%")) continue;
+      try { params.set(name, decodeURIComponent(values[0])); } catch { /* same fallback as uni */ }
+    }
+  }
+  return params;
+}
+
 function runNavigationChain(attempts: NavigationAttempt[]): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false;

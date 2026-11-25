@@ -152,7 +152,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
           <text>{{ fill(urgent ? (isBank ? copy.urgentBank : copy.urgent) : (isBank ? copy.payWithinBank : copy.payWithin), { t: clock(payLeft) }) }}</text>
         </view>
-        <text v-if="confirming" class="pp-note" role="status">{{ copy.confirmWait }}</text>
+        <text v-if="confirming && !trialReviewPending" class="pp-note" role="status">{{ copy.confirmWait }}</text>
         <text class="pp-hero__meta">{{ s.summary }}<template v-if="s.orderNo"> · {{ copy.orderNo }} <text class="pp-mono">{{ s.orderNo }}</text></template></text>
       </view>
 
@@ -237,7 +237,7 @@
          The bank page does not close itself; returning keeps the automatic checks running. -->
     <view class="pp-cashier__foot" :style="{ paddingBottom: cashierFootPad + 'px' }">
       <text class="pp-cashier__note">{{ copy.autoReturn }}</text>
-      <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.closeCashier" />
+      <NxButton class="pp-cashier__done" :label="copy.paidReturn" variant="primary" @click="payment.confirmCashierPayment" />
     </view>
   </view>
 
@@ -258,20 +258,24 @@ import NxTag from '@/components/ui/nx-tag.vue';
 import NxCodeValue from '@/components/ui/nx-code-value.vue';
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
 import DeviceStatusBar from '@/components/device/device-status-bar.vue';
-import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, unfinishedPurchasePayments, PAYMENT_BAR_HEIGHT_KEY, type PurchaseNotice } from '@/store/purchase-payment';
+import { usePurchasePayment, purchaseConclusion, refreshPendingPayments, unfinishedPurchasePayments, PAYMENT_BAR_HEIGHT_KEY, TRIAL_PAYMENT_CARD_KEY, type PurchaseNotice } from '@/store/purchase-payment';
 import { appDeviceOffline, appReadOnline, foregroundReadAllowed } from '@/lib/foreground-read';
 import { useApp } from '@/store/app';
 import { useLocaleStore } from '@/store/locale';
 import { useT } from '@/i18n/use-t';
 import { purchasePaymentCopy, fillCopy as fill } from '@/lib/purchase-payment-copy';
 import { checkoutFlowCopy } from '@/lib/checkout-flow-copy';
-import { purchasePaymentTiming } from '@/lib/purchase-payment-timing';
+import { isTrialPaymentReviewPending, purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { formatGroupedAmount } from '@/lib/amount-display';
 import { hostedPaymentUrlPattern, validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
+import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
+import { useTrialDetailCopy } from '@/i18n/trial-detail';
 import { toast } from '@/store/ui';
 import { navTo } from '@/lib/route';
 import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
+import { useFreeTrial } from '@/store/free-trial';
+import { originalTrialCheckoutHref } from '@/lib/trial-topup-return';
 import qrcode from 'qrcode-generator';
 const payment = usePurchasePayment(), s = payment.state, app = useApp(), locale = useLocaleStore();
 // Orders and the order detail show their payments in place, so they hide the floating bar.
@@ -285,7 +289,9 @@ const t = useT();
 const retryMessage = computed(() => s.retryNotice ? checkoutFlowCopy(locale.code)[s.retryNotice] : '');
 const unsettled = computed(() => { app.accountKey; s.revision; return payment.pending(); });
 const showsCheckoutCapacityResume = inject(showsCheckoutCapacityResumeKey, null);
-const records = computed(() => unfinishedPurchasePayments(unsettled.value).filter(row => !showsCheckoutCapacityResume?.(row)));
+const trialPaymentCard = inject(TRIAL_PAYMENT_CARD_KEY, null);
+const records = computed(() => unfinishedPurchasePayments(unsettled.value).filter(row => !showsCheckoutCapacityResume?.(row)
+  && !(row.kind === 'TRIAL_CONVERT' && row.intentNo && row.intentNo === trialPaymentCard?.())));
 const pending = computed(() => records.value.filter(row => !payment.resumeDismissed(row)));
 const ownsCheckoutCapacityPayment = inject(ownsCheckoutCapacityPaymentKey, null);
 const openCheckoutCapacityProgress = inject(openCheckoutCapacityProgressKey, null);
@@ -425,7 +431,9 @@ useVisibleInterval(() => { now.value = Date.now(); }, 1000, () => active.value &
 const deadlineLeft = computed(() => s.deadlineAt === null ? null : Math.max(0, s.deadlineAt - now.value));
 const quoteLeft = computed(() => s.quote ? Math.max(0, Date.parse(s.quote.expiresAt) - now.value) : null);
 // The payment page counts to whichever closes first: the intent or the order.
-const timing = computed(() => purchasePaymentTiming(s.intent, now.value, s.deadlineAt));
+const timing = computed(() => purchasePaymentTiming(s.intent, now.value, s.deadlineAt, payment.legacyTrialExpiry()));
+const trialReviewPending = computed(() => isTrialPaymentReviewPending(s.intent));
+const trialDetail = useTrialDetailCopy();
 const payLeft = computed(() => timing.value.left);
 const confirming = computed(() => timing.value.confirming);
 const networkPaused = computed(() => timing.value.networkPaused);
@@ -442,9 +450,10 @@ const waitTitle = computed(() => {
   const c = copy.value;
   if (appDeviceOffline.value && !retryMessage.value) return c.offline;
   if (s.originalRecovery) return c.checkingOriginalPayment;
-  if (s.canResubmit) return c.originalPaymentNotFoundRetry;
+  if (s.canResubmit) return s.kind === 'TRIAL_CONVERT' ? c.checkingOriginalPayment : c.originalPaymentNotFoundRetry;
   if (s.busy && !s.intent) return c.creating;
   if (retryMessage.value) return retryMessage.value;
+  if (trialReviewPending.value) return trialDetail.value.origConfirming;
   if (confirming.value) return c.confirming;
   return ready.value ? c.waiting : c.checkingOriginalPayment;
 });
@@ -452,6 +461,44 @@ watch(() => timing.value.canPay, (canPay) => { if (!canPay && s.cashier) payment
 
 type Notice = { title: string; body: string; primary: string; secondary?: string; icon: 'alert' | 'clock' | 'shield' | 'failed' | 'info'; tone: 'warning' | 'danger' | 'brand' | 'neutral'; onPrimary: () => void; onSecondary: () => void };
 const dismiss = () => payment.notify('');
+const trialCopy = useTrialPurchaseCopy();
+const trial = useFreeTrial();
+const trialTerminalIntent = computed(() => active.value && s.open && s.intent?.kind === 'TRIAL_CONVERT' && s.intent.trialPurchaseOutcome
+  ? s.intent.intentNo : null);
+const terminalAuthority = ref<string | null>(null);
+async function readTerminalAuthority(intentNo: string) {
+  const binding = app.accountBindingEpoch;
+  const ready = await trial.refreshRemote();
+  if (app.accountBindingEpoch === binding && trialTerminalIntent.value === intentNo)
+    terminalAuthority.value = ready ? intentNo : null;
+}
+watch(trialTerminalIntent, id => {
+  terminalAuthority.value = null;
+  if (id) void readTerminalAuthority(id);
+});
+const terminalTrialExit = computed(() => {
+  if (!trialTerminalIntent.value || trialTerminalIntent.value !== terminalAuthority.value || trial.authorityStatus !== 'ready') return null;
+  const state = trial.displayState, claimNo = s.intent?.claimNo;
+  if (!state || !claimNo || state.claimNo !== claimNo) return null;
+  if (state.originalPurchase) {
+    const original = state.originalPurchase;
+    if (original.kind === 'EXTERNAL' && original.paymentNo === trialTerminalIntent.value) return null;
+    return { label: original.status === 'AWAITING_PAYMENT' ? copy.value.continuePay : copy.value.viewProgress,
+      href: originalTrialCheckoutHref(original) };
+  }
+  return state.status === 'active' || state.status === 'grace'
+    ? { label: trialCopy.value.coChangeDevice, href: '/pages/me/trial' } : null;
+});
+async function openTerminalTrialExit() {
+  const id = trialTerminalIntent.value;
+  if (!id) return;
+  await readTerminalAuthority(id);
+  const exit = terminalTrialExit.value;
+  if (trialTerminalIntent.value === id && exit) {
+    payment.close();
+    void navTo(exit.href);
+  }
+}
 function noticeFor(kind: PurchaseNotice): Notice | null {
   const c = copy.value, order = s.kind === 'ORDER_PAY' && !!s.orderNo;
   // A reloaded payment has no way to order again (PRD §6).
@@ -459,6 +506,9 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     ? { primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
     : { primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }) };
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
+  const trialExit = { primary: terminalTrialExit.value?.label ?? c.close,
+    onPrimary: terminalTrialExit.value ? openTerminalTrialExit : payment.close,
+    onSecondary: payment.close, ...(terminalTrialExit.value ? { secondary: c.close } : {}) };
   switch (kind) {
     // The order exists but no payment started yet: it stays for later and the close still ends on the store home.
     case 'keepOrder': return { icon: 'info', tone: 'warning', title: c.keepOrderTitle, body: c.keepOrderBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leaveToStore };
@@ -470,12 +520,17 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       ? s.coldResume
         ? { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
         : { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }
-      : { icon: 'clock', tone: 'neutral', title: c.timeoutOtherTitle, body: c.timeoutOther, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
-    case 'bankFailed': return s.coldResume
+      : { icon: 'clock', tone: 'neutral', title: c.timeoutOtherTitle, body: c.timeoutOther,
+        ...(trialTerminalIntent.value ? trialExit : { primary: c.ok, onPrimary: payment.close, onSecondary: payment.close }) };
+    case 'bankFailed': return trialTerminalIntent.value
+      ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, ...trialExit }
+      : s.coldResume
       ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: order ? c.continuePay : c.ok, secondary: order ? c.viewOrder : c.close, onPrimary: order ? () => payment.restart('methods') : payment.close, onSecondary: order ? payment.openOrder : payment.close }
       : { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
-    case 'late': return { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
+    case 'late': return s.intent?.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW'
+      ? { icon: 'info', tone: 'warning', title: c.lateTitle, body: trialCopy.value.coLatePayment, ...trialExit }
+      : { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     // Refunded to the original payment method (user 2026-11-24): the payment has ended, nothing is left to do here.
     case 'refunded': return { icon: 'info', tone: 'neutral', title: c.refundedTitle, body: c.refunded,
       primary: order ? c.viewOrder : c.ok, onPrimary: order ? payment.openOrder : payment.close,

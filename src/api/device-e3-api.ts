@@ -12,6 +12,8 @@ export interface PendingDeviceReplacement {
   newDeviceName: string;
 }
 
+export type SlotReplacementTiming = "IMMEDIATE" | "PENDING" | "UNKNOWN";
+
 export interface DeviceReplacementRequest {
   newDeviceId: number;
   oldDeviceId: number;
@@ -37,6 +39,7 @@ export interface CanonicalE3Device {
   runtimeStatus?: "ONLINE" | "OFFLINE" | "UNKNOWN";
   pendingDeactivate: boolean;
   replacement?: PendingDeviceReplacement;
+  slotReplacementTiming?: SlotReplacementTiming;
   activatedAt: number | null;
   /** Absent in older backend responses; the parser normalizes it to null. */
   deactivatedAt: number | null;
@@ -309,9 +312,11 @@ function device(value: unknown): CanonicalE3Device {
     replacement = { oldDeviceId, newDeviceId, oldDeviceName: string(pending.oldDeviceName),
       newDeviceName: string(pending.newDeviceName) };
   }
+  const timing = source.slotReplacementTiming;
   return {
     id,
     ...(replacement && { replacement }),
+    ...(timing === "IMMEDIATE" || timing === "PENDING" || timing === "UNKNOWN" ? { slotReplacementTiming: timing } : {}),
     rowVersion: integer(source.rowVersion),
     instanceNo: string(source.instanceNo),
     name: string(source.name),

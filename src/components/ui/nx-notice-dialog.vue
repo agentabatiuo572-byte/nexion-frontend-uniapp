@@ -61,7 +61,7 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
 .nx-notice--warning { --nx-notice-tone: var(--v5-warning); --nx-notice-fill: var(--v5-warning); --nx-notice-fill-amount: 14%; }
 .nx-notice--brand { --nx-notice-tone: var(--v5-brand); --nx-notice-fill: var(--v5-brand); --nx-notice-fill-amount: 14%; }
 .nx-notice--danger { --nx-notice-tone: var(--v5-danger); --nx-notice-fill: var(--v5-danger); --nx-notice-fill-amount: 14%; }
-.nx-notice--neutral { --nx-notice-tone: var(--v5-ink-2); --nx-notice-fill: var(--v5-ink-3); --nx-notice-fill-amount: 18%; }
+.nx-notice--neutral { --nx-notice-tone: var(--v5-ink-2); --nx-notice-fill: var(--v5-ink-3); --nx-notice-fill-amount: 14%; }
 .nx-notice__title { display: block; margin-top: 16px; font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); text-wrap: balance; }
 .nx-notice__body { display: block; margin-top: 8px; font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
 /* The secondary exit is a text button (03 §3.5): 12px below the primary, so its 44px target stays off the primary's. */

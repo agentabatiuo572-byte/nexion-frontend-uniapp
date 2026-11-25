@@ -62,7 +62,7 @@
         </LoopScope>
       </view>
       <FleetStage />
-      <DeviceSlotReplacementStatus class="mx-4" />
+      <DeviceSlotReplacementStatus class="mx-4 earn-replacement" />
 
       <EarningsLedgerCard class="mx-4 earn-block" />
       <MarketBoard class="earn-block" />
@@ -302,6 +302,7 @@ const rangeOptions = computed(() => RANGES.map(value => ({ value, label: rangeLa
 .earn-fleet-head { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 32px 18px 8px; }
 .earn-fleet-head__title { font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; }
 .earn-block { margin-top: 32px; }
+.earn-replacement { margin-top: 12px; }
 .earn-capacity-info { width:44px; height:44px; margin-left:-8px; flex:none; display:grid; place-items:center; color:var(--v5-brand); background:transparent; cursor:pointer; }
 /* The glyph is drawn in a 24-unit viewBox at 22px: one unit is 22/24 px. */
 .earn-capacity-info__rocket { position:relative; width:22px; height:22px; animation:earn-rocket-hop 1.6s ease-in-out infinite; }

@@ -26,9 +26,19 @@ export interface HttpResponse {
   headers: Record<string, string>;
 }
 
+function responseHeader(response: HttpResponse, header: string): string | undefined {
+  return Object.entries(response.headers ?? {}).find(([name]) => name.toLowerCase() === header)?.[1];
+}
+
 function responseRetryAfterMs(response: HttpResponse): number | undefined {
-  const header = Object.entries(response.headers ?? {}).find(([name]) => name.toLowerCase() === 'retry-after');
-  return parseRetryAfterMs(header?.[1]);
+  return parseRetryAfterMs(responseHeader(response, "retry-after"));
+}
+
+function responseDateMs(response: HttpResponse): number | undefined {
+  const date = responseHeader(response, "date");
+  if (typeof date !== "string") return undefined;
+  const time = Date.parse(date);
+  return Number.isFinite(time) && new Date(time).toUTCString() === date.trim() ? time : undefined;
 }
 
 export interface HttpTransport {
@@ -68,7 +78,7 @@ export interface ApiRequest {
     code: number;
     message: string;
   }>;
-  parseResponseData?: (data: unknown, status: number) => unknown;
+  parseResponseData?: (data: unknown, status: number, envelope: { code: number; message: string }) => unknown;
   /** A rejected secret-bearing command must ask the user again after authentication. */
   retryAfterAuth?: boolean;
   beforeAuthRetry?: () => void;
@@ -260,6 +270,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         code: envelope?.code,
         retryable: response.status >= 500,
         retryAfterMs,
+        responseDateMs: responseDateMs(response),
         providerReason: typeof providerDenial?.providerReason === "string" ? providerDenial.providerReason : undefined,
         purchaseIntentNo: typeof purchaseConflict?.intentNo === "string" && purchaseConflict.intentNo.trim() ? purchaseConflict.intentNo : undefined,
       });
@@ -279,7 +290,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       });
     }
     if (businessWrite(request)) { invalidatePassiveTabReads(); invalidateTabSnapshots(undefined, snapshotWrite); }
-    return (parseResponseData ? parseResponseData(envelope.data, response.status) : envelope.data) as T;
+    return (parseResponseData ? parseResponseData(envelope.data, response.status, envelope) : envelope.data) as T;
   }
 
   async function terminateSession(

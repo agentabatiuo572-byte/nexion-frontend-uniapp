@@ -13,9 +13,9 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
-import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
+import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPresetSelfOrderPoints, rankPresetTeamMembers, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
-import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
+import { auxiliaryDemo, demoCurrentTaskSample, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
 import { supportDemo } from './prototype-demo-support.mjs';
 import { stakingDemo } from './prototype-demo-staking.mjs';
@@ -24,7 +24,7 @@ import { accountDemo, accountDeletionWallet } from './prototype-demo-account.mjs
 import { bankDemo } from './prototype-demo-bank.mjs';
 import { contentOptions, demoHasLongBillRefs } from './prototype-demo-long-content.mjs';
 import { riskDemo } from './prototype-demo-risk.mjs';
-import { trialDemo } from './prototype-demo-trial.mjs';
+import { trialDemo, trialPurchaseOptionSku } from './prototype-demo-trial.mjs';
 import { demoBinaryLegMembers, demoH4Account, demoH4CheckInBonus, demoH4EventResponse, demoH4Gift, demoH4GiftQuantity, demoH4PromotionWindow, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate, demoTeamNetworkMembers, wheelVoucherId } from './prototype-demo-events.mjs';
 import { demoCommissionGroups, demoStreakMilestones, demoReferralLedger, demoHasOpeningMilestone, demoSettledTasks, demoStreakFacts, demoTaskPeriods, demoWalletBills, demoWalletBillList, demoWalletBillSummary, demoWalletNex, demoWalletUsdt, initializeDemoWalletCheckpoint, postDemoActivityRewards, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 import { authDemoDefaults, authDemoOptions } from './prototype-demo-auth.mjs';
@@ -112,7 +112,11 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,...rankPresetDefaults};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',slotReplacementState:'none',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,...rankPresetDefaults};
+Object.assign(demoDefaults,{
+  trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
+  trialPurchaseReadState:'normal',trialPurchasePriceState:'normal',trialOriginalPurchaseState:'none',trialPurchaseWindow:'follow',
+});
 export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   scopeState:[['normal','常规网页业务'],['mixed','隐藏手机占槽 / 手机商品任务 / 质押增益 / 置换来源含手机'],['review','范围复核：Mobile 硬件 / SHARE / iPhone15 / 手机号任务']],
@@ -126,9 +130,16 @@ export const demoOptions = {
   setupGateState:[['open','正常写入'],['setup-required','服务端拒绝：需完成初始设置（试用领取 / 首日浏览商店任务 / 课程开始）']],
   topupChannels:[['all','充值通道均启用'],['bank-off','充值银行未配置'],['erc20-off','充值 ERC20 未配置'],['usdt-off','充值 USDT 未配置']],
   computeState:[['app','App 默认（v1 任务）'],['cycles','服务端周期 v3'],['running','v2 运行中'],['queued','v2 排队'],['verifying','v2 核验'],['recovering','v2 恢复'],['pending','v2 待结算'],['blocked','v2 结算受阻'],['failed','v2 失败'],['cancelled','v2 已取消']],
-  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
+  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['full-term','整期结算 · 按已产出抵扣'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['repriced','试用期内 · 提前优惠 11'],['capped','领取抵扣上限 20'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
   trialReadState:[['normal','正常读取'],['error','试用读取失败']],
+  trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share']],
+  trialPurchaseOptionTarget:[['rack-p1','UVELRack P1'],['trial-device','本人试用设备']],
+  trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架']],
+  trialPurchaseReadState:[['normal','正常读取'],['loading','清单慢速读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
+  trialPurchasePriceState:[['normal','正常价格'],['trial-up','试用设备商城价上涨'],['trial-down','试用设备商城价下调'],['extra-up','Rack P1 涨价']],
+  trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-expired','试用设备 · 过期仍确认中（先从页面发起外部付款再切）'],['external-unpaid-terminal','试用设备 · 未付款终结（先从页面发起外部付款再切）'],['external-late','试用设备 · 迟付允许重选（先从页面发起外部付款再切）'],['external-late-unmarked','试用设备 · 迟付仍进行中（先从页面发起外部付款再切）'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-ready','Rack P1 · 余额已受理可继续'],['balance-resumable','下一次余额提交不送达'],['balance-hold-next','下一次余额提交已受理 · 丢响应'],['balance-settled','原余额付款出结果'],['external-quote-conflict','下次试用外部报价遇到 Rack P1 原提交']],
+  trialPurchaseWindow:[['follow','按领取单时间'],['grace','可抵扣期']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（自动按原键核对）'],['timeout','确认超时（15 秒转待确认）']],
   messageState:[['normal','普通会话 · 1条未读'],['receipts','双向回执样例'],['history','三页历史与图文消息'],['timeline','时间分组 · 24小时间隔'],['incoming','追加客服消息（原页刷新）'],['long-count','长未读计数 · 1298'],['author-photo','客服带本人头像'],['recommendations','商品与链接推荐'],['agent-switch','客服已切换提示（有名字/无名字）'],['welcome-unassigned','刚注册 · 未分配客服 · 欢迎语未读'],['welcome-assigned','刚注册 · 已有专属客服 · 欢迎语未读'],['read','会话全部已读'],['transferred','已转接 · 只读旧会话待核对'],['transferred-restart','已转接 · 无当前会话 · 重新发起']],
@@ -181,6 +192,8 @@ export const demoOptions = {
   fleetState:[['normal','默认设备'],['phone-history','含 PHONE / MOBILE 账号收益'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位'],['earning-credit','收益到账通知 · 三台设备']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['funds-confirmed','已收到付款 · 等待开通'],['waiting','一直等待到账'],['read-error','原付款读取失败（503，保留原单）'],['intent-missing','确证没有原付款单（404，结束查询）'],['remote-in-progress','别处发起的进行中付款（本机无记录）'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','后台关闭 ERC20'],['usdt-off','后台关闭 USDT 两个网络'],['low-balance','钱包余额不足（820.64 USDT）'],['reward-clawback-debt','奖励扣回·USDT 欠款（−12.123456）']],
   deviceTaskSampleState:[['default','默认作业样例'],['long','长作业名 · 最近完成 10 条（模拟作业）']],
+  // Implies fleetState=full: device 41 (running sample job) waits to be replaced by inventory UVELBox Pro 47.
+  slotReplacementState:[['none','无替换'],['pending','替换等待中 · 槽位已满']],
   interfaceLanguagesState:[['all','9 种全开'],['default','后端默认八种（不含中文）'],['en-only','只开英文']],
 };
 const skuDefinitions = [
@@ -223,17 +236,23 @@ function demoDailyUsdt(monthlyTarget, percent = 100) {
 }
 
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
+  const trialSku=state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku);
+  const optionTarget=trialPurchaseOptionSku(state);
   const inventory=(id,index,share)=>{
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
-    const outOfStock=state.outOfStockProductNo===id||(state.catalogState==='outofstock'&&id==='stellarbox-s1');
+    const outOfStock=(id===optionTarget&&state.trialPurchaseOptionState==='sold-out')||state.outOfStockProductNo===id||(state.catalogState==='outofstock'&&id==='stellarbox-s1');
     const stock=share?null:outOfStock?0:
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     return {stock,sold:42+index*13+bought,purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null};
   };
   const products=skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
-    const price=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
+    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
+    const priceChange=state.trialPurchasePriceState==='extra-up'&&id==='stellarrack-p1'?100:
+      id===trialSku?({ 'trial-up':100,'trial-down':-100 })[state.trialPurchasePriceState]??0:0;
+    const price=priceChange?Math.max(0.01,Number((basePrice+priceChange).toFixed(6))):basePrice;
+    const optionState=id===optionTarget?state.trialPurchaseOptionState:'normal';
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
     const dailyEarn=demoDailyUsdt(monthlyEstimateUsdt),b=demoBandPct/100;
     // AppProductCatalogService projects release and stock gates independently.
@@ -243,9 +262,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',...inventory(id,index,share),
-      features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:'active',available:!upcoming,
-      releaseState:upcoming?'E1_PHASE_NOT_REACHED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
-      purchaseGate:state.catalogState==='restricted'&&id==='stellarbox-s1'?{mode:'all',enforce:true,rankMin:8}:null,
+      features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:optionState==='unlisted'?'legacy':'active',
+      available:!upcoming&&optionState!=='unlisted',
+      releaseState:upcoming?'E1_PHASE_NOT_REACHED':optionState==='unlisted'?'PRODUCT_NOT_RELEASED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
+      purchaseGate:optionState==='ineligible'||(state.catalogState==='restricted'&&id==='stellarbox-s1')?{mode:'all',enforce:true,rankMin:8}:null,
       // B75 USDT follows the backend's six-decimal HALF_UP projection. UVT remains simulated (B75-BE-02).
       dailyEstimateLowUsdt:demoDailyUsdt(monthlyEstimateUsdt,100-demoBandPct),dailyEstimateHighUsdt:demoDailyUsdt(monthlyEstimateUsdt,100+demoBandPct),
       dailyEstimateLowNex:Math.round(dailyEarnNEX*(100-demoBandPct)*10_000)/1e6,
@@ -294,11 +314,11 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available&&remaining>0};
 }
 
-function demoE1PurchaseRule(state,product,now,checkLiveQuota=true) {
-  const required=product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
+function demoE1PurchaseRule(state,product,now,checkLiveQuota=true,skipPurchaseGate=false) {
+  const required=!skipPurchaseGate&&product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
   const current=required?demoH4Account(state,now).rank:0;
   const gap=Math.max(0,required-current);
-  const soldOut=checkLiveQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
+  const soldOut=!skipPurchaseGate&&checkLiveQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
   const decisionCode=!product.available?'PRODUCT_NOT_RELEASED':soldOut?'PURCHASE_GATE_SOLD_OUT':
     gap>0?'PURCHASE_GATE_NOT_MET':'ELIGIBLE';
   const conditions=required?[{kind:'rank',required,current,gap,met:gap===0}]:[];
@@ -306,8 +326,8 @@ function demoE1PurchaseRule(state,product,now,checkLiveQuota=true) {
   return {policy:'E1',eligible:decisionCode==='ELIGIBLE',decisionCode,mode:'ALL',conditions};
 }
 
-function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota=true) {
-  const e1=demoE1PurchaseRule(state,product,now,checkLiveQuota);
+function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota=true,skipPurchaseGate=false) {
+  const e1=demoE1PurchaseRule(state,product,now,checkLiveQuota,skipPurchaseGate);
   const f4b={policy:'F4B',eligible:true,decisionCode:'F4B_NOT_CONFIGURED',mode:'ALL',conditions:[]};
   if(checkLiveQuota&&state.quotaState==='approved'&&product.id===approvedQuotaSku(state)){
     const quota=demoHardwareQuota(product,state,points,now);
@@ -318,6 +338,10 @@ function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota
       {kind:'monthlyQuota',required:quota.monthlyStock,current:quota.usedThisMonth,gap:remaining,met:remaining>=quantity}];
     f4b.eligible=gap===0&&remaining>=quantity;
     f4b.decisionCode=remaining<quantity?'F4B_MONTHLY_QUOTA_EXHAUSTED':gap>0?'F4B_REQUIREMENTS_NOT_MET':'ELIGIBLE';
+  }
+  if(checkLiveQuota&&state.trialPurchaseOptionState==='quota-exhausted'&&product.id===trialPurchaseOptionSku(state)){
+    Object.assign(f4b,{eligible:false,decisionCode:'F4B_MONTHLY_QUOTA_EXHAUSTED',
+      conditions:[{kind:'monthlyQuota',required:1,current:1,gap:0,met:false}]});
   }
   const stocked=product.stock==null||product.stock>=quantity;
   return {eligible:e1.eligible&&f4b.eligible&&stocked,
@@ -400,7 +424,7 @@ export function validateDemoOrderItems(items, bundle = false) {
   return quantity;
 }
 
-export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null) {
+export function requireDemoPurchase(state,products,items,now,settlement=false,quotaHold=null,skipPurchaseGate=false) {
   const points=quotaHold ? 0 : demoTeamNetworkMembers(state,now).reduce((sum,member)=>sum+member.monthComputePoints,0);
   const quantities=new Map();
   for(const item of items){
@@ -411,7 +435,7 @@ export function requireDemoPurchase(state,products,items,now,settlement=false,qu
   for(const [sku,quantity] of quantities){
     const product=products.find(item=>item.id===sku);
     if(!product||state.dataState==='empty')throw Object.assign(new Error('PRODUCT_NOT_AVAILABLE'),{status:404});
-    const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity,!quotaHold);
+    const {eligible,decisionCode,policies}=demoSkuPurchaseRules(state,product,points,now,quantity,!quotaHold,skipPurchaseGate);
     if(settlement&&policies[0].eligible)requireDemoMonthlyQuota(state,policies[1]);
     if(!eligible)refuse(decisionCode);
     if(settlement&&policies[1].decisionCode==='ELIGIBLE')hardwareQuotaUsedAt=now;
@@ -464,6 +488,9 @@ function demoOrders(products,state,now,device41) {
       &&(original==='activated'||original==='provisioning_failed'))computePoints=640;
     if(device&&state.highestRank)computePoints=64000;
     else if(device&&state.walletLegacySeed)computePoints=1280;
+    // The two existing paid S1 orders carry their historical point snapshots.
+    if(usesRankPreset(state)&&(original==='activated'||original==='provisioning_failed'))
+      computePoints=rankPresetSelfOrderPoints(state,original);
     const repurchaseDays=repurchaseSampleDays[state.repurchaseState];
     const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
       ? at-repurchaseDays*day-samplePaidAfter
@@ -617,9 +644,12 @@ export function demoPurchasedOrderDevices(state, orders, products, template) {
     const inInventory = order.inventoryDeviceIds?.includes(id) ?? order.canonicalStatus === 'inventory';
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
-    const name=order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name;
+    const name=order.trialPurchasedDevice?.name??(order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name);
     devices.push({...template,id,instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
       activatedAt:inInventory ? null : (order.activatedAt ?? order.inventoryUsedAt),purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
+      ...(order.trialPurchasedDevice&&{imageUrl:order.trialPurchasedDevice.imageUrl,deviceType:product.productType,
+        gpuModel:product.gpu,vramTotalGb:Number.parseInt(product.vram,10)||0,basePowerW:Number.parseInt(product.power,10)||0,
+        location:product.datacenter||template.location,sourceOrderNo:order.orderNo}),
       ...(inInventory&&{status:'INACTIVE',runtimeStatus:'OFFLINE'}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
   }
   return devices;
@@ -638,7 +668,18 @@ export function demoFleetFacts(url,locale,state,eventOwner,postedTasks) {
   // DEMO-ORDER-004 is seeded device 41's own order, also once checkout has adopted it: it never adds a device.
   const session=demoPurchasedOrderDevices(state,orders.filter(order=>order.orderNo!=='DEMO-ORDER-004'),products,template);
   let reservedSlotCount=demoOrderSlots(orders);
+  const seeding=!state.fleetSeed;
   state.fleetSeed??=demoSeedFleet(state,template,products,seed.capacitySchedule,slotCap,trialSlotCount+reservedSlotCount+session.filter(device=>device.activatedAt!==null).length,retired);
+  // slotReplacementState=pending: the state a PENDING replacement leaves (markDevicePendingDeactivate does not bump row_version).
+  if(seeding&&state.slotReplacementState==='pending'&&(state.computeState??'app')==='app'
+      &&state.fleetSeed.some(device=>device.id===47)){
+    const oldDevice=state.fleetSeed.find(device=>device.id===41);
+    const task=oldDevice&&retainDemoSlotReplacementTask(state,oldDevice,now);
+    if(task){
+      (state.deviceActivations??={})[41]={...state.deviceActivations[41],pendingDeactivate:true};
+      state.slotReplacements={41:{newDeviceId:47,taskNo:task.taskNo,taskEndsAt:Date.parse(task.completableAt)}};
+    }
+  }
   // Payment committed the DEVICE reservation. Its receipt or cancellation releases that reservation.
   if(!state.promotionGift&&state.promotionRewardState!=='CANCELLED'&&demoAccountOrders(url,locale,state,now)
       .some(order=>order.orderNo===demoPromotionGift.orderNo&&order.paymentStatus==='PAID'))reservedSlotCount+=demoPromotionGift.quantity;
@@ -657,6 +698,27 @@ export function demoFleetFacts(url,locale,state,eventOwner,postedTasks) {
         todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
         ...(gift===state.promotionGift&&{sourceChannel:'PROMOTION_GIFT',sourceOrderNo:demoPromotionGift.orderNo})});
     }
+  }
+  // Restore the fixed task schedule from older preview handoffs that saved only the pair.
+  for(const [oldId,pair] of Object.entries(state.slotReplacements??{})){
+    if(pair.taskNo)continue;
+    const oldDevice=roster.find(device=>device.id===Number(oldId));
+    if(oldDevice)pair.taskNo=retainDemoSlotReplacementTask(state,oldDevice,pair.taskEndsAt-300000)?.taskNo;
+  }
+  for(const task of Object.values(state.slotReplacementTasks??{})){
+    if(task.completedAt!=null)continue;
+    const pair=state.slotReplacements?.[task.deviceId];
+    const endsAt=pair?.taskNo===task.taskNo?pair.taskEndsAt:Date.parse(task.completableAt);
+    if(endsAt<=now)completeDemoSlotReplacementTask(state,task,endsAt);
+  }
+  // The old device's job has ended: its deactivation and the successor's activation are one step
+  // (DeviceSlotReplacementCompletion.afterDeactivation). A successor that left the account only unbinds.
+  for(const [oldId,pair] of Object.entries(state.slotReplacements??{})){
+    if(pair.taskEndsAt>now||pair.computeCycle&&!state.walletMovements?.some(row=>row.bizNo===pair.taskNo))continue;
+    const current=id=>{const row=roster.find(device=>device.id===id);return row&&{...row,...state.deviceActivations?.[id]};};
+    const oldDevice=current(Number(oldId)),newDevice=current(pair.newDeviceId);
+    if(oldDevice&&newDevice)completeDemoSlotReplacement(state,oldDevice,newDevice,pair.taskEndsAt);
+    else delete state.slotReplacements[oldId];
   }
   const todayByDevice=state.fleetState==='earning-credit'
     ?demoReceiptTodayByDevice(demoWithEarningReceiptTasks(state,postedTasks??demoSettledTasks(state,state.previewFactsAt)),now)
@@ -678,8 +740,46 @@ export function demoFleetFacts(url,locale,state,eventOwner,postedTasks) {
       if(!projected.monthlyTargetActive)return projected;
       return {...projected,dailyUsdt:Number((product.dailyEarn*capacity.capacityPct/100).toFixed(6))};
     });
+  // Both devices of a waiting replacement carry the pair (DeviceSlotReplacementMapper.pending: old device pending_deactivate=1).
+  for(const [oldId,{newDeviceId}] of Object.entries(state.slotReplacements??{})){
+    const oldDevice=devices.find(device=>device.id===Number(oldId)),newDevice=devices.find(device=>device.id===newDeviceId);
+    if(!oldDevice?.pendingDeactivate||!newDevice)continue;
+    oldDevice.replacement=newDevice.replacement={oldDeviceId:oldDevice.id,newDeviceId,oldDeviceName:oldDevice.name,newDeviceName:newDevice.name};
+  }
   // serverNow is this read's time: the shared review fixture's clock stops at server start.
   return {devices,slotCap,reservedSlotCount,trialSlotCount,serverNow:now,slotsUsed:devices.filter(device=>device.activatedAt!==null).length+reservedSlotCount+trialSlotCount};
+}
+
+function retainDemoSlotReplacementTask(state,device,now,currentTask){
+  const [settlement]=demoSettledTasks(state,state.previewFactsAt??now);
+  const sample=demoCurrentTaskSample(state,device,settlement,now);
+  if(!sample)return null;
+  const tasks=state.slotReplacementTasks??={};
+  return tasks[sample.taskNo]??={...sample,...(currentTask&&{
+    startedAt:currentTask.startedAt,completableAt:currentTask.completableAt,
+  }),receiptId:11+Object.keys(tasks).length};
+}
+
+function completeDemoSlotReplacementTask(state,task,at){
+  postDemoWalletEntries(state,{bizNo:task.taskNo,bizType:'COMPUTE_TASK_REWARD',asset:'USDT',direction:'IN',
+    amount:task.amount,at,category:'bonus'});
+  Object.assign(task,{completedAt:at,postedAt:at,batchNo:null,
+    receiptNo:task.taskNo.replace('DEMO-TASK-','DEMO-RECEIPT-')});
+}
+
+// Old device first (deactivateOwnedDeviceCas), then the successor (activateOwnedDeviceCas): the active count never passes the cap.
+function completeDemoSlotReplacement(state,oldDevice,newDevice,at){
+  const activations=state.deviceActivations??={};
+  activations[oldDevice.id]={...activations[oldDevice.id],status:'DEACTIVATED',runtimeStatus:'OFFLINE',activatedAt:null,
+    deactivatedAt:at,pendingDeactivate:false,rowVersion:oldDevice.rowVersion+1};
+  activations[newDevice.id]={...activations[newDevice.id],status:'ACTIVE',activatedAt:at,deactivatedAt:null,
+    rowVersion:newDevice.rowVersion+1,runtimeStatus:'ONLINE'};
+  if(state.computeCycleStarts){
+    delete state.computeCycleStarts[oldDevice.id];
+    state.computeCycleStarts[newDevice.id]=at;
+  }
+  if(state.stoppedDevices)state.stoppedDevices=state.stoppedDevices.filter(id=>id!==newDevice.id);
+  delete state.slotReplacements[oldDevice.id];
 }
 
 export function demoCapacityReplacementSource(fleet, products) {
@@ -765,14 +865,31 @@ function demoLiveActivity(product,now) {
   return {viewers:Math.max(200,Math.round(floor+curve(150_000,0,floor*.25)+curve(15_000,-1.5,1.5))),sales24h,sales30m:Math.min(sales24h,Math.max(1,sales30m))};
 }
 
+function demoReplacementAssignmentsPath(state) {
+  return ['app','cycles'].includes(state.computeState??'app')?'/api/tasks/assignments':'/api/tasks/v2/assignments';
+}
+
+function demoActiveSlotReplacementTask(assignment) {
+  const task=assignment?.currentTask;
+  return ['CLAIMED','RUNNING'].includes(task?.status)?task:null;
+}
+
+function demoSlotReplacementTiming(assignment) {
+  if(!assignment||assignment.recoveryPending||assignment.simulationState==='WAITING_CONFIG')return 'UNKNOWN';
+  if(demoActiveSlotReplacementTask(assignment))return 'PENDING';
+  const task=assignment.currentTask;
+  if(!task||['COMPLETED','FAILED','CANCELLED'].includes(task.status))return 'IMMEDIATE';
+  return 'UNKNOWN';
+}
+
 // Read the effective task projection used by the preview before changing the source or payment.
 export function demoReplacementSourceCheck(source, state, external, read) {
   if(source?.activatedAt==null)return {assignment:null,refusal:null};
-  const explicitV2=!['app','cycles'].includes(state.computeState??'app');
-  const projection=read(explicitV2?'/api/tasks/v2/assignments':'/api/tasks/assignments');
+  const path=demoReplacementAssignmentsPath(state);
+  const projection=read(path);
   const assignment=projection.devices.find(row=>row.deviceId===source.id);
   const task=assignment?.currentTask;
-  if(explicitV2){
+  if(path==='/api/tasks/v2/assignments'){
     if(assignment?.recoveryPending)return {assignment,refusal:'COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED'};
     const drained=!task||(task.startedAt==null?task.status==='FAILED':['COMPLETED','FAILED','CANCELLED'].includes(task.status));
     return {assignment,refusal:drained?null:'COMPUTE_V2_DEVICE_BUSY'};
@@ -785,6 +902,9 @@ export function demoReplacementSourceCheck(source, state, external, read) {
 export function demoFixture(url,locale,state,request,now=Date.now()) {
   state.previewFactsAt??=demoStartedAt;
   state.walletLegacySeed??=false;
+  if(Object.values(state.slotReplacements??{}).some(pair=>pair.taskEndsAt<=now)
+    ||Object.values(state.slotReplacementTasks??{}).some(task=>task.completedAt==null&&Date.parse(task.completableAt)<=now))
+    demoFleetFacts(url,locale,state);
   const iso=new Date(now).toISOString(),pathname=url.pathname;
   const empty=state.dataState==='empty';
   const products=demoProducts(state,url.origin);
@@ -819,7 +939,67 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname.startsWith('/api/trial/')) {
     const fleet=demoFleetFacts(url,locale,state);
     return trialDemo(url,locale,state,request,fleet.slotsUsed>=fleet.slotCap,empty?[]:products,
-      productNo=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true,request.verifiedPayment?.quotaHold));
+      (productNo,isTrialProduct)=>requireDemoPurchase(state,products,[{productNo,quantity:1}],now,true,request.verifiedPayment?.quotaHold,isTrialProduct));
+  }
+  // Mirrors AppCanonicalBoundaryService.replaceDevice (cancel = the same method with cancel=true).
+  const slotReplacement=pathname.match(/^\/api\/devices\/slot-replacement(\/cancel)?$/);
+  if(slotReplacement&&request.method()==='POST'){
+    const cancel=Boolean(slotReplacement[1]);
+    const {oldDeviceId,newDeviceId,oldExpectedVersion:oldVersion,newExpectedVersion:newVersion}=request.postDataJSON()??{};
+    const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
+    if(![oldDeviceId,newDeviceId].every(id=>Number.isInteger(id)&&id>0)||oldDeviceId===newDeviceId)fail(422,'DEVICE_ID_REQUIRED');
+    if(![oldVersion,newVersion].every(version=>Number.isInteger(version)&&version>=0))fail(422,'DEVICE_VERSION_REQUIRED');
+    const key=request.headers?.()['idempotency-key']?.trim();
+    if(!key)fail(422,'IDEMPOTENCY_KEY_REQUIRED');
+    if(key.length>128)fail(422,'IDEMPOTENCY_KEY_INVALID');
+    if(previewAccountId(state,request.headers())!==demoAccountId)fail(403,'DEVICE_FORBIDDEN');
+    // Replace and cancel are separate idempotency scopes; a replay returns the first result.
+    const command=(cancel?'slot-replacement-cancel:':'slot-replacement:')+key;
+    const identity=JSON.stringify([oldDeviceId,newDeviceId,oldVersion,newVersion]);
+    const prior=state.deviceActivationReceipts?.[command];
+    if(prior){
+      if(prior.identity!==identity)refuse('IDEMPOTENCY_KEY_CONFLICT');
+      return prior.receipt;
+    }
+    const fleet=demoFleetFacts(url,locale,state);
+    const oldDevice=fleet.devices.find(row=>row.id===oldDeviceId),newDevice=fleet.devices.find(row=>row.id===newDeviceId);
+    if(!oldDevice||!newDevice||[oldDevice,newDevice].some(device=>(device.ownershipStatus??'OWNED')!=='OWNED'))fail(403,'DEVICE_FORBIDDEN');
+    if(oldDevice.rowVersion!==oldVersion||newDevice.rowVersion!==newVersion)refuse('DEVICE_VERSION_CONFLICT');
+    if([oldDevice,newDevice].some(device=>['PHONE','MOBILE'].includes(device.deviceType)))refuse('DEVICE_REPLACEMENT_STATE_CHANGED');
+    const replacements=state.slotReplacements??={},activations=state.deviceActivations??={};
+    const successor=replacements[oldDeviceId]?.newDeviceId;
+    let status;
+    if(cancel){
+      if(successor!==newDeviceId||!oldDevice.pendingDeactivate)refuse('DEVICE_REPLACEMENT_STATE_CHANGED');
+      // cancelDeactivation bumps the old device's row_version; the new device stays in inventory untouched.
+      activations[oldDeviceId]={...activations[oldDeviceId],pendingDeactivate:false,rowVersion:oldVersion+1};
+      delete replacements[oldDeviceId];
+      status='CANCELLED';
+    }else{
+      if(!['ACTIVE','ONLINE','BUSY','RUNNING','OFFLINE'].includes(oldDevice.status)||oldDevice.activatedAt==null
+          ||oldDevice.deactivatedAt!=null||oldDevice.pendingDeactivate||newDevice.activatedAt!=null
+          ||!['INACTIVE','INVENTORY','DEACTIVATED'].includes(newDevice.status)
+          ||successor!=null||Object.values(replacements).some(pair=>pair.newDeviceId===newDeviceId)
+          ||fleet.slotsUsed>fleet.slotCap)refuse('DEVICE_REPLACEMENT_STATE_CHANGED');
+      const {assignment,refusal}=demoReplacementSourceCheck(oldDevice,state,false,
+        path=>demoFixture(new URL(path,url.origin),locale,state,{...request,method:()=>'GET'},now));
+      if(refusal==='COMPUTE_V2_LEGACY_REQUEST_UNRESOLVED')refuse(refusal);
+      const task=demoActiveSlotReplacementTask(assignment);
+      if(task){
+        const taskEndsAt=typeof task.completableAt==='number'?task.completableAt:Date.parse(task.completableAt);
+        if(!computeFacts)retainDemoSlotReplacementTask(state,oldDevice,now,task);
+        // deactivateAfterTask with an active task: the old device keeps its slot and only gets pending_deactivate.
+        activations[oldDeviceId]={...activations[oldDeviceId],pendingDeactivate:true};
+        replacements[oldDeviceId]={newDeviceId,taskNo:task.taskNo,taskEndsAt,...(computeFacts&&{computeCycle:true})};
+        status='PENDING';
+      }else{
+        completeDemoSlotReplacement(state,oldDevice,newDevice,now);
+        status='COMPLETED';
+      }
+    }
+    const receipt={status,oldDeviceId,newDeviceId};
+    (state.deviceActivationReceipts??={})[command]={identity,receipt};
+    return receipt;
   }
   const deactivation=pathname.match(/^\/api\/device\/(\d+)\/deactivate$/);
   if((deactivation||pathname==='/api/devices/activate')&&request.method()==='POST'){
@@ -844,6 +1024,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(!device)fail(404,'DEVICE_NOT_FOUND');
     if(deactivation){
       if((device.ownershipStatus??'OWNED')!=='OWNED')fail(403,'DEVICE_FORBIDDEN');
+      if(state.slotReplacements?.[deviceId])refuse('DEVICE_REPLACEMENT_PENDING');
       const alreadyDeactivated=device.status==='DEACTIVATED';
       if(!alreadyDeactivated){
         if(device.activatedAt===null)refuse('DEVICE_STATE_CONFLICT');
@@ -860,6 +1041,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       return receipt;
     }
     if(device.rowVersion!==expectedVersion)refuse('DEVICE_VERSION_CONFLICT');
+    if(Object.values(state.slotReplacements??{}).some(pair=>pair.newDeviceId===deviceId))refuse('DEVICE_REPLACEMENT_PENDING');
     if(['PHONE','MOBILE'].includes(device.deviceType))refuse('PHONE_CALIBRATION_ACTIVATION_REQUIRED');
     const alreadyActive=device.activatedAt!==null;
     if(!alreadyActive){
@@ -970,6 +1152,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
+  const networkMembers=()=>usesRankPreset(state)?rankPresetTeamMembers(state,now):demoTeamNetworkMembers(state,now);
   const walletBills=()=>{
     const order=demoHasLongBillRefs(state)&&!empty&&state.accountDeletionState!=='clear'
       ?demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===longBillOrderNo&&row.canonicalStatus==='refunded'):null;
@@ -988,23 +1171,26 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,
       invitedCount,pendingCount:state.accountDeletionState==='clear'?0:Math.max(0,invitedCount-rewards.settledCount),...rewards};
   };
-  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts);if(auxiliary!==undefined)return auxiliary;
+  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts,networkMembers);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   const secondary=secondaryDemo(url,state,request,walletBills);
   if(secondary!==undefined)return secondary;
-  if(pathname==='/api/config/v-ranks'||pathname==='/api/team/rank'){
-    const preset=rankPresetResponse(pathname,structuredClone(base()),state,now);
-    if(preset!==undefined)return preset;
-  }
   if(pathname==='/api/config/v-ranks') {
     const data=structuredClone(base());
+    const preset=rankPresetResponse(pathname,data,state,now);
+    if(preset!==undefined)return preset;
     const own=[0,demoV1SelfComputePoints,640,2000,4000,8000,16000,32000,64000],team=[0,1280,6400,20000,64000,160000,480000,1280000,3200000];
     data.ranks=data.ranks.map((rank,index)=>({...rank,cultivationBonus:rank.rewards.filter(reward=>reward.type==='UVT').reduce((sum,reward)=>sum+reward.amount,0),selfComputePoints:own[index],teamComputePoints:team[index]}));
     return data;
   }
   if(pathname==='/api/team/rank') {
     const data=structuredClone(base());
+    const productPoints=new Map(products.map(product=>[product.id,product.computePoints]));
+    const selfComputePoints=demoAccountOrders(url,locale,state,now).filter(order=>demoPaidPurchase(order)&&order.paidAt<=now)
+      .reduce((sum,order)=>sum+(order.computePoints??order.lineItems.reduce((total,line)=>total+(productPoints.get(line.sku)??0)*line.quantity,0)),0);
+    const preset=rankPresetResponse(pathname,data,state,now,selfComputePoints);
+    if(preset!==undefined)return preset;
     const {rank}=demoH4Account(state);
     const members=demoH4TeamMembers(state,now).filter(member=>member.layer<=7);
     const direct=members.filter(member=>member.layer===1);
@@ -1012,9 +1198,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const vDownlineCounts={};
     for(const member of direct)vDownlineCounts[member.vRank]=(vDownlineCounts[member.vRank]??0)+1;
     const teamComputePoints=members.reduce((sum,member)=>sum+member.lifetimeComputePoints,0);
-    const productPoints=new Map(products.map(product=>[product.id,product.computePoints]));
-    const selfComputePoints=demoAccountOrders(url,locale,state,now).filter(order=>demoPaidPurchase(order)&&order.paidAt<=now)
-      .reduce((sum,order)=>sum+(order.computePoints??order.lineItems.reduce((total,line)=>total+(productPoints.get(line.sku)??0)*line.quantity,0)),0);
     return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,vDownlineCounts,selfComputePoints,teamComputePoints}};
   }
   if(pathname==='/api/team/binary'){
@@ -1776,8 +1959,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso};
   }
   if(pathname==='/api/app/team/network') {
-    const members=demoTeamNetworkMembers(state,now);
-    return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
+    const preset=usesRankPreset(state);
+    const afterId=Number(url.searchParams.get('afterId')??0);
+    const roster=networkMembers();
+    const available=preset?roster.filter(member=>Number(member.id)>afterId):roster;
+    // Small preview pages exercise the same cursor contract without a larger synthetic network.
+    const pageSize=100;
+    const members=preset?available.slice(0,pageSize).map(({paidOrders,sponsorUserId,...member})=>member):available;
+    const nextCursor=available.length>members.length?members.at(-1).id:null;
+    return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor};
   }
   if(pathname==='/api/devices/earnings') {
     const accountId=previewAccountId(state,request.headers?.()??{});
@@ -1791,6 +1981,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     data.realizedTodayUsdt=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsUsdt??0),0).toFixed(6));
     data.realizedTodayNex=Number(facts.devices.reduce((sum,device)=>sum+(device.todayEarningsNex??0),0).toFixed(6));
     Object.assign(data,facts);
+    if(active.length){
+      let assignments=[];
+      try{
+        assignments=read(demoReplacementAssignmentsPath(state)).devices;
+      }catch(error){
+        if(error.status!==404||error.message!=='COMPUTE_V2_NOT_AVAILABLE')throw error;
+      }
+      const byDevice=new Map(assignments.map(row=>[row.deviceId,row]));
+      data.devices=facts.devices.map(device=>device.activatedAt===null?device:{
+        ...device,slotReplacementTiming:demoSlotReplacementTiming(byDevice.get(device.id)),
+      });
+    }
     return data;
   }
   if(pathname==='/api/app/wallet/bills'||pathname==='/api/app/wallet/bills/summary') {
