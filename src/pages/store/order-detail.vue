@@ -225,7 +225,7 @@ import { formatTrialDateTime } from "@/lib/trial-date";
 import { useOrders, type OrderStatus, type Order, timelineFor } from "@/store/orders";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
-import { trialReservesSlotNow } from "@/store/free-trial";
+import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navReset, navTo, takeNavigationParameters } from "@/lib/route";
@@ -690,9 +690,21 @@ const paymentExpired = computed(() => order.value?.expiresAt != null
   && order.value.expiresAt <= detailNow.value);
 const canPayFromWallet = computed(() => remoteApiEnabled
   && currentOrderPayable()&&!cancellingOrder.value&&!orderCommandQuerying.value&&!orderCommandUnavailable.value
+  && trialOrderWaitReason.value !== 'ownTrialDeviceOrder'
   // An external payment already underway resumes its own intent; it never debits the wallet again.
   && (!orderAction.value || (orderAction.value.kind==='pay'&&(resumePaymentAllowed.value||externalPayment.value)))
   && !walletRefreshing.value && !paymentExpired.value);
+const freeTrial = useFreeTrial();
+function plainTrialOrderProduct(original: Order) {
+  if (original.promotionQuoteId || original.discount > 0 || original.tradeInDeviceId || original.quantity !== 1
+      || (original.lineItems && (original.lineItems.length !== 1 || original.lineItems[0]?.quantity !== 1))) return null;
+  return original.lineItems?.[0]?.sku ?? original.productId;
+}
+const trialOrderWaitReason = computed(() => {
+  if (liveOrder.value?.status !== 'placed') return null;
+  const productNo = plainTrialOrderProduct(liveOrder.value);
+  return productNo && freeTrial.isOwnTrialDevice(productNo) ? 'ownTrialDeviceOrder' : null;
+});
 const canResumeWalletPayment = computed(() => orderAction.value?.kind === 'pay' && resumePaymentAllowed.value
   && canPayFromWallet.value && !externalPayment.value && !refusedPayment.value);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
@@ -1007,6 +1019,16 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
       paymentNotice.value = 'blocked';
       return;
     }
+    const trialSku = plainTrialOrderProduct(original);
+    if (trialSku && !freeTrial.canConfirmOrdinaryProduct(trialSku)) {
+      if (!freeTrial.isOwnTrialDevice(trialSku)) await freeTrial.refreshRemote();
+      if (!isCurrentDetailScope(scope)) return;
+      if (!freeTrial.canConfirmOrdinaryProduct(trialSku)) {
+        paymentNoticeReason.value = purchaseCopy.value.coLoadFailed;
+        paymentNotice.value = 'blocked';
+        return;
+      }
+    }
     if (original.promotionQuoteId) {
       autoPayRequested.value = false;
       pendingPaymentIntentAccount = '';
@@ -1130,7 +1152,8 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
     return items.length === requestItems.length && items.every((item, index) => item.productNo === requestItems[index].productNo && item.quantity === requestItems[index].quantity);
   }
   function paymentOrderCurrent(): boolean {
-    return paymentOrderScopeCurrent() && !remoteOrderRefreshing.value && !remoteOrderError.value && paymentOrderMatches();
+    return paymentOrderScopeCurrent() && !remoteOrderRefreshing.value && !remoteOrderError.value
+      && trialOrderWaitReason.value !== 'ownTrialDeviceOrder' && paymentOrderMatches();
   }
   async function checkPaymentOrder(): Promise<PurchaseContextCheck> {
     while (paymentOrderScopeCurrent() && remoteOrderRead) await remoteOrderRead;

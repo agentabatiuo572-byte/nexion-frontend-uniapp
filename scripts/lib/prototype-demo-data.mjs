@@ -123,18 +123,18 @@ export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
   powerUpState:[['default','默认连签增益'],['staking','含质押活动入口（/wallet/staking）']],
-  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
+  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['sub-half-cent','试用设备 · 抵后应付 0.004000（配合试用中）'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['grace-ending','抵扣期剩余 45 秒'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
-  trialReadState:[['normal','正常读取'],['error','试用读取失败'],['user-not-found','试用读取 · 用户不存在']],
+  trialReadState:[['normal','正常读取'],['slow','试用状态 · 延迟返回原快照'],['error','试用读取失败'],['user-not-found','试用读取 · 用户不存在']],
   trialStartReceiptState:trialReceiptOptions,
   trialCancelReceiptState:trialReceiptOptions,
   purchaseCreateReceiptState:[['normal','正常建单'],['processing','原建单请求处理中（稍后出单）']],
   trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share']],
   trialPurchaseOptionTarget:[['rack-p1','UVELRack P1'],['trial-device','本人试用设备']],
-  trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架'],['image-missing','清单未返回图片']],
+  trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['quota-requirements','硬件名额条件不足'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架'],['image-missing','清单未返回图片']],
   trialPurchaseReadState:[['normal','正常读取'],['loading','清单慢速读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
   trialPurchasePriceState:[['normal','正常价格'],['trial-up','试用设备商城价上涨'],['trial-down','试用设备商城价下调'],['extra-up','Rack P1 涨价']],
-  trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-expired','试用设备 · 过期仍确认中（先从页面发起外部付款再切）'],['external-unpaid-terminal','试用设备 · 未付款终结（先从页面发起外部付款再切）'],['external-late','试用设备 · 迟付允许重选（先从页面发起外部付款再切）'],['external-late-unmarked','试用设备 · 迟付仍进行中（先从页面发起外部付款再切）'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-ready','Rack P1 · 余额已受理可继续'],['balance-resumable','下一次余额提交不送达'],['balance-hold-next','下一次余额提交已受理 · 丢响应'],['balance-settled','原余额付款出结果'],['external-quote-conflict','下次试用外部报价遇到 Rack P1 原提交']],
+  trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-expired','试用设备 · 过期仍确认中（先从页面发起外部付款再切）'],['external-unpaid-terminal','试用设备 · 未付款终结（先从页面发起外部付款再切）'],['external-late','试用设备 · 迟付允许重选（先从页面发起外部付款再切）'],['external-late-unmarked','试用设备 · 迟付仍进行中（先从页面发起外部付款再切）'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-ready','Rack P1 · 余额已受理可继续'],['balance-resumable','下一次余额提交不送达'],['balance-hold-next','下一次余额提交已受理 · 丢响应'],['legacy-balance-refused','旧版余额提交 · 名额拒绝，仅按原提交号查回'],['balance-settled','原余额付款出结果'],['external-quote-conflict','下次试用外部报价遇到 Rack P1 原提交']],
   trialPurchaseWindow:[['follow','按领取单时间'],['grace','可抵扣期']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（自动按原键核对）'],['timeout','确认超时（15 秒转待确认）']],
@@ -204,6 +204,9 @@ const skuDefinitions = [
 const catalogTaglineTranslations = {
   'stellarbox-pro': { zh:'全托管设备', vi:'Thiết bị vận hành trọn gói' },
 };
+const catalogTaglineFallbacks = {
+  'Fully managed device': {zh:'全托管设备',ru:'Устройство с полным обслуживанием'},
+};
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},
   {badge:'Best seller',badgeKind:'bestSeller'},
@@ -235,7 +238,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const trialSku=state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku);
   const optionTarget=trialPurchaseOptionSku(state);
   return skuDefinitions.map(([id,name,tier,listPrice,monthlyEstimateUsdt,dailyEarnNEX,gpu,vram,watts],index)=>{
-    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, precision:402.123456,
+    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const priceChange=state.trialPurchasePriceState==='extra-up'&&id==='stellarrack-p1'?100:
       id===trialSku?({ 'trial-up':100,'trial-down':-100 })[state.trialPurchasePriceState]??0:0;
@@ -346,6 +349,11 @@ function demoSkuPurchaseRules(state,product,points,now,quantity=1,checkLiveQuota
   if(checkLiveQuota&&state.trialPurchaseOptionState==='quota-exhausted'&&product.id===trialPurchaseOptionSku(state)){
     Object.assign(f4b,{eligible:false,decisionCode:'F4B_MONTHLY_QUOTA_EXHAUSTED',
       conditions:[{kind:'monthlyQuota',required:1,current:1,gap:0,met:false}]});
+  }
+  if(checkLiveQuota&&state.trialPurchaseOptionState==='quota-requirements'&&product.id===trialPurchaseOptionSku(state)
+      && product.productType!=='SHARE'){
+    Object.assign(f4b,{eligible:false,decisionCode:'F4B_REQUIREMENTS_NOT_MET',
+      conditions:[{kind:'teamComputePoints',required:points+1,current:points,gap:1,met:false}]});
   }
   const stocked=product.stock==null||product.stock>=quantity;
   return {eligible:e1.eligible&&f4b.eligible&&stocked,
@@ -1196,7 +1204,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const requested=(url.searchParams.get('locale')?.trim()||state.profile?.language||locale).toLowerCase().split(/[-_]/)[0];
     const language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(requested)?requested:'en';
     return {...authority,source:'nx_product',revision:null,products:empty?[]:products.map(product=>({
-      ...product,tagline:catalogTaglineTranslations[product.id]?.[language]??product.tagline,
+      ...product,tagline:catalogTaglineTranslations[product.id]?.[language]??catalogTaglineFallbacks[product.tagline]?.[language]??product.tagline,
     }))};
   }
   if(pathname==='/api/product/phase') return {phase:'P2',source:'H1_GROWTH_RHYTHM',devOverrideAllowed:false};

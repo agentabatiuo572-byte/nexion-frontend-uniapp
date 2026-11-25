@@ -56,7 +56,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const pricing=state.trialQuoteState||'default';
   // BUG-081 samples keep their labelled early prices through a zero offset cap;
   // settled earnings are paid out after purchase and use the same catalog rate as a default claim.
-  const precision=['precision','half-cent','precision-repriced'].includes(pricing);
+  const precision=['precision','half-cent','sub-half-cent','precision-repriced'].includes(pricing);
   if(!['default','historical-cap'].includes(pricing))Object.assign(unclaimedConfig,{trialDays:'3',discountRate:pricing==='excess-offset'?'0':'0.15',earlyPurchaseDiscountUSD:pricing==='repriced'?'11':'10',trialOffsetCapUSD:pricing==='capped'?'20':precision?'0':null});
   if(pricing==='cloud-share-half-cent')unclaimedConfig.trialOffsetCapUSD='6.34';
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
@@ -110,7 +110,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   }
   const snapshot=()=>{
     if(row.state==='ACTIVE'&&now>=row.startedAt+duration)row.state='GRACE';
-    if(row.state==='GRACE'&&now>=conversionDeadline()&&originalPurchase()?.kind!=='EXTERNAL'){
+    // The provider reader projects only still-open intents, including unresolved expiry.
+    const externalHold=row.state==='GRACE'&&now>=conversionDeadline()&&originalPurchase()?.kind==='EXTERNAL';
+    if(row.state==='GRACE'&&now>=conversionDeadline()&&!externalHold){
       const finishedAt=conversionDeadline();
       Object.assign(row,{state:'CANCELLED',endReason:'expired',finishedAt,cooldownUntil:finishedAt+cooldown,version:(row.version??0)+1});
     }

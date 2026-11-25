@@ -22,7 +22,7 @@ type ConfirmedSubmission = Submission & { confirmedAmountUSD: number; quoteVersi
 
 type RefusedTrialCheckout = {
   status: "refused"; claimNo: string; submissionNo: string; productNo: string;
-  confirmedAmountUSD: number | null; refusal: TrialRefusal;
+  confirmedAmountUSD: number | null; refusal: TrialRefusal; legacyRefusal?: boolean;
 };
 type TrialCheckoutOutcome =
   | { status: "idle" | "storage-error" }
@@ -261,13 +261,18 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     const result = terminalResult(reply);
     if (!result || (result.status === "refused" && result.originalPurchase)) return;
     const receiptClaim = result.status === "settled" ? result.receipt.claimNo : result.claimNo;
-    if ((reply.claimNo ?? receiptClaim) !== claimNo || (receiptClaim && receiptClaim !== claimNo)) return;
+    if ((reply.claimNo && reply.claimNo !== claimNo) || (receiptClaim && receiptClaim !== claimNo)
+        || (reply.productNo && reply.productNo !== productNo)) return;
     if (result.status === "settled") {
-      if (result.receipt.productNo === productNo) return { status: "settled", claimNo, receipt: result.receipt };
+      if ((reply.claimNo || receiptClaim) && result.receipt.productNo === productNo)
+        return { status: "settled", claimNo, receipt: result.receipt };
       return;
     }
-    if (result.productNo !== productNo) return;
-    return { status: "refused", claimNo, submissionNo, productNo, confirmedAmountUSD: null, refusal: result };
+    if (result.productNo && result.productNo !== productNo) return;
+    const original = useFreeTrial().pendingConversion(productNo);
+    if (!(reply.productNo || result.productNo) && original?.key !== submissionNo) return;
+    return { status: "refused", claimNo, submissionNo, productNo, confirmedAmountUSD: null,
+      refusal: result, legacyRefusal: !reply.claimNo && !receiptClaim };
   }
 
   function readSubmission(): Promise<void> {
@@ -278,7 +283,8 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     const current = currentAccount();
     const read = readPaymentCommand(apiClient, "trial-convert", submission.submissionNo).then(async reply => {
       if (!current() || workingSubmission.value?.submissionNo !== submission.submissionNo
-          || (reply.claimNo && reply.claimNo !== submission.claimNo) || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
+          || (reply.claimNo && reply.claimNo !== submission.claimNo) || (reply.productNo && reply.productNo !== submission.device.productNo)
+          || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
       const result = terminalResult(reply);
       if (result) finish(submission, result);
       else if (reply.canResumeSameKey && (reply.status === "PROCESSING" || reply.status === "NOT_SEEN")) {
@@ -313,7 +319,9 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
 
   function rememberExternalRefusal(claimNo: string, productNo: string, commandKey: string, amount: number, refusal: TrialRefusal) {
     useTrialPurchaseResult().publish({ status: "refused", claimNo, key: commandKey, reason: refusal.reasonCode });
-    if (authority.value?.claimNo !== claimNo) return;
+    const current = outcome.value;
+    if (authority.value?.claimNo !== claimNo || "submission" in current
+        || current.status === "original" || current.status === "settled") return;
     outcome.value = { status: "refused", claimNo, productNo, submissionNo: commandKey, confirmedAmountUSD: amount,
       refusal };
   }

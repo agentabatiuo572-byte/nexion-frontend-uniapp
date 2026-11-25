@@ -341,7 +341,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialSample, unpaidTerminalSample, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialClockDaysAtCreate, trialSample, unpaidTerminalSample, ...row} = intent, open = Date.now() < deadline;
     if (row.kind === 'TRIAL_CONVERT' && !trialPurchaseOptionsEnabled(state)) {
       delete row.claimNo;
       delete row.trialPurchaseOutcome;
@@ -370,7 +370,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   // The preview server observes providers independently of order, intent and receipt reads.
   function observePayments(observedAt = Date.now()) {
     sync();
-    for (const intent of intents.values()) advance(intent, observedAt);
+    for (const intent of intents.values()) {
+      // A trial clock preset moves payment grace as well as the trial deadline.
+      const trialAdvance=intent.kind==='TRIAL_CONVERT'
+        ? Math.max(0,(state.trialLifecycleAdvanceDays??0)-intent.trialClockDaysAtCreate)*86400000 : 0;
+      advance(intent, observedAt+trialAdvance);
+    }
   }
   // AppOrderCommandService refuses a wallet pay or a cancel while an order's external payment is open.
   const openOrderPayment = orderNo => { sync(); return openIntent({kind: 'ORDER_PAY', orderNo}); };
@@ -519,7 +524,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? new URL(intentNo, previewPurchaseCashier).href : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin,
-        trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{claimNo:trial.claimNo,version:1,reconciliationStatus:'PENDING'})};
+        trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{claimNo:trial.claimNo,version:1,reconciliationStatus:'PENDING',
+          trialClockDaysAtCreate:state.trialLifecycleAdvanceDays??0})};
       const commit = () => {
         if (suspended) {
           suspendedIntents.delete(intentNo);
