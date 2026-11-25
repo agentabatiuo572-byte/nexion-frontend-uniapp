@@ -3250,7 +3250,12 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 
 ### 9.11a 试用接口与交易边界
 
-2026-11-06（BUG-158）领取已知拒绝沿用现有资格原因和纠正入口。仅 HTTP 409 与 code 409 一致、原因已映射，且随后 state 读回仍为同一原领取单、处于非 active／grace 状态时结束本次缓存拒绝键。读回 active／grace 则确认既有领取结果；读取失败、领取单不匹配或未知结果继续保留原键。
+开通或取消结果未知时，按账号、命令种类及原 `Idempotency-Key` 只读查询回执。提交前持久化原请求号、当前领取单号及开通设备名。同账号重启或重新登录时继续查询未结命令，换号时隔离。确认期间不报失败，也不自动重发写请求。
+
+- `SUCCEEDED` 读回试用状态后结束确认并提示一次。状态读取暂时失败时保留回执和确认态，继续只读恢复。
+- `REJECTED` 按原错误码提示一次，结束本次命令。用户下次主动操作使用新请求号。
+- `NOT_SEEN` 无提示恢复操作入口。用户再次操作须沿用原请求号和载荷。 `PROCESSING` 继续按原节奏查询并保持确认中。
+- `INDETERMINATE` 或回执读取失败时按试用状态回退核对，三次连续一致的状态读取至少相隔 5 秒。旧后端返回非 `USER_NOT_FOUND` 的 HTTP 404 或 HTTP 405 时，本次会话退回既有状态读回规则（含 BUG-158 的领取拒绝核对）。
 
 用户端以正式后台 AppTrialLifecycleService 返回的领取单和资格为准。运营配置通过既有后台配置服务发布；客户端不直接调用管理员配置接口，也不自行决定资格、扣款或入账。
 
@@ -3261,11 +3266,12 @@ Staking 开仓必须展示档位 APY、锁期、提前退出 penalty、预计收
 | `/api/trial/purchase-options` | GET | — | 返回这次领取单的可购设备清单、每款六位报价与确认版本、能否购买及原因；接口不存在（404 且不是用户不存在）表示后端未支持，按只买本人试用设备处理；试用已不可转购时返回 409，重读试用状态 |
 | `/api/trial/start` | POST | `{ deviceName }` | 无需绑卡和支付；后台校验商品、库存、资格、名额及物理容量，创建或重开领取单并立即计时 |
 | `/api/trial/cancel` | POST | `{ reason }` | 主动取消当前试用，进入后台配置的冷却期；状态读回成功后移除试用槽 |
+| `/api/trial/commands/{start\|cancel}` | GET | `commandKey` 为原 `Idempotency-Key` | 只查本账号该类命令，返回原回执。成功带原领取单号，被拒带原错误码 |
 | `/api/trial/convert` | POST，`Idempotency-Key` 为原提交号 | `{ productNo, expectedAmountUsdt, quoteVersion, paymentPassword, credentialVersion, attemptNo }` | 只用于余额。商品为清单内任一款，确认版本必填，确认金额最多两位，应付精确为零也要验支付密码；主动确认后原子完成钱包扣款、订单、真实设备、试用终态及购后剩余收益入账 |
-| `/api/app/purchase-payment-quotes`、`/api/app/purchase-payment-intents` | POST／GET | 取报价带 `productNo, expectedAmountUsdt, quoteVersion`，建单带报价编号 | 本人试用设备的 USDT、银行卡付款；其他设备不能走外部付款。按原付款单号或原建单键查回 |
+| `/api/app/purchase-payment-quotes`、`/api/app/purchase-payment-intents` | POST／GET | 取报价带 `productNo, expectedAmountUsdt, quoteVersion`，建单带报价编号 | 本人试用设备的 USDT、银行卡付款；其他设备不能走外部付款。按原付款单号或原建单键查回。原键查询返回 HTTP 409 `PURCHASE_PAYMENT_INTENT_PROCESSING` 时保留原单锁、继续查询。404 沿用可信服务端时间与手动同键重试后的释放规则 |
 | `/api/trial/extension` | POST | — | 沿用后台延长资格；延长的是购买与抵扣有效期，不继续累计试用收益 |
 
-写操作使用 `Idempotency-Key`。未确认的网络结果重用原意图并先恢复读回；已知拒绝且权威状态确认未执行时才允许下一次新意图。领取成功必须经过同一领取单的成功读回，付款成功必须存在真实订单编号。历史 `redeem-early` 不是当前 App 购机入口；前端不得自行串接余额、设备和订单写入替代 convert。
+写操作使用 `Idempotency-Key`，未确认时先核对原意图。试用开通、取消成功须读回权威状态，付款成功须存在真实订单编号。历史 `redeem-early` 不是当前 App 购机入口。前端不得自行串接余额、设备和订单写入替代 convert。
 
 **金额与状态职责**
 - 领取时固定商品、价格、日收益、试用天数和收益抵扣上限；进行中的试用不得随当前目录变化被改写。冷却结束后的新领取使用当时有效配置。

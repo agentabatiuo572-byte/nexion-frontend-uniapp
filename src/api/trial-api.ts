@@ -190,10 +190,17 @@ export type TrialPurchaseConvertResult =
 export type TrialCancelResult = { status: "cancelled"; state: TrialAuthorityState }
   | { status: "payment-in-progress"; originalPurchase?: TrialOriginalPurchase };
 
+export type TrialLifecycleKind = "start" | "cancel";
+export type TrialLifecycleReceipt =
+  | { status: "NOT_SEEN" | "PROCESSING" | "INDETERMINATE" | "unsupported" }
+  | { status: "SUCCEEDED"; claimNo: string }
+  | { status: "REJECTED"; code: number; message: string };
+
 export interface TrialApi {
   state(): Promise<TrialAuthorityState>;
   purchaseOptions(): Promise<TrialPurchaseOptionsRead>;
   eligibility(): Promise<TrialAuthorityState>;
+  command(kind: TrialLifecycleKind, commandKey: string): Promise<TrialLifecycleReceipt>;
   start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
   convert(productNo: string, expectedAmountUsdt: number | null, quoteVersion: string | null,
     idempotencyKey: string, authorization?: PaymentPasswordAuthorization): Promise<TrialConvertReceipt>;
@@ -579,6 +586,27 @@ export function createTrialApi(client: ApiClient): TrialApi {
       }
     },
     eligibility: () => parse({ method: "GET", path: "/api/trial/eligibility" }),
+    async command(kind, commandKey) {
+      const path = `/api/trial/commands/${kind}?commandKey=${encodeURIComponent(commandKey)}`;
+      try {
+        const row = record(await client.request({ method: "GET", path }));
+        if (row?.kind !== kind || row.commandKey !== commandKey) return invalid();
+        const { status } = row;
+        if (status === "NOT_SEEN" || status === "PROCESSING" || status === "INDETERMINATE") return { status };
+        const claimNo = text(row.claimNo);
+        if (status === "SUCCEEDED" && claimNo) return { status, claimNo };
+        const message = text(row.message);
+        const code = row.code;
+        if (status === "REJECTED" && message && typeof code === "number" && Number.isInteger(code) && code >= 400 && code < 500)
+          return { status, code, message };
+        return invalid();
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.kind === "http"
+            && (cause.status === 405 || (cause.status === 404 && cause.message !== "USER_NOT_FOUND")))
+          return { status: "unsupported" };
+        throw cause;
+      }
+    },
     start: (idempotencyKey, deviceName) => parse({
       method: "POST",
       path: "/api/trial/start",

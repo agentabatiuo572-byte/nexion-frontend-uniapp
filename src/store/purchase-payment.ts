@@ -310,7 +310,7 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
     const result = trialLookup ? trialLookup.result
       : pending.intentNo && (expired || pending.kind === 'TRIAL_CONVERT')
       ? await api.snapshot(pending.intentNo) : await readIntent(pending);
-    if (!sameAccount() || !current() || state.open || !shouldRead(pending)) return;
+    if (!sameAccount() || !current() || state.open || !shouldRead(pending) || result?.status === 'processing') return;
     if (pending.kind === 'TRIAL_CONVERT') {
       if (result?.status === 'refused' || (!result && pending.trialCreateRefusal)) {
         projectTrialRefusal(result?.status === 'refused' ? result : pending.trialCreateRefusal!, pending, accountKey);
@@ -372,7 +372,7 @@ function projectPassivePayment(accountKey: string, pending: PendingExternal, int
 }
 
 type CheckoutCapacityPaymentRead = PaymentCommandReceipt | { status: 'AWAITING_PAYMENT'; intentNo: string; cutoff: number | null };
-let checkoutIntentRead: { accountKey: string; commandKey: string; result: Promise<PurchasePaymentIntent | null> } | null = null;
+let checkoutIntentRead: { accountKey: string; commandKey: string; result: ReturnType<typeof readIntent> } | null = null;
 
 /** Project a checkout-owned external read into the same records used by the floating bar.
  *  Undefined leaves the command lookup to checkout. Null means the known intent was released. */
@@ -386,6 +386,7 @@ export async function readCheckoutCapacityPayment(accountKey: string, kind: 'CAP
     if (checkoutIntentRead === read) checkoutIntentRead = null;
   });
   if (!current()) return;
+  if (intent?.status === 'processing') return { status: 'PROCESSING', canResumeSameKey: false };
   projectPassivePayment(accountKey, pending, intent);
   if (intent && !isVisiblePayment(intent)) return;
   if (!intent) return pending.intentNo ? null : undefined;
@@ -866,7 +867,15 @@ async function query(refreshTrialIntent = false) {
         // The 409 only names the intent. A locally known key is usable only for that same intent.
         const original = Object.values(rows(accountKey).records)
           .find(row => row.intentNo === recovery.intentNo && row.kind === recovery.kind);
-        if (original) intent = await api.find(original.kind, original.commandKey);
+        if (original) {
+          const result = await api.find(original.kind, original.commandKey);
+          if (!owns(version, accountKey) || state.concluded) return;
+          if (result?.status === 'processing') {
+            state.canResubmit = false;
+            return;
+          }
+          intent = result;
+        }
       }
       if (!owns(version, accountKey) || state.concluded) return;
       if (intent && (intent.intentNo !== recovery.intentNo || intent.kind !== recovery.kind)) {
@@ -908,6 +917,10 @@ async function query(refreshTrialIntent = false) {
       : await (refreshTrialIntent && pending.kind === 'TRIAL_CONVERT' && pending.intentNo ? api.get(pending.intentNo)
       : checkoutRead?.accountKey === accountKey && checkoutRead.commandKey === pending.commandKey ? checkoutRead.result : readIntent(pending));
     if (!owns(version, accountKey) || state.concluded) return;
+    if (result?.status === 'processing') {
+      state.canResubmit = false;
+      return;
+    }
     if (result?.status === 'refused') { finishTrialRefusal(result, pending); return; }
     if (result) {
       state.canResubmit = false;
@@ -1060,7 +1073,7 @@ async function submitOriginal(manualRetry = false) {
           state.pending = readOnly;
           try { save(readOnly); } catch { /* Keep read-only recovery for this session even if storage fails. */ }
         }
-        let existing: PurchasePaymentIntent | null;
+        let existing: Awaited<ReturnType<typeof api.find>>;
         try { existing = await api.find(pending.kind, pending.commandKey); }
         catch {
           // Only a read can prove no intent exists: the record stays, and the refusal still stands for the user.
@@ -1070,6 +1083,11 @@ async function submitOriginal(manualRetry = false) {
           return;
         }
         if (!owns(version, accountKey)) return;
+        if (existing?.status === 'processing') {
+          state.canResubmit = false;
+          lookup = true;
+          return;
+        }
         if (existing) accept(existing, pending);
         else {
           // A definite refusal plus a successful empty lookup releases the caller's matching unknown command too.

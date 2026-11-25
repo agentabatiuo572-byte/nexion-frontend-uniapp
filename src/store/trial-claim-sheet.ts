@@ -46,6 +46,7 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
   });
   function failureText(reason: TrialStartFailure | undefined): string {
     const t = getT();
+    if (reason === "storage-unavailable") return t.errors.txNotSavedTitle;
     if (reason === "rejected") return copy.value.claimRejected;
     if (reason === "capacity-full") return copy.value.capacityFull;
     if (reason === "converted") return t.trial.eligReasonConverted;

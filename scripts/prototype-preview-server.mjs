@@ -25,6 +25,7 @@ import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
 import { demoTradeinRecovery, tradeinRecoveryStates } from './lib/prototype-demo-tradein-recovery.mjs';
 import { applyDemoOrderTopupScene, demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
 import { demoRankSalaryCommand, isRankSalaryCommand } from './lib/prototype-demo-rank-salary.mjs';
+import { createTrialLifecyclePreview } from './lib/trial-lifecycle-preview-fixture.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -67,6 +68,7 @@ const fixtureFor=(url,request)=>{
     ...request,originalTrialPurchase:checkoutFlow?.originalTrialPurchase,
   }),state);
 };
+const trialLifecycle=createTrialLifecyclePreview(state,fixtureFor);
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
 await installFormalProbeSession({addInitScript:async(fn,arg)=>init.push(()=>{
@@ -80,7 +82,7 @@ const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
 const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-purchase-preselection-accounts-v1','nexgrid-trial-convert-accounts-v1','nexgrid-trial-checkout-accounts-v1','nexgrid-trial-topup-return-accounts-v1','uvel-event-pending-accounts-v1'];
-scenarioStorageKeys.push('nexgrid-rank-salary-command-v1');
+scenarioStorageKeys.push('nexgrid-rank-salary-command-v1','nexgrid-trial-lifecycle-commands-v1');
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
 const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
@@ -305,9 +307,12 @@ const server=http.createServer(async(req,res)=>{
         if(update.reset||scenarioChange){
           state.scenarioEpoch=++scenarioEpoch;
           checkoutFlow?.syncScenario();
+          trialLifecycle.reset();
           tradeinRecoverySeed=undefined;
           delete state.tradeinRecoveryState;
         }
+        if(update.trialStartReceiptState==='normal')trialLifecycle.release('start');
+        if(update.trialCancelReceiptState==='normal')trialLifecycle.release('cancel');
         if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.
@@ -540,7 +545,17 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,result.body,result.status);
       }
       if(bankTopupEndpoint)return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
-      if(/^\/api\/trial\/(state|eligibility|purchase-options|start|cancel|convert)$/.test(url.pathname))
+      const trialCommandPath=/^\/api\/trial\/commands\/([^/]+)$/.exec(url.pathname);
+      if(req.method==='GET'&&trialCommandPath){
+        const result=trialLifecycle.read(url,trialCommandPath[1],req.headers);
+        return sendJson(res,result.body,result.status);
+      }
+      const trialLifecyclePath=/^\/api\/trial\/(start|cancel)$/.exec(url.pathname);
+      if(req.method==='POST'&&trialLifecyclePath){
+        const result=trialLifecycle.submit(url,trialLifecyclePath[1],req.headers,JSON.parse(body||'{}'));
+        return sendJson(res,result.body,result.status);
+      }
+      if(/^\/api\/trial\/(state|eligibility|purchase-options|convert)$/.test(url.pathname))
         return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {

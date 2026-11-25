@@ -524,9 +524,15 @@ if (remoteApiEnabled) {
     toast.info(useT().value.trial.toastCancelled);
     void useApp().refreshRemoteFleet();
   });
+  watch(() => trial.confirmedCancelDenial, reason => {
+    if (!reason) return;
+    const t = useT().value;
+    toast.warn(reason === "payment-in-progress" ? trialDetailCopy.value.cancelLocked
+      : reason === "not-cancellable" ? t.trial.endedTitle : t.security.opFailed);
+  });
   useAutoRecovery({
     failed: () => trial.lifecycleReadbackPending,
-    retry: () => trial.refreshRemote(),
+    retry: () => trial.recoverLifecycleCommand(),
     repeatMs: 30_000,
     quiet: true,
   });
