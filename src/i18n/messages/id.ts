@@ -2594,7 +2594,7 @@ export const id: Messages = {
     gateLockedCta: "Cara membuka",
     gateSoldOut: "Habis periode ini",
     temporarilyOutOfStock: "Stok sedang habis",
-    trialCreditTag: "Bisa pakai kredit uji coba",
+    trialCreditTag: "Kredit uji coba",
     buyWithTrialCredit: "Beli dengan kredit uji coba",
     trialCreditLimitDevice: "Maks. 1 unit, uji coba berakhir saat dibeli",
     trialCreditLimitShare: "Maks. 1 porsi, uji coba berakhir saat dibeli",

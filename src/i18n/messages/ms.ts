@@ -2594,7 +2594,7 @@ export const ms: Messages = {
     gateLockedCta: "Cara membuka",
     gateSoldOut: "Habis dijual kitaran ini",
     temporarilyOutOfStock: "Kehabisan stok buat sementara",
-    trialCreditTag: "Boleh guna kredit percubaan",
+    trialCreditTag: "Kredit percubaan",
     buyWithTrialCredit: "Beli dengan kredit percubaan",
     trialCreditLimitDevice: "Had 1 unit, percubaan tamat selepas dibeli",
     trialCreditLimitShare: "Had 1 bahagian, percubaan tamat selepas dibeli",

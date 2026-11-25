@@ -161,8 +161,9 @@ function move(row: { productNo: string }, delta: number) {
 .tdp-row__was--claim { margin-left: -16px; }
 .tdp-row__claim { margin-right: 4px; }
 /* 「领取时价格」 on its own line above the struck price, clear of the estimate. */
-.tdp-row__was--stack { margin-left: 0; }
+.tdp-row__was--stack { margin-left: 0; max-width: 96px; white-space: normal; }
 .tdp-row__was--stack .tdp-row__claim { display: block; margin-right: 0; }
+.tdp-row__was--stack .tdp-row__strike { white-space: nowrap; }
 .tdp-row__strike { text-decoration: line-through; }
 .tdp-row__unknown { flex: none; color: var(--v5-ink-3); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-v5); }
 .tdp-row__radio { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); display: grid; place-items: center; }

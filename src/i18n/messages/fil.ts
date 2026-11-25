@@ -2594,7 +2594,7 @@ export const fil: Messages = {
     gateLockedCta: "Paano i-unlock",
     gateSoldOut: "Ubos na ngayong cycle",
     temporarilyOutOfStock: "Pansamantalang ubos ang stock",
-    trialCreditTag: "Puwede ang credit sa trial",
+    trialCreditTag: "Credit sa trial",
     buyWithTrialCredit: "Bilhin gamit ang credit sa trial",
     trialCreditLimitDevice: "Hanggang 1 unit, tapos ang trial pagkabili",
     trialCreditLimitShare: "Hanggang 1 share, tapos ang trial pagkabili",

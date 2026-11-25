@@ -2594,7 +2594,7 @@ export const uz: Messages = {
     gateLockedCta: "Qanday ochiladi",
     gateSoldOut: "Bu davrda sotilib boʻldi",
     temporarilyOutOfStock: "Vaqtincha omborda yoʻq",
-    trialCreditTag: "Sinov mablagʻi qoʻllanadi",
+    trialCreditTag: "Sinov mablagʻi",
     buyWithTrialCredit: "Sinov mablagʻi bilan olish",
     trialCreditLimitDevice: "Faqat 1 dona, xariddan soʻng sinov tugaydi",
     trialCreditLimitShare: "Faqat 1 ulush, xariddan soʻng sinov tugaydi",

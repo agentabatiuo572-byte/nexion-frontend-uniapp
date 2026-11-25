@@ -4732,6 +4732,8 @@ button.checkout-policy-link::after { border:0; }
 /* P4 card: the first block of the review column, with the product card's margins (16 sides, 20 to the next block). */
 .checkout-paying-card { margin:var(--v5-space-5) var(--v5-space-4) 0; }
 .checkout-sticky-copy { min-width:0; }
+/* A button pushed onto its own line stays on the right (03 §3.6.1). */
+.checkout-sticky-copy + :deep(.nx-button) { margin-left:auto; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }

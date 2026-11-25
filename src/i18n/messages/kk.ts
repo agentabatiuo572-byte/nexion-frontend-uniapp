@@ -2594,7 +2594,7 @@ export const kk: Messages = {
     gateLockedCta: "Ашу жолы",
     gateSoldOut: "Осы кезеңде сатылып кетті",
     temporarilyOutOfStock: "Уақытша қоймада жоқ",
-    trialCreditTag: "Сынақ бонусы қолданылады",
+    trialCreditTag: "Сынақ бонусымен",
     buyWithTrialCredit: "Сынақ бонусымен сатып алу",
     trialCreditLimitDevice: "Тек 1 дана, сатып алған соң сынақ аяқталады",
     trialCreditLimitShare: "Тек 1 үлес, сатып алған соң сынақ аяқталады",

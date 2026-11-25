@@ -2594,7 +2594,7 @@ export const ru: Messages = {
     gateLockedCta: "Как открыть",
     gateSoldOut: "Распродано в этом цикле",
     temporarilyOutOfStock: "Временно нет в наличии",
-    trialCreditTag: "Можно с пробным бонусом",
+    trialCreditTag: "С пробным бонусом",
     buyWithTrialCredit: "Купить с бонусом",
     trialCreditLimitDevice: "1 шт., пробный период завершится",
     trialCreditLimitShare: "1 доля, пробный период завершится",

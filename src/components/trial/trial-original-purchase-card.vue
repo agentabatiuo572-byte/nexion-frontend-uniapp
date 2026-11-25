@@ -94,12 +94,13 @@ const countdown = computed(() => {
 .tpc__name { display: block; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .tpc__tagline { display: flex; margin-top: 4px; }
 .tpc__method { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
-.tpc__side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+/* The status may take two lines; the name column keeps room for a whole word (03 §3.6.1). */
+.tpc__side { flex: 0 1 auto; min-width: 0; max-width: 42%; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
 .tpc__amount { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); white-space: nowrap; }
 .tpc__cur { margin-right: 1px; color: var(--v5-ink-3); font-size: var(--ui-type-meta); }
 .tpc__dec { color: var(--v5-ink-3); }
-.tpc__status { display: flex; align-items: center; justify-content: flex-end; gap: 4px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
-.tpc__status > text { white-space: nowrap; }
+.tpc__status { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 4px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.tpc__status > .tpc__count { white-space: nowrap; }
 .tpc__status--warn { color: var(--v5-warning-ink); }
 .tpc__count { font-family: var(--font-metric); font-variant-numeric: tabular-nums; }
 .tpc__spinner { flex: none; box-sizing: border-box; width: 12px; height: 12px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
