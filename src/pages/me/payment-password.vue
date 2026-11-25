@@ -4,9 +4,7 @@
     <view class="payment-pin-page">
       <text v-if="!state" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
       <template v-if="pendingVisible">
-        <!-- Change-only wording (coordinator 2026-11-25): querying by the original key, or the request never arrived and may be resubmitted. -->
-        <text class="payment-pin-page__note" role="status">{{ canResubmit ? t.paymentPin.changeUnseen : t.paymentPin.changePending }}</text>
-        <view v-if="canResubmit" class="pin-change__link" role="button" tabindex="0" @click="resubmit">{{ t.paymentPin.resubmit }}</view>
+        <text class="payment-pin-page__note" role="status">{{ ui.pendingOperation === 'change' ? t.paymentPin.changePending : t.paymentPin.pending }}</text>
       </template>
       <view v-else-if="loading && !state?.configured" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
       <!-- Nothing to show (03 §3.4, §3.5.2): one sentence in the middle of the page and the page's single reload. -->
@@ -83,7 +81,7 @@ import { navBack, navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { sessionVault } from "@/api/runtime";
 import { isAmbiguousOutcome } from "@/api/errors";
-import type { PaymentPasswordChangeCommand, PaymentPasswordChangeProof, PaymentPasswordChangeVerification } from "@/api/payment-password-api";
+import type { PaymentPasswordChangeProof, PaymentPasswordChangeVerification } from "@/api/payment-password-api";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() => ui.state); const t = useT();
 const passwords = reactive({ current: "", new: "", confirm: "" }); const loading = ref(true);
@@ -92,7 +90,6 @@ const statusReadFailed = ref(false);
 const verifying = ref(false);
 const verificationAttempt = shallowRef<PaymentPasswordChangeVerification>();
 const verifiedChange = shallowRef<PaymentPasswordChangeProof & { expectedCredentialVersion: number }>();
-const submittedChange = shallowRef<PaymentPasswordChangeCommand>();
 let pageGeneration = 0;
 const validation = computed(() => {
   if (validPaymentPassword(passwords.new) && simplePaymentPassword(passwords.new)) return t.value.paymentPin.simple;
@@ -112,14 +109,13 @@ const heading = computed(() => step.value === "verify" ? t.value.paymentPin.veri
 const hint = computed(() => step.value === "verify" ? t.value.paymentPin.verifyHint : step.value === "new" ? t.value.paymentPin.rule : t.value.paymentPin.repeatDigits);
 const actionBusy = computed(() => ui.busy || verifying.value);
 const retryVerification = computed(() => !!verificationAttempt.value && !verifying.value);
-const submittingChange = computed(() => !!submittedChange.value && ui.busy && !ui.visible && step.value === "confirm");
+const submittingChange = computed(() => ui.pendingOperation === "change" && ui.busy && !ui.visible && step.value === "confirm");
 const pendingVisible = computed(() => !!ui.pendingOperation && !submittingChange.value);
 const canBackToVerify = computed(() => step.value !== "verify" && !pendingVisible.value);
 const proofUsable = computed(() => {
   const verified = verifiedChange.value;
   return !!verified && Date.parse(verified.expiresAt) > ui.now && verified.expectedCredentialVersion === state.value?.credentialVersion;
 });
-const canResubmit = computed(() => proofUsable.value && !!submittedChange.value && ui.changeResumeKey === submittedChange.value.commandKey);
 const inputDisabled = computed(() => loading.value || statusReadFailed.value || actionBusy.value || (step.value === "verify" && (!!state.value?.lockedUntil || retryVerification.value)));
 const stepError = computed(() => {
   if (submittingChange.value || verifying.value) return "";
@@ -190,7 +186,6 @@ function clear() {
   verifying.value = false;
   verificationAttempt.value = undefined;
   verifiedChange.value = undefined;
-  submittedChange.value = undefined;
   passwords.current = "";
   passwords.new = "";
   passwords.confirm = "";
@@ -222,11 +217,14 @@ onMounted(() => {
 });
 onUnmounted(() => releaseBrowserBack?.());
 // #endif
+// Observe the settled UI state before rendering the pending screen, after the busy flag and durable key update together.
+watch(pendingVisible, visible => {
+  if (visible && ui.pendingOperation === "change") clear();
+});
 watch(() => ui.changeError, key => {
   if (!key) return;
   pin.tick();
   if (key === "samePassword" && proofUsable.value) {
-    submittedChange.value = undefined;
     restartNew();
     return;
   }
@@ -253,24 +251,15 @@ async function load() {
 useAutoRecovery({
   active: () => active.value && !ui.visible,
   failed: () => !loading.value && !ui.busy && !ui.pendingOperation && (statusReadFailed.value || (!!state.value?.lockedUntil && !pin.locked())),
-  retry: readStatus, repeatMs: 30_000,
+  retry: readStatus, repeatMs: 30_000, quiet: false,
 });
 useAutoRecovery({
   active: () => active.value && !ui.visible,
   failed: () => !loading.value && pendingVisible.value && !ui.busy && !ui.reading,
-  retry: async () => {
+  retry: () => {
     const generation = pageGeneration;
-    const isCurrent = () => active.value && generation === pageGeneration && !ui.visible;
-    await pin.query(isCurrent);
-    if (!isCurrent()) return;
-    pin.tick();
-    const key = ui.changeResumeKey;
-    if (key && !canResubmit.value && pin.retireUnseenChange(key)) {
-      clear();
-      ui.changeError = "changeProofExpired";
-      await readStatus();
-    }
-  }, repeatMs: 15_000,
+    return pin.query(() => active.value && generation === pageGeneration && !ui.visible);
+  }, repeatMs: 15_000, quiet: true,
 });
 async function setup() { await pin.waitForQuery(); if (!await pin.setup()) await load(); }
 async function recover() { await pin.waitForQuery(); if (actionBusy.value) return; clear(); if (!await pin.recover()) await load(); }
@@ -279,15 +268,9 @@ async function save() {
   const verified = verifiedChange.value;
   if (!active.value || !canSave.value || !verified) return;
   try {
-    submittedChange.value = { changeProof: verified.changeProof, expectedCredentialVersion: verified.expectedCredentialVersion,
-      newPassword: passwords.new, confirmPassword: passwords.confirm, commandKey: requireCryptoUuid(), attemptNo: requireCryptoUuid() };
+    void pin.change({ changeProof: verified.changeProof, expectedCredentialVersion: verified.expectedCredentialVersion,
+      newPassword: passwords.new, confirmPassword: passwords.confirm, commandKey: requireCryptoUuid(), attemptNo: requireCryptoUuid() });
   } catch { ui.changeError = "failed"; return; }
-  await pin.change(submittedChange.value);
-}
-async function resubmit() {
-  await pin.waitForQuery();
-  pin.tick();
-  if (active.value && canResubmit.value && submittedChange.value) await pin.change(submittedChange.value);
 }
 watch(() => ui.completedRevision, () => {
   if (!active.value || ui.context || !ui.completedOperation) return;
