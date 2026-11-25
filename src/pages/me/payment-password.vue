@@ -31,11 +31,11 @@
         <PaymentPasswordInput :key="step" v-model="passwords[stepField]" class="pin-change__input" :label="heading" :adjust-position="false"
           :auto-focus="!inputDisabled" :disabled="inputDisabled" @complete="completeStep" />
         <!-- In-place result line under the digits: lock (with time) wins, then the error, then the busy status. -->
-        <text v-if="step === 'verify' && state.lockedUntil" class="pin-change__error" role="alert">{{ lockMessage }}</text>
+        <text v-if="step === 'verify' && (pin.locked() || ui.changeLockUnconfirmed)" class="pin-change__error" role="alert">{{ lockMessage }}</text>
         <text v-else-if="stepError" id="pin-change-error" class="pin-change__error" role="alert">{{ stepError }}</text>
         <text v-else-if="stepStatus" id="pin-change-status" class="pin-change__status" role="status">{{ stepStatus }}</text>
         <view v-if="step === 'verify'" class="pin-change__links">
-          <view v-if="retryVerification || (state.lockedUntil && !pin.locked())" class="pin-change__link" role="button" tabindex="0" @click="retryVerification ? verifyCurrent() : load()">{{ t.paymentPin.retry }}</view>
+          <view v-if="retryVerification || (lockNeedsRead && statusReadFailed && !loading)" class="pin-change__link" role="button" tabindex="0" @click="retryVerification ? verifyCurrent() : load()">{{ t.paymentPin.retry }}</view>
           <view class="pin-change__link" role="button" :tabindex="actionBusy ? -1 : 0" :aria-disabled="actionBusy" @click="recover">{{ t.paymentPin.forgot }}</view>
         </view>
         <view v-else-if="step === 'confirm'" class="pin-change__links">
@@ -97,6 +97,8 @@ const validation = computed(() => {
   return "";
 });
 const error = computed(() => !ui.changeError || ui.changeError === "locked" ? "" : ui.changeError === "incorrect" ? fmt(t.value.paymentPin.incorrect, { n: state.value?.remainingAttempts ?? 0 }) : t.value.paymentPin[ui.changeError]);
+const changeLocked = computed(() => ui.changeLockUnconfirmed || !!state.value?.lockedUntil);
+const lockNeedsRead = computed(() => changeLocked.value && !pin.locked());
 const lockMessage = computed(() => {
   if (!pin.locked()) return t.value.paymentPin.lockedLabel;
   const seconds = Math.max(0, Math.ceil((Date.parse(state.value?.lockedUntil ?? "") - ui.now) / 1000));
@@ -116,16 +118,19 @@ const proofUsable = computed(() => {
   const verified = verifiedChange.value;
   return !!verified && Date.parse(verified.expiresAt) > ui.now && verified.expectedCredentialVersion === state.value?.credentialVersion;
 });
-const inputDisabled = computed(() => loading.value || statusReadFailed.value || actionBusy.value || (step.value === "verify" && (!!state.value?.lockedUntil || retryVerification.value)));
+const inputDisabled = computed(() => loading.value || statusReadFailed.value || actionBusy.value || (step.value === "verify" && (changeLocked.value || retryVerification.value)));
 const stepError = computed(() => {
   if (submittingChange.value || verifying.value) return "";
   if (retryVerification.value) return t.value.paymentPin.verifyUnavailable;
+  if (step.value === "verify" && lockNeedsRead.value) {
+    return statusReadFailed.value && !loading.value ? t.value.paymentPin.unavailable : "";
+  }
   return validation.value || error.value || (statusReadFailed.value ? t.value.paymentPin.unavailable : "");
 });
 const stepStatus = computed(() => {
   if (submittingChange.value) return t.value.paymentPin.changing;
   if (verifying.value) return t.value.paymentPin.verifying;
-  return loading.value ? t.value.paymentPin.loading : "";
+  return loading.value || (step.value === "verify" && lockNeedsRead.value) ? t.value.paymentPin.loading : "";
 });
 const canNext = computed(() => step.value === "new" && !inputDisabled.value && validPaymentPassword(passwords.new) && !validation.value);
 const canSave = computed(() => step.value === "confirm" && !!verifiedChange.value && !inputDisabled.value && validPaymentPassword(passwords.new) && validPaymentPassword(passwords.confirm) && !validation.value && !state.value?.lockedUntil && !ui.pendingOperation);
@@ -191,7 +196,11 @@ function clear() {
   passwords.confirm = "";
   step.value = "verify";
 }
-function backToVerify() { if (!ui.busy) clear(); }
+function backToVerify() {
+  if (ui.busy) return;
+  clear();
+  ui.changeError = "";
+}
 const dialogHoldsBack = useDialogBackHeld();
 onBackPress(event => {
   if (event.from !== "backbutton" || dialogHoldsBack(event)) return false;
@@ -231,12 +240,15 @@ watch(() => ui.changeError, key => {
   clear();
   if (key === "samePassword") ui.changeError = "changeProofExpired";
 });
-async function readStatus() {
+watch(() => ui.changeRecheckRevision, () => {
+  if (active.value && !ui.visible) void readStatus(true);
+});
+async function readStatus(keepSnapshot = false) {
   const generation = pageGeneration;
   const isCurrent = () => active.value && generation === pageGeneration;
   if (!isCurrent() || !sessionVault.read()) return;
   loading.value = true;
-  const result = await pin.refreshStatus({ isCurrent, keepTransientSnapshot: true });
+  const result = await pin.refreshStatus({ isCurrent, silent: keepSnapshot || changeLocked.value, keepTransientSnapshot: true });
   if (isCurrent()) {
     statusReadFailed.value = !result;
     loading.value = false;
@@ -250,7 +262,7 @@ async function load() {
 }
 useAutoRecovery({
   active: () => active.value && !ui.visible,
-  failed: () => !loading.value && !ui.busy && !ui.pendingOperation && (statusReadFailed.value || (!!state.value?.lockedUntil && !pin.locked())),
+  failed: () => !loading.value && !ui.busy && !ui.pendingOperation && (statusReadFailed.value || lockNeedsRead.value),
   retry: readStatus, repeatMs: 30_000, quiet: false,
 });
 useAutoRecovery({
@@ -269,7 +281,7 @@ async function save() {
   if (!active.value || !canSave.value || !verified) return;
   try {
     void pin.change({ changeProof: verified.changeProof, expectedCredentialVersion: verified.expectedCredentialVersion,
-      newPassword: passwords.new, confirmPassword: passwords.confirm, commandKey: requireCryptoUuid(), attemptNo: requireCryptoUuid() });
+      newPassword: passwords.new, confirmPassword: passwords.confirm, commandKey: requireCryptoUuid(), attemptNo: requireCryptoUuid() }, verified.expiresAt);
   } catch { ui.changeError = "failed"; return; }
 }
 watch(() => ui.completedRevision, () => {

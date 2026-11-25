@@ -84,10 +84,21 @@ function receipt(value: unknown, commandKey: string): PaymentPasswordReceipt {
   if (data.commandKey !== commandKey || !["SUCCEEDED", "REJECTED", "PROCESSING", "NOT_SEEN", "INDETERMINATE"].includes(data.status as string)
     || (data.canResumeSameKey !== undefined && typeof data.canResumeSameKey !== "boolean")
     || (data.code !== undefined && !Number.isSafeInteger(data.code)) || (data.message !== undefined && typeof data.message !== "string")) throw invalid();
-  const state = data.state === undefined ? undefined : parsePaymentPasswordState(data.state);
+  const state = data.code === 429 && data.message === "PAYMENT_PASSWORD_LOCKED"
+    ? parseLockedState(data.state ?? data.receipt)
+    : data.state === undefined ? undefined : parsePaymentPasswordState(data.state);
   if (data.status === "SUCCEEDED" && !state) throw invalid();
   return { commandKey: data.commandKey, status: data.status as PaymentPasswordReceipt["status"], state,
     code: data.code as number | undefined, message: data.message as string | undefined, canResumeSameKey: data.canResumeSameKey === true };
+}
+
+function parseLockedState(value: unknown): PaymentPasswordState | undefined {
+  try {
+    const state = parsePaymentPasswordState(value);
+    return state.lockedUntil ? state : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function createPaymentPasswordApi(client: ApiClient): PaymentPasswordApi {
@@ -119,7 +130,16 @@ export function createPaymentPasswordApi(client: ApiClient): PaymentPasswordApi 
       validateChangeAttempt(input);
       const { changeProof, newPassword, confirmPassword, expectedCredentialVersion, attemptNo, commandKey } = input;
       if (!validChangeProof(changeProof) || !validPaymentPassword(newPassword) || !validPaymentPassword(confirmPassword)) throw invalidInput();
-      return mutate("change", { changeProof, newPassword, confirmPassword, expectedCredentialVersion, attemptNo, commandKey });
+      return client.request<PaymentPasswordReceipt>({
+        method: "POST", path: `${base}/change`, idempotencyKey: commandKey, retryAfterAuth: false,
+        body: { changeProof, newPassword, confirmPassword, expectedCredentialVersion, attemptNo },
+        acceptedResponses: [200, 429].map(status => ({ status, code: 429, message: "PAYMENT_PASSWORD_LOCKED" })),
+        parseResponseData(value, _, { code, message }) {
+          return code === 429
+            ? { commandKey, status: "REJECTED", code, message, state: parseLockedState(value), canResumeSameKey: false }
+            : receipt(value, commandKey);
+        },
+      });
     },
     reset: input => mutate("reset", input),
     receipt: async key => receipt(await client.request({ path: `${base}/commands/${encodeURIComponent(key)}` }), key),
