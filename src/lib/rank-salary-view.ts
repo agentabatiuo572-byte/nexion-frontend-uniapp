@@ -111,6 +111,7 @@ export function displayedSalaryMonth(salary: RankSalary | null | undefined) {
 /** 卡片优先显示未领且最先到期的月份；另一项只给 D4e 的底注用。 */
 export function salaryView(input: {
   salary: RankSalary | null | undefined; // null：读取失败（D9）
+  qualificationUnavailable?: boolean;
   pending?: RankSalaryAttempt | null;
   phase: SalaryClaimPhase;
   hidden: boolean;
@@ -125,10 +126,10 @@ export function salaryView(input: {
   const num = (value: string) => formatHowNumber(value, input.locale);
   const usdt = (value: string) => hidden ? "••••" : `${num(value)}\u00A0USDT`;
   const say = (template: string, params: Record<string, string | number>) => d.sentence(fmt(template, params));
-  if (salary === null) return { card: { tag: null, caption: "", amount: hidden ? "••••" : "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
-  if (!salary) return { card: null, dock: null, promo: null };
   const item = displayedSalaryMonth(salary);
-  if (!item) return { card: null, dock: null, promo: null };
+  const staleQualification = phase === "idle" && input.qualificationUnavailable && item && item.status !== "CLAIMED";
+  if (salary === null || staleQualification) return { card: { tag: null, caption: "", amount: hidden ? "••••" : "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
+  if (!salary || !item) return { card: null, dock: null, promo: null };
   const other = salary.months.find(month => month.month !== item.month && month.status !== "CLAIMED");
   const caption = hidden ? input.mask("") : say(copy.monthRank, { m: d.month(item.month), r: item.rankCode });
   const expiresAt = pending?.amountExpiresAt ?? salaryAmountExpiresAt(salary, item);
