@@ -6,7 +6,7 @@
         <template v-if="rankAvailable">
           <!-- 身份区（DESIGN 7.5、第 8 节）：V0–V6 为焦点卡（等级色相整体底色）；V7 为卡外星河舞台＋纯色条件卡；V8 为黑金会员卡。
                隐藏统计时 V7、V8 也回到中性焦点卡（徽章换成 •••• 圆），不从舞台或卡面露出等级。 -->
-          <view v-if="identityKind === 'v7'" class="rank-headbg" :class="{ 'is-solid': !stageUnderHeader }" aria-hidden="true" />
+          <view v-if="identityKind === 'v7'" class="rank-headbg" :class="{ 'is-solid': !stageUnderHeader, 'is-still': motion.still.value }" aria-hidden="true" />
           <RankV7Stage v-if="identityKind === 'v7'" :caption="t.rank.currentRank" :theme="theme.resolved"><view ref="headSentinel" class="rank-headbg__sentinel" aria-hidden="true" /></RankV7Stage>
           <RankV8Card v-else-if="identityKind === 'v8'" :caption="t.rank.currentRank" :top-rank="t.myRank.topRank" />
           <view v-if="identityKind === 'tier' || prog.next" :class="identityKind === 'tier' ? ['rank-focus', 'nx-tint', `rank-focus--${tierSegment}`] : ['rank-card', 'rank-cond-card']" :style="identityKind === 'tier' ? focusVars : undefined">
@@ -32,7 +32,7 @@
             </RankConditions>
           </view>
           <!-- 月薪卡（DESIGN 第 6 节，画板 C、D）：salary 字段存在且 months 不为空时显示；salary 为 null（读取失败）时金额「—」（D9）；没有 salary 字段时按 CA 构图。 -->
-          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :swap="salarySwap" :still="motion.still.value" />
+          <RankSalaryCard v-if="salary.card" :title="t.myRank.salaryTitle" :view="salary.card" :resend-note="t.myRank.resendNote" :swap="salarySwap && !motion.still.value" :still="motion.still.value" />
           <!-- V8 会员页（H0）：月薪卡后是 V8 专享权益（大号）和「你现在的权益」。 -->
           <RankV8Perks v-if="identityKind === 'v8'" size="hero" :title="fmt(t.myRank.perksCap, { r: 'V8' })" :count="fmt(t.myRank.perksCount, { n: v8Perks.length })" :perks="v8Perks" :theme="theme.resolved" />
           <view v-if="identityKind === 'v8' && currentBenefits.length" class="rank-section">
@@ -75,7 +75,7 @@
                隐藏统计时（Ch）不标「当前」「下一级」，徽章下仍写 V0–V8 的名字（等级名是公开信息）。 -->
           <scroll-view class="rank-rail" :class="{ 'rank-rail--smooth': !motion.still.value }" scroll-x :scroll-left="railScroll" :show-scrollbar="false">
             <view class="rank-rail__track" role="tablist" :aria-label="t.myRank.allRanks">
-              <view class="rank-rail__ind" :class="{ 'is-on': railInd.on }" :style="{ width: railInd.w + 'px', height: railInd.h + 'px', transform: `translateX(${railInd.x}px)` }" aria-hidden="true" />
+              <view class="rank-rail__ind" :class="{ 'is-on': railInd.on, 'is-still': motion.still.value }" :style="{ width: railInd.w + 'px', height: railInd.h + 'px', transform: `translateX(${railInd.x}px)` }" aria-hidden="true" />
               <view v-for="r in rankDefs" :id="`rank-tab-${r.v}`" :key="r.v" class="rank-rail__item" :class="[`rank-rail__item--${rowStatus(r.v)}`, { 'is-pop': popRank === r.v }]" :data-t="railTier(r.v)" role="tab" tabindex="0" :aria-selected="expandedRank === r.v ? 'true' : 'false'" :aria-controls="`rank-details-${r.v}`" :aria-label="rankLabel(r.v,locale.code,rankDefs)" @click="selectRank(r.v)" @keydown.enter.prevent="selectRank(r.v)" @keydown.space.prevent="selectRank(r.v)">
                 <view class="rank-rail__badge" :style="{ '--rail-accent': railAccent(r.v) }">
                   <TeamRankEmblem class="rank-rail__emb" :rank="r.v" :size="40" />
@@ -389,7 +389,10 @@ const { phase: salaryPhase, pending: salaryAttempt, submit: submitClaim, resend:
     if (code === "COVERAGE_BELOW_REDLINE" || code === "COVERAGE_UNAVAILABLE") {
       const deadline = lastClaimDay(attempt.amountExpiresAt ?? item.expiresAt);
       const today = vState.salary?.businessDate ?? attempt.businessDate;
-      const desc = today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
+      const upcoming = vState.salary?.upcoming;
+      const dropsTo = today === deadline && upcoming?.month === item.month && compareSalaryAmounts(upcoming.amountUsdt, item.amountUsdt) < 0 && Number(upcoming.amountUsdt) > 0 ? upcoming.amountUsdt : null;
+      const desc = dropsTo ? fmt(copy.toastFailDrop, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(dropsTo) })
+        : today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
       toast.warn(copy.toastFailTitle, desc);
     } else if (code === "SALARY_ALREADY_CLAIMED" || code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_AMOUNT_CHANGED") {
       await vState.refreshCanonicalVRank();
@@ -775,6 +778,7 @@ useAutoRecovery({
 .rank-headbg { position:sticky;top:0;z-index:49;height:0;margin:0 -16px;pointer-events:none; }
 .rank-headbg::before { content:"";position:absolute;left:0;right:0;top:0;height:56px;background:var(--v5-bg);opacity:0;transition:opacity 200ms linear; }
 .rank-headbg.is-solid::before { opacity:1; }
+.rank-headbg.is-still::before { transition:none; }
 .rank-headbg__sentinel { position:absolute;left:0;bottom:84px;width:1px;height:1px;pointer-events:none; }
 /* V7 纯色条件卡（.hero--cond）：舞台是本屏区焦点，条件区改为纯色卡。 */
 .rank-cond-card { padding:16px 20px; }
@@ -794,6 +798,7 @@ useAutoRecovery({
 .rank-rail__track { position:relative;display:inline-flex;gap:6px;padding:4px 16px 2px; }
 .rank-rail__ind { position:absolute;left:0;top:4px;border-radius:16px;background:color-mix(in srgb,var(--v5-ink) 7%,transparent);box-shadow:var(--ui-glass-edge-shadow);opacity:0;transition:transform 240ms cubic-bezier(.32,.72,0,1);pointer-events:none; }
 .rank-rail__ind.is-on { opacity:1; }
+.rank-rail__ind.is-still { transition:none; }
 .rank-rail__item { position:relative;z-index:0;display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;min-width:64px;box-sizing:border-box;padding:6px;border-radius:16px;cursor:pointer; }
 .rank-rail__item + .rank-rail__item::before { content:"";position:absolute;left:-6px;top:26px;width:6px;height:2px;background:var(--v5-surface-3); }
 .rank-rail__item--done + .rank-rail__item::before, .rank-rail__item--current::before { background:var(--v5-brand) !important; }

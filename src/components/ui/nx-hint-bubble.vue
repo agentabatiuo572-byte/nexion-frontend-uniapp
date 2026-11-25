@@ -14,7 +14,7 @@
       :style="{ width: size + 'px', height: size + 'px' }" @click.stop="toggle" @keydown.enter.prevent="onKey" @keydown.space.prevent="onKey">
       <NxIcon :name="tone === 'warning' ? 'hint-warn' : 'hint-info'" :size="size" />
     </view>
-    <view v-if="isOpen" :id="bubbleId" class="nx-hint__bubble" :class="{ 'nx-hint__bubble--placed': placed }" :style="bubbleStyle" aria-hidden="true">
+    <view v-if="isOpen" :id="bubbleId" class="nx-hint__bubble" :class="{ 'nx-hint__bubble--placed': placed }" :style="bubbleStyle" aria-hidden="true" @touchmove="close">
       <text v-for="(line, index) in lines" :key="index" class="nx-hint__line">{{ line }}</text>
       <view class="nx-hint__arrow" :style="arrowStyle" />
     </view>
@@ -140,7 +140,7 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; gap: var(--v5-space-1); padding: var(--v5-space-3) 14px; border-radius: var(--v5-radius-m);
   background: var(--v5-toast-bg); box-shadow: var(--v5-toast-shadow); -webkit-backdrop-filter: blur(12px) saturate(125%); backdrop-filter: blur(12px) saturate(125%);
   opacity: 0; pointer-events: none; }
-.nx-hint__bubble--placed { opacity: 1; pointer-events: auto; transition: opacity 160ms ease; }
+.nx-hint__bubble--placed { opacity: 1; pointer-events: auto; }
 .nx-hint__line { display: block; font: 400 13px/18px var(--font-v5); color: var(--v5-toast-ink); white-space: normal; overflow-wrap: break-word; }
 .nx-hint__arrow { position: absolute; top: 100%; width: 12px; height: 6px; margin-left: -6px; background: var(--v5-toast-bg); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 /* Layer order: captcha-slider.vue 秩序表 (785 catcher, 786 bubble, both below the business half sheets). */
@@ -149,7 +149,6 @@ onBeforeUnmount(() => {
 /* The App's catcher is above the page; the bubble sits one layer over it so a tap on the bubble stays on the bubble. */
 .nx-hint__bubble { z-index: 786; }
 /* #endif */
-@media (prefers-reduced-motion: reduce) { .nx-hint__bubble--placed { transition: none; } }
 /* Reduced transparency or more contrast: the shared surfaces' fallback (glass-surfaces.css), an opaque face and no blur.
    The theme's toast colour is laid over black, so the face stays the toast's dark in both themes. */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {

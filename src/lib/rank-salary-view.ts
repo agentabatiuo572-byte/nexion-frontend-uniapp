@@ -137,6 +137,8 @@ export function salaryView(input: {
   const next = salary.upcoming?.month === item.month ? salary.upcoming : null;
   // 金额会降或变 0 时才提示今天截止；晋升当天金额会升，提示由托盘和气泡讲（DESIGN D4、D4c）。
   const amountEndsToday = item.status === "CLAIMABLE" && !!next && compareSalaryAmounts(next.amountUsdt, item.amountUsdt) < 0 && lastDay === salary.businessDate;
+  // 下一档更低但还有金额：今天只是这笔金额的最后一天，不是整月作废。
+  const dropsTo = amountEndsToday && Number(next!.amountUsdt) > 0 ? next!.amountUsdt : null;
   const claimBy = say(copy.claimBy, { d: d.day(lastDay) });
   const amount = hidden ? "••••" : num(item.amountUsdt);
   const businessMonth = salary.businessDate.slice(0, 7);
@@ -184,6 +186,7 @@ export function salaryView(input: {
       card.tip = { tone: "neutral", lines: splitSentences(copy.claimRules) };
     }
     if (amountEndsToday) card.tag = { label: copy.todayTag, tone: "warning" };
+    if (dropsTo) card.tip = { tone: "warning", lines: splitSentences(say(copy.dropNote, { a: usdt(item.amountUsdt), b: usdt(dropsTo) })) };
     if (!dock) dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimBtn, { a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
   }
 
