@@ -37,6 +37,7 @@ const hour = 3_600_000;
 const day = 24 * hour;
 export const demoRewardNexUsdtPrice = .128;
 export const demoPurchaseNexPerUsdt = [50, 20, 10, 5, 2.5, 1, 1];
+export const demoPurchaseBudgetPolicy = { influenceClampMin: 1, influenceClampMax: 5, promoMultiplier: 1, exitCapRate: .25 };
 
 export function demoPurchasePolicy(state) {
   return {
@@ -49,7 +50,9 @@ export function demoPurchasePolicy(state) {
 export function rankDevicePolicies(state, at) {
   const enabled = state.dataState !== 'empty' && state.rankDeviceLevel2State !== 'disabled';
   const previous = {policyVersion:2, effectiveAt:at-30*day, enabled:true, totalRatePct:5, level2RatePct:2, usdtSharePct:70, coolingDays:7};
-  const current = {...previous, policyVersion:3, effectiveAt:at-8*day, enabled,
+  const effectiveAt = usesRankPreset(state) || state.rankDeviceLevel2State === 'disabled'
+    ? at - 8 * day : Date.parse('2026-10-01T00:00:00Z');
+  const current = {...previous, policyVersion:3, effectiveAt, enabled,
     totalRatePct:state.dataState==='empty'?0:5,
     level2RatePct:state.rankDeviceLevel2State==='on'?2:0,
     coolingDays:state.rankPreset==='follow'?0:demoPurchasePolicy(state).coolingDays};
@@ -78,12 +81,18 @@ function rankTargetsFor(state) {
     state.rankPriorState === 'next-met' && state.rankReviewState === 'off' ? 'met' : state.rankPriorState);
 }
 
+export function rankPresetSelfOrderPoints(state, orderStatus) {
+  const total = rankTargetsFor(state).selfComputePoints;
+  const activatedPoints = Math.floor(total / 2);
+  return orderStatus === 'activated' ? activatedPoints : total - activatedPoints;
+}
+
 // These paid orders also supply the named purchase-reward rows.
 const rankPurchaseSamples = [
-  ['p1', 'Lina', 1, 299, 1],
-  ['t1', 'Minh Anh', 2, 299, 2],
-  ['p2', 'Kai', 1, 149, 7 * 24 + 4],
-  ['t2', 'Rustam Abdullayev', 2, 149, 7 * 24 + 7],
+  ['p1', 'Lina', 1, 299, 3, 'DEMO-LINA-S1'],
+  ['t1', 'Minh Anh', 2, 299, 2, 'DEMO-MINH-S1'],
+  ['p2', 'Kai', 1, 149, 7 * 24 + 4, 'DEMO-KAI-S1'],
+  ['t2', 'Rustam Abdullayev', 2, 149, 7 * 24 + 7, 'DEMO-RUSTAM-S1'],
   ['p3', 'Omar', 1, 109, 7 * 24 + 6],
 ];
 
@@ -94,8 +103,10 @@ export function rankPresetTeamMembers(state, now) {
   const unranked = buyers - ranks.length;
   const anchor = state.previewFactsAt ?? now;
   const accountId = String(previewSelectedAccountId(state));
-  const joinedAt = new Date(anchor - 10 * day).toISOString();
   const month = demoTeamBusinessDate(now).slice(0, 7);
+  const anchorMonth = demoTeamBusinessDate(anchor).slice(0, 7);
+  // Already-owned source devices predate the current policy and this month's purchase volume.
+  const oldPaidAt = Math.min(anchor - 11 * day, Date.parse(anchorMonth + '-01T00:00:00+07:00') - day);
   // Give ranked buyers their own required points, then allocate the remaining team points.
   const minimum = ranks.reduce((sum, rank) => sum + RANK_RULES[rank][1], 0);
   const unrankedPoints = Math.min(RANK_RULES[1][1] - 1, Math.floor((teamComputePoints - minimum) / Math.max(buyers, 1)));
@@ -104,17 +115,23 @@ export function rankPresetTeamMembers(state, now) {
   const direct = [];
   return Array.from({ length: buyers }, (_, index) => {
     const id = String(100 + index);
-    const [rewardId, name, layer, amountUsdt, hoursAgo] = rankPurchaseSamples[index]
+    const [rewardId, name, layer, amountUsdt, hoursAgo, sourceDeviceId] = rankPurchaseSamples[index]
       ?? [null, `Member ${index + 1}`, index % 12 === 0 ? 1 : 2, 100, 24];
     const vRank = ranks[index - unranked] ?? 0;
     const points = vRank > 0 ? RANK_RULES[vRank][1] + perRanked
       + (index === buyers - 1 ? remainder % ranks.length : 0) : unrankedPoints;
     const paidAt = anchor - hoursAgo * hour;
-    const paidOrders = [{ orderNo: rewardId ? `DEMO-RANK-${rewardId}` : `DEMO-RANK-MEMBER-${id}`, paidAt, amountUsdt, points, rewardId }];
+    const historicalPoints = sourceDeviceId ? Math.floor(points / 2) : 0;
+    const paidOrders = [{ orderNo: rewardId ? `DEMO-RANK-${rewardId}` : `DEMO-RANK-MEMBER-${id}`,
+      paidAt, amountUsdt, points: points - historicalPoints, rewardId }];
+    if (sourceDeviceId) paidOrders.push({ orderNo: `DEMO-RANK-DEVICE-${id}`, paidAt: oldPaidAt,
+      amountUsdt: 100, points: historicalPoints, activatedAt: oldPaidAt + hour, sourceDeviceId });
+    const joinedAt = new Date(sourceDeviceId ? oldPaidAt - day : anchor - 10 * day).toISOString();
     const sponsor = layer === 1 ? null : direct[index % direct.length];
     const member = { id, name, vRank, layer, avatarUrl: null, status: 'ACTIVE', joinedAt, region: null,
       sponsorUserId: sponsor?.id ?? accountId, leg: sponsor?.leg ?? (direct.length % 2 ? 'B' : 'A'), paidOrders,
-      monthComputePoints: demoTeamBusinessDate(paidAt).startsWith(month) ? points : 0,
+      monthComputePoints: paidOrders.filter(order => demoTeamBusinessDate(order.paidAt).startsWith(month))
+        .reduce((sum, order) => sum + order.points, 0),
       lifetimeComputePoints: points };
     if (layer === 1) direct.push(member);
     return member;
@@ -208,7 +225,7 @@ export function rankSalaryReadback(state, now) {
 }
 
 /** 预设开着时接管 /api/config/v-ranks 和 /api/team/rank；其余路径返回 undefined。base 是原有应答（保留校验需要的公共字段）。 */
-export function rankPresetResponse(pathname,base,state,now){
+export function rankPresetResponse(pathname,base,state,now,selfComputePoints){
   if(!usesRankPreset(state))return undefined;
   const v=Number(state.rankPreset.slice(1));
   if(pathname==='/api/config/v-ranks'){
@@ -233,7 +250,7 @@ export function rankPresetResponse(pathname,base,state,now){
     const vDownlineCounts = {};
     for (const { vRank } of firstTwoLayers) vDownlineCounts[vRank] = (vDownlineCounts[vRank] ?? 0) + 1;
     const data={...base,rankCode:'V'+v,progress:{...base.progress,
-      selfComputePoints:rankTargetsFor(state).selfComputePoints,
+      selfComputePoints,
       teamComputePoints:members.reduce((sum, member) => sum + member.lifetimeComputePoints, 0),
       directRefs:firstTwoLayers.filter(member => member.paidOrders.some(order => order.paidAt <= now)).length,
       vDownlineCounts}};

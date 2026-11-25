@@ -1,11 +1,11 @@
 // The loopback account's visible ledger and wallet summaries.
 import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-account.mjs';
-import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
+import { demoH4Credits, demoH4Savers, demoH4TeamMembers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoDeletionStake } from './prototype-demo-staking.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
 import {
-  demoPurchaseNexPerUsdt, demoPurchasePolicy, demoRewardNexUsdtPrice, RANK_RULES,
-  rankDevicePolicies, rankPresetTeamMembers, rankSalaryPaidFacts,
+  demoPurchaseBudgetPolicy, demoPurchaseNexPerUsdt, demoPurchasePolicy, demoRewardNexUsdtPrice, RANK_RULES,
+  rankDevicePolicies, rankPresetTeamMembers, rankSalaryPaidFacts, usesRankPreset,
 } from './prototype-demo-rank-presets.mjs';
 
 const day=86400000;
@@ -50,6 +50,22 @@ export function demoSettledTasks(state,at) {
   }).concat(completedReplacements);
 }
 
+function splitPurchaseBudget(budget, share) {
+  const micros = Math.round(budget * 1e6);
+  return {
+    amountUSDT: Math.floor(micros * share / 100) / 1e6,
+    amountNEX: Math.floor(micros * (100 - share) * 10_000 / Math.round(demoRewardNexUsdtPrice * 1e6)) / 1e6,
+  };
+}
+
+function deviceRewardAmounts(basis, layer, policy) {
+  const reward = basis * (layer === 1 ? policy.totalRatePct : policy.level2RatePct) / 100;
+  return {
+    amountUSDT: money(reward * policy.usdtSharePct / 100),
+    amountNEX: money(reward * (100 - policy.usdtSharePct) / 100 / demoRewardNexUsdtPrice),
+  };
+}
+
 export function demoCommissionGroups(state,at) {
   if(!demoHasEarningsHistory(state))return [];
   const [year,month]=demoTeamBusinessDate(at).split('-').map(Number);
@@ -78,7 +94,22 @@ export function demoCommissionGroups(state,at) {
     amountUSDT:legacy?100:120,amountNEX:0,status:legacy?'frozen':'unlocked',
     ts:matchedAt,unlockAt:Math.min(at,matchedAt+7*day),
   };
-  if(state.rankPreset&&state.rankPreset!=='follow')return [...demoRankPresetRewardRows(state,at),binary].sort((a,b)=>b.ts-a.ts);
+  if(usesRankPreset(state))return [...demoRankPresetRewardRows(state,at),binary].sort((a,b)=>b.ts-a.ts);
+  const { current, previous } = rankDevicePolicies(state, at);
+  if (state.rankCoolingState === 'zero') {
+    const order = demoH4TeamMembers(state, at).find(member => member.name === 'Maya').paidOrders[1];
+    const { usdtSharePct } = demoPurchasePolicy(state);
+    Object.assign(purchase, splitPurchaseBudget(money(order.amountUsdt * .1), usdtSharePct), {
+      orderId: order.orderNo, sourceRef: order.orderNo, orderAmountUSD: order.amountUsdt,
+      ts: order.paidAt, unlockAt: order.paidAt, status: 'unlocked', policyVersion: current.policyVersion,
+    });
+  }
+  if (state.rankDeviceLevel2State === 'disabled') {
+    const ts = current.effectiveAt - day;
+    Object.assign(device, deviceRewardAmounts(device.orderAmountUSD, device.layer, previous), {
+      ts, unlockAt: ts + previous.coolingDays * day, status: 'unlocked', policyVersion: previous.policyVersion,
+    });
+  }
   return [purchase,device,network,binary].sort((a,b)=>b.ts-a.ts);
 }
 
@@ -91,39 +122,51 @@ function demoRankPresetRewardRows(state,at) {
   const purchasePolicy = demoPurchasePolicy(state);
   const [, , , , , , l1Rate, l2Rate] = RANK_RULES[Number(state.rankPreset.slice(1))];
   const members = rankPresetTeamMembers(state, at);
-  const row = (id, kind, name, layer, basis, ts, unlockAt, amountUSDT, amountNEX, policyVersion) => ({
+  const membersById = new Map(members.map(member => [member.id, member]));
+  const paidOrders = members.flatMap(member => member.paidOrders);
+  const { influenceClampMin, influenceClampMax, promoMultiplier, exitCapRate } = demoPurchaseBudgetPolicy;
+  const row = (id, kind, name, layer, basis, ts, unlockAt, amounts, policyVersion) => ({
     id: 'demo-rank-' + id, kind, sourceUserName: name, layer, orderId: 'DEMO-RANK-' + id,
-    sourceRef: 'DEMO-RANK-' + id, orderAmountUSD: basis, amountUSDT, amountNEX,
+    sourceRef: 'DEMO-RANK-' + id, orderAmountUSD: basis, ...amounts,
     ts, unlockAt, status: unlockAt <= at ? 'unlocked' : 'cooling', policyVersion,
   });
-  const purchases = members.flatMap(({ name, layer, paidOrders }) => paidOrders.filter(order => order.rewardId).map(order => {
-    const direct = layer === 1;
-    const budget = money(order.amountUsdt * (direct ? l1Rate : l2Rate));
-    const budgetMicros = Math.round(budget * 1e6);
-    const share = purchasePolicy.usdtSharePct;
-    const usdt = direct ? Math.floor(budgetMicros * share / 100) / 1e6 : budget;
-    const nex = direct
-      ? Math.floor(budgetMicros * (100 - share) * 10_000 / Math.round(demoRewardNexUsdtPrice * 1e6)) / 1e6
-      : money(budget * demoPurchaseNexPerUsdt[layer - 1]);
-    return row(order.rewardId, direct ? 'direct_purchase' : 'unilevel', name, layer, order.amountUsdt,
-      order.paidAt, order.paidAt + purchasePolicy.coolingDays * day, usdt, nex, current.policyVersion);
+  const purchases = members.flatMap(member => member.paidOrders.filter(order => order.rewardId).map(order => {
+    const { name, layer, sponsorUserId } = member;
+    const { amountUsdt: basis, paidAt } = order;
+    const cap = money(basis * exitCapRate);
+    let budget = Math.min(cap, money(money(basis * l1Rate) * promoMultiplier));
+    if (layer === 2) {
+      const month = demoTeamBusinessDate(paidAt).slice(0, 7);
+      const volume = paidOrders.filter(order => order.paidAt <= paidAt && demoTeamBusinessDate(order.paidAt).startsWith(month))
+        .reduce((sum, order) => sum + order.amountUsdt, 0);
+      const influence = money(Math.max(influenceClampMin, Math.min(influenceClampMax, 1 + Math.log10(Math.max(volume, 1) / 100))));
+      const sponsor = membersById.get(sponsorUserId);
+      const firstLayerBudget = Math.min(cap, money(money(basis * RANK_RULES[sponsor.vRank][6]) * promoMultiplier));
+      const secondLayerBudget = money(money(money(basis * l2Rate) * influence) * promoMultiplier);
+      budget = Math.min(money(cap - firstLayerBudget), secondLayerBudget);
+    }
+    const amounts = layer === 1 ? splitPurchaseBudget(budget, purchasePolicy.usdtSharePct)
+      : { amountUSDT: budget, amountNEX: money(budget * demoPurchaseNexPerUsdt[layer - 1]) };
+    return row(order.rewardId, layer === 1 ? 'direct_purchase' : 'unilevel', name, layer, basis,
+      paidAt, paidAt + purchasePolicy.coolingDays * day, amounts, current.policyVersion);
   }));
-  const device=(id,name,layer,sourceDeviceId,basis,ts,policy)=>{
-    const rate=layer===1?policy.totalRatePct:policy.level2RatePct;
-    const reward=basis*rate/100;
-    const unlockAt=ts+policy.coolingDays*day;
-    const usdt=money(reward*policy.usdtSharePct/100);
-    const nex=money(reward*(100-policy.usdtSharePct)/100/demoRewardNexUsdtPrice);
-    return {...row(id,'direct_device_earning',name,layer,basis,ts,unlockAt,usdt,nex,policy.policyVersion),sourceDeviceId};
-  };
-  const l1Policy=current.enabled?current:previous;
-  const l2Policy=current.enabled&&current.level2RatePct>0?current:previous;
+  const secondLayerEnabled = current.enabled && current.level2RatePct > 0;
   const devices = [
-    device('d1','Lina',1,'DEMO-LINA-S1',100,current.enabled?at-hour:current.effectiveAt-day-hour,l1Policy),
-    device('d2','Minh Anh',2,'DEMO-MINH-S1',80,l2Policy===current?at-2*hour:current.effectiveAt-day-2*hour,l2Policy),
-    device('d3','Kai',1,'DEMO-KAI-S1',40,current.enabled?current.effectiveAt+hour:current.effectiveAt-2*day,l1Policy),
-    device('d4','Rustam Abdullayev',2,'DEMO-RUSTAM-S1',25,current.effectiveAt-2*day-hour,previous),
-  ].filter(row => members.some(member => member.name === row.sourceUserName));
+    ['d1', 'Lina', 100, current.enabled ? at - hour : current.effectiveAt - day - hour],
+    ['d2', 'Minh Anh', 80, secondLayerEnabled ? at - 2 * hour : current.effectiveAt - day - 2 * hour],
+    ['d3', 'Kai', 40, current.enabled ? current.effectiveAt + hour : current.effectiveAt - 2 * day],
+    ['d4', 'Rustam Abdullayev', 25, current.effectiveAt - 2 * day - hour],
+  ].flatMap(([id, name, basis, scheduledAt]) => {
+    const member = members.find(member => member.name === name);
+    const sourceOrder = member?.paidOrders.find(order => order.sourceDeviceId);
+    if (!sourceOrder) return [];
+    const { layer, joinedAt } = member;
+    const ts = Math.max(scheduledAt, Math.max(Date.parse(joinedAt), sourceOrder.paidAt, sourceOrder.activatedAt) + hour);
+    const policy = ts >= current.effectiveAt ? current : previous;
+    const unlockAt = ts + policy.coolingDays * day;
+    return [{ ...row(id, 'direct_device_earning', name, layer, basis, ts, unlockAt,
+      deviceRewardAmounts(basis, layer, policy), policy.policyVersion), sourceDeviceId: sourceOrder.sourceDeviceId }];
+  });
   return [
     ...purchases,
     ...devices,

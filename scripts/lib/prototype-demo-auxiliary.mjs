@@ -4,7 +4,7 @@ import { demoCommissionGroups, demoCommissionTotals, demoLifetimeEarningsUsdt, d
 
 import { demoBatchPage } from './prototype-demo-secondary.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
-import { demoPurchaseNexPerUsdt, demoPurchasePolicy, demoRewardNexUsdtPrice, rankDevicePolicies, usesRankPreset } from './prototype-demo-rank-presets.mjs';
+import { demoPurchaseBudgetPolicy, demoPurchaseNexPerUsdt, demoPurchasePolicy, demoRewardNexUsdtPrice, rankDevicePolicies, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
@@ -48,7 +48,10 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   // No published overrides in this demo: keep the App's bundled dictionary.
   if(p==='/api/content/i18n')return {namespace:'*',locale:{zh:'zh-CN',en:'en-US',vi:'vi-VN'}[lang],messages:{},serverCanonical:true};
   // Existing src/store/commission.ts mock rates; other fields mirror the public projection's shipped defaults.
-  if(p==='/api/config/commission/rates'&&url.searchParams.get('schemaVersion')==='2')return {...proof,serverCanonical:true,runId:null,schemaVersion:2,unilevel:[10,5,3,2,1,.5,.5].map((usdtPct,i)=>({level:'L'+(i+1),usdtPct,nexReward:demoPurchaseNexPerUsdt[i]})),unilevelPaused:Object.fromEntries([1,2,3,4,5,6,7].map(i=>['L'+i,false])),partnerTiersJson:{standard:0,verified:5000,premium:50000,diamond:500000},influenceClampMin:1,influenceClampMax:5,coolingDays:null,promoMultiplier:1};
+  if(p==='/api/config/commission/rates'&&url.searchParams.get('schemaVersion')==='2'){
+    const { influenceClampMin, influenceClampMax, promoMultiplier } = demoPurchaseBudgetPolicy;
+    return {...proof,serverCanonical:true,runId:null,schemaVersion:2,unilevel:[10,5,3,2,1,.5,.5].map((usdtPct,i)=>({level:'L'+(i+1),usdtPct,nexReward:demoPurchaseNexPerUsdt[i]})),unilevelPaused:Object.fromEntries([1,2,3,4,5,6,7].map(i=>['L'+i,false])),partnerTiersJson:{standard:0,verified:5000,premium:50000,diamond:500000},influenceClampMin,influenceClampMax,coolingDays:null,promoMultiplier};
+  }
   const sample=text('原型演示资料，正式内容以发布版本为准。','Prototype sample. Refer to the published version for formal content.','Tài liệu nguyên mẫu. Nội dung chính thức theo phiên bản công bố.');
   if(p==='/api/app/proof') {
     const {createdAt:joinedAt}=read('/api/app/profile');
@@ -76,7 +79,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
     const {effectiveAt,policyVersion,...deviceEarning}=current;
     const v2=url.searchParams.get('schemaVersion')==='2';
     return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:policyVersion,
-      effectiveAt:empty?null:state.rankPreset==='follow'?'2026-10-01T00:00:00Z':new Date(effectiveAt).toISOString(),
+      effectiveAt:empty?null:new Date(effectiveAt).toISOString(),
       nexUsdtPrice:empty?null:demoRewardNexUsdtPrice,purchase,deviceEarning,
       ...(v2&&{schemaVersion:2,settlementMode:'SEVEN_V2',purchaseSplitConfigured:!empty,
         purchaseSplit:{enabled,usdtSharePct},

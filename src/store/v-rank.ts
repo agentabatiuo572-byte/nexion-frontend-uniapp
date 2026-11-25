@@ -2,7 +2,7 @@ import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from
 import { teamRankProgress } from "@/lib/team-rank-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
-import { onScopeDispose, ref, watch } from "vue";
+import { onScopeDispose, ref, shallowRef, watch } from "vue";
 import { apiRuntimeConfig, remoteApiEnabled, vRankApi } from "@/api/runtime";
 import type { CanonicalVRankLadder, CanonicalVRankState, RankSalary } from "@/api/v-rank-api";
 import { asApiError } from "@/api/errors";
@@ -221,12 +221,15 @@ export const useVRank = defineStore("vRank", () => {
   const remoteError = ref<string | null>(null);
   const remoteRateLimited = ref(false);
   const remoteTransientFailure = ref(false);
+  // The rank page can display its last verified read while live facts are unavailable.
+  const rankPageSnapshot = shallowRef<(VRankData & { ladder: VRankDef[]; salary: RankSalary | null | undefined }) | null>(null);
   let retryAt = 0;
   let environmentInvalidated = false;
   let inFlight: { account: VRankRemoteRequest; runtime: RuntimeRevisionScope; promise: Promise<void> } | null = null;
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
-  function clearRemoteFacts(): void {
+  function clearRemoteFacts(keepRankPageSnapshot = false): void {
+    if (!keepRankPageSnapshot) rankPageSnapshot.value = null;
     myRank.value = 0;
     selfComputePoints.value = undefined;
     teamComputePoints.value = undefined;
@@ -319,6 +322,9 @@ export const useVRank = defineStore("vRank", () => {
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Record<VRank, number>;
       salary.value = remoteCurrent.salary;
+      rankPageSnapshot.value = { myRank: myRank.value, selfComputePoints: selfComputePoints.value,
+        teamComputePoints: teamComputePoints.value, directRefs: directRefs.value, vDownlineCounts: vDownlineCounts.value,
+        ladder: ladder.value, salary: salary.value };
       remoteReady.value = true;
       remoteError.value = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
       const progress = teamRankProgress({ myRank: myRank.value, selfComputePoints: selfComputePoints.value, directRefs: directRefs.value, teamComputePoints: teamComputePoints.value, vDownlineCounts: vDownlineCounts.value }, ladder.value);
@@ -336,7 +342,7 @@ export const useVRank = defineStore("vRank", () => {
       if (!transient) { strictFailure = true; invalidateTabSnapshots(["rank"], snapshotWrite); }
       remoteRateLimited.value = limited && !strictFailure;
       remoteTransientFailure.value = transient && !strictFailure;
-      clearRemoteFacts(); remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
+      clearRemoteFacts(transient && !strictFailure); remoteError.value = "V_RANK_REMOTE_AUTHORITY_UNAVAILABLE";
       failureRecorded = true;
     };
     const readPair = () => {
@@ -376,7 +382,8 @@ export const useVRank = defineStore("vRank", () => {
   // A catalogue refresh invalidates in-flight rank reads too. Start a read in
   // the new revision so discarding the old response cannot strand the loading
   // state. Keep the account/revision/generation fences on both success and error.
-  const unsubscribeRuntime = subscribeRuntimeRevision(() => {
+  const unsubscribeRuntime = subscribeRuntimeRevision((_scope, reason) => {
+    if (reason === "authority") rankPageSnapshot.value = null;
     if (remoteApiEnabled) void refreshCanonicalVRank();
   });
   onScopeDispose(unsubscribeRuntime);
@@ -412,7 +419,7 @@ export const useVRank = defineStore("vRank", () => {
     selfComputePoints, teamComputePoints,
     myRank, directRefs, vDownlineCounts, ladder, prizeName, salary,
     capabilities,
-    remoteReady, remoteError, remoteRateLimited, remoteTransientFailure,
+    remoteReady, remoteError, remoteRateLimited, remoteTransientFailure, rankPageSnapshot,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner,
   };
 });
