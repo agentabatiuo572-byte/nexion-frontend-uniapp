@@ -18,7 +18,11 @@
           <text class="payment-pin-summary__name">{{ ui.context.summary }}</text>
           <view class="payment-pin-summary__amount"><text class="payment-pin-summary__label">{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" class="payment-pin-summary__value" :value="ui.context.amount" :currency="ui.context.currency" :precision="ui.context.precision" /><text v-else class="payment-pin-summary__value payment-pin-summary__value--plain">{{ formatGroupedAmount(ui.context.amount) }}<text class="payment-pin-summary__unit">&nbsp;{{ ui.context.currency }}</text></text></view>
           <view v-if="ui.context.details?.length" class="payment-pin-link" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded">{{ expanded ? t.paymentPin.hideDetails : t.paymentPin.details }}</view>
-          <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ detailAmount(item.amount) }}&nbsp;{{ ui.context.currency }}</template></text></view></view>
+          <view v-if="expanded" class="payment-pin-details">
+            <!-- One unit for the list: shown once as the amount column head, read per row (03 §3.6.1); an unread amount shows — (03 §3.4). -->
+            <text class="payment-pin-details__head" aria-hidden="true">{{ fmt(t.paymentPin.detailsAmount, { unit: ui.context.currency }) }}</text>
+            <view v-for="(item, index) in ui.context.details" :key="index" class="payment-pin-details__row"><text class="payment-pin-details__name">{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template></text><text class="payment-pin-details__amount"><template v-if="item.amount !== undefined">{{ detailAmount(item.amount) }}<text class="nx-sr-only">&nbsp;{{ ui.context.currency }}</text></template><template v-else>—</template></text></view>
+          </view>
         </view>
         <text v-if="ui.stage === 'loading'" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
         <template v-else-if="ui.stage === 'pending'">
@@ -181,6 +185,10 @@ export default paymentPinViewportView;
 .payment-pin-summary__value--plain { font-family: var(--font-amount); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .payment-pin-summary__unit { color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); letter-spacing: 0; }
 .payment-pin-details { font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
+.payment-pin-details__head { display: block; color: var(--v5-ink-3); text-align: right; }
+.payment-pin-details__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--v5-space-3); }
+.payment-pin-details__name { flex: 1; min-width: 0; }
+.payment-pin-details__amount { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
 .payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); }
 .payment-pin-primary.nx-button { padding:0; background:none; }
 .payment-pin-primary:not(.nx-button)[aria-disabled="true"] { opacity: .45; }
