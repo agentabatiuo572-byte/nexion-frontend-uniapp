@@ -48,23 +48,37 @@ export function compareSalaryAmounts(left: string, right: string): number {
 const LOWER = new Set(["vi", "ru", "kk", "uz"]);
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+// Own month names: WebView ICU data has no kk or uz (it prints "M11") and native UniApp can omit Intl. Wording follows the
+// approved board (DESIGN 11.1 #11): lowercase in vi, ru, kk, uz, capitalised when a sentence starts.
+const MONTH_NAMES: Record<string, readonly string[]> = {
+  vi: ["tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6", "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12"],
+  ru: ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"],
+  kk: ["қаңтар", "ақпан", "наурыз", "сәуір", "мамыр", "маусым", "шілде", "тамыз", "қыркүйек", "қазан", "қараша", "желтоқсан"],
+  uz: ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"],
+  id: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
+  ms: ["Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"],
+  fil: ["Enero", "Pebrero", "Marso", "Abril", "Mayo", "Hunyo", "Hulyo", "Agosto", "Setyembre", "Oktubre", "Nobyembre", "Disyembre"],
+};
+// Russian dates take the genitive («30 ноября»); the others use the name above.
+const RU_GENITIVE = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 
 /** 月份和日期的写法同画板（DESIGN 11.1 第 11 条）：vi、ru、kk、uz 小写传入，整句渲染后再把首字母大写。 */
 export function salaryDates(localeCode: string) {
   const lang = uiLocale(localeCode);
-  const intl = (date: string, options: Intl.DateTimeFormatOptions) => {
-    const text = new Intl.DateTimeFormat(lang, { ...options, timeZone: "UTC" }).format(new Date(toUtc(date)));
-    return LOWER.has(lang) ? text.toLocaleLowerCase(lang) : text;
-  };
   const m = (date: string) => Number(date.slice(5, 7));
+  const d = (date: string) => Number(date.slice(8, 10));
+  const name = (date: string) => MONTH_NAMES[lang]?.[m(date) - 1] ?? MON[m(date) - 1];
+  // A no-break space keeps the number and its month on one line when a tray or a note wraps.
+  const day = (date: string) => lang === "ru" ? `${d(date)}\u00A0${RU_GENITIVE[m(date) - 1]}` : lang === "uz" ? `${d(date)}-${name(date)}`
+    : lang === "fil" ? `${name(date)}\u00A0${d(date)}` : `${d(date)}\u00A0${name(date)}`;
   return {
     /** 「11 月」「Nov」「ноябрь」 */
-    month: (date: string) => lang === "zh" ? `${m(date)} 月` : lang === "en" ? MON[m(date) - 1] : intl(date, { month: "long" }),
-    /** 「11 月 30 日」「Nov 30」「30 ноября」 */
-    day: (date: string) => lang === "zh" ? `${m(date)} 月 ${Number(date.slice(8, 10))} 日` : lang === "en" ? `${MON[m(date) - 1]} ${Number(date.slice(8, 10))}` : intl(date, { month: "long", day: "numeric" }),
+    month: (date: string) => lang === "zh" ? `${m(date)}\u00A0月` : lang === "en" ? MON[m(date) - 1] : name(date),
+    /** 「11 月 30 日」「Nov 30」「30 ноября」「30-noyabr」 */
+    day: (date: string) => lang === "zh" ? `${m(date)}\u00A0月\u00A0${d(date)}\u00A0日` : lang === "en" ? `${MON[m(date) - 1]}\u00A0${d(date)}` : day(date),
     /** carryNote 的「November’s」，其他语言同 month */
-    monthWord: (date: string) => lang === "zh" ? `${m(date)} 月` : lang === "en" ? `${MONL[m(date) - 1]}’s` : intl(date, { month: "long" }),
-    sentence: (text: string) => LOWER.has(lang) ? text.charAt(0).toLocaleUpperCase(lang) + text.slice(1) : text,
+    monthWord: (date: string) => lang === "zh" ? `${m(date)}\u00A0月` : lang === "en" ? `${MONL[m(date) - 1]}’s` : name(date),
+    sentence: (text: string) => LOWER.has(lang) ? text.charAt(0).toUpperCase() + text.slice(1) : text,
   };
 }
 

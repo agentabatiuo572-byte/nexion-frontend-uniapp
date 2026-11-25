@@ -5,13 +5,13 @@
     <view class="rank-salary__head">
       <NxIconTile tone="amber" size="s"><NxIcon name="rank-salary" :size="20" /></NxIconTile>
       <text class="rank-salary__title" role="heading" aria-level="2">{{ title }}</text>
-      <NxTag v-if="view.tag" class="rank-salary__tag" :tone="view.tag.tone"><text v-if="view.tag.busy" class="rank-salary__spin" aria-hidden="true" /><text>{{ view.tag.label }}</text></NxTag>
+      <NxTag v-if="view.tag" class="rank-salary__tag" :tone="view.tag.tone"><text v-if="view.tag.busy" class="rank-salary__spin" :class="{ 'is-still': still }" aria-hidden="true" /><text>{{ view.tag.label }}</text></NxTag>
     </view>
     <view :key="view.statusKey" class="rank-salary__body" :class="{ 'rank-salary__body--swap': swap }">
       <text v-if="view.caption" class="rank-salary__caption">{{ view.caption }}</text>
       <view class="rank-salary__amount-row">
         <text class="rank-salary__amount nx-num-amount">{{ view.amount }}<text class="rank-salary__unit">&#160;USDT</text></text>
-        <NxHintTip v-if="view.tip" class="rank-salary__tip" :tone="view.tip.tone" :lines="view.tip.lines" />
+        <NxHintBubble v-if="view.tip" class="rank-salary__tip" :tone="view.tip.tone" :text="view.tip.lines" :size="20" />
       </view>
     </view>
     <text v-if="view.note" class="rank-salary__note">{{ view.note }}</text>
@@ -24,10 +24,10 @@
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import NxHintTip from "@/components/ui/nx-hint-tip.vue";
+import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
 import type { SalaryCardView } from "@/lib/rank-salary-view";
 
-defineProps<{ title: string; view: SalaryCardView; resendNote: string; /** 状态变化时主体交叉淡入（10.1 领取），首屏不播 */ swap: boolean }>();
+defineProps<{ title: string; view: SalaryCardView; resendNote: string; /** 状态变化时主体交叉淡入（10.1 领取），首屏不播 */ swap: boolean; /** 减少动态或系统省电：加载指示静止（A10） */ still: boolean }>();
 </script>
 
 <style scoped>
@@ -45,7 +45,7 @@ defineProps<{ title: string; view: SalaryCardView; resendNote: string; /** 状�
 /* 主金额 Montserrat 30/36 500（DESIGN 第 4 节，10.2 待登记），单位 12/16 500 辅助色。 */
 .rank-salary__amount { font:500 30px/36px var(--font-amount);letter-spacing:-.02em;color:var(--v5-ink);font-variant-numeric:tabular-nums;white-space:nowrap; }
 .rank-salary__unit { font:500 12px/16px var(--font-v5);letter-spacing:0;color:var(--v5-ink-3); }
-/* 提示图标贴在金额右侧，不把金额推离中线。不用 transform：它会成为气泡（position: fixed）的定位容器，把气泡挪走。 */
+/* 提示图标贴在金额右侧，不把金额推离中线；气泡以图标为锚点，在它上方。 */
 .rank-salary__tip { position:absolute;left:100%;top:50%;margin:-10px 0 0 6px; }
 .rank-salary__note { display:block;margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--v5-ink) 8%,transparent);font:400 12px/18px var(--font-v5);color:var(--v5-ink-3);text-align:center;overflow-wrap:break-word; }
 /* 异常提醒用警示色加图标（design-rules），排法同底注：居中、上方 1px 分隔。 */
@@ -54,6 +54,7 @@ defineProps<{ title: string; view: SalaryCardView; resendNote: string; /** 状�
 /* 10.1 领取：状态变化时新内容从下 8px 淡入 200ms（延迟 80），只动 transform、opacity。 */
 .rank-salary__body--swap { animation:rank-salary-in 200ms 80ms cubic-bezier(.2,.8,.2,1) backwards; }
 @keyframes rank-salary-in { from { opacity:0;transform:translateY(8px); } }
-@media (prefers-reduced-motion: reduce) { .rank-salary__body--swap { animation:none; } .rank-salary__spin { animation-duration:2.4s; } }
+.rank-salary__spin.is-still { animation:none; }
+@media (prefers-reduced-motion: reduce) { .rank-salary__body--swap { animation:none; } .rank-salary__spin { animation:none; } }
 :global(html.fx-still) .rank-salary__body--swap { animation:none; }
 </style>

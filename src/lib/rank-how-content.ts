@@ -114,10 +114,10 @@ export function formatHowNumber(value: number | string, locale: string) {
     if (carry) rounded.unshift("1");
   }
   const fixed = rounded.join("");
-  const vietnamese = locale.split("-")[0] === "vi";
   const decimals = fixed.slice(-6).replace(/0+$/, "");
-  return (negative ? "-" : "") + fixed.slice(0, -6).replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, vietnamese ? "." : ",")
-    + (decimals ? `${vietnamese ? "," : "."}${decimals}` : "");
+  // Every language groups with a comma and keeps the point for decimals, like formatGroupedAmount (06 §6.2).
+  return (negative ? "-" : "") + fixed.slice(0, -6).replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    + (decimals ? `.${decimals}` : "");
 }
 
 export function formatRankPurchaseRate(rate: string | number | undefined, locale: string): string {

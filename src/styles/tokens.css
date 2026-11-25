@@ -1029,7 +1029,7 @@ body {
 :is(.nx-loops-paused, .nx-chassis[data-page-visible="false"], .nx-chassis[data-scrolling="true"]) .nx-home-art-float { animation-play-state: paused; }
 .nx-home-arrow { display: grid; place-items: center; border-radius: var(--v5-radius-full); background: var(--v5-surface-2); color: var(--v5-ink-2); box-shadow:var(--ui-glass-edge-shadow); }
 /* Shared capsule material: soft rim and broad inner refraction, like the wallet edge. */
-.nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-glass-bar, .nx-tray-float, .nx-float-panel, .nx-soft-glass, .nx-glass-sheet, .nx-tint {
+.nx-frosted-button, .promotion-action, .reward-cta, .nx-liquid-glass, .nx-home-arrow, .nx-glass-bar, .nx-tray-float, .nx-float-panel, .nx-soft-glass, .nx-glass-sheet, .nx-tint, .rank-rail__ind {
   --ui-button-rim: rgba(255,255,255,.10);
   --ui-button-highlight: rgba(255,255,255,.24);
   --ui-button-bottom: rgba(0,0,0,.28);
@@ -1044,7 +1044,7 @@ body {
   backdrop-filter: blur(12px) saturate(125%);
   -webkit-backdrop-filter: blur(12px) saturate(125%);
 }
-[data-theme="light"] .nx-frosted-button, [data-theme="light"] .promotion-action, [data-theme="light"] .reward-cta, [data-theme="light"] .nx-liquid-glass, [data-theme="light"] .nx-home-arrow, [data-theme="light"] .nx-glass-bar, [data-theme="light"] .nx-tray-float, [data-theme="light"] .nx-float-panel, [data-theme="light"] .nx-soft-glass, [data-theme="light"] .nx-tint, [data-theme="light"] .nx-glass-sheet {
+[data-theme="light"] .nx-frosted-button, [data-theme="light"] .promotion-action, [data-theme="light"] .reward-cta, [data-theme="light"] .nx-liquid-glass, [data-theme="light"] .nx-home-arrow, [data-theme="light"] .nx-glass-bar, [data-theme="light"] .nx-tray-float, [data-theme="light"] .nx-float-panel, [data-theme="light"] .nx-soft-glass, [data-theme="light"] .nx-tint, [data-theme="light"] .nx-glass-sheet, [data-theme="light"] .rank-rail__ind {
   --ui-button-rim: rgba(73,94,125,.12);
   --ui-button-highlight: rgba(255,255,255,.85);
   --ui-button-bottom: rgba(87,115,155,.18);

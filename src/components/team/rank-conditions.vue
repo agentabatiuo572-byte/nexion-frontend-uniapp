@@ -1,7 +1,7 @@
 <template>
   <view class="rank-conditions">
     <view class="rank-conditions__head">
-      <view class="rank-conditions__lead"><TeamRankEmblem v-if="badge !== undefined" class="rank-conditions__badge" :rank="badge" :size="28" /><text class="rank-conditions__title">{{ heading }}</text><NxHintTip v-if="hint.length" :lines="hint" /></view>
+      <view class="rank-conditions__lead"><TeamRankEmblem v-if="badge !== undefined" class="rank-conditions__badge" :rank="badge" :size="28" /><text class="rank-conditions__title">{{ heading }}</text><NxHintBubble v-if="hint.length" :text="hint" :size="20" /></view>
       <NxTag v-if="tag" :tone="tagTone">{{ tag }}</NxTag>
     </view>
     <view class="rank-conditions__rows">
@@ -30,7 +30,7 @@
 // V0–V6 放在焦点卡分隔线下；V7 的纯色条件卡、V8 的「另需」文字条件由 V7/V8 项复用这里（文字条件放进默认插槽）。
 // 只管显示：行的取值、遮罩和计数由页面算好传进来。
 import { getCurrentInstance, ref } from "vue";
-import NxHintTip from "@/components/ui/nx-hint-tip.vue";
+import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import TeamRankEmblem from "@/components/team/team-rank-emblem.vue";
@@ -76,7 +76,7 @@ const priorOpen = ref(false);
 .rank-conditions__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin-bottom: 4px; }
 .rank-conditions__lead { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
 .rank-conditions__title { min-width: 0; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
-.rank-conditions__lead :deep(.nx-hint-tip) { margin-left: 4px; }
+.rank-conditions__lead :deep(.nx-hint) { margin-left: 4px; }
 .rank-conditions__badge { margin-right: 6px; }
 .rank-conditions__rows { display: flex; flex-direction: column; }
 .rank-condition-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-height: 40px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid color-mix(in srgb, var(--v5-ink) 6%, transparent); }

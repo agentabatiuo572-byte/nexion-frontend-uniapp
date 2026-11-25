@@ -87,7 +87,7 @@
               </view>
               <view class="flex-1 min-w-0">
                 <view class="flex items-center" style="gap: 6px">
-                  <text class="truncate" :style="{ fontSize: '14px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
+                  <text class="truncate" :style="{ fontSize: '14px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ eventTitle(e) }}</text>
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
                 <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
@@ -312,7 +312,12 @@ const noKindText = computed(() =>
   fmt(t.value.commissions.noKindEvents, { kind: t.value.commissions.kind[filter.value as CommissionKind] }),
 );
 
+// Monthly reward rows: the kind is the title and the rank is the subtitle; every other row leads with the person.
+function eventTitle(e: CommissionEvent): string {
+  return e.kind === "vrank_salary" ? t.value.commissions.kind.vrank_salary : e.sourceUserName;
+}
 function eventMeta(e: CommissionEvent): string {
+  if (e.kind === "vrank_salary") return e.sourceUserName;
   const kindLabel = t.value.commissions.kind[e.kind];
   const order = !e.sourceRef && e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${visibility.mask(formatGroupedAmount(e.orderAmountUSD))}` : "";
   return `${kindLabel}${order}`;
@@ -401,7 +406,8 @@ const filterOptions = computed(() => [
   { value: "all" as Filter, label: filterCopy.value.all, fullLabel: t.value.commissions.all, count: remoteApiEnabled ? ledger.value?.totalRows : commission.events.length },
   // The old friend rank-up kind (cultivation) keeps its name on history rows but is offered as a filter only while it has rows.
   ...KIND_ORDER.filter(value => value !== 'vrank_salary' || (remoteApiEnabled ? ledger.value?.aggregate.byKind.vrank_salary !== undefined : byKind.value.vrank_salary.count > 0))
-    .filter(value => value !== 'cultivation' || (byKind.value.cultivation?.count ?? 0) > 0)
+    // 平级奖、激励池（规则默认关闭）和成员成长没有记录时不列（rank-rules）；有记录的照常可筛。
+    .filter(value => !(['peer', 'leadership', 'cultivation'] as CommissionKind[]).includes(value) || (byKind.value[value]?.count ?? 0) > 0)
     .map(value => ({ value, label: kindFilterLabel(value), fullLabel: t.value.commissions.kind[value], count: byKind.value[value].count })),
 ]);
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });

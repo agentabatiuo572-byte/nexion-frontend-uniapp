@@ -49,11 +49,15 @@ const badgeSize = (() => {
 .rank-v8-card__layer { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .rank-v8-card__dust { opacity: .9; }
 .rank-v8-card__sheen { position: absolute; top: -30%; bottom: -30%; left: 0; width: 34%; background: linear-gradient(100deg, rgba(255,240,200,0) 0%, rgba(255,240,200,.04) 30%, rgba(255,240,200,.22) 50%, rgba(255,240,200,.04) 70%, rgba(255,240,200,0) 100%); transform: translateX(-160%) skewX(-14deg); }
-.rank-v8-card__id { display: flex; align-items: center; gap: 20px; }
+/* 徽章和文字整组居中（01 §1.3；画板 board.css .id）：两侧等分余量；左侧至少留到冠光（236，以徽章为中心）不被卡边裁切，
+   长语言时靠右侧让出空间，文字放不下就在标签里换行。 */
+.rank-v8-card__id { --crown-room: 42px; display: flex; align-items: center; }
+.rank-v8-card__id::before, .rank-v8-card__id::after { content: ""; flex: 1 0 0; }
+.rank-v8-card__id::before { min-width: var(--crown-room); }
 .rank-v8-card__crest { position: relative; display: grid; place-items: center; flex: none; }
 .rank-v8-card__rays { position: absolute; left: 50%; top: 50%; width: 236px; height: 236px; transform: translate(-50%, -50%); }
 .rank-v8-card__badge { position: relative; }
-.rank-v8-card__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.rank-v8-card__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; margin-left: 20px; }
 .rank-v8-card__caption { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: rgba(247,231,184,.70); }
 .rank-v8-card__num { font: 500 var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-metric); letter-spacing: -.02em; color: transparent; background-image: linear-gradient(180deg, #FFF3CF 8%, #EBCB7A 52%, #B8913F 100%); -webkit-background-clip: text; background-clip: text; }
 /* 卡面标签：卡面专用色（同 04.4 银行卡状态标签的做法），24 高、12/16 500。 */
@@ -68,7 +72,8 @@ const badgeSize = (() => {
 .rank-v8-card.is-still .rank-v8-card__rays { animation: none; opacity: 1; transform: translate(-50%, -50%); }
 @keyframes rank-v8-sheen { 0% { transform: translateX(-160%) skewX(-14deg); } 17%, 100% { transform: translateX(330%) skewX(-14deg); } }
 @keyframes rank-v8-breathe { 0%, 100% { opacity: .72; transform: translate(-50%, -50%) scale(.96); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); } }
-@media (max-width: 374px) { .rank-v8-card__id { gap: 16px; } }
+/* 360 档徽章 100：冠光收到 196（约 2 倍），余量留给标签（kk、vi、fil 的「已是最高等级」要一行放下）。 */
+@media (max-width: 374px) { .rank-v8-card__id { --crown-room: 28px; } .rank-v8-card__rays { width: 196px; height: 196px; } .rank-v8-card__copy { margin-left: 16px; } }
 @media (prefers-reduced-motion: reduce) {
   .rank-v8-card__sheen { animation: none; opacity: 0; }
   .rank-v8-card__rays { animation: none; opacity: 1; transform: translate(-50%, -50%); }

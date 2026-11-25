@@ -27,17 +27,18 @@ const { elRef, classes, still, lite } = useRankFxGuard(".rank-v7-stage");
 </script>
 
 <style scoped>
-/* 舞台：全宽出血（页面左右边距 16），向上拉到页头后面（页头 56＋下边距 12＋内容上边距 4）。 */
-.rank-v7-stage { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: center; margin: -72px -16px 0; padding: 72px 16px 4px; text-align: center; }
+/* 舞台：全宽出血（页面左右边距 16），从内容起点（页头 56＋内容上边距 4）向上拉 60 到页头后面，上内边距 72、下内边距 20（DESIGN 8.2）。 */
+.rank-v7-stage { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: center; margin: -60px -16px 0; padding: 72px 16px 20px; text-align: center; }
 .rank-v7-stage__fx { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 .rank-v7-stage__galaxy, .rank-v7-stage__stars { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 360px; }
-.rank-v7-stage__crest { position: relative; display: grid; place-items: center; width: 128px; height: 128px; margin: 22px 0 26px; }
+.rank-v7-stage__crest { position: relative; display: grid; place-items: center; width: 144px; height: 144px; margin: 22px 0 26px; }
 /* 徽章光晕：静态径向渐变，不用模糊滤镜（10.4 P4）。 */
 .rank-v7-stage__crest::before { content: ""; position: absolute; inset: -46px; border-radius: 50%; background: radial-gradient(closest-side, rgba(220,236,255,.42), rgba(143,184,255,.14) 52%, rgba(143,184,255,0)); pointer-events: none; }
 [data-theme="light"] .rank-v7-stage__crest::before { background: radial-gradient(closest-side, rgba(255,255,255,.95), rgba(214,229,250,.55) 55%, rgba(214,229,250,0)); }
 .rank-v7-stage__orbit { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -150px 0 0 -150px; }
-.rank-v7-stage__orb { position: absolute; left: 50%; top: 50%; width: 280px; height: 280px; margin: -140px 0 0 -140px; transform: rotate(-14deg) scaleY(.314); }
-.rank-v7-stage__badge { position: relative; z-index: 1; margin: -8px; }
+/* 星环轨道裁在 300 的圆盘里：旋转时方形外接框的四角不再撑宽滚动区（量尺 L2-hscroll）；卫星在 280 轨道上，离盘边 10。 */
+.rank-v7-stage__orb { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -150px 0 0 -150px; overflow: hidden; transform: rotate(-14deg) scaleY(.314); }
+.rank-v7-stage__badge { position: relative; z-index: 1; }
 .rank-v7-stage__sat { position: absolute; left: 50%; top: -8px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: radial-gradient(circle, #FFFFFF 0 28%, rgba(160,200,255,.85) 42%, rgba(160,200,255,0) 70%); }
 .rank-v7-stage__sat--2 { top: auto; bottom: -5px; width: 10px; height: 10px; margin-left: -5px; opacity: .75; }
 [data-theme="light"] .rank-v7-stage__sat { background: radial-gradient(circle, #1E7BE8 0 26%, rgba(30,123,232,.5) 42%, rgba(30,123,232,0) 70%); }
@@ -47,7 +48,7 @@ const { elRef, classes, still, lite } = useRankFxGuard(".rank-v7-stage");
 /* 两个持续循环（10.2）：亮星整层闪烁 3.8s、卫星容器整体旋转 24s；只动 opacity／transform。
    离屏或页面隐藏时暂停（is-paused）；will-change 只在 is-looping 时有（P6）。 */
 .rank-v7-stage__stars { animation: rank-v7-twinkle 3.8s ease-in-out infinite; }
-.rank-v7-stage__spin { position: absolute; inset: 0; animation: rank-v7-spin 24s linear infinite; }
+.rank-v7-stage__spin { position: absolute; inset: 10px; animation: rank-v7-spin 24s linear infinite; }
 .rank-v7-stage.is-paused .rank-v7-stage__stars, .rank-v7-stage.is-paused .rank-v7-stage__spin { animation-play-state: paused; }
 .rank-v7-stage.is-looping .rank-v7-stage__spin { will-change: transform; }
 .rank-v7-stage.is-looping .rank-v7-stage__stars { will-change: opacity; }

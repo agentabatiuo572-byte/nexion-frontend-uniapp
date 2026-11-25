@@ -33,7 +33,7 @@
 
         <!-- My V-rank summary -->
         <!-- Badge, the gap to the next rank and one bar per next-rank condition. -->
-        <view class="nx-team-rank-link team-rank" role="link" tabindex="0" :aria-label="t.team.rankBenefits" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')">
+        <view class="nx-team-rank-link team-rank" :class="{ 'team-rank--bare': !rankBars.length }" role="link" tabindex="0" :aria-label="t.team.rankBenefits" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')">
           <view class="team-rank__header"><text class="team-rank__title">{{ t.myRank.g1Title }}</text><view class="team-rank__chev" aria-hidden="true"><NxIcon name="chevron-right" /></view></view>
           <!-- G1: badge and level centred, the gap line under them, then one shared .nx-progress per next-rank condition. -->
           <view class="team-rank__identity">
@@ -258,11 +258,11 @@ const rankGapText = computed(() => {
   if (!rankReadable.value) return designCopy.value.benefitsAndRewards;
   const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
   const underReview = (rank: number) => `${fmt(t.value.myRank.g2Toward, { r: `V${rank}` })} · ${t.value.myRank.reviewTag}`;
-  if (snapshot) return snapshot.next === null ? t.value.home.rankTopTier
+  if (snapshot) return snapshot.next === null ? t.value.myRank.topRank
     : snapshot.reviewPending ? underReview(snapshot.next)
     : fmt(t.value.myRank.gapTag, { r: `V${snapshot.next}`, n: snapshot.missing });
   const next = rankProgress.value.next;
-  if (!next) return t.value.home.rankTopTier;
+  if (!next) return t.value.myRank.topRank;
   return rankProgress.value.reviewPending ? underReview(next.v)
     : fmt(t.value.myRank.gapTag, { r: `V${next.v}`, n: rankProgress.value.unmetCount });
 });
@@ -645,6 +645,9 @@ useAutoRecovery({
 .team-rank__title { min-width: 0; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); }
 .team-rank__chev { display: grid; flex: none; font-size: 18px; color: var(--v5-ink-4); }
 .team-rank__identity { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+/* 没有进度条时（V8，或条件全部未知）徽章和说明居中，下半不空（04.3 双卡平衡）。 */
+.team-rank--bare { justify-content: center; }
+.team-rank--bare .team-rank__header { position: absolute; left: var(--ui-space-inset); right: var(--ui-space-inset); top: var(--ui-space-inset); }
 .team-rank__level { font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); color: var(--v5-brand); font-variant-numeric: tabular-nums; }
 .team-rank__hint { margin-top: -4px; align-self: center; text-align: center; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
 .team-rank__bars { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 6px 8px; margin-top: auto; }

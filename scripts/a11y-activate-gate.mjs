@@ -57,8 +57,8 @@ const LABEL = {
 const OVERLAY_SELF_MANAGED = new Set([
   "src/components/earn/device-card-pc.vue",
   // 提示气泡(03 §3.5.1)是非模态说明:App 端的全屏层只是透明接触面,点外部或滑动就关;
-  // 背景内容本该继续可操作、Tab 不该被困住,所以不接焦点陷阱。Esc 关闭、读屏走 aria-live 播报区。
-  "src/components/ui/nx-hint-tip.vue",
+  // 背景内容本该继续可操作、Tab 不该被困住,所以不接焦点陷阱。Esc 关闭,读屏从图标名读出全文。
+  "src/components/ui/nx-hint-bubble.vue",
 ]);
 
 // ── ① 平台层:role 表从它的源码提取,保证门与运行时同源 ────────────────────────

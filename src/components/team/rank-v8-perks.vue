@@ -31,7 +31,7 @@ import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
 import { RANK_ASSETS, rankAsset, type RankPerk, type RankTheme } from "@/lib/rank-tier-style";
 
-defineProps<{ size: "hero" | "small"; title: string; count: string; theme: RankTheme; perks: readonly { key: RankPerk; title: string; desc: string }[] }>();
+const props = withDefaults(defineProps<{ size: "hero" | "small"; title: string; count: string; theme: RankTheme; perks: readonly { key: RankPerk; title: string; desc: string }[]; /** 掠光晚多少毫秒开始：横条点选时等点选那组动画结束（10.4 P10） */ glintDelay?: number }>(), { glintDelay: 0 });
 // 区块露出约 12% 时五枚徽章一起掠光一次（DESIGN 10.1），320ms，不错峰、不循环；减少动态、省电时不播。
 const { elRef, inView } = useScrollGrowProgress({ threshold: 0.12, fallbackInView: false, nativeSelector: ".rank-v8-perks" });
 const { still } = useRankFxMotion();
@@ -40,8 +40,10 @@ let played = false, timer: ReturnType<typeof setTimeout> | undefined;
 watch(inView, (visible) => {
   if (!visible || played || still.value) return;
   played = true;
-  glint.value = true;
-  timer = setTimeout(() => { glint.value = false; }, 340);
+  timer = setTimeout(() => {
+    glint.value = true;
+    timer = setTimeout(() => { glint.value = false; }, 340);
+  }, props.glintDelay);
 });
 onUnmounted(() => { if (timer) clearTimeout(timer); });
 </script>

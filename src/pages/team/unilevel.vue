@@ -6,7 +6,10 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
         <EmptyState v-if="remoteState === 'error'" kind="recoverable-error" page :title="updateRequired ? t.directReferral.updateRequired : t.network.projectionErrorTitle" :desc="updateRequired ? t.directReferral.updateHint : t.network.projectionErrorDesc" :cta-label="updateRequired ? t.network.retry : t.ui.reload" @cta="retryRemote" />
         <template v-else>
-        <view v-if="remoteState !== 'ready' && !remoteSnapshot" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
+        <!-- 首次加载（03 §3.4）：合计卡和记录卡按真实尺寸的静止占位，不闪烁。 -->
+        <view v-if="remoteState !== 'ready' && !remoteSnapshot" class="nx-unilevel-loading" role="status" aria-busy="true" :aria-label="t.network.projectionLoadingTitle">
+          <view class="nx-unilevel-loading__hero nx-tint" aria-hidden="true"><view class="nx-unilevel-loading__bar nx-unilevel-loading__bar--label" /><view class="nx-unilevel-loading__bar nx-unilevel-loading__bar--amount" /><view class="nx-unilevel-loading__bar nx-unilevel-loading__bar--uvt" /></view>
+        </view>
         <template v-else-if="remoteSnapshot">
           <RewardHero class="nx-unilevel-hero nx-tint" kind="members">
             <text class="block nx-unilevel-hero-title">{{ filter === 'device_earning' ? t.directReferral.deviceEarning : t.directReferral.purchaseTotal }} · {{ visibility.mask(remoteGroupCount) }} {{ t.directReferral.settlementGroups }}</text>
@@ -18,12 +21,11 @@
         </template>
         <view class="nx-unilevel-filters">
           <GlassSegments :label="t.directReferral.period" v-model="period" :options="periodOptions" layout="equal" surface="glass" selection="flat" />
-          <!-- F2b: the row scrolls only when the options overflow; the selected option is scrolled into view (03 §3.7). -->
-          <scroll-view class="nx-unilevel-sources" scroll-x :show-scrollbar="false" scroll-with-animation :scroll-into-view="`nx-unilevel-src-${filter}`" role="group" :aria-label="t.directReferral.source">
-            <view class="nx-unilevel-sources__row">
-              <view v-for="option in filterOptions" :id="`nx-unilevel-src-${option.value}`" :key="option.value" role="button" tabindex="0" class="nx-unilevel-source nx-unilevel-focus" :class="{ 'nx-unilevel-source--selected': filter === option.value }" :aria-pressed="filter === option.value" @click="filter = option.value" @keydown.enter.prevent="filter = option.value" @keydown.space.prevent="filter = option.value"><text class="nx-unilevel-source__face" :class="{ 'nx-frosted-button': filter === option.value }">{{ option.label }}</text></view>
-            </view>
-          </scroll-view>
+          <!-- F2b: 来源筛选用共享次级分段控件（03 §3.7），放不下才滚动、选中项自动滚入可见。 -->
+          <GlassSegments :label="t.directReferral.source" semantics="radio" v-model="filter" :options="filterOptions" layout="scroll" />
+        </view>
+        <view v-if="remoteState !== 'ready' && !remoteSnapshot" class="nx-unilevel-loading__card" aria-hidden="true">
+          <view v-for="n in 3" :key="n" class="nx-unilevel-loading__row"><view class="nx-unilevel-loading__icon" /><view class="nx-unilevel-loading__lines"><view class="nx-unilevel-loading__bar nx-unilevel-loading__bar--name" /><view class="nx-unilevel-loading__bar nx-unilevel-loading__bar--meta" /></view><view class="nx-unilevel-loading__bar nx-unilevel-loading__bar--value" /></view>
         </view>
         <view v-if="(remoteState === 'ready' || remoteState === 'loading') && remoteSnapshot" class="nx-unilevel-ledger">
           <view v-for="day in eventDays" :key="day.key" class="nx-unilevel-day">
@@ -52,7 +54,7 @@
           <view v-if="remoteSnapshot.events.length < remoteSnapshot.totalRows" class="nx-unilevel-load-more nx-unilevel-focus reward-cta reward-cta--wide" role="button" :tabindex="remoteState !== 'ready' || remoteLoadMoreStatus === 'loading' ? -1 : 0" :aria-disabled="remoteState !== 'ready' || remoteLoadMoreStatus === 'loading'"  @click="loadMoreRemote" @keydown.enter.prevent="loadMoreRemote" @keydown.space.prevent="loadMoreRemote"><text>{{ t.unilevel.loadMore }}</text></view>
         </view>
         <view v-if="policyState === 'error'" class="nx-unilevel-details"><text>{{ auditCopy.settlementDetails }}</text><text>—</text></view>
-        <view v-else-if="policyState !== 'ready' && !policy" role="status" aria-busy="true"><text>{{ t.network.projectionLoadingTitle }}</text></view>
+        <view v-else-if="policyState !== 'ready' && !policy" class="nx-unilevel-loading__bar nx-unilevel-loading__bar--policy" role="status" aria-busy="true" :aria-label="t.network.projectionLoadingTitle" />
         <view v-else-if="policy" style="display: flex; flex-direction: column; gap: 8px">
           <text v-if="!policy.configured" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.directReferral.unconfigured }}</text>
           <text v-else-if="!devicePaused && policy.nexUsdtPrice === null" style="font-size: 12px; color: var(--v5-warning)">{{ t.directReferral.priceUnavailable }}</text>
@@ -323,13 +325,22 @@ useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && rem
 .nx-royalty-totals-large > view:first-child > text { font-size: 26px !important; line-height: 34px; }
 
 .nx-unilevel-filters { display: flex; flex-direction: column; gap: var(--ui-space-inline); }
-/* Source filter = 03 §3.7 secondary filter: open floor, 32px options inside 44px hit areas, one line each; the row
-   scrolls sideways only when the options overflow. Selected = shared glass surface + brand text. */
-.nx-unilevel-sources { width: 100%; white-space: nowrap; }
-.nx-unilevel-sources__row { display: flex; flex-wrap: nowrap; gap: var(--v5-space-2); width: max-content; }
-.nx-unilevel-source { flex: none; min-height: 44px; display: flex; align-items: center; border-radius: 999px; cursor: pointer; }
-.nx-unilevel-source__face { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; white-space: nowrap; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
-.nx-unilevel-source--selected .nx-unilevel-source__face { color: var(--v5-brand); }
+/* First-load placeholder: the hero and one day card at their own sizes with still neutral bars (03 §3.4). */
+.nx-unilevel-loading { display: flex; flex-direction: column; gap: var(--v5-space-4); }
+.nx-unilevel-loading__hero { --nx-tint: var(--v5-brand); display: flex; flex-direction: column; box-sizing: border-box; padding: var(--v5-space-5); border-radius: 28px; }
+.nx-unilevel-loading__bar { height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.nx-unilevel-loading__bar--label { width: 120px; }
+.nx-unilevel-loading__bar--amount { width: 168px; height: 36px; margin: var(--v5-space-4) 0 var(--v5-space-2); border-radius: 12px; }
+.nx-unilevel-loading__bar--uvt { width: 88px; }
+.nx-unilevel-loading__card { padding: var(--v5-space-1) var(--ui-space-inset); border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.nx-unilevel-loading__row { display: flex; align-items: center; gap: var(--v5-space-3); min-height: 64px; }
+.nx-unilevel-loading__row + .nx-unilevel-loading__row { border-top: 1px solid var(--v5-border); }
+.nx-unilevel-loading__icon { flex: none; width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.nx-unilevel-loading__lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--v5-space-2); }
+.nx-unilevel-loading__bar--name { width: 96px; }
+.nx-unilevel-loading__bar--meta { width: 132px; height: 10px; }
+.nx-unilevel-loading__bar--value { width: 72px; }
+.nx-unilevel-loading__bar--policy { width: 180px; margin: var(--v5-space-2) 0; }
 .nx-unilevel-ledger { display: flex; flex-direction: column; gap: var(--ui-space-inset); }
 .nx-unilevel-day { display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .nx-unilevel-day-label { padding: 0 var(--v5-space-1); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
