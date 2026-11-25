@@ -395,7 +395,8 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
       // 今天截止但还有下一档：月中明天起可领，月末只限下月 1 日当天。
       const following = today === deadline && upcoming?.month === item.month && Number(upcoming.amountUsdt) > 0 && compareSalaryAmounts(upcoming.amountUsdt, item.amountUsdt) !== 0 ? upcoming : null;
       const followingDay = following ? salaryDay(following.claimableFrom) : "";
-      const desc = following ? dates.sentence(fmt(followingDay.slice(0, 7) === item.month ? copy.toastFailDrop : copy.toastFailEnd, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(following.amountUsdt), d: dates.day(followingDay) }))
+      // 资格没读到，或截止日已过（迟到的回执），不说作废日期。
+      const desc = !vState.salary || today > deadline ? undefined : following ? dates.sentence(fmt(followingDay.slice(0, 7) === item.month ? copy.toastFailDrop : copy.toastFailEnd, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(following.amountUsdt), d: dates.day(followingDay) }))
         : today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
       toast.warn(copy.toastFailTitle, desc);
     } else if (code === "SALARY_ALREADY_CLAIMED" || code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_AMOUNT_CHANGED") {

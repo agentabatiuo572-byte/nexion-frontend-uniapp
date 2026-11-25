@@ -90,6 +90,11 @@ function makeResource() {
       state.value = { ...state.value, loading: true, error: false };
       return;
     }
+    // 正文读失败时保留已读到的正文和等级表，继续按失败恢复。
+    if (value.error && state.value.policy) {
+      state.value = { ...state.value, loading: false, error: false, ladderFailed: true };
+      return;
+    }
     state.value = value.ladderFailed
       ? { ...value, ranks: state.value.ranks, capabilities: state.value.capabilities }
       : value;

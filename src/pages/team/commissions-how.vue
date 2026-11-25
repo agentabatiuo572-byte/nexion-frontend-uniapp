@@ -163,7 +163,10 @@ function makeResource() {
   },
   apply: next => {
     if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
-    state.value = next.loading && state.value.snapshot ? { ...state.value, loading: true, error: false } : next;
+    if (next.loading && state.value.snapshot) { state.value = { ...state.value, loading: true, error: false }; return; }
+    // 同一账户和环境里已读到的比例，重读失败时保留，同时按失败继续恢复。
+    const kept = next.snapshot?.ratesFailed ? state.value.snapshot?.rates : undefined;
+    state.value = next.snapshot && kept ? { ...next, snapshot: { ...next.snapshot, rates: kept } } : next;
   },
 });
 }

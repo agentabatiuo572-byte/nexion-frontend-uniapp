@@ -6,8 +6,8 @@
       <view v-if="languageFallback" class="team-rule-published__notice" role="status" aria-live="polite">
         <text>{{ t.howPublished.languageFallback }}</text>
       </view>
-      <TeamRuleHero :kind="kind" :title="copy.overview" :sections="directory" :nav-label="copy.contents" />
-      <TeamRuleDocument :blocks="content.blocks" />
+      <TeamRuleHero :kind="kind" :title="hero?.title || copy.overview" :sub="hero?.body" :sections="directory" :nav-label="copy.contents" />
+      <TeamRuleDocument :blocks="bodyBlocks" />
     </template>
     <EmptyState v-if="failureShown && !content" kind="recoverable-error" page :title="t.howPublished.unavailableTitle" :cta-label="t.ui.reload" @cta="load" />
     <view class="mx-4 mt-6"><view class="reward-cta reward-cta--wide" role="button" tabindex="0" @click="navBack(back)" @keydown.enter.prevent="navBack(back)" @keydown.space.prevent="navBack(back)"><text>{{ backLabel }}</text></view></view>
@@ -41,8 +41,11 @@ const requestFence = new PublishedContentRequestFence();
 // View only: a shown failure stays put while an automatic re-read runs (no swap to the loading line).
 const failureShown = ref(false);
 // Directory chips only when the publication is short enough to scan (design system 04.7).
+// The published intro (id "hero") belongs in the overview card, not in the chapters (design system 04.7).
+const hero = computed(() => content.value?.blocks.find(block => block.id === "hero" && block.kind !== "callout"));
+const bodyBlocks = computed(() => (content.value?.blocks ?? []).filter(block => block !== hero.value));
 const directory = computed(() => {
-  const sections = (content.value?.blocks ?? []).filter(block => block.kind !== "callout").map(block => ({ id: block.id, title: block.title }));
+  const sections = bodyBlocks.value.filter(block => block.kind !== "callout").map(block => ({ id: block.id, title: block.title }));
   return sections.length <= 6 ? sections : [];
 });
 
