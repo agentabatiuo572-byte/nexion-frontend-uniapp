@@ -37,8 +37,8 @@
       <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary.
            The line itself is a sheet status or hint line (10 §10.2): a result still being confirmed is a status line (16px status
            icon, body ink); a refusal is a hint line (16px warning icon, primary ink). -->
-      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" :class="freeTrial.pendingStart ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
-        <svg v-if="freeTrial.pendingStart" class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" :class="lineIsStatus ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
+        <svg v-if="lineIsStatus" class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
         <svg v-else class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
       <!-- A failed read recovers on its own (03 §3.5.2, 04.5): warning icon, the result and the retry line, no button. -->
@@ -117,7 +117,10 @@ const claimDisabled = computed(() => claiming.value || claimDenied.value || (fre
 // so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
 const claimFromRetry = ref(false);
 const heldReasonText = ref("");
+const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+// The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
@@ -166,6 +169,7 @@ async function onClaim() {
   const requestedSequence = ++claimSequence;
   claimFromRetry.value = claimRetryable.value;
   heldReasonText.value = claimErrorText.value;
+  heldStatusLine.value = !!freeTrial.pendingStart;
   claiming.value = true;
   claimError.value = false;
   claimErrorReason.value = undefined;

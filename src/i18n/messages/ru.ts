@@ -3786,7 +3786,7 @@ export const ru: Messages = {
     unitPrice: "Цена за шт.",
     subtotal: "Сумма",
     discount: "Скидка",
-    trialDiscount: "Скидка за пробный период",
+    trialDiscount: "Скидка за пробу",
     trialOffset: "Пробный бонус",
     total: "Итого",
     refundAmount: "Сумма возврата",

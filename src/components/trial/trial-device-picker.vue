@@ -13,7 +13,7 @@
     <!-- The lock is said on every radio (aria-disabled) and once for the group (describedby): an aria-disabled group would also
          disable the conditions link, which is the radio's sibling and stays usable (03 §3.5 单选行). -->
     <view v-else class="tdp__list" role="radiogroup" :aria-label="copy.selectTitle" :aria-describedby="locked ? 'tdp-lock-note' : undefined">
-      <view v-for="row in rows" :key="row.option.productNo" class="tdp-row" :class="{ 'tdp-row--on': row.checked, 'tdp-row--off': !row.option.canBuy, 'tdp-row--tag': row.option.isTrialProduct, 'tdp-row--link': row.link }">
+      <view v-for="row in rows" :key="row.option.productNo" class="tdp-row" :class="{ 'tdp-row--on': row.checked, 'tdp-row--off': !row.option.canBuy, 'tdp-row--tag': row.option.isTrialProduct, 'tdp-row--link': row.link, 'tdp-row--claim': row.claimPrice }">
         <view class="tdp-row__body" role="radio" :data-product-no="row.option.productNo" :aria-checked="row.checked ? 'true' : 'false'" :aria-disabled="row.selectable ? undefined : 'true'" :aria-label="row.aria" :tabindex="row.productNo === tabStop ? 0 : -1"
           @click="choose(row)" @keydown.space.stop.prevent="choose(row)" @keydown.enter.stop.prevent="choose(row)"
           @keydown.down.stop.prevent="move(row, 1)" @keydown.right.stop.prevent="move(row, 1)" @keydown.up.stop.prevent="move(row, -1)" @keydown.left.stop.prevent="move(row, -1)">
@@ -142,8 +142,9 @@ function move(row: { productNo: string }, delta: number) {
 /* Device art has no backing block (01 §1.3); one draw size for every SKU, shifted up so the machine, not the image box, sits on the row's centre line. */
 .tdp-row__thumb { position: relative; flex: none; width: 76px; height: 48px; }
 .tdp-row__img { position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; transform: translate(-50%, calc(-50% - 7px)); pointer-events: none; }
-/* Never narrower than its widest unbreakable line (the estimate): the price column gives way instead of running over it. */
-.tdp-row__main { flex: 1 1 0; min-width: auto; }
+.tdp-row__main { flex: 1; min-width: 0; }
+/* With 「领取时价格」 the name column is never narrower than its estimate line, so the price column, not the estimate, gives way. */
+.tdp-row--claim .tdp-row__main { min-width: auto; }
 .tdp-row__name { display: block; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 /* The trial tag holds its own line under the name in every language and width (03 §3.5). */
 .tdp-row__tagline { display: flex; margin-top: 4px; }
