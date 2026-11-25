@@ -922,7 +922,7 @@ const faqQStyle: CSSProperties = {
 /* One outer corner clip; the catalog image and its pedestal keep their full size. */
 .detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
 /* A short screen keeps the trial-credit entry clear of the purchase tray: the art gives up the height (04 商城入口). */
-@media (max-height: 800px) { .detail-hero--credit :deep(.detail-product-render) { aspect-ratio:1 / .92 !important; } }
+@media (max-height: 860px) { .detail-hero--credit :deep(.detail-product-render) { aspect-ratio:1 / .92 !important; } }
 .detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {
   background:linear-gradient(to top, var(--v5-content-surface) 0%, color-mix(in srgb, var(--v5-content-surface) 60%, transparent) 50%, transparent 100%) !important;
 }
