@@ -166,11 +166,15 @@
         <template v-if="pendingOrderActionsVisible">
           <!-- A full-price order for the device now on trial (R13) cannot be paid: the reason above the tray, cancel stays, and the
                way on is the trial credit with this device preselected (04 普通结算与本人试用设备). -->
-          <text v-if="ownTrialOrderProduct" class="nx-tray-note w-full" role="status">{{ purchaseCopy.coOwnTrialOrderDetail }}</text>
+          <text v-if="trialOrderWaitNote" id="order-trial-wait-note" class="nx-tray-note w-full" role="status">{{ trialOrderWaitNote }}</text>
           <NxButton v-if="!order.promotionQuoteId" class="order-hero__cancel nx-reverse-action" variant="secondary" :label="t.orders.cancelOrder" :busy="cancellingOrder" @click="handleCancel" />
           <!-- One verb for paying an open order on every surface (结算页, 外付中, 钱包待付): 继续付款; the name also says the amount. -->
           <NxButton v-if="ownTrialOrderProduct" variant="primary" :label="t.store.buyWithTrialCredit" @click="navTo('/pages/me/trial?product=' + encodeURIComponent(ownTrialOrderProduct))"><text>{{ t.store.buyWithTrialCredit }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
-          <NxButton v-else-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary" :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })" :busy-label="pendingPaymentChecking ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet" @click="requestPendingPayment(false, 'tray')"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
+          <NxButton v-else-if="remoteApiEnabled && (!paymentExpired || externalPayment)" class="order-hero__pay" data-testid="order-continue-payment" variant="primary"
+            :label="t.orders.paymentInProgressContinue + ' · ' + paymentCopy.payable + ' ' + formatCheckoutReviewAmount(commerceOrderAmount(order).value, commerceOrderAmount(order).currency, { unit: true })"
+            :busy-label="pendingPaymentChecking || trialOrderWaitReason === 'loading' ? pendingCopy.checking : undefined" :busy="pendingPaymentChecking || payingFromWallet || trialOrderWaitReason === 'loading'"
+            :disabled="trialOrderWaitReason === 'failed'" :aria-describedby="trialOrderWaitReason === 'failed' ? 'order-trial-wait-note' : undefined"
+            @click="requestPendingPayment(false, 'tray')"><text>{{ t.orders.paymentInProgressContinue }}</text></NxButton>
         </template>
         <template v-else-if="needsRecovery">
           <NxButton v-if="canBuyAgain" variant="secondary" :label="buyAgainLabel" @click="goStore" />
@@ -337,6 +341,7 @@ function preserveOrderOriginInH5() {
 const remoteOrderError = ref(false);
 const remoteOrderRefreshing = ref(false);
 const remoteOrderAttempted = ref(false);
+const trialOrderReadStarted = ref(false);
 let remoteOrderRefreshSequence = 0;
 let activeRemoteOrderScope: DetailRequestScope | null = null;
 let remoteOrderRead: Promise<void> | null = null;
@@ -373,6 +378,10 @@ async function refreshOrder(discoverPayment = true) {
       if (sequence === remoteOrderRefreshSequence && isCurrentDetailScope(scope)) {
         orderPresentation.value = result && isVisibleUsdtNetwork(result.paymentMethod) ? result : null;
         remoteOrderError.value = false;
+        if (!trialOrderReadStarted.value && result?.status === 'placed' && plainTrialOrderProduct(result)) {
+          trialOrderReadStarted.value = true;
+          void freeTrial.refreshRemote();
+        }
         if (automaticPaymentDiscovery && discoverPayment && result?.status === 'placed' && (!paymentLookupScope || !isCurrentDetailScope(paymentLookupScope))
             && !refusedPayment.value && !pendingOrderPayment(scope.accountScope.accountKey, scope.orderNo, true)) {
           paymentLookupScope = scope;
@@ -397,6 +406,7 @@ onShow(() => {
   detailMounted = true;
   detailVisible = true;
   detailEpoch += 1;
+  trialOrderReadStarted.value = false;
   restoreOrderAction();
   preserveOrderOriginInH5();
   // A ?pay=1 link is an explicit payment intent, separate from background reads.
@@ -425,6 +435,7 @@ const orderEnvironmentInvalidated = ref(false);
 watch(() => apiRuntimeConfig?.environment, () => { orderEnvironmentInvalidated.value = true; orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, locale.code], () => { orderPresentation.value = null; }, { flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.accountId, id.value, apiRuntimeConfig?.environment], () => {
+  trialOrderReadStarted.value = false;
   useUI().clearConfirmsBy(topupConfirmOwner);
   paymentResultOrder.value = null; paymentResultVisible.value = false;
   confirmedPaymentReceipt.value = null;
@@ -694,23 +705,35 @@ const paymentExpired = computed(() => order.value?.expiresAt != null
   && order.value.expiresAt <= detailNow.value);
 const canPayFromWallet = computed(() => remoteApiEnabled
   && currentOrderPayable()&&!cancellingOrder.value&&!orderCommandQuerying.value&&!orderCommandUnavailable.value
-  && trialOrderWaitReason.value !== 'ownTrialDeviceOrder'
+  && !trialOrderWaitReason.value
   // An external payment already underway resumes its own intent; it never debits the wallet again.
   && (!orderAction.value || (orderAction.value.kind==='pay'&&(resumePaymentAllowed.value||externalPayment.value)))
   && !walletRefreshing.value && !paymentExpired.value);
 const freeTrial = useFreeTrial();
 function plainTrialOrderProduct(original: Order) {
-  if (original.promotionQuoteId || original.discount > 0 || original.tradeInDeviceId || original.quantity !== 1
+  if (original.promotionQuoteId || Number(original.promotionDiscountUsdt) > 0 || original.discount > 0
+      || original.tradeInDeviceId || original.trialReward || original.quantity !== 1
       || (original.lineItems && (original.lineItems.length !== 1 || original.lineItems[0]?.quantity !== 1))) return null;
   return original.lineItems?.[0]?.sku ?? original.productId;
 }
+const trialOrderProduct = computed(() => order.value?.status === 'placed' ? plainTrialOrderProduct(order.value) : null);
 const trialOrderWaitReason = computed(() => {
-  if (liveOrder.value?.status !== 'placed') return null;
-  const productNo = plainTrialOrderProduct(liveOrder.value);
-  return productNo && freeTrial.isOwnTrialDevice(productNo) ? 'ownTrialDeviceOrder' : null;
+  const productNo = trialOrderProduct.value;
+  if (!remoteApiEnabled || walletPaymentConfirmed.value || !productNo) return null;
+  if (!trialOrderReadStarted.value || freeTrial.authorityStatus === 'unknown') return 'loading';
+  if (freeTrial.authorityStatus === 'loading') return freeTrial.lastReadFailed ? 'failed' : 'loading';
+  if (freeTrial.authorityStatus === 'error') return 'failed';
+  if (freeTrial.isOwnTrialDevice(productNo)) return 'ownTrialDeviceOrder';
+  return freeTrial.canConfirmOrdinaryProduct(productNo) ? null : 'failed';
 });
-const ownTrialOrderProduct = computed(() => trialOrderWaitReason.value === 'ownTrialDeviceOrder' && liveOrder.value
-  ? plainTrialOrderProduct(liveOrder.value) : null);
+const ownTrialOrderProduct = computed(() => trialOrderWaitReason.value === 'ownTrialDeviceOrder' ? trialOrderProduct.value : null);
+const trialOrderWaitNote = computed(() => ownTrialOrderProduct.value ? purchaseCopy.value.coOwnTrialOrderDetail
+  : trialOrderWaitReason.value === 'failed' ? purchaseCopy.value.coLoadFailed : '');
+useAutoRecovery({
+  failed: () => trialOrderWaitReason.value === 'failed',
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+});
 const canResumeWalletPayment = computed(() => orderAction.value?.kind === 'pay' && resumePaymentAllowed.value
   && canPayFromWallet.value && !externalPayment.value && !refusedPayment.value);
 const isProvisioning = computed(() => order.value?.status === "provisioning");
@@ -1026,10 +1049,10 @@ async function requestPendingPayment(originalJustRead = false, source?: 'tray'):
       return;
     }
     const trialSku = plainTrialOrderProduct(original);
-    if (trialSku && !freeTrial.canConfirmOrdinaryProduct(trialSku)) {
-      if (!freeTrial.isOwnTrialDevice(trialSku)) await freeTrial.refreshRemote();
+    if (trialSku && (trialOrderWaitReason.value || !freeTrial.canConfirmOrdinaryProduct(trialSku))) {
+      if (trialOrderWaitReason.value !== 'ownTrialDeviceOrder') await freeTrial.refreshRemote();
       if (!isCurrentDetailScope(scope)) return;
-      if (!freeTrial.canConfirmOrdinaryProduct(trialSku)) {
+      if (trialOrderWaitReason.value || !freeTrial.canConfirmOrdinaryProduct(trialSku)) {
         paymentNoticeReason.value = freeTrial.isOwnTrialDevice(trialSku) ? purchaseCopy.value.coOwnTrialOrderDetail : purchaseCopy.value.coLoadFailed;
         paymentNotice.value = 'blocked';
         return;
