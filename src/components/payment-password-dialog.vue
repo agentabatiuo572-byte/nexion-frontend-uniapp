@@ -17,14 +17,14 @@
           <text class="payment-pin-summary__name">{{ ui.context.summary }}</text>
           <view class="payment-pin-summary__amount"><text class="payment-pin-summary__label">{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" :value="ui.context.amount" :currency="ui.context.currency" :precision="ui.context.precision" /><text v-else>{{ formatGroupedAmount(ui.context.amount) }} <text class="payment-pin-note">{{ ui.context.currency }}</text></text></view>
           <view v-if="ui.context.details?.length" class="payment-pin-link" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded">{{ expanded ? t.paymentPin.hideDetails : t.paymentPin.details }}</view>
-          <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ formatGroupedAmount(item.amount) }}</template></text></view></view>
+          <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ formatGroupedAmount(item.amount, ui.context.precision) }}</template></text></view></view>
         </view>
         <text v-if="ui.stage === 'loading'" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
         <template v-else-if="ui.stage === 'pending'">
           <text class="payment-pin-note" role="status">{{ t.paymentPin.pending }}</text>
           <view class="payment-pin-link" role="button" tabindex="0" @click="support">{{ t.paymentPin.support }}</view>
         </template>
-        <view v-else-if="ui.stage === 'read-error'" class="payment-pin-primary" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load">{{ t.paymentPin.retry }}</view>
+        <view v-else-if="ui.stage === 'read-error'" class="payment-pin-primary" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load()">{{ t.paymentPin.retry }}</view>
         <template v-else-if="ui.stage === 'recovery'">
           <text class="payment-pin-note">{{ t.paymentPin.recoveryIntro }}</text>
           <template v-if="ui.challenge">
@@ -43,7 +43,7 @@
           <template v-if="ui.stage === 'pay'">
             <text class="payment-pin-note">{{ Number(ui.context?.amount) === 0 ? t.paymentPin.autoConfirm : t.paymentPin.autoSubmit }}</text>
             <text v-if="pin.locked()" class="payment-pin-error" role="alert">{{ lockMessage }}</text>
-            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load">{{ t.paymentPin.retry }}</view>
+            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load()">{{ t.paymentPin.retry }}</view>
             <view class="payment-pin-link" role="button" tabindex="0" @click="pin.startRecovery">{{ t.paymentPin.forgot }}</view>
           </template>
           <template v-else>
@@ -80,6 +80,16 @@ const active = ref(true); const password = ref(""); const code = ref(""); const 
 const standalone = computed(() => !ui.context && (ui.stage === "setup" || ui.stage === "confirm"));
 const statusHeight = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const open = computed(() => ui.visible && active.value);
+useAutoRecovery({
+  active: () => open.value,
+  failed: () => ui.stage === "read-error" && !ui.busy,
+  retry: () => pin.load(false), repeatMs: 30_000,
+});
+useAutoRecovery({
+  active: () => open.value,
+  failed: () => !!ui.context?.readDetailAmounts && ui.context.details?.some(item => item.amount === undefined) === true,
+  retry: pin.recoverDetailAmounts, repeatMs: 30_000,
+});
 useAutoRecovery({
   failed: () => open.value && ui.stage === "pending" && !!ui.pendingOperation && !ui.busy && !ui.reading,
   retry: () => pin.query(() => active.value), repeatMs: 15_000,

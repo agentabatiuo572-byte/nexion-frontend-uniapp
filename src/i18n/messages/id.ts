@@ -48,6 +48,7 @@ export const id: Messages = {
     autoConfirm: "Pembelian/tukar tambah dikonfirmasi setelah PIN lengkap.",
     details: "Lihat rincian",
     hideDetails: "Sembunyikan rincian",
+    detailsAmount: "Jumlah ({unit})",
     readFailed: "Gagal membaca status PIN pembayaran. Coba lagi.",
     failed: "Tindakan ini belum dapat diselesaikan. Coba lagi.",
     mismatch: "Kedua PIN baru tidak sama. Masukkan lagi.",

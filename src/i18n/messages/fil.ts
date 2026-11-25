@@ -48,6 +48,7 @@ export const fil: Messages = {
     autoConfirm: "Kukumpirmahin ang pagbili o trade-in na ito pagkakumpleto ng PIN.",
     details: "Detalye",
     hideDetails: "Itago ang detalye",
+    detailsAmount: "Halaga ({unit})",
     readFailed: "Hindi mabasa ang status ng PIN sa pagbabayad. Subukan ulit.",
     failed: "Hindi matapos ang aksyong ito. Subukan ulit.",
     mismatch: "Hindi tugma ang dalawang bagong PIN. Ilagay ulit.",
