@@ -465,6 +465,8 @@ export const vi: Messages = {
     errorSignInStateChanged: "Trạng thái đăng nhập của tài khoản đã thay đổi. Vui lòng đăng nhập lại.",
     serverSessionReloadNotice: "Vui lòng đăng nhập lại để tiếp tục.",
     nativeSessionReloadNotice: "Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.",
+    sessionReplacedNotice: "Tài khoản đã đăng nhập trên ứng dụng nên phiên bản web đã đăng xuất.",
+    takeoverHint: "Nếu bạn đang đăng nhập trên ứng dụng, ứng dụng sẽ đăng xuất và tính toán trên điện thoại sẽ dừng.",
   },
   register: {
     errorDeviceSignupLimited: "Đăng ký tạm thời bị giới hạn. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.",

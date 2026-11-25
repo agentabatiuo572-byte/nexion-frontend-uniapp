@@ -810,6 +810,8 @@ export const ms: Messages = {
     errorSignInStateChanged: "Status log masuk akaun telah berubah. Sila log masuk semula.",
     serverSessionReloadNotice: "Sila log masuk semula untuk meneruskan.",
     nativeSessionReloadNotice: "Sila log masuk semula untuk terus menggunakan app.",
+    sessionReplacedNotice: "Akaun anda dilog masuk di app, jadi versi web telah dilog keluar.",
+    takeoverHint: "Jika anda log masuk di app, app akan dilog keluar dan pengkomputeran telefon akan dihentikan.",
   },
   register: {
     errorDeviceSignupLimited: "Pendaftaran dihadkan buat sementara. Cuba lagi nanti atau hubungi khidmat pelanggan.",

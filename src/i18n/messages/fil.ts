@@ -810,6 +810,8 @@ export const fil: Messages = {
     errorSignInStateChanged: "Nagbago ang login state ng account. Mag-log in ulit.",
     serverSessionReloadNotice: "Mag-log in ulit para magpatuloy.",
     nativeSessionReloadNotice: "Mag-log in ulit para patuloy na magamit ang app.",
+    sessionReplacedNotice: "Nag-log in ang account mo sa app kaya na-log out ang web version.",
+    takeoverHint: "Kung naka-log in ka sa app, mala-log out ito at hihinto ang compute ng phone.",
   },
   register: {
     errorDeviceSignupLimited: "Pansamantalang limitado ang pag-sign up. Subukan ulit mamaya o makipag-ugnayan sa support.",

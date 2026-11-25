@@ -810,6 +810,8 @@ export const id: Messages = {
     errorSignInStateChanged: "Status masuk akun telah berubah. Masuk lagi.",
     serverSessionReloadNotice: "Masuk lagi untuk melanjutkan.",
     nativeSessionReloadNotice: "Masuk lagi untuk terus menggunakan aplikasi.",
+    sessionReplacedNotice: "Akun Anda masuk di aplikasi, jadi versi web telah keluar.",
+    takeoverHint: "Jika Anda masuk di aplikasi, aplikasi akan keluar dan komputasi ponsel akan berhenti.",
   },
   register: {
     errorDeviceSignupLimited: "Pendaftaran dibatasi sementara. Coba lagi nanti atau hubungi layanan pelanggan.",

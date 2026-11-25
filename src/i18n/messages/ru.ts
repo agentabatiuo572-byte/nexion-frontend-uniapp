@@ -810,6 +810,8 @@ export const ru: Messages = {
     errorSignInStateChanged: "Статус входа изменился. Войдите снова.",
     serverSessionReloadNotice: "Войдите снова, чтобы продолжить.",
     nativeSessionReloadNotice: "Войдите снова, чтобы продолжить работу в приложении.",
+    sessionReplacedNotice: "Выполнен вход в приложение, сеанс в веб-версии завершён.",
+    takeoverHint: "Если вы вошли в приложение, сеанс там завершится, а вычисления на телефоне остановятся.",
   },
   register: {
     errorDeviceSignupLimited: "Регистрация временно ограничена. Повторите позже или напишите в поддержку.",

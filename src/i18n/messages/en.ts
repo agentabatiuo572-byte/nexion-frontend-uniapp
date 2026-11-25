@@ -470,6 +470,8 @@ export const en = {
     errorSignInStateChanged: "The account sign-in state changed. Please sign in again.",
     serverSessionReloadNotice: "Please sign in again to continue.",
     nativeSessionReloadNotice: "Please sign in again to continue using the app.",
+    sessionReplacedNotice: "Your account was signed in on the app, so the web version was signed out.",
+    takeoverHint: "If you're signed in to the app, it will sign out and phone compute will stop.",
   },
   register: {
     errorDeviceSignupLimited: "Sign-up is temporarily limited. Try again later or contact support.",

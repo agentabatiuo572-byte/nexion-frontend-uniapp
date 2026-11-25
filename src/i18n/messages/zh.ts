@@ -454,6 +454,8 @@ export const zh: Messages = {
     errorSignInStateChanged: "账号登录状态已更新，请重新登录。",
     serverSessionReloadNotice: "请重新登录以继续使用。",
     nativeSessionReloadNotice: "请重新登录以继续使用 App。",
+    sessionReplacedNotice: "账号已在 App 登录，网页版已退出。",
+    takeoverHint: "若已登录 App，App 会退出，手机算力会停用。",
   },
   register: {
     errorDeviceSignupLimited: "注册暂时受限，请稍后重试或联系客服。",

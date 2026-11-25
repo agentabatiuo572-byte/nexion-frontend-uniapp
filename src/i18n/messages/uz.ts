@@ -810,6 +810,8 @@ export const uz: Messages = {
     errorSignInStateChanged: "Akkaunt kirish holati oʻzgardi. Qayta kiring.",
     serverSessionReloadNotice: "Davom etish uchun qayta kiring.",
     nativeSessionReloadNotice: "Ilovadan foydalanishni davom ettirish uchun qayta kiring.",
+    sessionReplacedNotice: "Hisobga ilovadan kirildi, veb-versiyadagi seans tugadi.",
+    takeoverHint: "Ilovaga kirgan boʻlsangiz, u yerdan chiqasiz va telefon quvvati toʻxtaydi.",
   },
   register: {
     errorDeviceSignupLimited: "Roʻyxatdan oʻtish vaqtincha cheklangan. Keyinroq urining yoki yordam xizmatiga murojaat qiling.",

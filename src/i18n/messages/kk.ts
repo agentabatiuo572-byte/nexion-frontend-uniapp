@@ -810,6 +810,8 @@ export const kk: Messages = {
     errorSignInStateChanged: "Аккаунтқа кіру күйі өзгерді. Қайта кіріңіз.",
     serverSessionReloadNotice: "Жалғастыру үшін қайта кіріңіз.",
     nativeSessionReloadNotice: "Қолданбаны пайдалануды жалғастыру үшін қайта кіріңіз.",
+    sessionReplacedNotice: "Аккаунтқа қолданбадан кірілді, веб-нұсқадағы сеанс аяқталды.",
+    takeoverHint: "Қолданбаға кірген болсаңыз, ол жерден шығасыз және телефон есептеу қуаты тоқтайды.",
   },
   register: {
     errorDeviceSignupLimited: "Тіркелу уақытша шектелген. Кейінірек қайталаңыз немесе қолдауға жазыңыз.",
