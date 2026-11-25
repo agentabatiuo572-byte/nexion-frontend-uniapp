@@ -50,7 +50,6 @@
             <text v-if="pin.locked()" class="payment-pin-error" role="alert">{{ lockMessage }}</text>
             <!-- The lock has run out: the layout stays while the server confirms it (03 §3.4); input opens only after that read. -->
             <text v-else-if="unlockReady" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
-            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load(false)">{{ t.paymentPin.retry }}</view>
             <view class="payment-pin-link" role="button" tabindex="0" @click="pin.startRecovery">{{ t.paymentPin.forgot }}</view>
           </template>
           <template v-else>
