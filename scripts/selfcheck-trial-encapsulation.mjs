@@ -36,7 +36,17 @@ const ALLOWLIST = {
   "src/App.vue":
     "轮询编排:在 pollTrial 前后各取一次状态以判定「本 tick 是否发生迁移」,读的是 poll 推进**之后**的值,不参与任何金额计算",
   "src/pages/me/trial.vue":
-    "纯展示:试用页五态渲染,≤4s 视觉滞后由下一次 poll 自愈,不参与任何金额计算",
+    "兼容没有远端快照的五态展示；转购读取绑定已确认的领取单，金额取所选设备报价或 404 时的试用报价",
+  "src/pages/me/devices.vue":
+    "库存试用行、在线设备计数和取消入口；取消命令仍复核权威状态及原付款",
+  "src/components/home/home-benefits.vue":
+    "决定是否显示首页试用入口；领取资格仍由试用展示与领取流程确认",
+  "src/components/trial-ghost-slot.vue":
+    "旧试用行的显示、标签及色调，不参与报价或付款",
+  "src/components/trial-promo-banner.vue":
+    "根据试用阶段显示旧推广入口，不计算金额",
+  "src/components/me/trial-entry.vue":
+    "个人中心的试用入口与状态，不提交付款",
 };
 
 /**
@@ -45,6 +55,7 @@ const ALLOWLIST = {
  */
 const MONEY_PATHS = [
   "src/pages/store/checkout.vue",
+  "src/store/trial-checkout.ts",
   "src/pages/me/wallet-withdraw.vue",
   "src/store/orders.ts",
   "src/store/app.ts",

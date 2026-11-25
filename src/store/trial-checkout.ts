@@ -20,7 +20,7 @@ type TrialCheckoutOutcome =
   | { status: "idle" | "storage-error" }
   | { status: "submitting" | "processing" | "resumable"; submission: Submission }
   | { status: "original"; originalPurchase: TrialOriginalPurchase }
-  | { status: "refused"; claimNo: string; productNo: string; confirmedAmountUSD: number; refusal: TrialRefusal }
+  | { status: "refused"; claimNo: string; submissionNo: string; productNo: string; confirmedAmountUSD: number; refusal: TrialRefusal }
   | { status: "settled"; claimNo: string; receipt: TrialConvertReceipt };
 
 const COMMANDS = "nexgrid-trial-checkout-accounts-v1";
@@ -69,24 +69,36 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       : { status: purchase.status === "RESUMABLE" ? "resumable" : "processing", submission: purchase };
   }
 
+  function adoptAuthority(next: TrialAuthorityState) {
+    if (authority.value && authority.value.claimNo !== next.claimNo) outcome.value = { status: "idle" };
+    authority.value = next;
+    try {
+      local.value = readLocal(next.claimNo);
+    } catch {
+      outcome.value = { status: "storage-error" };
+      return;
+    }
+    const current = outcome.value, original = next.originalPurchase;
+    if (current.status === "submitting" || current.status === "settled") return;
+    if (original) {
+      if (original.kind === "BALANCE" && (
+        current.status === "refused" && current.submissionNo === original.submissionNo
+        || current.status === "resumable" && current.submission.submissionNo === original.submissionNo
+      )) return;
+      adoptOriginal(original);
+    } else if (local.value && current.status !== "resumable") {
+      outcome.value = { status: "processing", submission: local.value };
+    } else if (current.status === "original") {
+      outcome.value = { status: "idle" };
+    }
+  }
+
   function readAuthority(): Promise<TrialAuthorityState | null> {
     if (authorityRead) return authorityRead;
     const current = currentAccount();
     const read = trialApi.state().then(next => {
       if (!current()) return null;
-      authority.value = next;
-      try {
-        local.value = readLocal(next.claimNo);
-      } catch {
-        outcome.value = { status: "storage-error" };
-        return next;
-      }
-      const status = outcome.value.status;
-      if (status === "submitting" || status === "settled") return next;
-      if (next.originalPurchase) adoptOriginal(next.originalPurchase);
-      else if (local.value && status !== "resumable")
-        outcome.value = { status: "processing", submission: local.value };
-      else if (!local.value && status === "original") outcome.value = { status: "idle" };
+      adoptAuthority(next);
       return next;
     }).finally(() => { if (authorityRead === read) authorityRead = null; });
     authorityRead = read;
@@ -117,7 +129,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       adoptOriginal(result.originalPurchase);
     } else {
       outcome.value = {
-        status: "refused", claimNo: submission.claimNo, productNo: submission.device.productNo,
+        status: "refused", claimNo: submission.claimNo, submissionNo: submission.submissionNo, productNo: submission.device.productNo,
         confirmedAmountUSD: submission.confirmedAmountUSD, refusal: result,
       };
     }
@@ -200,5 +212,5 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       outcome.value = { status: "idle" };
   }
 
-  return { authority, outcome, workingSubmission, readAuthority, readSubmission, submit, settleExternal, clearSettled };
+  return { authority, outcome, workingSubmission, adoptAuthority, readAuthority, readSubmission, submit, settleExternal, clearSettled };
 });

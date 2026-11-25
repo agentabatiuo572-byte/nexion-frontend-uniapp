@@ -22,6 +22,7 @@ import { toast } from './ui';
 /** Height of the page's floating payment bar, 0 while it is hidden. The bar measures itself and writes it; the chassis
  *  only reads it to lift the support shortcut and pad the content, so the two never measure each other. */
 export const PAYMENT_BAR_HEIGHT_KEY: InjectionKey<Ref<number>> = Symbol('nx-payment-bar-height');
+export const TRIAL_PAYMENT_CARD_KEY: InjectionKey<() => string | null> = Symbol('nx-trial-payment-card');
 /** `orderNo`, `deadlineAt` and `image` only feed the payment screens; `reorder` runs after a timed-out order. */
 export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<string, unknown>; amount: number | string; summary: string; current: () => boolean; commandKey?: () => string;
   scopeCurrent?: () => boolean;

@@ -1,7 +1,10 @@
 import { computed, watch } from "vue";
 import type { TrialPurchaseOption } from "@/api/trial-api";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialPurchaseOptions } from "@/store/trial-purchase-options";
+import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 
 /**
  * The store's trial-credit entry (PLAN §2.3, R14): a product shows the 「可用试用抵扣金」 tag, the detail entry and the tray
@@ -11,11 +14,11 @@ import { useTrialPurchaseOptions } from "@/store/trial-purchase-options";
  * reads exactly as it does without the feature.
  */
 export function useTrialCreditOption(productNo: () => string | undefined) {
-  const trial = useFreeTrial();
-  const options = useTrialPurchaseOptions();
+  const trial = useFreeTrial(), options = useTrialPurchaseOptions();
   return computed<TrialPurchaseOption | null>(() => {
-    if (trial.status !== "active" && trial.status !== "grace") return null;
-    if (!trial.authorityClaimNo || options.claimNo !== trial.authorityClaimNo || options.current.status !== "ready") return null;
+    const state = trial.displayState;
+    if (!state?.claimNo || (state.status !== "active" && state.status !== "grace") || !trial.authorityClaimNo
+        || options.claimNo !== state.claimNo || options.current.status !== "ready") return null;
     const no = productNo();
     return options.current.options.find((option) => option.productNo === no
       && option.canBuy && !option.isTrialProduct && option.quote !== undefined) ?? null;
@@ -23,17 +26,36 @@ export function useTrialCreditOption(productNo: () => string | undefined) {
 }
 
 /**
- * Binds the purchase list to the current trial claim and reads it while the page is visible, so the store and the
- * detail page share one read (PLAN §2.3). 读取时机由接线项复核: recovery after a failed read, foreground and
- * pull-to-refresh are the wiring item's.
+ * Visible consumers share one authoritative list read per claim. Pages call the returned
+ * refresh alongside their other pull-to-refresh reads.
  */
-export function useTrialCreditOptionsRead(visible: () => boolean) {
+export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProduct?: () => string | undefined) {
   const trial = useFreeTrial();
   const options = useTrialPurchaseOptions();
-  watch(() => [visible(), trial.status, trial.authorityClaimNo] as const, ([shown, status, claimNo]) => {
-    if (!shown || !claimNo || (status !== "active" && status !== "grace")) return;
-    if (options.claimNo !== claimNo) options.bindClaim(claimNo);
-    // A failed read stays in current.status ("failed"), which hides the entry; retrying it is the wiring item's.
-    options.refresh().catch(() => {});
+  const claim = computed(() => {
+    const state = trial.displayState;
+    return state?.claimNo === trial.authorityClaimNo && (state?.status === "active" || state?.status === "grace")
+      ? state.claimNo : null;
+  });
+  const active = () => visible() && claim.value !== null;
+  const failed = () => active() && (options.current.status === "failed"
+    || (options.current.status === "ready" && options.current.options.some(trialOptionReadFailed)));
+  async function read() {
+    if (active() && foregroundReadAllowed() && options.claimNo === claim.value) await options.refresh();
+  }
+  const recovery = useAutoRecovery({
+    active, failed, retry: read, quiet: false, repeatMs: 30_000,
+    repeatWhile: () => !hasVisiblePullRefresh(),
+  });
+  watch([visible, claim, foregroundReadAllowed], ([shown, claimNo, allowed]) => {
+    if (!shown) return;
+    if (claimNo === null) {
+      if (!trial.displayState || !["active", "grace"].includes(trial.displayState.status)) options.bindClaim(null);
+      return;
+    }
+    const productNo = takeEntryProduct?.();
+    if (options.claimNo !== claimNo || productNo) options.bindClaim(claimNo, productNo);
+    if (allowed && (!failed() || productNo)) void read().catch(() => {});
   }, { immediate: true });
+  return { refresh: () => failed() ? recovery.retry() : read() };
 }

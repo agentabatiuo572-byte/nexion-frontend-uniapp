@@ -193,6 +193,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const authorityResultUnknown = ref(false);
   // Display only. A transient GET failure still clears the live command authority.
   const displayState = shallowRef<TrialAuthorityState | null>(null);
+  const originalPurchase = computed(() => displayState.value?.originalPurchase ?? null);
+  const purchasedDevice = computed(() => displayState.value?.status === "converted"
+    ? displayState.value.purchasedDevice ?? null : null);
   const pendingStart = shallowRef<{ claimNo: string | null } | null>(null);
   const confirmedStartDenial = ref<TrialIneligibleReason>();
   const confirmedStartClaimNo = ref<string | null>(null);
@@ -890,7 +893,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   // PRODUCTION: POST /api/trial/cancel. Spec ④: only `active →(用户主动取消)ended`
   // — grace has nothing left to cancel (production already stopped).
-  async function cancel(): Promise<{ ok: boolean; reason?: TrialIneligibleReason }> {
+  async function cancel(): Promise<{ ok: boolean; reason?: TrialIneligibleReason | "payment-in-progress" }> {
     if (remoteApiEnabled) {
       const requestedEpoch = accountBindingEpoch;
       if (authorityStatus.value !== "ready") await refreshRemote(true);
@@ -914,12 +917,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         return { ok: true };
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
-        authorityError.value = asApiError(error).message;
+        const failure = asApiError(error);
+        const paymentInProgress = isApiRefusal(error, 409, "TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS");
+        authorityError.value = failure.message;
         const reconciled = await refreshRemote();
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         if (reconciled && authorityClaimNo.value === expectedClaimNo && status.value === "ended") {
           return { ok: true };
         }
+        if (paymentInProgress) return { ok: false, reason: "payment-in-progress" };
         return { ok: false, reason: commandFailureReason(error) };
       }
     }
@@ -970,7 +976,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     status, startedAt, expiresAt, graceEndsAt, finishedAt, hasPendingConversion, pendingConversion, conversionPaymentKey,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
-    displayState, pendingStart, confirmedStartClaimNo, confirmedStartDenial, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
+    displayState, originalPurchase, purchasedDevice, pendingStart, confirmedStartClaimNo, confirmedStartDenial, confirmedHomeOffer, authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
     eligibility, canStart, showPromo, showHeroPromo, confirmedOfferState,

@@ -136,6 +136,25 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
   });
   const sameTrialSubmission = (body, purchase) => body.productNo===purchase.device.productNo
     && body.expectedAmountUsdt===Number(purchase.confirmedAmountUsdt) && body.quoteVersion===purchase.quoteVersion;
+  const trialIntent = body => JSON.stringify([body.productNo,body.expectedAmountUsdt,body.quoteVersion,body.paymentMethod]);
+  function settleTrialWallet(url, request, key, purchase, readOriginal = originalTrialPurchase) {
+    const command='trial-convert:'+key, intent=trialIntent(request.postDataJSON());
+    try {
+      const receipt=demoFixture(url,locale(),state,{...request,originalTrialPurchase:readOriginal,walletAuthorized:true});
+      pin.state.payWrites++;
+      pin.commands.set(command,{...trialCommand(key,'SUCCEEDED',receipt),intent});
+      return ok(receipt);
+    } catch(error) {
+      if (!error.status) throw error;
+      if (purchase) {
+        delete state.trialBalancePurchase;
+        state.trialOriginalPurchaseState='none';
+      }
+      const data=error.data??null;
+      pin.commands.set(command,{...trialCommand(key,'REJECTED',data,error.message),code:error.status,intent});
+      return {status:error.status,message:error.message,data};
+    }
+  }
   function convertTrial(url, request, key) {
     const fail = (status,message,data=null) => ({status,message,data});
     if (request.method()!=='POST') return fail(405,'METHOD_NOT_ALLOWED');
@@ -143,7 +162,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     if (!key) return fail(422,'IDEMPOTENCY_KEY_REQUIRED');
     const command='trial-convert:'+key;
     const body=request.postDataJSON();
-    const intent=JSON.stringify([body.productNo,body.expectedAmountUsdt,body.quoteVersion,body.paymentMethod]);
+    const intent=trialIntent(body);
     const recorded=pin.commands.get(command);
     if (recorded) {
       if (recorded.intent!==undefined&&recorded.intent!==intent) return fail(409,'IDEMPOTENCY_KEY_CONFLICT');
@@ -157,21 +176,7 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       return fail(409,'TRIAL_EXISTING_PURCHASE',{reasonCode:'TRIAL_EXISTING_PURCHASE',originalPurchase:purchase});
     const authorization=pin.authorize(body);
     if (authorization.status!==200) return authorization;
-    try {
-      const receipt=demoFixture(url,locale(),state,{...request,originalTrialPurchase,walletAuthorized:true});
-      pin.state.payWrites++;
-      pin.commands.set(command,{...trialCommand(key,'SUCCEEDED',receipt),intent});
-      return ok(receipt);
-    } catch(error) {
-      if (!error.status) throw error;
-      if (samePurchase) {
-        delete state.trialBalancePurchase;
-        state.trialOriginalPurchaseState='none';
-      }
-      const data=error.data??null;
-      pin.commands.set(command,{...trialCommand(key,'REJECTED',data,error.message),code:error.status,intent});
-      return fail(error.status,error.message,data);
-    }
+    return settleTrialWallet(url,request,key,samePurchase);
   }
   let trialSampleSequence=0;
   function setTrialPurchaseSample(origin, mode) {
@@ -190,6 +195,17 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
     }
     if (mode==='external-late'&&!state.trialBalancePurchase) {
       const result=external.setTrialExternalSample(origin,true,true);
+      if (result.status===200) state.trialOriginalPurchaseState=mode;
+      return result;
+    }
+    if (mode==='balance-settled') {
+      const original=state.trialBalancePurchase;
+      if (original?.status!=='PROCESSING') return {status:409,message:'TRIAL_PREVIEW_PROCESSING_REQUIRED'};
+      const body={productNo:original.device.productNo,expectedAmountUsdt:Number(original.confirmedAmountUsdt),
+        quoteVersion:original.quoteVersion,paymentMethod:original.paymentMethod};
+      const request={method:()=>'POST',postDataJSON:()=>body,headers:()=>({'idempotency-key':original.submissionNo})};
+      const result=settleTrialWallet(new URL('/api/trial/convert',origin),request,original.submissionNo,true,
+        ()=>({...original,status:'RESUMABLE'}));
       if (result.status===200) state.trialOriginalPurchaseState=mode;
       return result;
     }

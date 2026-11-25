@@ -290,6 +290,7 @@ import { usePublishedTrust } from "@/composables/use-published-trust";
 import { uiLocale, serverLanguage } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
 import { useTrialCreditOption, useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -616,8 +617,12 @@ const annualPctText = computed(() =>
 const priceText = computed(() => product.value ? `$${formatAmount(product.value.price * qty.value)}` : "-");
 
 // Trial-credit entry (PLAN §2.3, R13): only on the plain product page, not an activity or voucher entry, whose buy
-// button is not the full-price purchase the tray note describes. 读取时机由接线项复核.
-useTrialCreditOptionsRead(() => stickyPageVisible.value && !publicOnly.value);
+// button is not the full-price purchase the tray note describes.
+const trialCreditReadVisible = () => stickyPageVisible.value && !publicOnly.value;
+const trialCreditRead = useTrialCreditOptionsRead(trialCreditReadVisible);
+watch(trialCreditReadVisible, (visible, _, onCleanup) => {
+  if (visible) onCleanup(registerActivePageRefresh(trialCreditRead.refresh, "pages/store/detail"));
+}, { immediate: true });
 const trialCredit = useTrialCreditOption(() => product.value?.id);
 const trialCreditEntry = computed(() => {
   const option = trialCredit.value;

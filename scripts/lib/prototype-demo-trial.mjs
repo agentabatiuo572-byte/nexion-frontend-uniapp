@@ -227,8 +227,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   }
   if(url.pathname==='/api/trial/cancel'){
     const purchase=originalPurchase();
-    if(purchase)rejectPurchase('TRIAL_EXISTING_PURCHASE',{originalPurchase:purchase});
     if(row.state!=='ACTIVE')refuse('TRIAL_NOT_CANCELLABLE');
+    if(purchase?.kind==='EXTERNAL'||purchase?.status==='PROCESSING')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS');
     Object.assign(row,{state:'CANCELLED',finishedAt:now,version:(row.version||1)+1});return remember(snapshot());
   }
   if(url.pathname==='/api/trial/purchase-options'){

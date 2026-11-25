@@ -128,7 +128,7 @@ export const demoOptions = {
   trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架']],
   trialPurchaseReadState:[['normal','正常读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
   trialPurchasePriceState:[['normal','正常价格'],['trial-up','试用设备商城价上涨'],['trial-down','试用设备商城价下调'],['extra-up','Rack P1 涨价']],
-  trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-late','试用设备 · 迟付且已过确认宽限'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-resumable','Rack P1 · 未提交成功可续付']],
+  trialOriginalPurchaseState:[['none','无原购买'],['external','试用设备 · 外部待支付'],['external-late','试用设备 · 迟付且已过确认宽限'],['balance-processing','Rack P1 · 余额结果确认中'],['balance-resumable','Rack P1 · 未提交成功可续付'],['balance-settled','Rack P1 · 原余额付款已确认']],
   trialPurchaseWindow:[['follow','按领取单时间'],['grace','可抵扣期']],
   realtimeState:[['online','客服在线'],['offline','客服离线'],['reconnecting','正在恢复连接']],
   messageSendState:[['normal','正常确认'],['delayed','发送延迟（约 2 秒）'],['failed','确认失败（未发送）'],['unknown','结果待确认（自动按原键核对）'],['timeout','确认超时（15 秒转待确认）']],

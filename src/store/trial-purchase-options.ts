@@ -70,6 +70,14 @@ export const useTrialPurchaseOptions = defineStore("trial-purchase-options", () 
     return true;
   }
 
+  function invalidateSelection(productNo: string) {
+    const key = scopeKey.value;
+    if (key === null || claimNo.value === null) return;
+    preselected.delete(key);
+    claims.set(key, { ...current.value, selectedProductNo: null, invalidatedProductNo: productNo });
+    remember(app.accountKey, claimNo.value, null);
+  }
+
   /** Share a read per claim across the detail, checkout and catalog entry points. */
   function refresh(): Promise<void> {
     const key = scopeKey.value;
@@ -101,7 +109,8 @@ export const useTrialPurchaseOptions = defineStore("trial-purchase-options", () 
         let invalidatedProductNo = view.invalidatedProductNo;
         let selectedProductNo: string | null = null;
         if (requested) {
-          if (options.some(option => option.productNo === requested && option.canBuy)) {
+          const option = options.find(item => item.productNo === requested);
+          if (option?.canBuy || trialOptionReadFailed(option)) {
             selectedProductNo = requested;
             if (entryProduct) remember(accountKey, claim, requested);
           } else {
@@ -124,5 +133,9 @@ export const useTrialPurchaseOptions = defineStore("trial-purchase-options", () 
     return request;
   }
 
-  return { claimNo, current, selectedOption, bindClaim, select, refresh };
+  return { claimNo, current, selectedOption, bindClaim, select, invalidateSelection, refresh };
 });
+
+export function trialOptionReadFailed(option?: TrialPurchaseOption): boolean {
+  return option?.reasonCode === "TRIAL_OPTION_QUOTE_UNAVAILABLE" || option?.reasonCode === "TRIAL_OPTION_DATA_UNAVAILABLE";
+}

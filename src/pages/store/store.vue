@@ -163,9 +163,8 @@ let storeViewReportedScope = "";
 let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<typeof createStoreViewEvent>; tries: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
 let releaseActiveRefresh = () => {};
 // Trial-credit list for the cards' 「可用试用抵扣金」 tag: one read per visit, shared with the detail page (PLAN §2.3).
-// 读取时机由接线项复核.
 const trialCreditReadVisible = ref(false);
-useTrialCreditOptionsRead(() => trialCreditReadVisible.value);
+const trialCreditRead = useTrialCreditOptionsRead(() => trialCreditReadVisible.value && !publicOnly.value);
 async function refreshVisibleStore() {
   if (!storePageVisible) return;
   if (publicOnly.value) return;
@@ -173,7 +172,7 @@ async function refreshVisibleStore() {
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
     revalidateProductCatalog(), phoneTierReadFailed() ? undefined : earnConfig.ensure(), app.ensureRemoteFleet(),
-    bundlePolicy.failed.value ? undefined : bundlePolicy.refresh(),
+    bundlePolicy.failed.value ? undefined : bundlePolicy.refresh(), trialCreditRead.refresh(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
