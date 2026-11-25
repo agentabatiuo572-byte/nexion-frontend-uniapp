@@ -4,7 +4,7 @@ import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTab
 import { defineStore } from "pinia";
 import { onScopeDispose, ref, shallowRef, watch } from "vue";
 import { apiRuntimeConfig, remoteApiEnabled, vRankApi } from "@/api/runtime";
-import type { CanonicalVRankLadder, CanonicalVRankState, RankSalary } from "@/api/v-rank-api";
+import type { CanonicalVRankLadder, CanonicalVRankState, RankSalary, RankSalaryAttempt, RankSalaryReceipt } from "@/api/v-rank-api";
 import { asApiError } from "@/api/errors";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -242,6 +242,34 @@ export const useVRank = defineStore("vRank", () => {
     remoteReady.value = false;
   }
 
+  function applySalaryReceipt(
+    receipt: Extract<RankSalaryReceipt, { status: "SUCCEEDED" | "REJECTED" }>,
+    attempt: RankSalaryAttempt,
+  ): void {
+    const snapshot = rankPageSnapshot.value;
+    if (!snapshot) return;
+    const previous = snapshot.salary;
+    const months = previous?.months.filter(month => month.month !== receipt.month) ?? [];
+    const upcoming = previous?.upcoming?.month === receipt.month ? null : previous?.upcoming ?? null;
+    if (receipt.status === "SUCCEEDED") {
+      const month = previous?.months.find(month => month.month === receipt.month) ?? attempt.item;
+      months.push({ ...month, status: "CLAIMED", rankCode: receipt.rankCode, amountUsdt: receipt.amountUsdt, claimNo: receipt.claimNo });
+      rankPageSnapshot.value = { ...snapshot, salary: {
+        businessDate: previous?.businessDate ?? attempt.businessDate,
+        months, upcoming, nextClaimableFrom: previous?.nextClaimableFrom ?? null,
+      } };
+      return;
+    }
+    if (!previous) return;
+    const code = receipt.rejectionCode;
+    if (code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_ALREADY_CLAIMED") {
+      rankPageSnapshot.value = { ...snapshot, salary: { ...previous, months, upcoming } };
+    } else if (code === "SALARY_AMOUNT_CHANGED" || code === "COVERAGE_BELOW_REDLINE" || code === "COVERAGE_UNAVAILABLE") {
+      // The receipt withdraws this month's prior eligibility. A new read supplies its next state.
+      rankPageSnapshot.value = { ...snapshot, salary: months.length ? { ...previous, months, upcoming } : null };
+    }
+  }
+
   function persist() {
     if (remoteApiEnabled) return;
     writeAccountRow<VRankData>(ACCOUNTS_KEY, boundKey, {
@@ -420,7 +448,7 @@ export const useVRank = defineStore("vRank", () => {
     myRank, directRefs, vDownlineCounts, ladder, prizeName, salary,
     capabilities,
     remoteReady, remoteError, remoteRateLimited, remoteTransientFailure, rankPageSnapshot,
-    setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner,
+    setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner, applySalaryReceipt,
   };
 });
 

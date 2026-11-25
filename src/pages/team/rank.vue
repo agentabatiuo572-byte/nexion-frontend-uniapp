@@ -385,6 +385,7 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
     const copy = t.value.myRank;
     const dates = salaryDates(locale.code);
     const { item } = attempt;
+    if (result.status !== "FAILED") vState.applySalaryReceipt(result, attempt);
     if (result.status === "SUCCEEDED") {
       toast.success(fmt(copy.toastOkTitle, { a: salaryAmountText(result.amountUsdt) }), copy.toastOkDesc);
       await vState.refreshCanonicalVRank();
@@ -402,6 +403,7 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
       const desc = !vState.salary || today > deadline ? undefined : following ? dates.sentence(fmt(followingDay.slice(0, 7) === item.month ? copy.toastFailDrop : copy.toastFailEnd, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(following.amountUsdt), d: dates.day(followingDay) }))
         : today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
       toast.warn(copy.toastFailTitle, desc);
+      await vState.refreshCanonicalVRank();
     } else if (code === "SALARY_ALREADY_CLAIMED" || code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_AMOUNT_CHANGED") {
       await vState.refreshCanonicalVRank();
       if (!isVisible()) return;
