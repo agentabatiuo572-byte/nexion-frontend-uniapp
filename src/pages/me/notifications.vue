@@ -201,12 +201,9 @@ const sectionOptions = computed(() => [
   { value: "service", label: t.value.notifs.serviceTab, hasUnread: center.serviceUnread > 0 },
 ]);
 const unreadLabel = computed(() => {
-  if (notifs.readFailedWithoutData || center.serviceReadError) {
-    return t.value.notifs.unreadUnavailable;
-  }
+  if (!center.unreadAvailable) return t.value.notifs.unreadUnavailable;
   if (center.totalUnread > 0) return fmt(t.value.notifs.unreadCount, { n: center.totalUnread });
-  const unreadLoading = conversations.loading || (notifs.loading && !notifs.hasRemoteSnapshot);
-  return unreadLoading ? t.value.notifs.unreadUnavailable : t.value.notifs.allCaughtUp;
+  return t.value.notifs.allCaughtUp;
 });
 const filterIds: Filter[] = ["all", "finance", "device", "team", "rewards", "system"];
 const visibleFilterIds = computed(() => filterIds);

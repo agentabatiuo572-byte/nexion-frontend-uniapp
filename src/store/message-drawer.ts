@@ -14,9 +14,10 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
   const humanUnread = computed(() => advisorUnread.value + supportUnread.value);
   const serviceUnread = computed(() => humanUnread.value);
   const totalUnread = computed(() => notifications.unread + serviceUnread.value);
+  const unreadAvailable = computed(() => notifications.unreadAvailable && conversations.unreadAvailable);
   // The inbox still shows reading-unread. Bells use only the separate authority.
   // Never count loaded notification rows or reinterpret unreadByKind as backend policy.
-  const actionableUnread = computed(() => notifications.actionableUnread == null || serviceReadError.value
+  const actionableUnread = computed(() => notifications.actionableUnread == null || !conversations.unreadAvailable
     ? null : notifications.actionableUnread + serviceUnread.value);
   const loading = computed(() => notifications.loading || conversations.loading);
   const serviceReadError = computed(() => conversations.error
@@ -55,6 +56,6 @@ export const useMessageDrawer = defineStore("messageDrawer", () => {
     section.value = "notifications";
   }
 
-  return { section, show, advisorUnread, supportUnread, humanUnread, serviceUnread, totalUnread, actionableUnread,
+  return { section, show, advisorUnread, supportUnread, humanUnread, serviceUnread, totalUnread, unreadAvailable, actionableUnread,
     loading, error, serviceReadError, refreshService, bindAccount };
 });

@@ -7,7 +7,7 @@ import { notificationApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
-import { isTransientReadFailure } from "@/lib/remote-read-failure";
+import { isReadAuthorizationDenial, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { nexGridBrandText } from "@/lib/brand-copy";
 import type { NotificationEarning, NotificationFilter } from "@/api/notification-api";
 
@@ -71,9 +71,14 @@ export const useNotifications = defineStore("notifications", () => {
   const items = computed({ get: () => remoteApiEnabled ? pageState.value.items : localItems.value,
     set: (value: Notification[]) => { if (remoteApiEnabled) pageState.value.items = value; else localItems.value = value; } });
   const unread = ref(items.value.filter((item) => !item.readAt).length);
+  const unreadAvailable = ref(!remoteApiEnabled);
   const lastRemoteUnread = ref<number | null>(null);
   const earningsReadConfirmed = computed(() => lastRemoteUnread.value === 0);
   const actionableUnread = ref<number | null>(null);
+  function invalidateUnread() {
+    actionableUnread.value = null;
+    unreadAvailable.value = !remoteApiEnabled;
+  }
   const unreadByKind = ref<Record<string, number> | null>(null);
   const unreadByCategoryExact = computed(() => !remoteApiEnabled || unread.value === 0 || unreadByKind.value !== null);
   // Without a server summary, positive counts describe only the loaded rows and
@@ -156,6 +161,7 @@ export const useNotifications = defineStore("notifications", () => {
     unread.value = page.unread;
     lastRemoteUnread.value = page.unread;
     actionableUnread.value = page.actionableUnread ?? null;
+    unreadAvailable.value = true;
     unreadByKind.value = page.unreadByKind ? { ...page.unreadByKind } : null;
     if (!head || !pageState.value.historyLoaded || !page.nextCursor || !overlaps) nextCursor.value = page.nextCursor;
     pageState.value.historyLoaded = true;
@@ -196,7 +202,7 @@ export const useNotifications = defineStore("notifications", () => {
       return isCurrent();
     } catch (cause) {
       if (!isCurrent()) return false;
-      if (!isTransientReadFailure(cause)) actionableUnread.value = null;
+      if (!isTransientReadFailure(cause)) invalidateUnread();
       pageState.value.readError = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
       return false;
     } finally {
@@ -231,6 +237,7 @@ export const useNotifications = defineStore("notifications", () => {
     }
     catch (cause) {
       if (isCurrent()) {
+        if (isReadAuthorizationDenial(cause)) invalidateUnread();
         pageState.value.pageError = cause instanceof Error ? cause.message : "NOTIFICATION_UNAVAILABLE";
         return false;
       }
@@ -282,7 +289,7 @@ export const useNotifications = defineStore("notifications", () => {
     mutations = { pending: 0, tail: Promise.resolve() };
     unreadByKind.value = null;
     lastRemoteUnread.value = null;
-    actionableUnread.value = null;
+    invalidateUnread();
     hasRemoteSnapshot.value = false;
     if (remoteApiEnabled) {
       items.value = [];
@@ -443,5 +450,5 @@ export const useNotifications = defineStore("notifications", () => {
   async function recordSwipeConversion(id: string, earningReceiptNo?: string) { return recordRemoteAction(id, "swipe_conversion", earningReceiptNo); }
   function clearAll() { if (remoteApiEnabled) { void refreshRemote(); return; } items.value = []; recount(); persist(); }
   function removeOne(id: string) { if (remoteApiEnabled) return; items.value = items.value.filter((item) => item.id !== id); recount(); persist(); }
-  return { items, category, unread, earningsReadConfirmed, actionableUnread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, loadingMore, readError, pageError, commandError, readFailedWithoutData, hasRemoteSnapshot, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, selectCategory, loadMoreRemote, recordCta, recordSwipeConversion };
+  return { items, category, unread, unreadAvailable, earningsReadConfirmed, actionableUnread, unreadByKind, unreadByCategory, unreadByCategoryExact, loading, loadingMore, readError, pageError, commandError, readFailedWithoutData, hasRemoteSnapshot, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, cancelRefresh, selectCategory, loadMoreRemote, recordCta, recordSwipeConversion };
 });
