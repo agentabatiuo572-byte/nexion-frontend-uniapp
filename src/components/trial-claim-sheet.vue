@@ -37,7 +37,7 @@
       <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary.
            The line itself is a sheet status or hint line (10 §10.2): a result still being confirmed is a status line (16px status
            icon, body ink); a refusal is a hint line (16px warning icon, primary ink). -->
-      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" :class="lineIsStatus ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
+      <view v-if="reasonLine" id="tcs-reason" class="tcs-error" :class="lineIsStatus ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
         <svg v-if="lineIsStatus" class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
         <svg v-else class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
@@ -53,8 +53,8 @@
           <NxButton variant="primary" :label="copy.viewDevices" @click="goDevices" />
           <NxButton variant="secondary" :label="fleetCopy.buy" @click="goTrial" />
         </template>
-        <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" />
-        <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
+        <NxButton v-else-if="!showRetry" variant="primary" :label="claimCtaLabel" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" :aria-describedby="claimDisabled && reasonLine ? 'tcs-reason' : undefined" @click="onClaim" />
+        <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="dismissLabel" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ dismissLabel }}</text></view>
       </view>
     </view>
   </view>
@@ -91,7 +91,8 @@ const stateReadFailed = trialView.readFailedWithoutData;
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
 const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '—' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
-const estimateNote = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value ? t.value.exchange.staleSnapshot : trialView.config.value
+// While a start is being confirmed the status line below says what is going on; the estimate is catalog information (03 §3.4).
+const estimateNote = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value && !freeTrial.pendingStart ? t.value.exchange.staleSnapshot : trialView.config.value
   ? trialView.config.value.shadowDailyUSD === null ? '' : fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
@@ -105,12 +106,22 @@ const claiming = ref(false);
 const { activated } = storeToRefs(sheet);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
+// View state only: the service's settled answer while the claim cannot go ahead. A refusal that a re-read did not lift, and the
+// current ineligibility when the sheet is reopened, show their reason and exit instead of a retry or a primary that cannot run
+// (03 §3.1 禁用要有原因, §3.4 无权限／不可用).
+const standingReason = computed<TrialStartFailure | undefined>(() => {
+  if (activated.value || claiming.value || freeTrial.pendingStart || freeTrial.authorityStatus !== "ready" || freeTrial.canStart()) return undefined;
+  const reason = freeTrial.eligibility().reason;
+  return reason === "unknown" ? undefined : reason;
+});
+const shownReason = computed<TrialStartFailure | undefined>(() => !claimErrorReason.value || claimErrorReason.value === "rejected"
+  ? standingReason.value ?? claimErrorReason.value : claimErrorReason.value);
 const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
-  "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
+  "terms-required", "onboarding-required"].includes(shownReason.value ?? ""));
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
-const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
+const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
 const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
-  : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
+  : claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value);
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
   ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
 // View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
@@ -124,6 +135,9 @@ const startNotRun = computed(() => !!freeTrial.pendingStart && freeTrial.startRe
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
 const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
+const reasonLine = computed(() => !!freeTrial.pendingStart || claimError.value || retryHeld.value || !!standingReason.value);
+// Nothing left to decide once the claim is refused for now: the exit closes the sheet instead of 「我再想想」.
+const dismissLabel = computed(() => activated.value || claimDenied.value ? copy.value.close : t.value.trial.sheetDismissCta);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
   failed: () => remoteApiEnabled && !freeTrial.authorityResultUnknown && freeTrial.authorityStatus !== "loading"
@@ -133,17 +147,17 @@ useAutoRecovery({
 });
 let claimSequence = 0;
 const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
-  : claimErrorReason.value === 'capacity-full' ? copy.value.manageDevices
-  : claimErrorReason.value === 'converted' ? copy.value.viewDevices
-  : claimErrorReason.value === 'in-progress' ? copy.value.viewTrial
-  : claimErrorReason.value === 'used' ? copy.value.buyDevice
-  : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
-  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
+  : shownReason.value === 'capacity-full' ? copy.value.manageDevices
+  : shownReason.value === 'converted' ? copy.value.viewDevices
+  : shownReason.value === 'in-progress' ? copy.value.viewTrial
+  : shownReason.value === 'used' ? copy.value.buyDevice
+  : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
+  : shownReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
 const claimErrorText = computed(() => freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
-  : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
-  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
-  : sheet.failureText(claimErrorReason.value));
+  : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
+  : shownReason.value === "terms-required" ? t.value.trial.claimTermsRequired
+  : sheet.failureText(shownReason.value));
 
 function hide() {
   claimError.value = false;
@@ -154,10 +168,10 @@ function goDevices() { hide(); navTo('/pages/me/devices'); }
 function goTrial() { hide(); navTo('/pages/me/trial'); }
 async function onClaim() {
   if (claimDisabled.value || !sheet.open || activated.value) return;
-  if (claimErrorReason.value === 'capacity-full' || claimErrorReason.value === 'converted') { goDevices(); return; }
-  if (claimErrorReason.value === 'in-progress' || claimErrorReason.value === 'used') { goTrial(); return; }
-  if (claimErrorReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
-  if (claimErrorReason.value === "onboarding-required") {
+  if (shownReason.value === 'capacity-full' || shownReason.value === 'converted') { goDevices(); return; }
+  if (shownReason.value === 'in-progress' || shownReason.value === 'used') { goTrial(); return; }
+  if (shownReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
+  if (shownReason.value === "onboarding-required") {
     hide();
     // #ifdef H5
     navTo("/pages/register/success?setup=1");

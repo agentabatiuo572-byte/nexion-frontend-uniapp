@@ -22,7 +22,7 @@
             <text class="vcs-title">{{ t.voucher.popupTitle }}</text>
           </view>
         </view>
-        <view class="vcs-close" role="button" tabindex="0" :aria-label="t.voucher.closeAria" @click="hide">
+        <view class="vcs-close" role="button" tabindex="0" :aria-label="t.voucher.closeAria" @click="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -55,8 +55,9 @@
         </view>
       </view>
 
-      <view class="vcs-dismiss" role="button" tabindex="0" :aria-label="t.voucher.dismissCta" @click="hide">
-        <text class="vcs-dismiss-t">{{ t.voucher.dismissCta }}</text>
+      <!-- Text button (03 §3.1). Once every listed voucher is claimed there is nothing left to decline, so it closes (06.1). -->
+      <view class="vcs-dismiss" role="button" tabindex="0" :aria-label="dismissLabel" @click="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide">
+        <text class="vcs-dismiss-t">{{ dismissLabel }}</text>
       </view>
     </view>
   </view>
@@ -92,6 +93,9 @@ const vouchers = computed<VoucherDef[]>(() => {
     sheet.surface,
   );
 });
+
+const dismissLabel = computed(() => vouchers.value.length > 0 && vouchers.value.every(v => voucher.isClaimed(v.id))
+  ? t.value.voucher.closeAria : t.value.voucher.dismissCta);
 
 function formatDate(ms: number): string {
   return formatDisplayDate(ms, dateLocale());
@@ -366,11 +370,15 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
 .vcs-dismiss:active {
   opacity: 0.7;
 }
+/* Text button (03 §3.1): no container, brand ink, button role. */
 .vcs-dismiss-t {
-  /* 《02》§4:用户需读懂才能决策 → body.s 13 而非 caption 12 */
-  font-size: var(--ui-type-list-subtitle);
-  line-height: 18px;
-  font-weight: 400;
-  color: var(--v5-ink-3);
+  font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);
+  color: var(--v5-brand);
+  text-align: center;
+}
+.vcs-close:focus-visible,
+.vcs-dismiss:focus-visible {
+  outline: 2px solid var(--v5-brand);
+  outline-offset: 3px;
 }
 </style>

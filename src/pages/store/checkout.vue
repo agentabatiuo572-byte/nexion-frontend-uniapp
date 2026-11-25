@@ -110,8 +110,10 @@
                 <text v-if="hasVoucher" class="checkout-discount">{{ reviewMoney(voucherDiscount, true) }}</text><view class="checkout-chevron" :class="{ 'checkout-chevron--open': voucherDetailsOpen }" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></view>
               </view>
               <view v-if="voucherDetailsOpen && !multiTrialCheckout" class="checkout-voucher-details">
+                <!-- Locked group (03 §3.5 整组暂时不能改选): every row at 50% and one sentence under the group's title saying why. -->
+                <view v-if="voucherLockedByOrder" id="checkout-voucher-lock" class="checkout-voucher-lock"><svg class="checkout-voucher-lock__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg><text>{{ reviewCopy.voucherLocked }}</text></view>
                 <text v-if="voucherMatch" class="checkout-row-description checkout-voucher-match">{{ voucherMatch.def.name }}</text>
-                <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher">
+                <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher" :aria-describedby="voucherLockedByOrder ? 'checkout-voucher-lock' : undefined">
                   <!-- Single-select rows (03 §3.5): the checked row is the one tab stop; arrows move to the other choice and select it; Space/Enter select.
                        Written out (no v-for) so the radio-group keyboard gate sees both members. -->
                   <view class="checkout-voucher-choice" role="radio" data-automatic="true" :aria-checked="voucherAutomatic === true" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === true ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(true)"
@@ -127,7 +129,7 @@
                     <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === false }" aria-hidden="true" />
                   </view>
                 </view>
-                <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
+                <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')" @keydown.enter.stop.prevent="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
               </view>
               <view v-if="promoDiscount > 0" class="checkout-option"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 12v9h16v-9M2 7h20v5H2zM12 7v14M12 7C3 8 4 0 8 2c3 1 4 5 4 5s1-4 4-5c4-2 5 6-4 5" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ promoRowLabel }}</text></view><text class="checkout-discount">{{ reviewMoney(promoDiscount, true) }}</text></view>
               <view v-if="trialOffsetView.offsetUSD > 0" class="checkout-option"><NxIconTile tone="amber" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></NxIconTile><view class="checkout-option-copy"><text class="checkout-row-title">{{ t.store.coRowTrialOffset }}</text></view><text class="checkout-discount">{{ reviewMoney(trialOffsetView.offsetUSD, true) }}</text></view>
@@ -1527,6 +1529,8 @@ function canChangeVoucher():boolean {
     &&!remoteTradeinRecoveryRequired.value&&!activeSession.value&&!resumeSessionId&&!orderId.value
     &&!remoteOrderFailure.value&&!receiptWriteFailure.value&&!createdCheckoutOrder.value&&!pendingCheckoutCreate.value;
 }
+// A submitted order already carries its voucher: the choice stays locked and says why (03 §3.5 整组暂时不能改选).
+const voucherLockedByOrder = computed(() => !!(createdCheckoutOrder.value || pendingCheckoutCreate.value || orderId.value || activeSession.value));
 async function selectAutomaticVoucher(enabled:boolean):Promise<void> {
   if(!canChangeVoucher())return;
   const scope=captureCheckoutRoute();voucherSelecting.value=true;
@@ -1906,8 +1910,11 @@ async function moveVoucherChoice(automatic: boolean) {
   const group = (document.activeElement as HTMLElement | null)?.closest('[role="radiogroup"]');
   await selectAutomaticVoucher(!automatic);
   await nextTick();
-  // A failed selection leaves the old choice checked: focus stays with the one tab stop.
-  if (group?.isConnected) group.querySelector<HTMLElement>(`[role="radio"][data-automatic="${voucherAutomatic.value}"]`)?.focus();
+  // A failed selection leaves the old choice checked: focus stays with the one tab stop. Only while focus is still in the group
+  // (or on nothing): a user who moved on during the wait keeps their place.
+  const active = document.activeElement;
+  if (group?.isConnected && (!active || active === document.body || group.contains(active)))
+    group.querySelector<HTMLElement>(`[role="radio"][data-automatic="${voucherAutomatic.value}"]`)?.focus();
 }
 
 const step = ref<Step>("select-payment");
@@ -4993,10 +5000,15 @@ button.checkout-policy-link::after { border:0; }
 <style scoped>
 /* Single-select rows (03 §3.5): the checked row is brand 10% with a 1.5px brand inner edge; the circle is a 1.5px ink-3 ring,
    checked a 2px brand ring with a 12px brand dot; no movement on change. A group that cannot change is 50% throughout. */
-.checkout-voucher-choice { min-height:48px; display:flex; align-items:center; gap:var(--v5-space-3); padding:0 var(--v5-space-3); border-radius:12px; cursor:pointer; }
+/* Single-select row height follows 10.3: 64 standard, 56 at small widths (03 §3.5). */
+.checkout-voucher-choice { min-height:64px; display:flex; align-items:center; gap:var(--v5-space-3); padding:0 var(--v5-space-3); border-radius:12px; cursor:pointer; }
 .checkout-voucher-choice[aria-checked="true"] { background:color-mix(in srgb, var(--v5-brand) 10%, transparent); box-shadow:inset 0 0 0 1.5px var(--v5-brand); }
-.checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink-2); font:400 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
-.checkout-voucher-choice[aria-checked="true"] .checkout-voucher-choice__label { color:var(--v5-ink); font-weight:var(--ui-type-subheading-weight); }
+/* Row title = list title role in main ink, the same in both states (03 §3.5, 10.1). */
+.checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
+.checkout-voucher-choice:active:not([aria-disabled="true"]) { opacity:.85; }
+@media (max-width:374px) { .checkout-voucher-choice { min-height:56px; } }
+.checkout-voucher-lock { display:flex; align-items:flex-start; gap:6px; padding:var(--v5-space-2) var(--v5-space-4) 0 64px; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.checkout-voucher-lock__icon { flex:none; width:16px; height:16px; margin-top:2px; }
 .checkout-voucher-choice[aria-disabled="true"] { opacity:.5; pointer-events:none; }
 /* Radio per design rules: hollow 1.5px ring; selected = 2px brand ring + 12px brand dot, no checkmark. */
 .checkout-voucher-radio { width:22px; height:22px; flex:none; box-sizing:border-box; display:grid; place-items:center; border-radius:999px; border:1.5px solid var(--v5-ink-3); }
