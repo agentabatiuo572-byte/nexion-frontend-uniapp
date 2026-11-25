@@ -316,6 +316,10 @@ function statusLabel(event: DirectReferralEvent | TeamUnilevelEvent, status = ev
 function go(url: string) { navTo(url); }
 function openRules() { go('/pages/team/unilevel-how'); }
 useAutoRecovery({ failed: () => remoteApiEnabled && !updateRequired.value && remoteState.value !== "loading" && policyState.value !== "loading" && (remoteState.value === "error" || policyState.value === "error"), retry: retryRemote });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !updateRequired.value && !!needsSharedRates.value && commission.configStatus === "error",
+  retry: () => commission.ensureCanonicalConfig(),
+});
 </script>
 
 <style scoped>

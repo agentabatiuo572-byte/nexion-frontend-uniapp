@@ -21,20 +21,22 @@
             <HowItem :n="rankBasedPurchase ? 3 : 2" :title="creditsAtOnce(purchaseDays) ? rankCopy.f1NowT : rankCopy.f1I3T" :body="creditsAtOnce(purchaseDays) ? rankCopy.f1NowD : fmt(rankCopy.f1I3D, { d: purchaseDays ?? '—' })" />
           </HowSection>
 
-          <TeamRuleDocument v-if="publishedRates.length" :blocks="publishedRates" />
-          <HowSection v-else-if="rateRows.length" anchor="purchase-rates" :title="ratesTitle" :lead="rankBasedPurchase && myRankCode ? fmt(rankCopy.f1RatesLead, { r: myRankCode }) : undefined">
+          <TeamRuleDocument v-if="publishedRates && !showRateTable" :blocks="[publishedRates]" />
+          <HowSection v-else-if="showRateTable" anchor="purchase-rates" :title="ratesTitle" :lead="ratesLead">
+            <HowItem v-for="(item, index) in publishedRates?.items" :key="index" :n="index + 1" :body="item" />
             <view class="commission-rates" role="table" :aria-label="ratesTitle">
               <view class="commission-rates__row commission-rates__row--head" role="row"><text role="columnheader">{{ rankCopy.f1Rank }}</text><text role="columnheader">{{ rankCopy.l1 }}</text><text role="columnheader">{{ rankCopy.l2 }}</text></view>
               <view v-for="row in rateRows" :key="row.v" class="commission-rates__row" :class="{ 'commission-rates__row--me': row.mine }" role="row"><text class="commission-rates__rank" role="cell">V{{ row.v }}</text><text role="cell">{{ row.l1 }}</text><text role="cell">{{ row.l2 }}</text></view>
             </view>
           </HowSection>
 
-          <TeamRuleDocument v-if="publishedDevice.length" :blocks="publishedDevice" />
-          <HowSection v-else-if="policy" anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="devicePaused ? t.directReferral.disabled : deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
+          <TeamRuleDocument v-if="publishedDevice && !showDevicePolicy" :blocks="[publishedDevice]" />
+          <HowSection v-else-if="showDevicePolicy" anchor="device-earnings" :title="deviceTitle" :lead="deviceLead" :body="devicePaused ? publishedDevice?.body : undefined" list>
+            <HowItem v-for="(item, index) in publishedDevice?.items" :key="index" :n="index + 1" :body="item" />
             <template v-if="!devicePaused">
-              <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
-              <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
-              <HowItem :n="3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays ?? '—' })" />
+              <HowItem :n="deviceItemOffset + 1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
+              <HowItem :n="deviceItemOffset + 2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
+              <HowItem :n="deviceItemOffset + 3" :title="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowT : rankCopy.f1DevI3T" :body="creditsAtOnce(deviceCoolingDays) ? rankCopy.f1NowD : fmt(rankCopy.f1DevI3D, { d: deviceCoolingDays ?? '—' })" />
             </template>
           </HowSection>
         </template>
@@ -42,6 +44,8 @@
         <HowSection v-if="channelIntro || channels.length" anchor="channels" :title="channelIntro?.title" :lead="channels.length ? channelIntro?.body : undefined" :body="channels.length ? undefined : channelIntro?.body" :list="!!channels.length">
           <HowItem v-for="(item, index) in channels" :key="item.id" :n="index + 1" :title="item.title" :body="item.body" />
         </HowSection>
+
+        <TeamRuleDocument v-if="additionalBlocks.length" :blocks="additionalBlocks" />
 
         <HowSection v-if="lifecycle || statuses.length || coolingNote" anchor="lifecycle" :title="lifecycle?.title" :lead="hasStatuses ? lifecycle?.body : undefined" :body="hasStatuses ? undefined : lifecycle?.body" :list="hasStatuses">
           <view v-if="statuses.length" class="commission-guide-statuses">
@@ -74,8 +78,6 @@
         <HowSection v-if="faq || faqs.length" anchor="faq" :title="faq?.title" :body="faqs.length ? undefined : faq?.body" :list="!!faqs.length">
           <HowFaqRow v-for="item in faqs" :key="item.id" :q="item.title" :a="item.body" :initial-open="item.id === 'faq-order'" />
         </HowSection>
-
-        <TeamRuleDocument v-if="additionalBlocks.length" :blocks="additionalBlocks" />
 
         <TeamRuleSection :title="guideCopy.fullText" fold>
           <view v-if="publicationFallback" class="commission-guide-publication-note" role="status"><text>{{ t.howPublished.languageFallback }}</text></view>
@@ -128,6 +130,7 @@ import { creditsAtOnce, purchaseCoolingDays } from "@/lib/reward-cooling";
 import { fmt, dateLocale } from "@/i18n/format";
 import { formatHowNumber, formatRankPurchaseRate } from "@/lib/rank-how-content";
 import { serverLanguage } from "@/i18n";
+import type { HowContentBlock } from "@/api/how-content-api";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -156,7 +159,7 @@ function makeResource() {
     const needsRates = ladder && (directPolicy?.sevenLayerReference?.purchaseBaseRateSource !== "BENEFICIARY_RANK"
       || ladder.ranks.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined));
     const rates = needsRates ? await commissionGuideApi.rates().catch(() => undefined) : undefined;
-    return { document, directPolicy, guide, ranks: ladder?.ranks ?? null, rates };
+    return { document, directPolicy, guide, ranks: ladder?.ranks ?? null, rates, ratesFailed: !!needsRates && !rates };
   },
   apply: next => {
     if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
@@ -179,8 +182,8 @@ const dedicatedIds = new Set([
 ]);
 const additionalBlocks = computed(() => content.value.blocks.filter(block => !dedicatedIds.has(block.id)));
 const publishedPurchase = computed(() => ["friend-purchase"].flatMap(id => s(id) ?? []));
-const publishedRates = computed(() => ["purchase-rates"].flatMap(id => s(id) ?? []));
-const publishedDevice = computed(() => ["device-earnings"].flatMap(id => s(id) ?? []));
+const publishedRates = computed(() => s("purchase-rates"));
+const publishedDevice = computed(() => s("device-earnings"));
 const hero = computed(() => s("hero"));
 const overview = computed(() => s("overview"));
 const channelIntro = computed(() => s("channels"));
@@ -193,23 +196,14 @@ const faq = computed(() => s("faq"));
 const footer = computed(() => s("footer"));
 const channels = computed(() => channelIds.flatMap(id => s(id) ?? []));
 const faqs = computed(() => faqIds.flatMap(id => s(id) ?? []));
-// Directory chips only when the publication is short enough to scan (design system 04.7).
-const directory = computed(() => [
-  ...(overview.value ? [{ id: "overview", title: overview.value.title }] : []),
-  ...[
-    { id: "friend-purchase", published: publishedPurchase.value[0], title: policy.value ? rankCopy.value.f1Sec : undefined },
-    { id: "purchase-rates", published: publishedRates.value[0], title: rateRows.value.length ? ratesTitle.value : undefined },
-    { id: "device-earnings", published: publishedDevice.value[0], title: policy.value ? rankCopy.value.f1DevSec : undefined },
-  ].flatMap(({ id, published, title }) => published
-    ? (published.kind === "callout" ? [] : [{ id, title: published.title }])
-    : (title ? [{ id, title }] : [])),
-  ...[channelIntro.value, lifecycle.value, example.value, faq.value].flatMap(section => section ? [{ id: section.id, title: section.title }] : []),
-]);
 const vrank = useVRank();
 const visibility = useDataVisibility();
 const policy = computed(() => state.value.snapshot?.directPolicy ?? null);
 const rankBasedPurchase = computed(() => policy.value?.sevenLayerReference?.purchaseBaseRateSource === "BENEFICIARY_RANK");
-const ratesTitle = computed(() => rankBasedPurchase.value ? rankCopy.value.f1RatesT : content.value.copy.purchaseBudget);
+const ratesTitle = computed(() => publishedRates.value?.title
+  ?? (rankBasedPurchase.value ? rankCopy.value.f1RatesT : content.value.copy.purchaseBudget));
+const ratesLead = computed(() => publishedRates.value?.body
+  ?? (rankBasedPurchase.value && myRankCode.value ? fmt(rankCopy.value.f1RatesLead, { r: myRankCode.value }) : undefined));
 const pct = (value: number | null) => value === null || !Number.isFinite(value) ? "—" : `${formatHowNumber(value, dateLocale())}%`;
 const myRankCode = computed(() => vrank.remoteReady ? visibility.mask(`V${vrank.myRank}`) : "");
 const purchaseDays = computed(() => purchaseCoolingDays(policy.value));
@@ -226,6 +220,28 @@ const rateRows = computed(() => {
     mine: rankBasedPurchase.value && !visibility.hidden && vrank.remoteReady && rank.v === vrank.myRank,
   }));
 });
+const showRateTable = computed(() => !publishedRates.value ? rateRows.value.length > 0
+  : publishedRates.value.kind !== "callout" && rateRows.value.some(row => row.l1 !== "—" || row.l2 !== "—"));
+const showDevicePolicy = computed(() => !!policy.value && publishedDevice.value?.kind !== "callout");
+const deviceTitle = computed(() => publishedDevice.value?.title ?? rankCopy.value.f1DevSec);
+const deviceLead = computed(() => devicePaused.value ? t.value.directReferral.disabled
+  : publishedDevice.value?.body ?? (deviceL2On.value ? rankCopy.value.f1DevLead : guideCopy.value.deviceBody));
+const deviceItemOffset = computed(() => publishedDevice.value?.items?.length ?? 0);
+
+function directoryEntry(block: HowContentBlock | undefined, id?: string, title?: string) {
+  if (block) return block.kind === "callout" ? [] : [{ id: block.id, title: block.title }];
+  return id && title ? [{ id, title }] : [];
+}
+// The directory follows the rendered anchors, with at most six entries (design system 04.7).
+const directory = computed(() => [
+  ...directoryEntry(overview.value),
+  ...directoryEntry(publishedPurchase.value[0], "friend-purchase", policy.value ? rankCopy.value.f1Sec : undefined),
+  ...directoryEntry(publishedRates.value, "purchase-rates", showRateTable.value ? ratesTitle.value : undefined),
+  ...directoryEntry(publishedDevice.value, "device-earnings", showDevicePolicy.value ? deviceTitle.value : undefined),
+  ...directoryEntry(channelIntro.value),
+  ...additionalBlocks.value.flatMap(block => directoryEntry(block)),
+  ...[lifecycle.value, example.value, faq.value].flatMap(block => directoryEntry(block)),
+]);
 const deviceRateTitle = computed(() => {
   const rule = policy.value?.deviceEarning;
   const a = pct(rule ? rule.totalRatePct : null);
@@ -279,7 +295,7 @@ function goBack() {
 }
 useAutoRecovery({ failed: () => {
   const { loading, error, snapshot } = state.value;
-  return !loading && (error || (snapshot !== null && (!snapshot.directPolicy || !snapshot.guide || !snapshot.ranks)));
+  return !loading && (error || (snapshot !== null && (!snapshot.directPolicy || !snapshot.guide || !snapshot.ranks || snapshot.ratesFailed)));
 }, retry: reload });
 </script>
 <style scoped>

@@ -77,7 +77,8 @@ const readEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl]
 let environmentInvalidated = false;
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
 const environmentCurrent = () => !environmentInvalidated && readEnvironment[0] === apiRuntimeConfig.environment && readEnvironment[1] === apiRuntimeConfig.baseUrl;
-const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [], capabilities: null });
+const initialState: RankHowResourceState = { loading: true, error: false, policy: null, ranks: [], capabilities: null, ladderFailed: false };
+const state = ref<RankHowResourceState>({ ...initialState });
 const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
 let resourceOwner = captureAccountScope();
 function makeResource() {
@@ -85,7 +86,13 @@ function makeResource() {
   resourceOwner = owner;
   return createRankHowResource({ published: policyApi.published, ladder: vRankApi.ladder, apply: value => {
     if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
-    state.value = value.loading && state.value.policy ? { ...state.value, loading: true, error: false } : value;
+    if (value.loading && state.value.policy) {
+      state.value = { ...state.value, loading: true, error: false };
+      return;
+    }
+    state.value = value.ladderFailed
+      ? { ...value, ranks: state.value.ranks, capabilities: state.value.capabilities }
+      : value;
   } });
 }
 let resource = makeResource();
@@ -93,7 +100,11 @@ const content = computed(() => buildRankHowContent(state.value.policy, state.val
 const incomplete = computed(() => content.value.sections.length === 0);
 const statusText = computed(() => state.value.loading ? content.value.copy.loading : content.value.copy.unavailable);
 function reload() {
-  if (!isCurrentAccountScope(resourceOwner)) { resource.dispose(); resource = makeResource(); }
+  if (!isCurrentAccountScope(resourceOwner)) {
+    resource.dispose();
+    state.value = { ...initialState };
+    resource = makeResource();
+  }
   return environmentCurrent() && auth.isAuthenticated ? resource.load(locale.code) : Promise.resolve();
 }
 function goBack() { navBack("/pages/team/rank"); }
@@ -101,7 +112,7 @@ onShow(reload);
 onHide(() => { resource.dispose(); resource = makeResource(); });
 const resourceInputs = () => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
 watch(resourceInputs, () => {
-  resource.dispose(); state.value = { loading: true, error: false, policy: null, ranks: [], capabilities: null }; resource = makeResource();
+  resource.dispose(); state.value = { ...initialState }; resource = makeResource();
 }, { flush: 'sync' });
 // Clear old content synchronously, then read after completeSignIn has rebound
 // both app state and account-scoped stores. reload recaptures that final owner.
@@ -132,7 +143,7 @@ const ruleGroups = computed(() => {
 const exampleSteps = new Map([['example-self', 1], ['example-team', 2], ['example-legs', 3]]);
 const stepNumber = (item: { id: string }) => exampleSteps.get(item.id);
 const directory = computed(() => [{ id: "ladder", title: guide.value.ladder }, ...ruleGroups.value.map(group => ({ id: group.id, title: group.title }))]);
-useAutoRecovery({ failed: () => !state.value.loading && (state.value.error || !state.value.capabilities), retry: reload });
+useAutoRecovery({ failed: () => !state.value.loading && (state.value.error || state.value.ladderFailed), retry: reload });
 </script>
 
 <style src="@/components/team/team-rule-type.css"></style>

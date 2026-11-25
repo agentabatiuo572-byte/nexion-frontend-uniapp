@@ -177,7 +177,14 @@ export function buildRankHowContent(policy: RankHowPolicy | null, ranks: Canonic
   return { ladder, sections, copy };
 }
 
-export interface RankHowResourceState { loading: boolean; error: boolean; policy: RankHowPolicy | null; ranks: CanonicalVRankRow[]; capabilities: CommissionCapabilities | null }
+export interface RankHowResourceState {
+  loading: boolean;
+  error: boolean;
+  policy: RankHowPolicy | null;
+  ranks: CanonicalVRankRow[];
+  capabilities: CommissionCapabilities | null;
+  ladderFailed: boolean;
+}
 export function createRankHowResource(deps: {
   published(locale: string): Promise<RankHowPolicy>;
   ladder(): Promise<{ ranks: CanonicalVRankRow[]; capabilities: CommissionCapabilities }>;
@@ -190,10 +197,16 @@ export function createRankHowResource(deps: {
     if (disposed) return Promise.resolve();
     if (pending?.locale === locale) return pending.promise;
     const request = ++epoch;
-    deps.apply({ loading: true, error: false, policy: null, ranks: [], capabilities: null });
+    deps.apply({ loading: true, error: false, policy: null, ranks: [], capabilities: null, ladderFailed: false });
     const promise = Promise.all([deps.published(locale), deps.ladder().catch(() => null)])
-      .then(([policy, ladder]) => { if (!disposed && epoch === request) deps.apply({ loading: false, error: false, policy, ranks: ladder?.ranks ?? [], capabilities: ladder?.capabilities ?? null }); })
-      .catch(() => { if (!disposed && epoch === request) deps.apply({ loading: false, error: true, policy: null, ranks: [], capabilities: null }); })
+      .then(([policy, ladder]) => {
+        if (disposed || epoch !== request) return;
+        deps.apply({
+          loading: false, error: false, policy, ranks: ladder?.ranks ?? [],
+          capabilities: ladder?.capabilities ?? null, ladderFailed: ladder === null,
+        });
+      })
+      .catch(() => { if (!disposed && epoch === request) deps.apply({ loading: false, error: true, policy: null, ranks: [], capabilities: null, ladderFailed: false }); })
       .finally(() => { if (epoch === request) pending = undefined; });
     pending = { locale, promise };
     return promise;

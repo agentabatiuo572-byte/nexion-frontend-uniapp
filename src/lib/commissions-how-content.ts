@@ -9,7 +9,14 @@ import { uiLocale } from "@/i18n";
 import { fmt } from "@/i18n/format";
 import { deviceLevel2On, deviceLevel2RatePct } from "./device-earning-level2";
 
-export interface CommissionsHowSnapshot { document: HowContentDocument; rates?: CommissionGuideRates; directPolicy: DirectReferralPolicy | null; guide: CommissionGuideRules | null; ranks: CanonicalVRankRow[] | null }
+export interface CommissionsHowSnapshot {
+  document: HowContentDocument;
+  rates?: CommissionGuideRates;
+  ratesFailed: boolean;
+  directPolicy: DirectReferralPolicy | null;
+  guide: CommissionGuideRules | null;
+  ranks: CanonicalVRankRow[] | null;
+}
 // Keep public settlement facts; current direct policy values come from the server.
 const COPY = {
   zh: {
