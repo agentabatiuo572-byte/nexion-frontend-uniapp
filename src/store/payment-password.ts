@@ -275,9 +275,9 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
       const result = await api.receipt(command.commandKey);
       if (!currentRead()) return;
       if (finishMutation(result)) return;
-      // Records written before the expiry was stored can only settle on a terminal receipt.
-      const expiredChangeNotSeen = command.operation === "change" && result.status === "NOT_SEEN" && command.expiresAt
-        && Date.parse(command.expiresAt) + CHANGE_PROOF_EXPIRY_GRACE_MS <= Date.now() + serverOffset;
+      // A change record without a stored expiry predates it (the product is not launched); it settles as the old build did.
+      const expiredChangeNotSeen = command.operation === "change" && result.status === "NOT_SEEN"
+        && (!command.expiresAt || Date.parse(command.expiresAt) + CHANGE_PROOF_EXPIRY_GRACE_MS <= Date.now() + serverOffset);
       if (result.status === "REJECTED" || expiredChangeNotSeen) {
         const error = expiredChangeNotSeen ? "changeNotCompleted" : paymentPasswordErrorKey(new ApiError({
           kind: "business", message: result.message ?? "PAYMENT_PASSWORD_UPDATE_REJECTED",
