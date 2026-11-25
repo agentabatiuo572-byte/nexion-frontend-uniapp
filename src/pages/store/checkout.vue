@@ -1690,11 +1690,12 @@ const exactTrialDue = computed(() => multiTrialCheckout.value ? trialReviewQuote
   : remoteApiEnabled && trialConversionMode.value ? freeTrial.authoritativeQuote?.amountUSD : undefined);
 const trialZeroDue = computed(() => remoteApiEnabled ? exactTrialDue.value === 0
   : trialConversionMode.value && netPrice.value === 0);
-function trialDueRoundsToZero(amount: number | undefined): boolean {
-  return amount !== undefined && amount > 0 && formatPlainAmount(amount) === "0.00";
+// A positive due below one cent: channels price in cents, so only the wallet can take it (R12; 0 is the no-charge confirm).
+function trialDueBelowCent(amount: number | undefined): boolean {
+  return amount !== undefined && amount > 0 && amount < 0.01;
 }
 const trialWalletOnly = computed(() => (multiTrialCheckout.value || remoteApiEnabled && trialConversionMode.value)
-  && (trialExternalWalletOnly.value || trialDueRoundsToZero(exactTrialDue.value)
+  && (trialExternalWalletOnly.value || trialDueBelowCent(exactTrialDue.value)
     || multiTrialCheckout.value && trialReviewOption.value?.paymentMethods.every(method => method === "WALLET") === true));
 // P2-1: if the user CLAIMED a voucher that applies to this SKU but it has expired
 // (so bestVoucherFor skipped it), surface a muted "已过期" note instead of silently
@@ -2132,7 +2133,7 @@ const shownPurchaseSubtotal = computed(() => trialUnavailablePrice.value
 const shownConfirmationTotal = computed(() => legacyTrialResume.value?.amount ?? trialOriginal.value?.confirmedAmountUSD
   ?? (trialUnavailablePrice.value ? retainedTrialReviewQuote.value?.amountUSD ?? null : confirmationTotal.value));
 const shownTrialDueBelowCent = computed(() => !trialOriginal.value && !legacyTrialResume.value
-  && trialDueRoundsToZero(exactTrialDue.value ?? retainedTrialReviewQuote.value?.amountUSD));
+  && trialDueBelowCent(exactTrialDue.value ?? retainedTrialReviewQuote.value?.amountUSD));
 const shownTrialDiscounts = computed(() => {
   if (trialOriginal.value?.kind === "EXTERNAL" && !originalTrialPaymentQuote.value)
     return { promo: null, offset: null, early: null };
@@ -2521,7 +2522,7 @@ function goToTrialTopup(scope: CheckoutRouteScope) {
 
 function trialPasswordContext(confirmedAmount: number, summary: string) {
   const due = exactTrialDue.value;
-  const belowCent = due !== undefined && trialDueRoundsToZero(due);
+  const belowCent = due !== undefined && trialDueBelowCent(due);
   return { amount: belowCent ? due : confirmedAmount, currency: "USDT" as const, summary, belowCent };
 }
 
