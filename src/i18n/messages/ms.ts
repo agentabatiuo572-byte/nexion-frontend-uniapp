@@ -4913,7 +4913,8 @@ export const ms: Messages = {
     estimate: "Anggaran ganjaran {period}",
     formula: "{rate}% nilai pesanan terendah antara dua kumpulan, dibayar {freq}",
     blocked: "Ganjaran dijeda",
-    settlementPending: "Menunggu hari bayaran",
+    settlementPending: "Sudah layak, menunggu hari bayaran",
+    settlesOnPayoutDay: "Dikira pada hari bayaran",
     settlementUnavailable: "Bayaran tidak tersedia",
     blockedDetail: "Nilai pesanan Kumpulan {side} belum mencapai syarat minimum.",
     blockReasons: {
@@ -4923,7 +4924,7 @@ export const ms: Messages = {
       COVERAGE_BELOW_REDLINE: "Ganjaran dijeda. Hubungi khidmat pelanggan jika ada soalan.",
       BINARY_LEG_ASSIGNMENT_INCOMPLETE: "Ganjaran dijeda. Hubungi khidmat pelanggan jika ada soalan.",
       BINARY_THRESHOLD_NOT_MET: "Nilai pesanan sekurang-kurangnya satu kumpulan belum mencapai syarat minimum. Jemput rakan untuk mencapainya lebih cepat.",
-      F3_SETTLEMENT_NOT_DUE: "Hari bayaran belum tiba.",
+      F3_SETTLEMENT_NOT_DUE: "Nilai pesanan kedua-dua kumpulan sudah mencapai syarat minimum. Ganjaran dikira pada hari bayaran, jumlahnya mengikut bayaran sebenar.",
       UNKNOWN: "Ganjaran dijeda. Hubungi khidmat pelanggan jika ada soalan.",
     },
     blockedAction: "Jemput rakan untuk capai lebih cepat.",

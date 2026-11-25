@@ -4913,7 +4913,8 @@ export const id: Messages = {
     estimate: "Est. hadiah {period}",
     formula: "{rate}% dari volume pesanan terendah, dibayarkan {freq}",
     blocked: "Hadiah dijeda",
-    settlementPending: "Menunggu hari pembayaran",
+    settlementPending: "Sudah memenuhi syarat, menunggu hari pembayaran",
+    settlesOnPayoutDay: "Dihitung pada hari pembayaran",
     settlementUnavailable: "Pembayaran tidak tersedia",
     blockedDetail: "Volume pesanan Grup {side} belum memenuhi syarat.",
     blockReasons: {
@@ -4923,7 +4924,7 @@ export const id: Messages = {
       COVERAGE_BELOW_REDLINE: "Hadiah dijeda. Hubungi layanan pelanggan jika ada pertanyaan.",
       BINARY_LEG_ASSIGNMENT_INCOMPLETE: "Hadiah dijeda. Hubungi layanan pelanggan jika ada pertanyaan.",
       BINARY_THRESHOLD_NOT_MET: "Volume pesanan setidaknya satu grup belum memenuhi syarat. Undang teman agar syaratnya lebih cepat terpenuhi.",
-      F3_SETTLEMENT_NOT_DUE: "Hari pembayaran belum tiba.",
+      F3_SETTLEMENT_NOT_DUE: "Volume pesanan kedua grup sudah memenuhi syarat. Hadiah dihitung pada hari pembayaran, jumlahnya mengikuti pembayaran aktual.",
       UNKNOWN: "Hadiah dijeda. Hubungi layanan pelanggan jika ada pertanyaan.",
     },
     blockedAction: "Undang teman agar lebih cepat tercapai.",

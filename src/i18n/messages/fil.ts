@@ -4913,7 +4913,8 @@ export const fil: Messages = {
     estimate: "Tinatayang reward {period}",
     formula: "{rate}% ng mas mababang volume ng order sa dalawang grupo, ibinibigay {freq}",
     blocked: "Naka-pause ang reward",
-    settlementPending: "Hinihintay ang araw ng payout",
+    settlementPending: "Kwalipikado na, hinihintay ang araw ng payout",
+    settlesOnPayoutDay: "Kinukuwenta sa araw ng payout",
     settlementUnavailable: "Hindi available ang payout",
     blockedDetail: "Hindi pa naaabot ng Grupo {side} ang kailangang volume ng order.",
     blockReasons: {
@@ -4923,7 +4924,7 @@ export const fil: Messages = {
       COVERAGE_BELOW_REDLINE: "Naka-pause ang reward. Makipag-ugnayan sa support kung may tanong ka.",
       BINARY_LEG_ASSIGNMENT_INCOMPLETE: "Naka-pause ang reward. Makipag-ugnayan sa support kung may tanong ka.",
       BINARY_THRESHOLD_NOT_MET: "May isang grupo na hindi pa umaabot sa kailangang volume. Mag-imbita ng kaibigan para mas mabilis.",
-      F3_SETTLEMENT_NOT_DUE: "Hindi pa araw ng payout.",
+      F3_SETTLEMENT_NOT_DUE: "Naabot na ng dalawang grupo ang kailangang volume. Kinukuwenta ang reward sa araw ng payout, at ang halaga ay batay sa aktuwal na payout.",
       UNKNOWN: "Naka-pause ang reward. Makipag-ugnayan sa support kung may tanong ka.",
     },
     blockedAction: "Mag-imbita ng kaibigan para mas mabilis.",
