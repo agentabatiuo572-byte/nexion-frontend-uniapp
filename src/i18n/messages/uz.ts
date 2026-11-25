@@ -4725,6 +4725,7 @@ export const uz: Messages = {
     todayTag: "Oxirgi kun",
     expiredToast: "{m} oyi uchun toʻlov muddati oʻtdi",
     resendNote: "Oldingi soʻrov yetib bormadi",
+    salaryStaleNote: "Oylik toʻlovni hozircha yuklab boʻlmadi. Maʼlumotlar avtomatik yangilanadi.",
     resendBtn: "Soʻrovni qayta yuborish",
     topRank: "Eng yuqori daraja",
     trayNow: "Hozir {b} olish",

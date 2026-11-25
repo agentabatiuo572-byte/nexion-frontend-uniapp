@@ -128,7 +128,7 @@ export function salaryView(input: {
   const say = (template: string, params: Record<string, string | number>) => d.sentence(fmt(template, params));
   const item = displayedSalaryMonth(salary);
   const staleQualification = phase === "idle" && input.qualificationUnavailable && item && item.status !== "CLAIMED";
-  if (salary === null || staleQualification) return { card: { tag: null, caption: "", amount: hidden ? "••••" : "—", tip: null, note: "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
+  if (salary === null || staleQualification) return { card: { tag: null, caption: "", amount: hidden ? "••••" : "—", tip: null, note: staleQualification ? copy.salaryStaleNote : "", resend: false, statusKey: "unknown" }, dock: null, promo: null };
   if (!salary || !item) return { card: null, dock: null, promo: null };
   const other = salary.months.find(month => month.month !== item.month && month.status !== "CLAIMED");
   const caption = hidden ? input.mask("") : say(copy.monthRank, { m: d.month(item.month), r: item.rankCode });
