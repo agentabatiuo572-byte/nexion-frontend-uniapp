@@ -206,8 +206,6 @@ const catalogTaglineTranslations = {
 };
 const catalogTaglineFallbacks = {
   'Fully managed device': {zh:'全托管设备',ru:'Устройство с полным обслуживанием'},
-  'Fully managed rack': {zh:'全托管机架',ru:'Стойка с полным обслуживанием'},
-  'Cloud-hosted share': {zh:'云托管份额',ru:'Доля с размещением в облаке'},
 };
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},

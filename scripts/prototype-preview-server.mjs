@@ -293,6 +293,7 @@ const server=http.createServer(async(req,res)=>{
           delete state.trialAccrualReductionUsdt;
           delete state.trialNextWalletRefusal;
           delete state.trialDropNextExternalRefusal;
+          delete state.trialExternalRefusalReadDelayMs;
           state.trialOriginalPurchaseState='none';
         }
         if(scenarioChange)for(const key of ['rankSalaryClaims','rankSalaryCommands','rankSalaryTransitions','rankSalaryExpirations'])delete state[key];
@@ -356,6 +357,8 @@ const server=http.createServer(async(req,res)=>{
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
+        if(Number.isInteger(update.trialExternalRefusalReadDelayMs)&&update.trialExternalRefusalReadDelayMs>=0
+            &&update.trialExternalRefusalReadDelayMs<=6000)state.trialExternalRefusalReadDelayMs=update.trialExternalRefusalReadDelayMs;
         if([3,4].includes(update.trialPaymentFeePolicyVersion))state.trialPaymentFeePolicyVersion=update.trialPaymentFeePolicyVersion;
         if(['price-change','amount-mismatch','product-unlisted'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))

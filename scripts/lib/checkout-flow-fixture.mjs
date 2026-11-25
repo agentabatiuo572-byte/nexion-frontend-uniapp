@@ -157,8 +157,10 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
         state.trialOriginalPurchaseState='none';
       }
       const data=error.data??null;
+      const claimNo=legacyRefusal?null:data?.claimNo??(acceptedSubmission?state.trialRow?.claimNo:null);
       pin.commands.set(command,{...trialCommand(key,'REJECTED',data,error.message,error.status,false,
-        legacyRefusal ? null : state.trialRow?.claimNo),intent});
+        claimNo),intent,
+        ...(trialPurchaseOptionsEnabled(state)&&{productNo:request.postDataJSON().productNo})});
       return legacyRefusal ? {drop:true} : {status:error.status,message:error.message,data};
     }
   }
@@ -376,7 +378,15 @@ export function createCheckoutFlowFixture(state, locale = () => 'zh', projectMeO
       }
     }
     if (path.startsWith('/api/app/security/payment-password') || path.startsWith('/api/app/payment-commands/')) return pin.handle(url, request);
-    if (method === 'GET' && external.handles(path)) return external.handle(url, request);
+    if (method === 'GET' && external.handles(path)) {
+      const result=external.handle(url,request);
+      if(path==='/api/app/purchase-payment-intents'&&result?.message==='TRIAL_QUOTE_CHANGED'&&state.trialExternalRefusalReadDelayMs) {
+        const delay=state.trialExternalRefusalReadDelayMs;
+        delete state.trialExternalRefusalReadDelayMs;
+        await new Promise(resolve=>setTimeout(resolve,delay));
+      }
+      return result;
+    }
     for (const order of state.createdOrders ?? []) if (demoOrderTimedOut(order,state,Date.now())) Object.assign(order,demoTimedOutOrder);
     if (external.handles(path)) return external.handle(url, request);
     const kind = tradeinCommands.get(path);
