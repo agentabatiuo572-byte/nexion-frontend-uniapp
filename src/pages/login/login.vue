@@ -306,7 +306,7 @@ async function retryOriginalLogin(captchaTicket?: string) {
   } catch (cause) { if (mounted && flowVersion === otpFlowVersion) {
     syncLoginRecovery();
     if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
-    else error.value = remoteLoginError(cause);
+    else error.value = loginReceiptError(cause);
   } }
   finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
@@ -330,10 +330,7 @@ async function recoverLoginResult() {
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
-    // A recovered attempt whose session was taken over says why, like any other ended session.
-    const replaced = cause instanceof Error && ["APP_REPLACED", "H5_REPLACED"].includes(cause.message);
-    if (replaced) sessionEndReason.value = (cause as Error).message;
-    error.value = replaced ? null : remoteLoginError(cause);
+    error.value = loginReceiptError(cause);
   } finally { if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 const returnParam = ref<string | null>(null);
@@ -763,6 +760,16 @@ function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = invalidPhoneMessage.value; return; }
   void requestCode();
+}
+/**
+ * The original attempt's session was issued and has since ended. A takeover is explained by the notice at the
+ * top, like any other ended session; other endings ask for a new sign-in. Anything else keeps its own message.
+ */
+function loginReceiptError(cause: unknown): string | null {
+  const reason = cause instanceof ApiError && cause.kind === "auth" ? cause.message : "";
+  if (["APP_REPLACED", "H5_REPLACED"].includes(reason)) { sessionEndReason.value = reason; return null; }
+  if (["CURRENT_LOGOUT", "SECURITY_REVOKED", "SESSION_EXPIRED", "REAUTH_REQUIRED", "SESSION_REPLACED"].includes(reason)) return t.value.login.sessionReplaced;
+  return remoteLoginError(cause);
 }
 function remoteLoginError(error: unknown): string {
   syncLoginRecovery();
