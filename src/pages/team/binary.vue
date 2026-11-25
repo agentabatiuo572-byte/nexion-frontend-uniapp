@@ -51,7 +51,7 @@
               </view>
             </view>
 
-            <view v-if="wings.some(wing => wing.top) || pageState.memberDetails !== 'ready'" class="binary-leaders">
+            <view v-if="wings.some(wing => wing.top) || !memberDetailsReadable" class="binary-leaders">
               <text class="binary-section-title">{{ binaryCopy.leadingMembers }}</text>
               <view class="reward-wings">
                 <view v-for="wing in wings" :key="wing.key" class="reward-wing" :style="wingStyle(wing.isWeak)">
@@ -395,7 +395,7 @@ function recentRowStyle(isLast: boolean): CSSProperties {
   return { padding: "14px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 useAutoRecovery({ failed: () => remoteSessionReady.value && commission.binaryStatus === "error", retry: () => remoteSessionReady.value ? commission.refreshCanonicalBinary() : Promise.resolve() });
-useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus === "error", retry: () => remoteSessionReady.value ? network.refreshCanonicalNetwork() : Promise.resolve(false) });
+useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus === "error", retry: () => remoteSessionReady.value ? network.refreshCanonicalNetwork() : Promise.resolve(false), retryNotBefore: network.retryNotBefore });
 </script>
 
 <style scoped>
