@@ -26,7 +26,7 @@
           </view>
           <view v-if="row.due" class="tdp-row__price">
             <text class="tdp-row__due"><text class="tdp-row__cur">$</text>{{ row.due.whole }}<text class="tdp-row__dec">{{ row.due.decimals }}</text></text>
-            <text class="tdp-row__was"><text v-if="row.claimPrice" class="tdp-row__claim">{{ copy.claimPrice }} </text><text class="tdp-row__strike">{{ row.was }}</text></text>
+            <text class="tdp-row__was" :class="{ 'tdp-row__was--claim': row.claimPrice }"><text v-if="row.claimPrice" class="tdp-row__claim">{{ copy.claimPrice }}</text><text class="tdp-row__strike">{{ row.was }}</text></text>
           </view>
           <text v-else-if="row.quoteFailed" class="tdp-row__unknown">—</text>
           <view class="tdp-row__radio" aria-hidden="true" />
@@ -160,6 +160,9 @@ function move(row: { productNo: string }, delta: number) {
 .tdp-row__cur { margin-right: 1px; color: var(--v5-ink-3); font-size: var(--ui-type-meta); }
 .tdp-row__dec { color: var(--v5-ink-3); }
 .tdp-row__was { margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
+/* The claim label hangs left, level with the tag line's free space, so it does not narrow the name column. */
+.tdp-row__was--claim { margin-left: -16px; }
+.tdp-row__claim { margin-right: 4px; }
 .tdp-row__strike { text-decoration: line-through; }
 .tdp-row__unknown { flex: none; color: var(--v5-ink-3); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-v5); }
 .tdp-row__radio { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); display: grid; place-items: center; }
@@ -188,5 +191,8 @@ function move(row: { productNo: string }, delta: number) {
   .tdp-row__thumb { width: 60px; }
   .tdp-row__img { width: 80px; height: 80px; transform: translate(-50%, calc(-50% - 6px)); }
   .tdp-row__link { left: 84px; }
+  /* 「领取时价格」 takes its own line above the struck price, clear of the estimate. */
+  .tdp-row__was--claim { margin-left: 0; }
+  .tdp-row__claim { display: block; margin-right: 0; }
 }
 </style>

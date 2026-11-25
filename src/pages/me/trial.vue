@@ -60,11 +60,12 @@
             <TrialCountAmount :config="earnedCount.config.value" :parts="earnedParts" tone="earned" />
             <text class="trial-earned__unit">USDT</text>
           </view>
-          <text class="trial-earned__uvt">+ {{ visibility.mask(formatGroupedAmount(shadowNEX)) }}<text class="trial-unit-small"> UVT</text></text>
-          <text class="trial-earned__note">{{ detail.withdrawAfterBuy }}</text>
+          <!-- Each figure carries its own use: the USDT offsets a purchase, the UVT arrives after one (04 §4.6). -->
+          <text class="trial-earned__note">{{ detail.creditOnBuy }}</text>
+          <text class="trial-earned__uvt">+ {{ visibility.mask(formatGroupedAmount(shadowNEX)) }}<text class="trial-unit-small">&nbsp;UVT</text><text class="trial-earned__uvt-after">&nbsp;·&nbsp;{{ detail.uvtAfterBuy }}</text></text>
         </view>
 
-        <view v-if="originalPurchase || showDevicePicker" style="align-self: stretch; margin: 32px 16px 0; display: flex; flex-direction: column; gap: 24px">
+        <view v-if="originalPurchase || showDevicePicker" class="trial-select trial-rise trial-rise--3">
           <TrialOriginalPurchaseCard v-if="originalPurchase" :purchase="originalPurchase"
             :is-trial-device="originalPurchase.device.productNo === trialProductId" :now="serverNow" />
           <TrialDevicePicker v-if="showDevicePicker" :options="purchaseOptionsView.options"
@@ -74,11 +75,12 @@
         </view>
 
         <!-- FEAT-TRIAL05: every amount below is the server quote convert() will settle. -->
-        <view v-if="purchaseQuote" class="trial-ticket trial-rise trial-rise--3" data-testid="trial-credit-summary">
+        <view v-if="purchaseQuote" class="trial-ticket trial-rise trial-rise--4" data-testid="trial-credit-summary">
           <view class="trial-ticket__body">
-            <NxTag v-if="earlyQuote" class="trial-ticket__tag" tone="brand"><svg class="trial-ticket__tag-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>{{ detail.earlyTag }}</NxTag>
-            <text class="trial-ticket__title" data-testid="trial-buy-title">{{ buyTitle }}</text>
-            <text v-if="earlyQuote" class="trial-ticket__subtitle">{{ detail.earlySubtitle }}<text class="trial-ticket__estimate">{{ detail.earlyEstimate }}</text></text>
+            <!-- The early-discount title and tag need a real discount; without it the first row names the device (board note 4). -->
+            <NxTag v-if="earlySaving" class="trial-ticket__tag" tone="brand"><svg class="trial-ticket__tag-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>{{ detail.earlyTag }}</NxTag>
+            <text v-if="buyTitle" class="trial-ticket__title" data-testid="trial-buy-title">{{ buyTitle }}</text>
+            <text v-if="earlySaving" class="trial-ticket__subtitle">{{ detail.earlySubtitle }}<text class="trial-ticket__estimate">{{ detail.earlyEstimate }}</text></text>
 
             <view class="trial-total">
               <text class="trial-total__breakdown">{{ totalBreakdown }}</text>
@@ -87,14 +89,14 @@
                 <text class="nx-sr-only">{{ totalParts[1] ? `${totalParts[0]}.${totalParts[1]}` : totalParts[0] }}</text>
                 <TrialCountAmount :config="totalCount.config.value" :parts="totalParts" tone="total" />
                 <text class="trial-unit-small trial-total__unit">USDT</text>
-                <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text>
+                <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small">&nbsp;UVT</text></text>
               </view>
             </view>
 
             <view class="trial-rows" role="group" :aria-label="purchase.payGroup">
-              <view class="trial-row"><text class="trial-row__label">{{ detail.unitPrice }}</text><text class="trial-row__value">{{ usd(purchaseQuote.priceUSD) }}</text></view>
+              <view class="trial-row"><view class="trial-row__label"><text>{{ earlySaving ? detail.unitPrice : ticketDeviceName }}</text><text v-if="claimPriceDiffers" class="trial-row__claim">{{ detail.claimPrice }}</text></view><text class="trial-row__value">{{ usd(purchaseQuote.priceUSD) }}</text></view>
               <view v-if="ticketDiscounts.promo > 0" class="trial-row"><view class="trial-row__label">{{ promoLabel }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ usd(ticketDiscounts.promo) }}</text></view>
-              <view v-if="earlyQuote && ticketDiscounts.early > 0" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ usd(ticketDiscounts.early) }}</text></view>
+              <view v-if="earlySaving" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ usd(ticketDiscounts.early) }}</text></view>
               <view v-if="ticketDiscounts.offset > 0" class="trial-row"><view class="trial-row__label">{{ detail.offsetRow }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">{{ visibility.mask(`−${usd(ticketDiscounts.offset)}`) }}</text></view>
             </view>
             <view class="trial-sum">
@@ -115,13 +117,14 @@
               <text class="trial-credit__label">{{ purchase.creditGroup }}</text>
               <view class="trial-credit__row">
                 <text class="trial-credit__name">{{ detail.creditRow }}</text>
-                <text class="trial-credit__value" data-testid="trial-credit-after"><template v-if="purchaseQuote.remainderUSD > 0">{{ visibility.mask(formatGroupedAmount(purchaseQuote.remainderUSD)) }}<text class="trial-unit-small trial-dim"> USDT</text></template><text v-if="purchaseQuote.remainderUSD > 0 && purchaseQuote.rewardNEX > 0" class="trial-credit__sep"> · </text><text v-if="purchaseQuote.rewardNEX > 0" class="trial-credit__uvt">{{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small"> UVT</text></text></text>
+                <text class="trial-credit__value" data-testid="trial-credit-after"><template v-if="purchaseQuote.remainderUSD > 0">{{ visibility.mask(formatGroupedAmount(purchaseQuote.remainderUSD)) }}<text class="trial-unit-small trial-dim">&nbsp;USDT</text></template><text v-if="purchaseQuote.remainderUSD > 0 && purchaseQuote.rewardNEX > 0" class="trial-credit__sep"> · </text><text v-if="purchaseQuote.rewardNEX > 0" class="trial-credit__uvt">{{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small">&nbsp;UVT</text></text></text>
               </view>
+              <text class="trial-credit__note">{{ detail.creditNote }}</text>
             </view>
           </template>
         </view>
         <!-- Older servers without a quote keep the accrued-only presentation. -->
-        <view v-else-if="!usePurchaseOptions && !originalPurchase" class="trial-ticket trial-ticket__body trial-rise trial-rise--3" data-testid="trial-credit-summary">
+        <view v-else-if="!usePurchaseOptions && !originalPurchase" class="trial-ticket trial-ticket__body trial-rise trial-rise--4" data-testid="trial-credit-summary">
           <view class="trial-sum__row">
             <text class="trial-row__label">{{ lifecycle.availableOffsetLabel }}</text>
             <text class="trial-sum__discount">{{ visibility.mask(usd(trialOffset.offsetUSD)) }}</text>
@@ -131,7 +134,7 @@
           <text v-if="trialOffset.remainderUSD > 0" class="trial-legacy-note">{{ offsetRemainderNote }}</text>
         </view>
 
-        <view class="trial-links trial-rise trial-rise--4">
+        <view class="trial-links trial-rise trial-rise--5">
           <view class="trial-link" role="button" tabindex="0" :aria-label="detail.rulesRow" @click="rulesOpen = true" @keydown.enter.prevent="rulesOpen = true" @keydown.space.prevent="rulesOpen = true">
             <text>{{ detail.rulesRow }}</text>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
@@ -201,7 +204,8 @@
       <!-- Reserves the bottom bar's height so the last row scrolls clear of it: the bar's own note and
            retry rows, invisible, wrap exactly as in the bar; the button, padding and safe area are fixed. -->
       <view v-if="!authorityScreenUnavailable" class="trial-bar-space" aria-hidden="true">
-        <text v-if="barNote" class="trial-bar__note">{{ barNote }}</text>
+        <view v-if="barNoteWarn" class="trial-bar__note trial-bar__note--warn"><view class="trial-bar__note-icon" /><text>{{ barNote }}</text></view>
+        <text v-else-if="barNote" class="trial-bar__note">{{ barNote }}</text>
         <view v-if="barRetry" class="trial-bar__retry trial-bar-space__retry" />
       </view>
     </view>
@@ -210,10 +214,13 @@
     <template #pageFixed>
       <view v-if="!authorityScreenUnavailable" class="trial-bar nx-glass-bar" :class="{ 'trial-bar--pair': conversionRefunded }">
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
-          <text v-if="barNote" class="trial-bar__note nx-tray-note">{{ barNote }}</text>
+          <view v-if="barNoteWarn" class="trial-bar__note trial-bar__note--warn nx-tray-note" role="status"><svg class="trial-bar__note-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg><text>{{ barNote }}</text></view>
+          <text v-else-if="barNote" class="trial-bar__note nx-tray-note" role="status">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
-          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy" @click="goCheckout">
-            <svg v-if="isActiveCycle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
+          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
+            <!-- Reading the list keeps the label beside the spinner (board S6a); a press in progress uses the shared busy state. -->
+            <view v-if="listLoading" class="trial-bar__spinner" aria-hidden="true" />
+            <svg v-else-if="isActiveCycle && !originalPurchase && !trialBuyDisabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text>{{ trialBuyCtaText }}</text>
           </NxButton>
         </template>
@@ -231,26 +238,19 @@
     </template>
 
     <!-- ═══ Rules half-sheet (spec ⑥「查看抵扣规则」) ═══ -->
-    <view v-if="rulesOpen" class="trs-root" role="dialog" aria-modal="true">
-      <view class="trs-backdrop" role="button" tabindex="0" @click="rulesOpen = false" />
+    <view v-if="rulesOpen" class="trs-root" role="dialog" aria-modal="true" aria-labelledby="trs-title">
+      <view class="trs-backdrop" aria-hidden="true" @click="rulesOpen = false" />
       <view class="nx-glass-sheet trs-panel" @click.stop>
-        <view class="flex items-center justify-between">
-          <text style="font-family: var(--font-v5); font-size: var(--ui-type-section); font-weight: 600; color: var(--v5-ink)">{{ t.trial.rulesTitle }}</text>
-          <view class="grid place-items-center active:opacity-70" style="width: 44px; height: 44px; border-radius: 999px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="rulesOpen = false">
-            <view class="rounded-full grid place-items-center" style="width: 36px; height: 36px; background: var(--v5-surface-2)">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-            </view>
+        <view class="trs-head">
+          <text id="trs-title" class="trs-title">{{ t.trial.rulesTitle }}</text>
+          <view class="trs-close" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="rulesOpen = false" @keydown.enter.stop.prevent="rulesOpen = false" @keydown.space.stop.prevent="rulesOpen = false">
+            <view class="trs-close__face nx-frosted-button"><NxIcon name="close" :size="16" /></view>
           </view>
         </view>
-        <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
-          <view v-for="(line, i) in rulesLines" :key="i" class="flex items-start" style="gap: 8px">
-            <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); margin-top: 6px; flex-shrink: 0" />
-            <text style="flex: 1; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.625; text-wrap: pretty">{{ line }}</text>
-          </view>
+        <view class="trs-list" role="list">
+          <view v-for="(line, i) in rulesLines" :key="i" class="trs-line" role="listitem"><view class="trs-line__dot" aria-hidden="true" /><text class="trs-line__text">{{ line }}</text></view>
         </view>
-        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="rulesGotStyle" role="button" tabindex="0" :aria-label="t.trial.rulesGotCta" @click="rulesOpen = false">
-          <text>{{ t.trial.rulesGotCta }}</text>
-        </view>
+        <NxButton class="trs-got" variant="secondary" :label="t.trial.rulesGotCta" @click="rulesOpen = false" />
       </view>
     </view>
   </AppChassis>
@@ -260,13 +260,14 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
-import { computed, ref, onMounted, provide, watch, type CSSProperties } from "vue";
+import { computed, ref, onMounted, provide, watch } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import EmptyState from "@/components/empty-state.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import { appDeviceOffline, foregroundReadAllowed } from "@/lib/foreground-read";
@@ -290,8 +291,6 @@ import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useTrialFleetCopy } from "@/i18n/trial-fleet";
-import { useLocaleStore } from "@/store/locale";
-import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { useTrialCheckout } from "@/store/trial-checkout";
@@ -316,8 +315,6 @@ const lifecycle = useTrialLifecycleCopy();
 const purchase = useTrialPurchaseCopy();
 const detail = useTrialDetailCopy();
 const fleetCopy = useTrialFleetCopy();
-const locale = useLocaleStore();
-const payCopy = computed(() => purchasePaymentCopy(locale.code));
 const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || freeTrial.authorityIncomplete));
 // The last complete snapshot belongs to this account and only supplies display values.
 const displayState = computed(() => freeTrial.displayState);
@@ -521,11 +518,19 @@ const totalSource = computed(() => (purchaseQuote.value && !authorityScreenUnava
 const totalCount = useViewCountUp(totalSource, "grouped", { follow: true });
 const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibility.mask(0), ""] : amountParts(totalSource.value ?? 0)));
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
+// The discount this order really gets, at the two decimals its row shows.
+const earlySaving = computed(() => !!earlyQuote.value && ticketDiscounts.value.early > 0);
+const ticketDeviceName = computed(() => (selectedOption.value?.productName ?? trialDeviceName.value).replace(/ /g, "\u00A0"));
+// The trial device keeps the price it was claimed at; say so when the store price differs.
+const claimPriceDiffers = computed(() => {
+  const option = selectedOption.value;
+  return !!option?.isTrialProduct && option.marketPriceUSD !== undefined && option.marketPriceUSD !== option.priceUSD;
+});
 const buyTitle = computed(() => {
-  if (earlyQuote.value) return fmt(detail.value.earlyTitle, {
-    device: selectedOption.value?.productName ?? trialDeviceName.value, amount: usdShort(earlyQuote.value.earlyDiscountUSD),
+  if (earlySaving.value) return fmt(selectedOption.value && !selectedOption.value.isTrialProduct ? detail.value.earlyTitleOther : detail.value.earlyTitle, {
+    device: ticketDeviceName.value, amount: usdShort(ticketDiscounts.value.early),
   });
-  return isGrace.value ? detail.value.graceTitle : purchase.value.accruedTitle;
+  return isGrace.value ? detail.value.graceTitle : "";
 });
 // What arrives after purchase: USDT when there is some, otherwise the UVT (amounts never split across lines).
 // Both figures carry the trial earnings, so the data-visibility mask hides them like the hero.
@@ -560,14 +565,15 @@ const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { re
 const openingPurchase = ref(false);
 const trialBuyBusy = computed(() => openingPurchase.value || (originalPurchase.value ? false
   : usePurchaseOptions.value ? purchaseOptionLoading.value : trialCatalogLoading.value));
+const listLoading = computed(() => purchaseOptionLoading.value && !originalPurchase.value);
 const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalPurchase.value ? false
   : usePurchaseOptions.value ? !purchaseQuote.value : trialProductUnavailable.value && !trialCatalogLoading.value));
 const trialBuyCtaText = computed(() => {
   const original = originalPurchase.value;
   if (original) return original.status === "AWAITING_PAYMENT" || original.status === "RESUMABLE"
-    ? t.value.orders.pendingContinue : payCopy.value.viewProgress;
+    ? t.value.orders.pendingContinue : detail.value.viewProgress;
   if (usePurchaseOptions.value) {
-    if (waitingForReselection.value) return t.value.earn.selectDevice;
+    if (waitingForReselection.value) return detail.value.chooseDevice;
     return purchaseQuote.value ? fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
   }
   if (productCatalogState.status === "error") return t.value.store.catalogErrorTitle;
@@ -607,11 +613,11 @@ const barNote = computed(() => {
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
-  if (originalPurchase.value) return originalPurchase.value.status === "PROCESSING" ? detail.value.origConfirming : "";
+  if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? purchase.value.coNotSent : "";
   if (usePurchaseOptions.value) {
     if (waitingForReselection.value) return "";
-    if (purchaseOptionsFailed.value) return detail.value.quoteFailed;
-    if (noBuyableDevices.value) return trialRefusalMessage(showDevicePicker.value ? undefined : purchaseOptionsView.value.options[0]?.reasonCode);
+    if (purchaseOptionsFailed.value) return detail.value.listFailed;
+    if (noBuyableDevices.value) return detail.value.noneBuyable;
     return "";
   }
   if ((isActiveCycle.value || status.value === "ended") && trialProductUnavailable.value && productCatalogState.status === "ready") {
@@ -619,6 +625,8 @@ const barNote = computed(() => {
   }
   return "";
 });
+
+const barNoteWarn = computed(() => barNote.value !== "" && barNote.value === detail.value.listFailed);
 
 // Rules sheet (spec ⑥: pre-purchase offset / no cash-out / post-purchase
 // remainder → balance / expiry).
@@ -629,7 +637,10 @@ const rulesLines = computed(() => [
   w.value.rulesNoCash,
   w.value.rulesAfter,
   ...(earlyQuote.value ? [
-    fmt(lifecycle.value.rulesEarly, { discount: formatGroupedAmount(earlyQuote.value.earlyDiscountConfiguredUSD) }),
+    ...(earlyQuote.value.earlyDiscountConfiguredUSD > 0 ? [fmt(
+      earlyQuote.value.settlementPolicy === "FULL_TERM_ON_CONVERSION" ? detail.value.rulesEarlyFull : detail.value.rulesEarly,
+      { discount: usdShort(earlyQuote.value.earlyDiscountConfiguredUSD) },
+    )] : []),
     lifecycle.value.rulesRefund,
   ] : []),
   w.value.rulesExpiry,
@@ -676,7 +687,7 @@ async function goCheckout() {
         if (!visit.current() || originalPurchase.value || authorityUnavailable.value) return;
         const options = trialOptions.current;
         if (options.status === "unsupported") {
-          if (productNo !== trialProductId.value) toast.warn(purchase.value.coDeviceRemoved);
+          if (productNo !== trialProductId.value) toast.warn(detail.value.deviceGone);
           else if (!trialProductUnavailable.value) await navTo(checkoutHref(productNo));
           return;
         }
@@ -705,7 +716,7 @@ watch([pageVisible, displayState, authorityUnavailable], ([visible, state, unava
   if (visible && state && !unavailable) checkout.adoptAuthority(state);
 });
 watch(() => hasScopedOptions.value ? trialOptions.current.invalidatedProductNo : null, (invalidated) => {
-  if (invalidated && pageVisible.value && !originalPurchase.value) toast.warn(purchase.value.coDeviceRemoved);
+  if (invalidated && pageVisible.value && !originalPurchase.value) toast.warn(detail.value.deviceGone);
 }, { flush: "post" });
 watch([pageVisible, originalPurchase], ([visible, original]) => {
   if (visible && original) observedOriginalClaim = original.claimNo;
@@ -798,8 +809,6 @@ function goRefundedOrder() {
   if (orderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
 }
 
-const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
-
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.value = false; }, true);
@@ -860,10 +869,14 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-earned__label { color:var(--v5-ink-3);font:400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .trial-earned__amount { display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:4px; }
 .trial-earned__unit { color:var(--v5-ink-3);font:500 15px/20px var(--font-v5); }
-.trial-earned__uvt { margin-top:4px;color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
-.trial-earned__note { margin-top:8px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.trial-earned__uvt { margin-top:8px;color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
+.trial-earned__uvt-after { color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);white-space:nowrap; }
+.trial-earned__note { margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-dim { color:var(--v5-ink-3); }
 .trial-unit-small { font-size:12px;line-height:16px; }
+
+/* ── Payment in progress and device list ── */
+.trial-select { align-self:stretch;display:flex;flex-direction:column;gap:24px;margin:var(--ui-space-section-gap) 16px 0; }
 
 /* ── Quote ticket ── */
 .trial-ticket { align-self:stretch;margin:28px 16px 0;border-radius:var(--ui-radius-surface);background:var(--v5-surface);box-shadow:var(--v5-glass-shadow); }
@@ -875,7 +888,9 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-ticket__estimate { font-size:12px;line-height:16px; }
 .trial-total { margin-top:16px;padding:14px 16px;border-radius:16px;background:var(--v5-surface-2); }
 :global([data-theme="light"] .trial-total) { background:var(--v5-bg); }
-.trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
+/* No title above it (trial term without a discount): the benefit block starts the ticket. */
+.trial-ticket__body > .trial-total:first-child { margin-top:0; }
+.trial-total__breakdown { display:block;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);font-variant-numeric:tabular-nums; }
 .trial-total__line { display:flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;margin-top:6px; }
 .trial-total__label { font:500 13px/18px var(--font-v5); }
 .trial-total__unit { color:var(--v5-ink-3);font-weight:500; }
@@ -884,6 +899,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-row { display:flex;align-items:center;justify-content:space-between;gap:12px;font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums; }
 .trial-row__label { flex:1;min-width:0;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
 .trial-row .trial-row__label { display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:2px; }
+.trial-row__claim { flex:none;font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);white-space:nowrap; }
 .trial-row__value { flex:none;white-space:nowrap; }
 .trial-ticket .trial-limit-tag { height:20px;padding:0 6px; }
 .trial-sum { display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--v5-border); }
@@ -904,6 +920,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-credit__row { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:6px; }
 .trial-credit__name { flex:1;min-width:0;color:var(--v5-ink-3);font:400 12px/16px var(--font-v5); }
 .trial-credit__value { flex:none;font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
+.trial-credit__note { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .trial-credit__sep { color:var(--v5-ink-4); }
 .trial-credit__uvt { color:var(--v5-nex-ink); }
 .trial-legacy-row { margin-top:10px; }
@@ -931,12 +948,16 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 /* ── Bottom action bar (DS-30): the shared glass bar ── */
 .trial-bar { position:absolute;z-index:36;display:flex;flex-direction:column;animation:trial-bar-in .42s cubic-bezier(.16,1,.3,1) .3s both; }
 .trial-bar--pair { flex-direction:row;flex-wrap:wrap; }
-.trial-bar__note { margin:0;padding-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center;text-wrap:pretty; }
+.trial-bar__note { margin:0;padding-top:4px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);text-align:center; }
+/* A failed read is an alert: warning ink with its icon. */
+.trial-bar .trial-bar__note--warn, .trial-bar__note--warn { display:flex;align-items:flex-start;justify-content:center;gap:4px;color:var(--v5-warning-ink); }
+.trial-bar__note-icon { flex:none;width:14px;height:14px;margin-top:1px; }
+.trial-bar__spinner { flex:none;box-sizing:border-box;width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:trial-spin .8s linear infinite; }
 .trial-bar__retry { display:flex;justify-content:center;margin:-8px 0 -4px; }
 /* Tray text buttons are 48 tall at any size, in neutral ink (03 §3.1 tray rule). */
 .trial-bar__retry :deep(.nx-button) { min-height:48px; color:var(--v5-ink); }
 /* In-flow twin of the bar: 12 top + 48 button + 30 bottom (+ safe area) + a 20px gap, less the 40px the chassis already pads. */
-.trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 16px calc(70px + env(safe-area-inset-bottom)); }
+.trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 32px calc(70px + env(safe-area-inset-bottom)); }
 .trial-bar-space__retry { height:48px; }
 .trial-bar__main { display:flex;width:100%; }
 .trial-bar__side { flex:1 1 0;min-width:fit-content; }
@@ -949,13 +970,15 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-rise--2 { animation-delay:.08s; }
 .trial-rise--3 { animation-delay:.16s; }
 .trial-rise--4 { animation-delay:.24s; }
+.trial-rise--5 { animation-delay:.32s; }
 @keyframes trial-rise { from { opacity:0;transform:translateY(14px); } to { opacity:1;transform:none; } }
 @keyframes trial-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes trial-ring-draw { from { stroke-dashoffset:603.19; } }
 @keyframes trial-bar-in { from { transform:translateY(100%); } to { transform:none; } }
+@keyframes trial-spin { to { transform:rotate(360deg); } }
 @keyframes trial-pop { 0% { opacity:0;transform:scale(.6); } 70% { opacity:1;transform:scale(1.08); } 100% { opacity:1;transform:scale(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .trial-rise, .trial-glow, .trial-ring__check, .trial-bar { animation:none; }
+  .trial-rise, .trial-glow, .trial-ring__check, .trial-bar, .trial-bar__spinner { animation:none; }
   .trial-ring :deep(.trial-ring__arc) { animation:none; }
 }
 
@@ -989,6 +1012,17 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
   overflow-y: auto;
   animation: trs-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.trs-head { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.trs-title { min-width:0;color:var(--v5-ink);font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);overflow-wrap:break-word; }
+.trs-close { flex:none;display:grid;place-items:center;width:44px;height:44px;margin-right:-4px;border-radius:50%;cursor:pointer; }
+.trs-close__face { display:grid;place-items:center;width:36px;height:36px;border-radius:50%; }
+.trs-close:active .trs-close__face { opacity:.7; }
+.trs-close:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px; }
+.trs-list { display:flex;flex-direction:column;gap:10px;margin-top:14px; }
+.trs-line { display:flex;align-items:flex-start;gap:8px; }
+.trs-line__dot { flex:none;width:6px;height:6px;margin-top:8px;border-radius:50%;background:var(--v5-brand); }
+.trs-line__text { flex:1;min-width:0;color:var(--v5-ink-2);font:var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5);overflow-wrap:break-word; }
+.trs-got { display:flex;width:100%;margin-top:18px; }
 @keyframes trs-fade {
   from { opacity: 0; }
   to { opacity: 1; }
