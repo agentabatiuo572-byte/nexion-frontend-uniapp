@@ -426,7 +426,7 @@ import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/ser
 import { isProductAvailable, productHasStock, productOutOfStock } from "@/store/product-availability";
 import { usePendingCheckout } from "@/store/pending-checkout";
 import { formatCountdown, PENDING_CHECKOUT_WINDOW_MIN, reconcileInvoiceQuote, type PendingCheckoutMethod, type PendingCheckoutSession } from "@/store/pending-checkout-core";
-import { uiLocale } from "@/i18n";
+import { uiLocale, type LocaleCode } from "@/i18n";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 // #ifdef H5
 import { hasOpenDialog, registerBrowserPageBack } from "@/composables/use-dialog-a11y";
@@ -2308,7 +2308,7 @@ function applyTrialCheckoutOutcome(scope: CheckoutRouteScope) {
     void reloadTrialRefusal(scope, reasonCode, state.confirmedAmountUSD, resultKey);
     return;
   }
-  toast.warn(trialPurchaseReasonMessage(t.value, reasonCode, locale.code) ?? purchaseCopy.value.coPurchaseUnavailable);
+  toast.warn(trialRefusalCopy(reasonCode, locale.code));
   trialResults.consume(resultKey, true);
 }
 
@@ -2334,9 +2334,9 @@ async function reloadTrialRefusal(scope: CheckoutRouteScope, reason: string, amo
   }
 }
 
-function trialRefusalCopy(reason?: string) {
+function trialRefusalCopy(reason?: string, language?: LocaleCode) {
   return reason === "ORDER_MONTHLY_QUOTA_UNAVAILABLE" ? purchaseCopy.value.coPurchaseUnavailable
-    : trialPurchaseReasonMessage(t.value, reason) ?? purchaseCopy.value.coPurchaseUnavailable;
+    : trialPurchaseReasonMessage(t.value, reason, language) ?? purchaseCopy.value.coPurchaseUnavailable;
 }
 
 function checkoutTrialTopupHref(scope: CheckoutRouteScope, amountUSD: number, shortfallUSD: number | null) {
@@ -3733,7 +3733,7 @@ watch(() => freeTrial.deniedLegacyConversion, result => {
   if (!result || !trialRoute.value || !isTopCheckoutPage() || freeTrial.displayState?.claimNo !== result.claimNo) return;
   const key = trialRefusalResultKey(result.claimNo, result.key);
   if (trialResults.wasDelivered(key)) return;
-  toast.warn(trialPurchaseReasonMessage(t.value, result.reason, locale.code) ?? purchaseCopy.value.coPurchaseUnavailable);
+  toast.warn(trialRefusalCopy(result.reason, locale.code));
   trialResults.consume(key, true);
 });
 watch(() => trialCheckout.outcome, state => {

@@ -111,8 +111,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const reportedState=liveStates.includes(row.state)&&trialNow>=row.startedAt+duration?'GRACE':row.state;
     const claimed=row.state!=='ELIGIBLE',live=liveStates.includes(row.state);
     const conversion=row.state==='REDEEMED'?conversionFacts():null;
-    const naturallyEnded=row.state==='CANCELLED'&&row.endReason==='expired';
-    const {shadow,nex}=claimed&&!naturallyEnded?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
+    const {shadow,nex}=claimed&&row.state!=='CANCELLED'?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
     const eligible=!claimed||(['FAILED','CANCELLED'].includes(row.state)&&row.cooldownUntil!=null&&row.cooldownUntil<=now);
     // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
     const canStart=eligible&&available&&!capacityFull;
@@ -123,7 +122,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?row.claimNo:null,version:row.version??0,serverNowEpochMs:trialNow,endReason:row.endReason??null,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,
-      graceEndsAtEpochMs:claimed&&!naturallyEnded?row.startedAt+duration+grace:null,
+      graceEndsAtEpochMs:live?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
       cooldownUntilEpochMs:row.cooldownUntil??null,
       shadowUsdt:number(shadow),shadowNex:number(nex),

@@ -2,7 +2,7 @@ import { reactive, type InjectionKey, type Ref } from 'vue';
 import { canSelectNewUsdtNetwork, isVisibleUsdtNetwork } from '@/lib/usdt-network-options';
 import { cregisDepositApi as deposits, purchasePaymentApi as api, purchaseEligibilityApi } from '@/api/runtime';
 import { asApiError, isApiRefusal, type ApiError } from '@/api/errors';
-import type { TrialPurchaseOutcome, ExternalPaymentMethod, OrderTopupIntent, PurchaseKind, PurchaseMethod, PurchasePaymentIntent, PurchaseQuote, TrialExternalRefusal } from '@/api/purchase-payment-api';
+import { trialExternalRequote, type TrialPurchaseOutcome, type ExternalPaymentMethod, type OrderTopupIntent, type PurchaseKind, type PurchaseMethod, type PurchasePaymentIntent, type PurchaseQuote, type TrialExternalRefusal } from '@/api/purchase-payment-api';
 import { parseTrialConvertReceipt } from '@/api/trial-api';
 import type { PaymentCommandReceipt } from '@/api/payment-command-api';
 import { useApp } from './app';
@@ -67,6 +67,10 @@ const REVIEW_REASONS = ['PAYMENT_AMOUNT_MISMATCH', 'PAYMENT_MULTIPLE_ARRIVALS', 
 // Another payment for this purchase is still open, perhaps from another device: say so rather than asking to review the order.
 const ORDER_REFUSALS: Record<string, PurchaseNotice> = { ORDER_PAYMENT_EXPIRED: 'orderExpired', ORDER_NOT_PAYABLE: 'orderClosed', ORDER_NOT_FOUND: 'orderMissing', PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED: 'existing' };
 const TRIAL_REFUSALS = ['TRIAL_QUOTE_CHANGED', 'TRIAL_AMOUNT_MISMATCH'];
+function isTerminalTrialRequote(reason: string) {
+  return reason !== 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED'
+    && (trialExternalRequote(reason) || TRIAL_REFUSALS.includes(reason));
+}
 function paymentRefusalNotice(cause: ApiError, kind: PurchaseKind): DefinitePaymentNotice | EligibilityRetry | undefined {
   if (cause.kind !== 'http' || cause.status !== cause.code) return;
   if (cause.status === 409) {
@@ -498,6 +502,12 @@ function releaseUncreatedPayment(pending: PendingExternal, accountKey: string) {
   Object.assign(state, { pending: null, quote: null, intent: null });
 }
 
+function rememberTrialCreateRefusal(pending: PendingExternal, refusal: TrialExternalRefusal) {
+  const readOnly = { ...pending, lookupOnly: true, trialCreateRefusal: refusal };
+  state.pending = readOnly;
+  try { save(readOnly); } catch { /* Keep the rejected quote read-only for this session. */ }
+}
+
 function projectTrialRefusal(refusal: TrialExternalRefusal, pending: PendingExternal, accountKey: string) {
   const claimNo = paymentRecordClaimNo(pending);
   const payload = purchaseRecordPayload(pending);
@@ -903,7 +913,18 @@ async function query(refreshTrialIntent = false) {
       state.canResubmit = false;
       accept(result, pending);
     }
-    else if (pending.trialCreateRefusal) finishTrialRefusal(pending.trialCreateRefusal, pending);
+    else if (pending.trialCreateRefusal) {
+      const owner = context;
+      if (pending.structuredTrialRefusals || !owner) finishTrialRefusal(pending.trialCreateRefusal, pending);
+      else {
+        releaseUncreatedPayment(pending, accountKey);
+        if (!owner.current()) finish(null);
+        else {
+          Object.assign(state, { reading: false, cashier: false, deadlineAt: owner.deadlineAt ?? null });
+          if (available(state.method)) await select(state.method); else reconcileChannel();
+        }
+      }
+    }
     else if (pending.useOrderTopup) {
       const method = pending.paymentMethod ?? state.method;
       releaseUncreatedPayment(pending, accountKey);
@@ -940,15 +961,15 @@ async function query(refreshTrialIntent = false) {
   }
 }
 function retryOriginal() {
-  if (state.canResubmit && !state.reading) void submitOriginal();
+  if (state.canResubmit && !state.reading) void submitOriginal(true);
 }
 /** Resubmits the original quote under the original key; the server applies it at most once. */
-async function submitOriginal() {
+async function submitOriginal(manualRetry = false) {
   const pending = state.pending;
   if (!pending || state.busy || state.reading || state.concluded) return;
   if (state.originalRecovery || pending.intentNo || pending.lookupOnly || pending.quotaRefusal || pending.useOrderTopup) return query();
   const version = requestVersion, accountKey = state.accountKey;
-  const retryingUnknownTrial = pending.kind === 'TRIAL_CONVERT' && state.canResubmit;
+  const retryingUnknownTrial = pending.kind === 'TRIAL_CONVERT' && manualRetry;
   let failed = false, requote = false, lookup = false;
   Object.assign(state, { busy: true, canResubmit: false, retryNotice: '' });
   try {
@@ -958,12 +979,11 @@ async function submitOriginal() {
       state.retryNotice = '';
       if (intent.status !== 'refused') accept(intent, pending);
       else if (intent.action === 'original') finishTrialRefusal(intent, pending);
-      else if (retryingUnknownTrial) lookup = true;
       else {
-        const readOnly = { ...pending, lookupOnly: true, trialCreateRefusal: intent };
-        state.pending = readOnly;
+        // A definite quote refusal follows the server's same-key replay check.
+        if (!retryingUnknownTrial || intent.action === 'review' && isTerminalTrialRequote(intent.reasonCode))
+          rememberTrialCreateRefusal(pending, intent);
         lookup = true;
-        try { save(readOnly); } catch { /* Keep the rejected quote read-only for this session. */ }
       }
     }
   } catch (error) {
@@ -1016,6 +1036,9 @@ async function submitOriginal() {
         return;
       }
       if (retryingUnknownTrial) {
+        const status = cause.message === 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND' ? 404 : 409;
+        if (isTerminalTrialRequote(cause.message) && isApiRefusal(cause, status, cause.message))
+          rememberTrialCreateRefusal(pending, { status: 'refused', action: 'review', reasonCode: cause.message });
         lookup = true;
         return;
       }

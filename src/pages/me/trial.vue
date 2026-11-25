@@ -764,6 +764,11 @@ const payment = usePurchasePayment();
 useVisibleInterval(() => { if (foregroundReadAllowed()) void freeTrial.refreshRemote(); }, 15_000,
   () => originalPurchase.value?.kind === "EXTERNAL" && !payment.state.open);
 
+function trialRefusalCopy(reason: string) {
+  return reason === "ORDER_MONTHLY_QUOTA_UNAVAILABLE" ? purchase.value.coPurchaseUnavailable
+    : trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable;
+}
+
 watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () => freeTrial.deniedLegacyConversion,
   () => checkout.outcome], ([visible, state, legacyResult, legacyDenial, outcome]) => {
   if (!visible || !state?.claimNo) return;
@@ -774,7 +779,7 @@ watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () 
   if (legacyDenial?.claimNo === state.claimNo) {
     const key = trialRefusalResultKey(legacyDenial.claimNo, legacyDenial.key);
     if (!trialResults.wasDelivered(key)) {
-      toast.warn(trialPurchaseReasonMessage(t.value, legacyDenial.reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable);
+      toast.warn(trialRefusalCopy(legacyDenial.reason));
       trialResults.consume(key, true);
     }
   }
@@ -794,13 +799,13 @@ watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () 
       trialResults.consume(key, true);
       void optionsRead.refresh().catch(() => {});
     } else if (reason === "TRIAL_NOT_CONVERTIBLE") {
-      toast.warn(trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable);
+      toast.warn(trialRefusalCopy(reason));
       trialResults.consume(key, true);
       void freeTrial.refreshRemote();
     } else if (reason === "TRIAL_WALLET_INSUFFICIENT" || trialPriceChanged(reason) || reason === "TRIAL_PRODUCT_NOT_AVAILABLE") {
       void navTo(checkoutHref(outcome.productNo, { kind: "refusal", submissionNo: outcome.submissionNo }));
     } else {
-      toast.warn(trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable);
+      toast.warn(trialRefusalCopy(reason));
       trialResults.consume(key, true);
       void optionsRead.refresh().catch(() => {});
     }
