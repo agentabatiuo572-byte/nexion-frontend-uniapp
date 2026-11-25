@@ -221,7 +221,8 @@ import { useDataVisibility } from "@/store/data-visibility";
 import { remoteApiEnabled } from "@/api/runtime";
 import type { RankSalary, RankSalaryAttempt, RankSalaryClaim } from "@/api/v-rank-api";
 import { useRankSalaryClaim } from "@/composables/use-rank-salary-claim";
-import { onShow } from "@dcloudio/uni-app";
+import { onHide, onShow } from "@dcloudio/uni-app";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const copy = useAuditUiCopy();
@@ -234,18 +235,19 @@ const theme = useTheme();
 const visibility = useDataVisibility();
 const motion = useRankFxMotion();
 
-const myRank = computed(() => vState.myRank);
-const rankDefs = computed(() => vState.ladder);
-const rankAvailable = computed(() => !remoteApiEnabled || vState.remoteReady);
+const displayRank = computed(() => remoteApiEnabled ? vState.rankPageSnapshot : vState);
+const myRank = computed(() => displayRank.value?.myRank ?? 0);
+const rankDefs = computed(() => displayRank.value?.ladder ?? []);
+const rankAvailable = computed(() => displayRank.value !== null);
 
 // The API supplies exact rank buckets; the engine counts members at or above
 // each required rank. This projection is only for the observed progress display.
 const previewData = computed(() => ({
-  myRank: vState.myRank,
-  selfComputePoints: vState.selfComputePoints,
-  directRefs: vState.directRefs,
-  teamComputePoints: vState.teamComputePoints,
-  vDownlineCounts: vState.vDownlineCounts,
+  myRank: myRank.value,
+  selfComputePoints: displayRank.value?.selfComputePoints,
+  directRefs: displayRank.value?.directRefs ?? 0,
+  teamComputePoints: displayRank.value?.teamComputePoints,
+  vDownlineCounts: displayRank.value?.vDownlineCounts ?? {},
 }));
 const prog = computed(() => teamRankProgress(previewData.value, rankDefs.value));
 const expandedRank = ref<VRank | null>(null);
@@ -259,7 +261,7 @@ watch(() => [auth.accountId, rankAvailable.value, visibility.hidden, myRank.valu
     expansionInitialized = false;
     expandedRank.value = null;
   }
-  // onShow can hide or clear facts while rereading. Only a complete ladder can
+  // Only a complete, verified ladder can
   // invalidate the chosen tier; null after initialization is an intentional fold.
   if (!ready) return;
   if (!expansionInitialized || (expandedRank.value !== null && !rankDefs.value.some(rank => rank.v === expandedRank.value))) {
@@ -350,7 +352,7 @@ const gains = computed<Gain[]>(() => {
   const uvt = uvtReward(next);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: `+${formatHowNumber(uvt, locale.code)}`, unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: nextName.value })] });
   const salaryFrom = current.monthlySalaryUsdt ?? '0', salaryTo = next.monthlySalaryUsdt;
-  if (vState.salary !== undefined && salaryTo && compareSalaryAmounts(salaryTo, '0') > 0 && compareSalaryAmounts(salaryTo, salaryFrom) !== 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, old: compareSalaryAmounts(salaryFrom, '0') > 0 ? formatHowNumber(salaryFrom, locale.code) : undefined, value: formatHowNumber(salaryTo, locale.code), unit: 'USDT' });
+  if (displayRank.value?.salary !== undefined && salaryTo && compareSalaryAmounts(salaryTo, '0') > 0 && compareSalaryAmounts(salaryTo, salaryFrom) !== 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, old: compareSalaryAmounts(salaryFrom, '0') > 0 ? formatHowNumber(salaryFrom, locale.code) : undefined, value: formatHowNumber(salaryTo, locale.code), unit: 'USDT' });
   return rows;
 });
 const gainArrowInk = computed(() => prog.value.next ? rankTierVars(prog.value.next.v, theme.resolved, visibility.hidden)['--tier-ink'] : '');
@@ -363,7 +365,7 @@ function benefitRows(rank: VRankDef): Gain[] {
   const uvt = uvtReward(rank);
   if (uvt > 0) rows.push({ key: 'uvt', icon: 'rank-uvt', tone: 'purple', name: t.value.myRank.rankUpTo, value: formatHowNumber(uvt, locale.code), unit: 'UVT', hint: [fmt(t.value.myRank.rewardNote, { r: `V${rank.v}` })] });
   const salaryUsdt = rank.monthlySalaryUsdt;
-  if (vState.salary !== undefined && salaryUsdt && compareSalaryAmounts(salaryUsdt, '0') > 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, value: formatHowNumber(salaryUsdt, locale.code), unit: 'USDT' });
+  if (displayRank.value?.salary !== undefined && salaryUsdt && compareSalaryAmounts(salaryUsdt, '0') > 0) rows.push({ key: 'salary', icon: 'rank-salary', tone: 'amber', name: t.value.myRank.monthly, value: formatHowNumber(salaryUsdt, locale.code), unit: 'USDT' });
   return rows;
 }
 
@@ -383,6 +385,7 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
     const copy = t.value.myRank;
     const dates = salaryDates(locale.code);
     const { item } = attempt;
+    if (result.status !== "FAILED") vState.applySalaryReceipt(result, attempt);
     if (result.status === "SUCCEEDED") {
       toast.success(fmt(copy.toastOkTitle, { a: salaryAmountText(result.amountUsdt) }), copy.toastOkDesc);
       await vState.refreshCanonicalVRank();
@@ -400,6 +403,7 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
       const desc = !vState.salary || today > deadline ? undefined : following ? dates.sentence(fmt(followingDay.slice(0, 7) === item.month ? copy.toastFailDrop : copy.toastFailEnd, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(following.amountUsdt), d: dates.day(followingDay) }))
         : today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
       toast.warn(copy.toastFailTitle, desc);
+      await vState.refreshCanonicalVRank();
     } else if (code === "SALARY_ALREADY_CLAIMED" || code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_AMOUNT_CHANGED") {
       await vState.refreshCanonicalVRank();
       if (!isVisible()) return;
@@ -418,7 +422,7 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
 
 function openAmountChange() {
   const change = reconfirm.value;
-  if (!change || !vState.salary) return;
+  if (!change || !vState.remoteReady || !vState.salary) return;
   const current = vState.salary.months.find(month => month.month === change.month);
   reconfirm.value = null;
   if (current?.status !== "CLAIMABLE") return;
@@ -430,6 +434,12 @@ function openAmountChange() {
   salaryDialog.value = "amount";
 }
 watch(() => vState.salary, openAmountChange);
+watch(() => vState.remoteReady, ready => {
+  if (ready) { openAmountChange(); return; }
+  salaryDialog.value = null;
+  promoSalary.value = null;
+  amountChange.value = null;
+});
 watch(salaryAccount, () => {
   salaryDialog.value = null;
   promoSalary.value = null;
@@ -445,13 +455,17 @@ const salaryViewOptions = computed(() => ({
 }));
 const salary = computed(() => salaryView({
   ...salaryViewOptions.value,
-  salary: vState.salary,
+  salary: displayRank.value?.salary,
   phase: salaryPhase.value,
   pending: salaryAttempt.value,
 }));
-const salaryDock = computed(() => salary.value.dock);
+const salaryDock = computed(() => {
+  const dock = salary.value.dock;
+  return !vState.remoteReady && (dock?.kind === "claim" || dock?.kind === "tray") ? null : dock;
+});
 const hasDock = computed(() => !!salaryDock.value || !!dockAction.value);
 const salaryDialogView = computed(() => {
+  if (!vState.remoteReady) return null;
   const copy = t.value.myRank, d = salaryDates(locale.code);
   const promo = promoSalary.value && salaryView({ ...salaryViewOptions.value, salary: promoSalary.value, phase: "idle" }).promo;
   if (salaryDialog.value === "promo" && promo) return {
@@ -489,6 +503,7 @@ function openSalaryPromo() {
 function confirmSalaryDialog() {
   const which = salaryDialog.value, source = promoSalary.value, change = amountChange.value;
   salaryDialog.value = null;
+  if (!vState.remoteReady) return;
   if (which === "promo" && source) {
     const item = displayedSalaryMonth(source);
     if (item) submitSalary(salaryAttemptFor(source, item));
@@ -503,7 +518,7 @@ function resendSalaryClaim() {
 const missingKinds = computed(() => new Set(prog.value.missing.map(row => row.kind)));
 const dockAction = computed(() => {
   const kinds = missingKinds.value;
-  if (salaryDock.value || !prog.value.next || !kinds.size) return null;
+  if (salary.value.dock || !prog.value.next || !kinds.size) return null;
   return [...kinds].every(kind => kind === 'selfComputePoints')
     ? { kind: 'store' as const, label: t.value.earn.selectDevice, href: '/pages/store/store' }
     : { kind: 'invite' as const, label: t.value.myRank.inviteBtn, href: '/pages/team/team?intent=share' };
@@ -527,9 +542,19 @@ onMounted(() => {
   // Local rank data is not used in remote mode; the ladder and member progress arrive together.
   if (remoteApiEnabled) void vState.ensureCanonicalVRank();
 });
+const rankReadFailed = () => remoteApiEnabled && salaryPhase.value === "idle" && (!!vState.remoteError || vState.salary === null);
+let releaseRankRefresh = () => {};
 onShow(() => {
-  if (remoteApiEnabled) void vState.ensureCanonicalVRank();
+  if (!remoteApiEnabled) return;
+  void vState.ensureCanonicalVRank();
+  releaseRankRefresh();
+  releaseRankRefresh = registerActivePageRefresh(() => {
+    // The shared pull handler retries sections that were already failing.
+    if (salaryPhase.value === "idle" && !rankReadFailed()) return vState.ensureCanonicalVRank();
+  }, "pages/team/rank");
 });
+onHide(() => releaseRankRefresh());
+onUnmounted(() => releaseRankRefresh());
 
 function retryRank() {
   if (remoteApiEnabled) void vState.refreshCanonicalVRank();
@@ -537,7 +562,7 @@ function retryRank() {
 
 function rowStatus(v: VRank): "done" | "current" | "next" | "locked" {
   if (visibility.hidden) return "locked";
-  return v < vState.myRank ? "done" : v === vState.myRank ? "current" : prog.value.next?.v === v ? "next" : "locked";
+  return v < myRank.value ? "done" : v === myRank.value ? "current" : prog.value.next?.v === v ? "next" : "locked";
 }
 
 function go(url: string) {
@@ -631,7 +656,7 @@ const textConditionsFor = (v: number) => v === 8 && rankDefs.value.find(rank => 
   ? [{ key: 'letter', icon: VRANK_TEXT_ICONS.letter as NxIconName, name: fmt(t.value.myRank.condLetter, { r: 'V8' }) }, { key: 'review', icon: VRANK_TEXT_ICONS.review as NxIconName, name: t.value.myRank.condReview }]
   : [];
 const textConditions = computed(() => !visibility.hidden && prog.value.next ? textConditionsFor(prog.value.next.v) : []);
-const atLeast = (level: number) => Object.entries(vState.vDownlineCounts).reduce((sum, [rank, count]) => Number(rank) >= level ? sum + count : sum, 0);
+const atLeast = (level: number) => Object.entries(previewData.value.vDownlineCounts).reduce((sum, [rank, count]) => Number(rank) >= level ? sum + count : sum, 0);
 type DetailRow = { key: string; name: string; current: string | null; target: string; unit: string; state: 'met' | 'missing' | 'unknown' | 'hidden' };
 const detail = computed(() => {
   const def = rankDefs.value.find(rank => rank.v === expandedRank.value);
@@ -645,9 +670,9 @@ const detail = computed(() => {
     const compact = def.v <= myRank.value && state === 'met';
     rows.push({ key, name, current: compact ? null : visibility.mask(number(actual === 'unknown' ? undefined : current)), target: number(required), unit: people ? t.value.myRank.people : '', state });
   };
-  add('self', t.value.myRank.self, vState.selfComputePoints, c.selfComputePoints ?? 0, false);
-  add('team', t.value.myRank.team, vState.teamComputePoints, c.teamComputePoints ?? 0, false);
-  add('buyers', t.value.myRank.buyers, vState.directRefs, c.directRefs ?? 0, true);
+  add('self', t.value.myRank.self, previewData.value.selfComputePoints, c.selfComputePoints ?? 0, false);
+  add('team', t.value.myRank.team, previewData.value.teamComputePoints, c.teamComputePoints ?? 0, false);
+  add('buyers', t.value.myRank.buyers, previewData.value.directRefs, c.directRefs ?? 0, true);
   for (const [level, required] of Object.entries(c.vDownlines ?? {})) add(`v${level}`, fmt(t.value.myRank.leaders, { r: `V${level}` }), atLeast(Number(level)), required ?? 0, true);
   const status = rowStatus(def.v);
   const tag = visibility.hidden ? '••••' : status === 'done' ? t.value.rank.done : status === 'current' ? t.value.myRank.isCurrent : t.value.myRank.notMet;
@@ -689,9 +714,10 @@ useAutoRecovery({
   retry: () => commission.ensureCanonicalConfig(),
 });
 useAutoRecovery({
-  failed: () => remoteApiEnabled && salaryPhase.value === "idle" && (!!vState.remoteError || vState.salary === null),
+  failed: rankReadFailed,
   retry: () => vState.refreshCanonicalVRank(),
   repeatMs: 30_000,
+  quiet: false,
 });
 </script>
 

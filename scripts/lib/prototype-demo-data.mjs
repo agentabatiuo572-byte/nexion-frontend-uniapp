@@ -12,7 +12,7 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
-import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
+import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPresetSelfOrderPoints, rankPresetTeamMembers, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo, demoCurrentTaskSample, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -487,6 +487,9 @@ function demoOrders(products,state,now,device41) {
       &&(original==='activated'||original==='provisioning_failed'))computePoints=640;
     if(device&&state.highestRank)computePoints=64000;
     else if(device&&state.walletLegacySeed)computePoints=1280;
+    // The two existing paid S1 orders carry their historical point snapshots.
+    if(usesRankPreset(state)&&(original==='activated'||original==='provisioning_failed'))
+      computePoints=rankPresetSelfOrderPoints(state,original);
     const repurchaseDays=repurchaseSampleDays[state.repurchaseState];
     const placedAt=original==='provisioning_failed'&&repurchaseDays!==undefined
       ? at-repurchaseDays*day-samplePaidAfter
@@ -1098,6 +1101,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
+  const networkMembers=()=>usesRankPreset(state)?rankPresetTeamMembers(state,now):demoTeamNetworkMembers(state,now);
   const walletBills=()=>{
     const order=demoHasLongBillRefs(state)&&!empty&&state.accountDeletionState!=='clear'
       ?demoAccountOrders(url,locale,state,now).find(row=>row.orderNo===longBillOrderNo&&row.canonicalStatus==='refunded'):null;
@@ -1116,25 +1120,28 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {referralCode:'UVELDEMO',rewardEnabled:true,inviterRewardNex:10,
       invitedCount,pendingCount:state.accountDeletionState==='clear'?0:Math.max(0,invitedCount-rewards.settledCount),...rewards};
   };
-  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,()=>demoFleetFacts(url,locale,state).devices,referralFacts);if(auxiliary!==undefined)return auxiliary;
+  const auxiliary=auxiliaryDemo(url,locale,state,request,read,walletBills,()=>demoFleetFacts(url,locale,state).devices,referralFacts,networkMembers);if(auxiliary!==undefined)return auxiliary;
   const staking=stakingDemo(url,state,request);if(staking!==undefined)return staking;
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   if(pathname.startsWith('/api/tasks/receipts')&&state.fleetState==='earning-credit'&&!state.fleetSeed)
     demoFleetFacts(url,locale,state);
   const secondary=secondaryDemo(url,state,request,walletBills);
   if(secondary!==undefined)return secondary;
-  if(pathname==='/api/config/v-ranks'||pathname==='/api/team/rank'){
-    const preset=rankPresetResponse(pathname,structuredClone(base()),state,now);
-    if(preset!==undefined)return preset;
-  }
   if(pathname==='/api/config/v-ranks') {
     const data=structuredClone(base());
+    const preset=rankPresetResponse(pathname,data,state,now);
+    if(preset!==undefined)return preset;
     const own=[0,demoV1SelfComputePoints,640,2000,4000,8000,16000,32000,64000],team=[0,1280,6400,20000,64000,160000,480000,1280000,3200000];
     data.ranks=data.ranks.map((rank,index)=>({...rank,cultivationBonus:rank.rewards.filter(reward=>reward.type==='UVT').reduce((sum,reward)=>sum+reward.amount,0),selfComputePoints:own[index],teamComputePoints:team[index]}));
     return data;
   }
   if(pathname==='/api/team/rank') {
     const data=structuredClone(base());
+    const productPoints=new Map(products.map(product=>[product.id,product.computePoints]));
+    const selfComputePoints=demoAccountOrders(url,locale,state,now).filter(order=>demoPaidPurchase(order)&&order.paidAt<=now)
+      .reduce((sum,order)=>sum+(order.computePoints??order.lineItems.reduce((total,line)=>total+(productPoints.get(line.sku)??0)*line.quantity,0)),0);
+    const preset=rankPresetResponse(pathname,data,state,now,selfComputePoints);
+    if(preset!==undefined)return preset;
     const {rank}=demoH4Account(state);
     const members=demoH4TeamMembers(state,now).filter(member=>member.layer<=7);
     const direct=members.filter(member=>member.layer===1);
@@ -1142,9 +1149,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const vDownlineCounts={};
     for(const member of direct)vDownlineCounts[member.vRank]=(vDownlineCounts[member.vRank]??0)+1;
     const teamComputePoints=members.reduce((sum,member)=>sum+member.lifetimeComputePoints,0);
-    const productPoints=new Map(products.map(product=>[product.id,product.computePoints]));
-    const selfComputePoints=demoAccountOrders(url,locale,state,now).filter(order=>demoPaidPurchase(order)&&order.paidAt<=now)
-      .reduce((sum,order)=>sum+(order.computePoints??order.lineItems.reduce((total,line)=>total+(productPoints.get(line.sku)??0)*line.quantity,0)),0);
     return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,vDownlineCounts,selfComputePoints,teamComputePoints}};
   }
   if(pathname==='/api/team/binary'){
@@ -1838,8 +1842,15 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       factSources:['nx_referral_reward_settlement','nx_wallet_ledger','nx_earnings_release_entry','nx_user_wallet'],refreshedAt:iso};
   }
   if(pathname==='/api/app/team/network') {
-    const members=demoTeamNetworkMembers(state,now);
-    return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor:null};
+    const preset=usesRankPreset(state);
+    const afterId=Number(url.searchParams.get('afterId')??0);
+    const roster=networkMembers();
+    const available=preset?roster.filter(member=>Number(member.id)>afterId):roster;
+    // Small preview pages exercise the same cursor contract without a larger synthetic network.
+    const pageSize=100;
+    const members=preset?available.slice(0,pageSize).map(({paidOrders,sponsorUserId,...member})=>member):available;
+    const nextCursor=available.length>members.length?members.at(-1).id:null;
+    return {...authority,source:'server',generatedAt:iso,totalMembers:members.length,directMembers:members.filter(member=>member.layer===1).length,activeMembers:members.filter(member=>member.status==='ACTIVE').length,monthComputePoints:members.reduce((sum,m)=>sum+m.monthComputePoints,0),lifetimeComputePoints:members.reduce((sum,m)=>sum+m.lifetimeComputePoints,0),members,nextCursor};
   }
   if(pathname==='/api/devices/earnings') {
     const facts=demoFleetFacts(url,locale,state,previewAccountId(state,request.headers?.()??{}));
