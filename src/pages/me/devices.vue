@@ -101,8 +101,8 @@
               @tradein="handleTradein(d)"
             >
               <!-- Board S6: the waiting pair as a warning strip; name and instance number never split. -->
-              <template v-if="d.replacement && isLiteDeviceReplacement(d.replacement, app.visibleDevices)" #replacement-status>
-                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.oldWaiting, pairSides(d.replacement))" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
+              <template v-if="d.replacement" #replacement-status>
+                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in replacementNoteParts(d.replacement, 'old')" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
               </template>
             </DeviceInventoryRow>
           </view>
@@ -121,7 +121,7 @@
               :class="{ 'device-replacement-row': d.replacement || canStartSlotReplacement(d) }"
               :device="d"
               :active="false"
-              :show-action="canControlDevice(d)"
+              :show-action="canControlDevice(d) && (!d.replacement || !!replacementCounterpart(d))"
               :disabled="slotsFull || !activationReady"
               :disabled-label="slotsUsed === null || !activationReady ? slotUnavailableText : undefined"
               :activate-label="t.myDevices.inventoryRowActivate"
@@ -134,12 +134,13 @@
               @toggle="handleActivate(d)"
               @tradein="handleTradein(d)"
             >
-              <template v-if="d.replacement && isLiteDeviceReplacement(d.replacement, app.visibleDevices)" #replacement-status>
-                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.newWaiting, pairSides(d.replacement))" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
+              <template v-if="d.replacement" #replacement-status>
+                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in replacementNoteParts(d.replacement, 'new')" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
               </template>
               <!-- Undoing is a reverse action (03 §3.1): plain ink-3 text, no container. With no candidate the entry stays,
-                   greyed, and the reason with its way out sits on the line below (board S9). -->
-              <template v-if="(d.replacement && isLiteDeviceReplacement(d.replacement, app.visibleDevices)) || canStartSlotReplacement(d)" #inventory-action>
+                   greyed, and the reason with its way out sits on the line below (board S9). A waiting device whose other end
+                   is not in the fleet list at all gets no action: neither undo nor a plain activate the server would refuse. -->
+              <template v-if="d.replacement || canStartSlotReplacement(d)" #inventory-action>
                 <view v-if="d.replacement" class="device-replacement-undo nx-reverse-action" role="button" :tabindex="replacementBusy ? -1 : 0" :aria-disabled="replacementBusy"
                   @click="cancelSlotReplacement(d)" @keydown.enter.prevent="cancelSlotReplacement(d)" @keydown.space.prevent="cancelSlotReplacement(d)"><text>{{ replacementCopy.cancel }}</text></view>
                 <NxButton v-else size="small" variant="brand" :label="replacementCopy.replace"
@@ -314,7 +315,7 @@ import { productCatalogState } from "@/store/product-catalog";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
 import { invalidatePassiveTabRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { isActivatableInventoryDevice, requiresActivationConfirmation } from "@/lib/device-slot-policy";
-import { isLiteDeviceReplacement } from "@/lib/lite-scope";
+import { isLiteShownDevice } from "@/lib/lite-scope";
 
 const t = useT();
 const app = useApp();
@@ -476,7 +477,9 @@ const replacementEffects = computed(() => {
 const undoSides = computed(() => {
   const decision = replacementDecision.value;
   if (!decision?.cancel) return [];
-  return [{ device: decision.oldDevice, fate: replacementCopy.value.cancelKeepsOld }, { device: decision.newDevice, fate: replacementCopy.value.cancelKeepsNew }];
+  // A device outside Lite's view (a phone) gets no block: its name and art stay hidden (Lite PRD §5.0).
+  return [{ device: decision.oldDevice, fate: replacementCopy.value.cancelKeepsOld }, { device: decision.newDevice, fate: replacementCopy.value.cancelKeepsNew }]
+    .filter(side => isLiteShownDevice(side.device.id, app.visibleDevices));
 });
 function deviceSide(device: Device) {
   return { name: deviceName(t.value, device), code: device.instanceNo };
@@ -485,6 +488,18 @@ function deviceSide(device: Device) {
 function pairSides(pair: PendingDeviceReplacement) {
   const code = (id: number) => app.visibleDevices.find((device) => device.id === String(id))?.instanceNo;
   return { old: { name: pair.oldDeviceName, code: code(pair.oldDeviceId) }, new: { name: pair.newDeviceName, code: code(pair.newDeviceId) } };
+}
+// Board S6. When the other end is outside Lite's view the strip says 「另一台设备」 and never names it.
+function replacementNoteParts(pair: PendingDeviceReplacement, side: "old" | "new") {
+  const copy = replacementCopy.value;
+  const otherShown = isLiteShownDevice(side === "old" ? pair.newDeviceId : pair.oldDeviceId, app.visibleDevices);
+  if (otherShown) return slotCopyParts(side === "old" ? copy.oldWaiting : copy.newWaiting, pairSides(pair));
+  return slotCopyParts(side === "old" ? copy.oldWaitingOther : copy.newWaitingOther);
+}
+// The undo command needs the old device's id and version. A hidden old end (a phone) is still in the full fleet list.
+function replacementCounterpart(newDevice: Device) {
+  const pair = newDevice.replacement;
+  return pair ? app.devices.find(device => device.id === String(pair.oldDeviceId)) : undefined;
 }
 function candidateLabel(device: Device) {
   const timing = replacementTiming(device);
@@ -638,9 +653,7 @@ async function confirmSlotReplacement(oldDevice: Device) {
 }
 
 async function cancelSlotReplacement(newDevice: Device) {
-  const pair = newDevice.replacement;
-  if (!pair || !isLiteDeviceReplacement(pair, app.visibleDevices)) return;
-  const oldDevice = activeDevices.value.find(device => device.id === String(pair.oldDeviceId));
+  const oldDevice = replacementCounterpart(newDevice);
   if (oldDevice) await runSlotReplacement(oldDevice, newDevice, true);
 }
 
@@ -696,8 +709,8 @@ async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: 
     closeDecision();
     if (refused && currentPage()) toast.warn(replacementCopy.value.retry);
     if (!isCurrentAccountScope(scope) || !await app.refreshRemoteFleet() || refused || !currentPage()) return;
-    const latestNew = app.visibleDevices.find(device => device.id === newDevice.id);
-    const latestOld = app.visibleDevices.find(device => device.id === oldDevice.id);
+    const latestNew = app.devices.find(device => device.id === newDevice.id);
+    const latestOld = app.devices.find(device => device.id === oldDevice.id);
     if (!latestNew || !latestOld) return;
     const pair = latestNew.replacement;
     if (!cancel && pair?.oldDeviceId === payload.oldDeviceId && pair.newDeviceId === payload.newDeviceId) {
