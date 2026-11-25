@@ -61,6 +61,11 @@ function onPointerDown(event: Event) {
   const el = root();
   if (el && event.target instanceof Node && !el.contains(event.target)) close();
 }
+// Keyboard focus moving to another control closes the bubble, like a tap outside it.
+function onFocusIn(event: Event) {
+  const el = root();
+  if (el && event.target instanceof Node && !el.contains(event.target)) close();
+}
 function onEscape(event: KeyboardEvent) {
   if (event.key !== 'Escape') return;
   event.preventDefault();
@@ -98,6 +103,7 @@ function listen(on: boolean) {
   if (typeof document === 'undefined') return;
   const method = on ? 'addEventListener' : 'removeEventListener';
   document[method]('pointerdown', onPointerDown, true);
+  document[method]('focusin', onFocusIn);
   document[method]('scroll', close, true);
   document[method]('keydown', onEscape as EventListener);
 }

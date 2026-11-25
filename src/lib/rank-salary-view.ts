@@ -34,7 +34,7 @@ const DAY = 86400000;
 const toUtc = (date: string) => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10) || 1), 12);
 const shiftDate = (date: string, days: number) => new Date(toUtc(date) + days * DAY).toISOString().slice(0, 10);
 const daysBetween = (from: string, to: string) => Math.round((toUtc(to) - toUtc(from)) / DAY);
-const salaryDay = (instant: string) => businessDayKey("GROWTH_TEAM", Date.parse(instant));
+export const salaryDay = (instant: string) => businessDayKey("GROWTH_TEAM", Date.parse(instant));
 
 /** The API accepts up to 12 whole and 6 fractional digits. Compare those digits directly. */
 export function compareSalaryAmounts(left: string, right: string): number {
@@ -186,7 +186,10 @@ export function salaryView(input: {
       card.tip = { tone: "neutral", lines: splitSentences(copy.claimRules) };
     }
     if (amountEndsToday) card.tag = { label: copy.todayTag, tone: "warning" };
-    if (dropsTo) card.tip = { tone: "warning", lines: splitSentences(say(copy.dropNote, { a: usdt(item.amountUsdt), b: usdt(dropsTo) })) };
+    if (dropsTo) {
+      const nextDay = salaryDay(next!.claimableFrom); // 月末：只限下月 1 日当天（同 D4c）
+      card.tip = { tone: "warning", lines: splitSentences(say(nextDay.slice(0, 7) === item.month ? copy.dropNote : copy.dropEndNote, { a: usdt(item.amountUsdt), b: usdt(dropsTo), d: d.day(nextDay) })) };
+    }
     if (!dock) dock = { kind: "claim", label: hidden ? copy.claimSalary : say(copy.claimBtn, { a: usdt(item.amountUsdt) }), month: item.month, amountUsdt: item.amountUsdt };
   }
 

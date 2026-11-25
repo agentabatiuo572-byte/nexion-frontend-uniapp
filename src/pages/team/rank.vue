@@ -190,7 +190,7 @@ import { CHASSIS_QUERY_SCOPE, useLoopsInView } from "@/composables/use-loops-in-
 import { advisorChatRoute } from "@/lib/advisor-chat-route";
 import { useConversations } from "@/store/conversations";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
-import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryAmountExpiresAt, salaryDates, salaryView } from "@/lib/rank-salary-view";
+import { compareSalaryAmounts, displayedSalaryMonth, lastClaimDay, salaryAmountExpiresAt, salaryDates, salaryDay, salaryView } from "@/lib/rank-salary-view";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useRankFxMotion } from "@/composables/use-rank-fx-guard";
@@ -392,8 +392,10 @@ const { phase: salaryPhase, pending: salaryAttempt, receiptInFlight: salaryRecei
       const deadline = lastClaimDay(attempt.amountExpiresAt ?? item.expiresAt);
       const today = vState.salary?.businessDate ?? attempt.businessDate;
       const upcoming = vState.salary?.upcoming;
-      const dropsTo = today === deadline && upcoming?.month === item.month && compareSalaryAmounts(upcoming.amountUsdt, item.amountUsdt) < 0 && Number(upcoming.amountUsdt) > 0 ? upcoming.amountUsdt : null;
-      const desc = dropsTo ? fmt(copy.toastFailDrop, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(dropsTo) })
+      // 今天截止但还有下一档：月中明天起可领，月末只限下月 1 日当天。
+      const following = today === deadline && upcoming?.month === item.month && Number(upcoming.amountUsdt) > 0 && compareSalaryAmounts(upcoming.amountUsdt, item.amountUsdt) !== 0 ? upcoming : null;
+      const followingDay = following ? salaryDay(following.claimableFrom) : "";
+      const desc = following ? dates.sentence(fmt(followingDay.slice(0, 7) === item.month ? copy.toastFailDrop : copy.toastFailEnd, { a: salaryAmountText(item.amountUsdt), b: salaryAmountText(following.amountUsdt), d: dates.day(followingDay) }))
         : today === deadline ? copy.toastFailToday : dates.sentence(fmt(copy.toastFailDesc, { d: dates.day(deadline) }));
       toast.warn(copy.toastFailTitle, desc);
     } else if (code === "SALARY_ALREADY_CLAIMED" || code === "SALARY_NOT_CLAIMABLE" || code === "SALARY_AMOUNT_CHANGED") {

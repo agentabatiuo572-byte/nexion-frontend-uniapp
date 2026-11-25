@@ -220,8 +220,9 @@ const rateRows = computed(() => {
   const shared = policy.value ? snapshot?.rates?.unilevelUsdt : undefined;
   return (snapshot?.ranks ?? []).filter(rank => rank.visible).sort((a, b) => a.v - b.v).map(rank => ({
     v: rank.v,
-    l1: formatRankPurchaseRate((rankBasedPurchase.value ? rank.purchaseL1Rate : undefined) ?? shared?.[1], dateLocale()),
-    l2: formatRankPurchaseRate((rankBasedPurchase.value ? rank.purchaseL2Rate : undefined) ?? shared?.[2], dateLocale()),
+    // 政策没读到时，已读到的按等级比例（只在新制生效后才有这两个字段）照常显示，不当成未知。
+    l1: formatRankPurchaseRate((rankBasedPurchase.value || !policy.value ? rank.purchaseL1Rate : undefined) ?? shared?.[1], dateLocale()),
+    l2: formatRankPurchaseRate((rankBasedPurchase.value || !policy.value ? rank.purchaseL2Rate : undefined) ?? shared?.[2], dateLocale()),
     mine: rankBasedPurchase.value && !visibility.hidden && vrank.remoteReady && rank.v === vrank.myRank,
   }));
 });
