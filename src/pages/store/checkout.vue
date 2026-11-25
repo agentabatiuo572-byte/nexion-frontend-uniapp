@@ -2669,7 +2669,8 @@ async function submitMultiTrialReview() {
         checkCurrent: async method => {
           if (!routeCurrent()) return "abandoned";
           if (!await checkQuote()) return "changed";
-          return method !== "WALLET" && trialDueBelowCent(exactTrialDue.value) ? "abandoned" : "current";
+          // A due that fell below one cent, or to exactly 0, never opens an external payment (R12).
+          return method !== "WALLET" && (trialDueBelowCent(exactTrialDue.value) || exactTrialDue.value === 0) ? "abandoned" : "current";
         },
         parseReceipt: raw => { trialCheckout.settleExternal(claimNo, parseTrialConvertReceipt(raw)); },
       });
@@ -2821,7 +2822,7 @@ async function onConfirmPay() {
               const ready = await freeTrial.refreshRemote();
               if (!isCurrentCheckoutRoute(confirmationScope)) return "abandoned";
               if (!ready || !paymentCurrent()) return "changed";
-              return trialDueBelowCent(exactTrialDue.value) ? "abandoned" : "current";
+              return trialDueBelowCent(exactTrialDue.value) || exactTrialDue.value === 0 ? "abandoned" : "current";
             },
             onTrialWalletRequired: () => {
               if (paymentCurrent()) trialExternalWalletOnly.value = true;
