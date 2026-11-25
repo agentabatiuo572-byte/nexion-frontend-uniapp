@@ -14,8 +14,12 @@
           <template v-else><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></template>
         </svg>
       </view>
-      <text class="nx-toast__title">{{ ui.activeToast.title }}</text>
-      <text v-if="ui.activeToast.description" class="nx-toast__desc">{{ ui.activeToast.description }}</text>
+      <view class="nx-toast__title">
+        <text v-for="(phrase, index) in splitPhrases(ui.activeToast.title)" :key="index" class="nx-toast__phrase">{{ phrase }}</text>
+      </view>
+      <view v-if="ui.activeToast.description" class="nx-toast__desc">
+        <text v-for="(phrase, index) in splitPhrases(ui.activeToast.description)" :key="index" class="nx-toast__phrase">{{ phrase }}</text>
+      </view>
     </view>
   </view>
 
@@ -30,6 +34,12 @@ const ui = useUI();
 const shown = ref(true);
 onShow(() => { shown.value = true; });
 onHide(() => { shown.value = false; });
+
+function splitPhrases(message: string): string[] {
+  // Published copy may omit the optional | markers. Use its sentence boundaries in that case.
+  if (message.includes("|")) return message.split("|");
+  return message.replace(/([，。！？；]+|[.!?;]+ +)(?=\S)/g, "$1|").split("|");
+}
 </script>
 
 <style scoped>
@@ -53,7 +63,7 @@ onHide(() => { shown.value = false; });
   gap: 8px;
   min-width: 136px;
   max-width: min(280px, 100%);
-  padding: 18px 20px 16px;
+  padding: 18px 12px 16px;
   border-radius: 20px;
   background: var(--v5-toast-bg);
   -webkit-backdrop-filter: blur(12px) saturate(125%);
@@ -62,23 +72,27 @@ onHide(() => { shown.value = false; });
   text-align: center;
 }
 /* Info is text only. */
-.nx-toast--info { padding: 12px 18px; border-radius: 16px; }
+.nx-toast--info { padding: 12px; border-radius: 16px; }
 .nx-toast__icon { display: block; flex: none; width: 32px; height: 32px; }
 .nx-toast--success .nx-toast__icon { color: var(--v5-toast-success); }
 .nx-toast--warn .nx-toast__icon { color: var(--v5-toast-warning); }
 .nx-toast--error .nx-toast__icon { color: var(--v5-toast-danger); }
-.nx-toast__title {
-  display: block;
+.nx-toast__title,
+.nx-toast__desc {
   max-width: 100%;
+}
+.nx-toast__phrase {
+  display: inline-block;
+  max-width: 100%;
+  white-space: pre-wrap;
   overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.nx-toast__title {
   font: 500 15px/22px var(--font-v5);
   color: var(--v5-toast-ink);
 }
 .nx-toast__desc {
-  display: block;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: break-word;
   font: 400 13px/18px var(--font-v5);
   color: var(--v5-toast-ink-2);
 }
