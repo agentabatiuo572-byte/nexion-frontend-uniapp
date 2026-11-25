@@ -27,7 +27,7 @@
                 </view>
                 <view class="binary-rate"><text class="nx-num-metric">×{{ rateLabel }}%</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><text class="binary-note">{{ t.binary.weakBadge }}</text></view>
               </view>
-              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text class="reward-amount nx-num-amount"><text class="binary-dollar">$</text>{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text></text></view>
+              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text v-if="settlementNotDue" class="binary-estimate-status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else class="reward-amount nx-num-amount"><text class="binary-dollar">$</text>{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text></text></view>
             </view>
               <view class="reward-binary-basis">
                 <text class="binary-note">{{ formulaText }}</text>
@@ -38,7 +38,8 @@
 
           <template v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)">
             <view v-if="blocked" class="binary-notice" :style="blockedStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4m0 4h.01"/></svg>
+              <svg v-if="settlementNotDue" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4m0 4h.01"/></svg>
               <view class="binary-notice-copy">
                 <text class="binary-notice-title">{{ blockedTitleText }}</text>
                 <text class="binary-note">{{ blockedRecoveryText }}</text>
@@ -195,6 +196,8 @@ const periodMatch = computed(() => {
   return Math.min(weakVol.value * factor * MATCH_RATE.value, DAILY_CAP.value * settleDays.value);
 });
 const estimateAmountParts = computed(() => visibility.mask(formatFinanceAmount(periodMatch.value)).split('.'));
+// Both groups qualified, payout day not reached: the server gives no estimate, so the amount slot shows a status line.
+const settlementNotDue = computed(() => remoteApiEnabled && snapshot.value?.blockedReason === "F3_SETTLEMENT_NOT_DUE");
 const blocked = computed(() => remoteApiEnabled
   ? Boolean(snapshot.value?.blockedReason)
   : leftMonthVol.value < MIN_THRESHOLD.value || rightMonthVol.value < MIN_THRESHOLD.value);
@@ -370,6 +373,7 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-estimate { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-4); padding: 14px var(--v5-space-4); border-radius: 18px; background: color-mix(in srgb, var(--ui-device-ink) 10%, var(--v5-surface-2)); }
 .binary-estimate .binary-label { flex: 1; min-width: 0; color: var(--v5-ink-3); }
 .binary-hero .reward-amount { margin: 0; max-width: 68%; font-size: 30px; line-height: 38px; font-weight: 500; letter-spacing: -.03em; overflow-wrap: break-word; }
+.binary-estimate-status { flex: 0 1 auto; max-width: 60%; text-align: right; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 .binary-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
 .binary-decimals { color: var(--v5-ink-3); }
 .binary-section-title { display: block; font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: 600; color: var(--v5-ink); }

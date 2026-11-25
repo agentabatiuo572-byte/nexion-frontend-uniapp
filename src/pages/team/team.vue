@@ -76,8 +76,8 @@
               <view class="team-bento__head"><NxIconTile tone="device" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="binary && !visibility.hidden" class="team-bento__split" aria-hidden="true"><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.left}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION }" /><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.right}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: bentoInView === false ? '0ms' : vizStagger(1) }" /></view>
               <view class="team-bento__foot">
-                <text v-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount"><text class="team-bento__currency">{{ binaryAmountParts.prefix }}</text>{{ binaryAmountParts.integer }}<text class="team-bento__fraction">.{{ binaryAmountParts.fraction }}</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
-                <text class="team-bento__caption">{{ designCopy.twoGroupRewards }} · <text class="team-bento__muted">{{ designCopy.estimated }}</text></text>
+                <text v-if="binarySettlementNotDue" class="team-bento__status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount"><text class="team-bento__currency">{{ binaryAmountParts.prefix }}</text>{{ binaryAmountParts.integer }}<text class="team-bento__fraction">.{{ binaryAmountParts.fraction }}</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
+                <text class="team-bento__caption">{{ designCopy.twoGroupRewards }}<template v-if="!binarySettlementNotDue"> · <text class="team-bento__muted">{{ designCopy.estimated }}</text></template></text>
               </view>
             </view>
             <view class="nx-team-leadership-pool-link team-bento__card team-bento__card--wide team-bento__card--violet" role="link" tabindex="0" @click="go('/pages/team/leadership-pool')" @keydown.enter.prevent="go('/pages/team/leadership-pool')">
@@ -168,7 +168,7 @@ const rankPresentation = ref<number | null>(null);
 const displayLedger = computed(() => ledgerPresentation.value ?? readTabSnapshot("commission"));
 const networkDisplaySnapshot = computed(() => networkReadable.value ? null : readTabSnapshot("network"));
 const selectedRank = computed(() => rankPresentation.value ?? readTabSnapshot("rank")?.rank ?? null);
-const binaryPresentation = ref<Pick<CanonicalBinaryState, "estimatedAmountUsdt" | "trackA" | "trackB"> | null>(null);
+const binaryPresentation = ref<Pick<CanonicalBinaryState, "estimatedAmountUsdt" | "trackA" | "trackB" | "blockedReason"> | null>(null);
 const displayEnvironmentInvalidated = ref(false);
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => { displayEnvironmentInvalidated.value = true; }, { flush: "sync" });
 const displayCatalogValid = computed(() => !displayEnvironmentInvalidated.value && productCatalogDisplayProof.value !== null
@@ -217,8 +217,8 @@ watch([displayCatalogValid, () => commission.binaryStatus, () => commission.bina
   if (commission.binaryStatus === "error") { binaryPresentation.value = null; return; }
   const snapshot = commission.binarySnapshot;
   if (!displayCatalogValid.value || commission.binaryStatus !== "ready" || !snapshot) return;
-  const { estimatedAmountUsdt, trackA, trackB } = snapshot;
-  binaryPresentation.value = { estimatedAmountUsdt, trackA, trackB };
+  const { estimatedAmountUsdt, trackA, trackB, blockedReason } = snapshot;
+  binaryPresentation.value = { estimatedAmountUsdt, trackA, trackB, blockedReason };
 }, { immediate: true, flush: "sync" });
 watch([displayCatalogValid, () => commission.eventsStatus, () => commission.eventsEvidence, () => network.remoteStatus, () => network.remoteTransientFailure, () => commission.eventsTransientFailure], () => {
   if (ledgerStrictFailure.value) { ledgerPresentation.value = null; return; }
@@ -351,6 +351,7 @@ const binary = computed(() => {
   const match = Math.min(Math.min(L / 30, R / 30) * 0.1, 5000);
   return { binaryMatch: match, leftVol: L, rightVol: R };
 });
+const binarySettlementNotDue = computed(() => binaryPresentation.value?.blockedReason === "F3_SETTLEMENT_NOT_DUE");
 const binaryMatchText = computed(() => binary.value === null ? "—" : formatUsd(binary.value.binaryMatch));
 const binaryAmountParts = computed(() => binary.value === null ? null : formatUsdOverviewParts(binary.value.binaryMatch));
 
@@ -681,6 +682,7 @@ useAutoRecovery({
 .team-bento__amount { font-family: var(--font-amount); }
 .team-bento__value--count { font-size: 28px; line-height: 34px; }
 .team-bento__unit { margin-left: 6px; font: 400 13px/1 var(--font-v5); color: var(--v5-ink-3); }
+.team-bento__status { font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .team-bento__currency { font-size: 14px; }
 .team-bento__fraction { color: var(--v5-ink-3); }
 /* The caption names the figure above it: auxiliary description role, 400, muted (10 §10.1; 01 §1.1.1 pairing 1). */
