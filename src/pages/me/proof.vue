@@ -379,6 +379,7 @@ const shareText = computed(() => {
     return longestOrCurrent.value === null
       ? fmt(copy.shareIntro, { link })
       : fmt(copy.shareStreak, { days: longestOrCurrent.value, link });
+  if (visibility.hidden) return fmt(copy.shareIntro, { link });
   if (variant.value === "network")
     return totalMembers.value === null
       ? fmt(copy.shareIntro, { link })
@@ -402,12 +403,13 @@ function beginProofAction(): (() => boolean) | null {
   const request = remoteRequest;
   const snapshot = remoteSnapshot.value;
   const link = referralLink.value;
+  const hidden = visibility.hidden;
   const expectedAccount = app.accountKey;
   const expectedBinding = app.accountBindingEpoch;
   const accountScope = captureAccountScope();
   const runScope = captureRuntimeRevision();
   return () => remoteMounted && proofReady.value && request === remoteRequest
-    && snapshot === remoteSnapshot.value && link === referralLink.value
+    && snapshot === remoteSnapshot.value && link === referralLink.value && hidden === visibility.hidden
     && expectedAccount === app.accountKey && expectedBinding === app.accountBindingEpoch
     && isCurrentAccountScope(accountScope) && isCurrentRuntimeRevision(runScope);
 }
@@ -523,7 +525,7 @@ async function drawProofPoster(): Promise<void> {
       ctx.setFontSize(24);
       ctx.fillText(`${t.value.proof.activeDays}: ${proofPosterText(activeDays.value)}`, 124, 660);
       ctx.fillText(`${t.value.proof.devices}: ${proofPosterText(onlineDevices.value)}`, 124, 706);
-      ctx.fillText(`${t.value.proof.teamMembers}: ${proofPosterText(totalMembers.value)}`, 124, 752);
+      ctx.fillText(`${t.value.proof.teamMembers}: ${visibility.mask(proofPosterText(totalMembers.value))}`, 124, 752);
 
       drawPosterQr(ctx, 634, 438, 300);
       ctx.setFillStyle("#b7ff3c");
@@ -555,8 +557,8 @@ function posterMetricValue(): string {
   if (variant.value === "streak") return longestOrCurrent.value === null
     ? t.value.proof.valueUnavailable
     : `${proofPosterText(longestOrCurrent.value)} ${t.value.proof.daysShort}`;
-  if (variant.value === "network") return proofPosterText(totalMembers.value);
-  return `${earningsTotalText.value}`;
+  if (variant.value === "network") return visibility.mask(proofPosterText(totalMembers.value));
+  return visibility.mask(earningsTotalText.value);
 }
 
 function drawPosterQr(ctx: UniApp.CanvasContext, x: number, y: number, size: number) {

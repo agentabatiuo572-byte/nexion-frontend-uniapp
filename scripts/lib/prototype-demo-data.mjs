@@ -1,7 +1,7 @@
 // Local presentation data. This module is never imported into src or an App build.
 // Monetary amounts, hardware specifications and identities below are illustrative.
 import { createHash } from 'node:crypto';
-import { demoAccountId, demoPurchasingAccountId, demoReferralBuyer, previewAccountId } from './prototype-demo-identity.mjs';
+import { demoAccountId, demoPurchasingAccountId, demoReferralBuyer, previewAccountId, previewSelectedAccountId } from './prototype-demo-identity.mjs';
 import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { quoteBundleAmountUsdt } from '../../src/api/bundle-quote.ts';
@@ -1152,17 +1152,21 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {...data,rankCode:'V'+rank,progress:{...data.progress,directRefs,vDownlineCounts,selfComputePoints,teamComputePoints}};
   }
   if(pathname==='/api/team/binary'){
-    const members=demoH4TeamMembers(state,now);
-    const legs=demoBinaryLegMembers(members);
+    const preset=usesRankPreset(state);
+    const members=preset?networkMembers():demoH4TeamMembers(state,now);
+    const legs=demoBinaryLegMembers(members,preset?String(previewSelectedAccountId(state)):demoAccountId);
     const direct=members.filter(member=>member.layer===1);
     const trackAMembers=direct.filter(member=>member.leg==='A').length;
     const trackBMembers=direct.filter(member=>member.leg==='B').length;
-    const asOfDate=demoTeamBusinessDate(now);
+    const asOfDate=preset?new Date(now).toISOString().slice(0,10):demoTeamBusinessDate(now);
+    const month=asOfDate.slice(0,7);
     const monthEnd=new Date(Date.UTC(Number(asOfDate.slice(0,4)),Number(asOfDate.slice(5,7)),0)).getUTCDate();
-    const matches=demoCommissionGroups(state,state.previewFactsAt).filter(event=>event.kind==='binary');
+    // The legacy settlement has no matching paid orders in an explicit rank preset.
+    const matches=preset?[]:demoCommissionGroups(state,state.previewFactsAt).filter(event=>event.kind==='binary');
     const consumed=matches.reduce((total,match)=>total+match.orderAmountUSD,0);
     const volume=leg=>Math.max(0,legs[leg].flatMap(member=>member.paidOrders)
-      .filter(order=>order.paidAt<=now).reduce((sum,order)=>sum+order.amountUsdt,0)-consumed);
+      .filter(order=>order.paidAt<=now&&(!preset||new Date(order.paidAt).toISOString().startsWith(month)))
+      .reduce((sum,order)=>sum+order.amountUsdt,0)-consumed);
     const trackA=volume('A'),trackB=volume('B'),threshold=1000,matchRate=.1,dailyCap=5000;
     const periodCap=dailyCap*monthEnd;
     let blockedReason='';
