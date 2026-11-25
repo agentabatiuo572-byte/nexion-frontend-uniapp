@@ -26,7 +26,7 @@
           </view>
           <view v-if="row.due" class="tdp-row__price">
             <text class="tdp-row__due"><text class="tdp-row__cur">$</text>{{ row.due.whole }}<text class="tdp-row__dec">{{ row.due.decimals }}</text></text>
-            <text class="tdp-row__was" :class="{ 'tdp-row__was--claim': row.claimPrice }"><text v-if="row.claimPrice" class="tdp-row__claim">{{ copy.claimPrice }}</text><text class="tdp-row__strike">{{ row.was }}</text></text>
+            <text class="tdp-row__was" :class="{ 'tdp-row__was--claim': row.claimPrice, 'tdp-row__was--stack': row.claimStack }"><text v-if="row.claimPrice" class="tdp-row__claim">{{ copy.claimPrice }}</text><text class="tdp-row__strike">{{ row.was }}</text></text>
           </view>
           <text v-else-if="row.quoteFailed" class="tdp-row__unknown">—</text>
           <view class="tdp-row__radio" aria-hidden="true" />
@@ -89,11 +89,13 @@ const rows = computed(() => props.options.map(option => {
   const due = option.canBuy && option.quote ? amountParts(option.quote.amountUSD) : null;
   const was = option.priceUSD === null ? "" : `$${formatGroupedAmount(option.priceUSD, 2)}`;
   const claimPrice = option.isTrialProduct && option.marketPriceUSD !== undefined && option.marketPriceUSD !== option.priceUSD;
+  // Beside the struck price the label only fits in Chinese; longer words take the line above.
+  const claimStack = claimPrice && copy.value.claimPrice.length > 6;
   const link = option.reasonCode === "PURCHASE_GATE_NOT_MET" && (props.conditionLinks?.includes(option.productNo) ?? true);
   const checked = !props.locked && option.canBuy && option.productNo === props.selectedProductNo;
   const aria = [option.productName, option.isTrialProduct ? copy.value.thisTrialTag : "", reason || (estimate ? estimate.label + estimate.value : ""),
-    due ? `$${due.whole}${due.decimals}` : "", due ? (claimPrice ? `${copy.value.claimPrice} ${was}` : was) : ""].filter(Boolean).join(", ");
-  return { option, productNo: option.productNo, selectable, quoteFailed, reason, estimate, due, was, claimPrice, link, checked, aria };
+    due ? `${copy.value.finalPrice} $${due.whole}${due.decimals}` : "", due ? `${claimPrice ? copy.value.claimPrice : copy.value.unitPrice} ${was}` : ""].filter(Boolean).join(", ");
+  return { option, productNo: option.productNo, selectable, quoteFailed, reason, estimate, due, was, claimPrice, claimStack, link, checked, aria };
 }));
 // Roving tab stop: the checked row, else the first selectable one (03 §3.5).
 const tabStop = computed(() => rows.value.find(row => row.checked)?.productNo ?? rows.value.find(row => row.selectable)?.productNo ?? null);
@@ -158,6 +160,9 @@ function move(row: { productNo: string }, delta: number) {
 /* The claim label hangs left, level with the tag line's free space, so it does not narrow the name column. */
 .tdp-row__was--claim { margin-left: -16px; }
 .tdp-row__claim { margin-right: 4px; }
+/* 「领取时价格」 on its own line above the struck price, clear of the estimate. */
+.tdp-row__was--stack { margin-left: 0; }
+.tdp-row__was--stack .tdp-row__claim { display: block; margin-right: 0; }
 .tdp-row__strike { text-decoration: line-through; }
 .tdp-row__unknown { flex: none; color: var(--v5-ink-3); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-v5); }
 .tdp-row__radio { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); display: grid; place-items: center; }

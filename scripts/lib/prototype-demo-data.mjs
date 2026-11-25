@@ -612,12 +612,12 @@ export function demoPurchasedOrderDevices(state, orders, products, template) {
     const inInventory = order.inventoryDeviceIds?.includes(id) ?? order.canonicalStatus === 'inventory';
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
-    const name=order.trialPurchasedDevice?.productName??(order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name);
+    const name=order.trialPurchasedDevice?.name??(order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name);
     devices.push({...template,id,instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
       activatedAt:inInventory ? null : (order.activatedAt ?? order.inventoryUsedAt),purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
       ...(order.trialPurchasedDevice&&{imageUrl:order.trialPurchasedDevice.imageUrl,deviceType:product.productType,
         gpuModel:product.gpu,vramTotalGb:Number.parseInt(product.vram,10)||0,basePowerW:Number.parseInt(product.power,10)||0,
-        location:product.datacenter,sourceOrderNo:order.orderNo}),
+        location:product.datacenter||template.location,sourceOrderNo:order.orderNo}),
       ...(inInventory&&{status:'INACTIVE',runtimeStatus:'OFFLINE'}),...order.replacementDevice,actualPaidUsdt:Number(order.amountUsdt)/order.quantity});
   }
   return devices;

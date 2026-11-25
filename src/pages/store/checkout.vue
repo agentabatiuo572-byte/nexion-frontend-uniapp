@@ -122,7 +122,7 @@
           <view v-if="multiTrialCheckout && !trialOriginal && (trialWalletOnly || trialZeroDue || (trialQuotePending && productId !== trialDeviceNo))" class="checkout-section">
             <view class="checkout-section-heading"><text>{{ t.store.coPaymentMethod }}</text></view>
             <view class="checkout-group"><view class="checkout-option">
-              <NxIconTile tone="teal" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="WALLET_PATH" /><path :d="WALLET_PATH2" /></svg></NxIconTile>
+              <NxIconTile tone="teal" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="WALLET_PATH" /><path :d="WALLET_PATH2" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg></NxIconTile>
               <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.me.walletBalance }}</text><text class="checkout-row-description">{{ trialWalletRowNote }}</text></view>
             </view></view>
           </view>
@@ -2060,7 +2060,7 @@ const trialTrayNote = computed(() => {
   const status = activeTrialOutcome.value?.status;
   if (status === "storage-error" || trialNeedsTopup.value) return "";
   if (status === "processing") return purchaseCopy.value.coConfirming;
-  if (status === "resumable") return trialDetailCopy.value.origNotSent;
+  if (status === "resumable") return purchaseCopy.value.coUnfinished;
   return purchaseCopy.value.coTrialNotice;
 });
 // 更换设备 goes back to the trial detail's selection, as an unavailable trial device does (leaveTrialReview), minus its toast.

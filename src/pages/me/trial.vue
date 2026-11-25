@@ -606,7 +606,7 @@ const barNote = computed(() => {
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
-  if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? detail.value.origNotSent : "";
+  if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? purchase.value.coUnfinished : "";
   if (usePurchaseOptions.value) {
     const only = purchaseOptionsView.value.options[0];
     if (noBuyableDevices.value && purchaseOptionsView.value.options.length === 1 && only?.isTrialProduct) {
@@ -635,13 +635,11 @@ const rulesLines = computed(() => [
     : fmt(w.value.rulesBefore, { cap: formatGroupedAmount(cfg.value.trialOffsetCapUSD) }),
   w.value.rulesNoCash,
   w.value.rulesAfter,
-  ...(earlyQuote.value ? [
-    ...(earlyQuote.value.earlyDiscountConfiguredUSD > 0 ? [fmt(
-      earlyQuote.value.settlementPolicy === "FULL_TERM_ON_CONVERSION" ? detail.value.rulesEarlyFull : detail.value.rulesEarly,
-      { discount: usdShort(earlyQuote.value.earlyDiscountConfiguredUSD) },
-    )] : []),
-    lifecycle.value.rulesRefund,
-  ] : []),
+  ...(earlyQuote.value && earlyQuote.value.earlyDiscountConfiguredUSD > 0 ? [fmt(
+    earlyQuote.value.settlementPolicy === "FULL_TERM_ON_CONVERSION" ? detail.value.rulesEarlyFull : detail.value.rulesEarly,
+    { discount: usdShort(earlyQuote.value.earlyDiscountConfiguredUSD) },
+  )] : []),
+  lifecycle.value.rulesRefund,
   w.value.rulesExpiry,
 ]);
 
@@ -1023,7 +1021,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trs-list { display:flex;flex-direction:column;gap:10px;margin-top:14px; }
 .trs-line { display:flex;align-items:flex-start;gap:8px; }
 .trs-line__dot { flex:none;width:6px;height:6px;margin-top:8px;border-radius:50%;background:var(--v5-brand); }
-.trs-line__text { flex:1;min-width:0;color:var(--v5-ink-2);font:var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5);overflow-wrap:break-word; }
+.trs-line__text { flex:1;min-width:0;color:var(--v5-ink-2);font:var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5);overflow-wrap:break-word;text-wrap:pretty; }
 .trs-got { display:flex;width:100%;margin-top:18px; }
 @keyframes trs-fade {
   from { opacity: 0; }
