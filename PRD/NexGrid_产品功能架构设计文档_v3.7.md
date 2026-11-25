@@ -2217,7 +2217,7 @@ v2政策来自 `GET /api/config/commission/direct-referral?schemaVersion=2`，�
 - 30 天内退款 / 取消订单的 USDT 金额按比例扣减当月 GV
 - 下游成员降级 / 注销后,其历史算力额从对应轨道累加值中移除
 
-**周期**:按自然月统计,每月 1 日 00:00 UTC 滚动归零;月底 23:59 UTC 锁定结算。
+**周期**:按团队业务日的自然月统计(与结算一致,团队业务时区),每月 1 日 00:00 归零,月末最后一天为发放日。
 
 **实现引用**:
 - `useNetwork.leftVolumeMonth()` / `rightVolumeMonth()` — 遍历 `members[]` 按 `binary === "left" | "right"` 筛选,累加 `monthVolumeUSD` 字段
