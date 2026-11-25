@@ -1161,21 +1161,25 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const asOfDate=preset?new Date(now).toISOString().slice(0,10):demoTeamBusinessDate(now);
     const month=asOfDate.slice(0,7);
     const monthEnd=new Date(Date.UTC(Number(asOfDate.slice(0,4)),Number(asOfDate.slice(5,7)),0)).getUTCDate();
-    // The legacy settlement has no matching paid orders in an explicit rank preset.
-    const matches=preset?[]:demoCommissionGroups(state,state.previewFactsAt).filter(event=>event.kind==='binary');
+    const matches=demoCommissionGroups(state,state.previewFactsAt).filter(event=>event.kind==='binary');
     const consumed=matches.reduce((total,match)=>total+match.orderAmountUSD,0);
     const volume=leg=>Math.max(0,legs[leg].flatMap(member=>member.paidOrders)
       .filter(order=>order.paidAt<=now&&(!preset||new Date(order.paidAt).toISOString().startsWith(month)))
       .reduce((sum,order)=>sum+order.amountUsdt,0)-consumed);
     const trackA=volume('A'),trackB=volume('B'),threshold=1000,matchRate=.1,dailyCap=5000;
     const periodCap=dailyCap*monthEnd;
+    const assignmentIncomplete=trackAMembers+trackBMembers!==direct.length||(!preset&&(!trackAMembers||!trackBMembers));
+    const weakerVolume=Math.min(trackA,trackB);
+    const belowThreshold=weakerVolume<threshold;
+    const settlementNotDue=Number(asOfDate.slice(8))!==monthEnd;
     let blockedReason='';
-    if(trackAMembers+trackBMembers!==direct.length||!trackAMembers||!trackBMembers)blockedReason='BINARY_LEG_ASSIGNMENT_INCOMPLETE';
-    else if(Math.min(trackA,trackB)<threshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
-    else if(Number(asOfDate.slice(8))!==monthEnd)blockedReason='F3_SETTLEMENT_NOT_DUE';
+    if(assignmentIncomplete)blockedReason='BINARY_LEG_ASSIGNMENT_INCOMPLETE';
+    else if(belowThreshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
+    else if(settlementNotDue)blockedReason='F3_SETTLEMENT_NOT_DUE';
+    const estimateBlocked=assignmentIncomplete||belowThreshold||(!preset&&settlementNotDue);
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,
       trackATotalMembers:legs.A.length,trackBTotalMembers:legs.B.length,autoPlacedMembers:0,
-      matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:blockedReason?0:Number(Math.min(periodCap,Math.min(trackA,trackB)*matchRate).toFixed(6)),
+      matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:estimateBlocked?0:Number(Math.min(periodCap,weakerVolume*matchRate).toFixed(6)),
       settlePeriod:'monthly',residualPolicy:'carryForward',spilloverEnabled:false,gvReset:'monthly',paused:false,blockedReason,
       recentMatches:matches
         .map(event=>({id:event.id,amountUsdt:event.amountUSDT,status:event.status.toUpperCase(),
