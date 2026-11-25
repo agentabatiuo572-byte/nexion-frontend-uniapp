@@ -3638,6 +3638,7 @@ export const ms: Messages = {
       referralReward: "Ganjaran jemputan",
       earn: "Pendapatan",
       refer: "Ganjaran jemputan dikreditkan",
+      vrankSalary: "Ganjaran bulanan pangkat",
       referDebit: "Ganjaran jemputan ditarik balik",
       referNeutral: "Ganjaran jemputan",
       bonus: "Ganjaran dikreditkan",

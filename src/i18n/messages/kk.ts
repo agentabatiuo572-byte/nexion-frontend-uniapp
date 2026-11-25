@@ -3638,6 +3638,7 @@ export const kk: Messages = {
       referralReward: "Шақыру сыйақысы",
       earn: "Табыс",
       refer: "Шақыру сыйақысы",
+      vrankSalary: "Дәреже үшін айлық төлем",
       referDebit: "Шақыру сыйақысы кері алынды",
       referNeutral: "Шақыру сыйақысы",
       bonus: "Сыйақы",

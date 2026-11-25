@@ -3638,6 +3638,7 @@ export const id: Messages = {
       referralReward: "Hadiah undangan",
       earn: "Pendapatan",
       refer: "Hadiah undangan",
+      vrankSalary: "Hadiah bulanan peringkat",
       referDebit: "Hadiah undangan dibatalkan",
       referNeutral: "Hadiah undangan",
       bonus: "Hadiah",

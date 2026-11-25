@@ -3638,6 +3638,7 @@ export const uz: Messages = {
       referralReward: "Taklif mukofoti",
       earn: "Daromad tushdi",
       refer: "Taklif mukofoti tushdi",
+      vrankSalary: "Daraja uchun oylik toʻlov",
       referDebit: "Taklif mukofoti qaytarib olindi",
       referNeutral: "Taklif mukofoti",
       bonus: "Mukofot tushdi",

@@ -3638,6 +3638,7 @@ export const ru: Messages = {
       referralReward: "Награда за приглашение",
       earn: "Доход зачислен",
       refer: "Награда за приглашение зачислена",
+      vrankSalary: "Месячная выплата за ранг",
       referDebit: "Отзыв награды за приглашение",
       referNeutral: "За приглашение",
       bonus: "Награда зачислена",

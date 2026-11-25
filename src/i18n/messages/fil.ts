@@ -3638,6 +3638,7 @@ export const fil: Messages = {
       referralReward: "Reward sa imbita",
       earn: "Naidagdag ang kita",
       refer: "Naidagdag ang reward sa imbita",
+      vrankSalary: "Buwanang reward sa rank",
       referDebit: "Binawi ang reward sa imbita",
       referNeutral: "Reward sa imbita",
       bonus: "Naidagdag ang reward",
