@@ -4922,7 +4922,7 @@ export const fil: Messages = {
     formula: "{rate}% ng mas mababang volume ng order sa dalawang grupo, ibinibigay {freq}",
     blocked: "Naka-pause ang reward",
     settlementPending: "Kwalipikado na, hinihintay ang araw ng payout",
-    settlesOnPayoutDay: "Kinukuwenta sa araw ng payout",
+    settlesOnPayoutDay: "Sa araw ng payout",
     settlementUnavailable: "Hindi available ang payout",
     blockedDetail: "Hindi pa naaabot ng Grupo {side} ang kailangang volume ng order.",
     blockReasons: {

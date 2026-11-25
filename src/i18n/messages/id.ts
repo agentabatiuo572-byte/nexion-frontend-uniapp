@@ -4922,7 +4922,7 @@ export const id: Messages = {
     formula: "{rate}% dari volume pesanan terendah, dibayarkan {freq}",
     blocked: "Hadiah dijeda",
     settlementPending: "Sudah memenuhi syarat, menunggu hari pembayaran",
-    settlesOnPayoutDay: "Dihitung pada hari pembayaran",
+    settlesOnPayoutDay: "Pada hari pembayaran",
     settlementUnavailable: "Pembayaran tidak tersedia",
     blockedDetail: "Volume pesanan Grup {side} belum memenuhi syarat.",
     blockReasons: {
