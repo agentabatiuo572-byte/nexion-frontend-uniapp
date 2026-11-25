@@ -2602,9 +2602,11 @@ async function onConfirmPay() {
       toast.warn(t.value.store.coSetupRequired);
       return;
     }
-    // Background polls retain the reviewed page; only a fresh authority read can authorize payment.
-    const trialReady = await freeTrial.refreshRemote();
-    if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
+    // Only a checkout that may use trial credit needs fresh trial authority before payment.
+    if (!confirmedOrdinaryProduct.value) {
+      const trialReady = await freeTrial.refreshRemote();
+      if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
+    }
   }
   if (trialCheckoutSource.value && !trialView.value.applied) {
     confirming = false;
