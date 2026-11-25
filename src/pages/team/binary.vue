@@ -61,7 +61,7 @@
                         <text v-else class="reward-wing-member__rank">{{ visibility.mask('') }}</text>
                         <view class="reward-wing-member__body">
                         <text class="binary-label">{{ wing.name }}{{ binaryCopy.leads }}</text>
-                        <text class="reward-wing-member__name">{{ wing.top.name }}</text>
+                        <text class="reward-wing-member__name">{{ visibility.mask(wing.top.name) }}</text>
                         <text class="reward-wing-member__points nx-num-metric">{{ visibility.mask(formatComputePoints(wing.top.monthComputePoints, locale.code)) }}</text>
                         </view>
                       </view>
