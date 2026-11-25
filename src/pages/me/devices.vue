@@ -149,7 +149,7 @@
               </template>
             </DeviceInventoryRow>
           </view>
-          <view v-if="slotsFull && !inactiveDevices.some(canStartSlotReplacement)" class="device-inventory-warn">
+          <view v-if="showSlotsFullWarning" class="device-inventory-warn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
             <text>{{ t.myDevices.inventorySlotsFullWarning }}</text>
           </view>
@@ -450,6 +450,8 @@ const slotsUsed = computed(() => remoteApiEnabled && (!app.remoteFleetHasSnapsho
 const slotsFull = computed(() => slotsUsed.value === null || slotsUsed.value >= app.slotCap);
 const activationReady = computed(() => !remoteApiEnabled
   || (app.remoteFleetStatus === "ready" && trialPresentation.actionsReady.value));
+const showSlotsFullWarning = computed(() => slotsUsed.value !== null && slotsFull.value && activationReady.value
+  && inactiveDevices.value.some(device => !device.replacement && !canStartSlotReplacement(device)));
 const slotUnavailableText = computed(() => app.remoteFleetStatus === "error" || trial.authorityStatus === "error"
   ? trialCopy.value.slotsUnknown : trialCopy.value.slotsChecking);
 
@@ -467,20 +469,20 @@ const replacementCandidates = computed(() => activeDevices.value.filter((device)
   device.kind !== "unknown" && deviceOnline(device) && !device.pendingDeactivate && !device.replacement));
 const tasksConfirmed = computed(() => !remoteApiEnabled || app.remoteAssignmentStatus === "ready"
   || (app.remoteAssignmentStatus === "loading" && app.remoteAssignmentHasSnapshot));
-// The swap-out timing is written only from a confirmed job read: no job swaps out now, a claimed or running job defers
-// it (the server's active-task check); any other job state gets the neutral wording.
+// The job read can omit expired legacy assignments and drained v2 jobs that still affect stopping.
+// Simulated jobs may finish during the stop command. These reads cannot guarantee the swap-out timing.
 function replacementTiming(device: Device): "idle" | "busy" | null {
-  if (!tasksConfirmed.value) return null;
+  if (!tasksConfirmed.value || device.recoveryPending || device.currentTask?.executionMode === "SIMULATED") return null;
   const status = device.currentTask?.status;
-  if (!device.currentTask) return "idle";
-  return status === undefined || status === "CLAIMED" || status === "RUNNING" ? "busy" : null;
+  return status === "CLAIMED" || status === "RUNNING" ? "busy" : null;
 }
 const replacementStep = computed(() => replacementDecision.value?.cancel === false ? replacementDecision.value : null);
 const replacementEffects = computed(() => {
   const step = replacementStep.value;
   if (!step) return [];
   const copy = replacementCopy.value;
-  const timing = replacementTiming(step.oldDevice);
+  const currentOldDevice = replacementCandidates.value.find(device => device.id === step.oldDevice.id);
+  const timing = currentOldDevice ? replacementTiming(currentOldDevice) : null;
   if (timing === "idle") return [{ icon: "now", text: copy.confirmNow }];
   if (timing === "busy") return [{ icon: "job", text: copy.confirmAfterJob }, { icon: "return", text: copy.confirmReturnUndo }];
   return [{ icon: "info", text: copy.confirm }, { icon: "return", text: copy.confirmReturn }];
@@ -657,42 +659,56 @@ async function cancelSlotReplacement(newDevice: Device) {
 
 async function runSlotReplacement(oldDevice: Device, newDevice: Device, cancel: boolean) {
   if (replacementBusy.value) return;
-  const oldVersion = oldDevice.rowVersion;
-  const newVersion = newDevice.rowVersion;
-  if (oldVersion == null || newVersion == null) {
-    toast.warn(replacementCopy.value.retry);
-    return;
-  }
   const scope = captureAccountScope();
   const accountKey = app.accountKey;
   const pageEpoch = replacementPageEpoch;
   const currentPage = () => pageEpoch === replacementPageEpoch && isCurrentAccountScope(scope);
-  const operation = cancel ? "cancel-replacement" : "replace";
-  const pairKey = `${oldDevice.id}:${newDevice.id}:${newVersion}`;
   replacementBusy.value = true;
   try {
     const accepted = await askReplacementDecision(cancel, oldDevice, newDevice);
     if (!accepted || !currentPage()) return;
     replacementSubmitting.value = true;
-    const key = acquireDeviceCommandKey(accountKey, operation, pairKey, oldVersion);
+    const oldVersion = oldDevice.rowVersion;
+    const newVersion = newDevice.rowVersion;
+    if (oldVersion == null || newVersion == null) {
+      toast.warn(replacementCopy.value.retry);
+      return;
+    }
+    const operation = cancel ? "cancel-replacement" : "replace";
+    const pairKey = `${oldDevice.id}:${newDevice.id}:${newVersion}`;
     const payload = { oldDeviceId: Number(oldDevice.id), newDeviceId: Number(newDevice.id),
       oldExpectedVersion: oldVersion, newExpectedVersion: newVersion };
-    if (cancel) await deviceE3Api.cancelDeviceReplacement(payload, key);
-    else await deviceE3Api.replaceDevice(payload, key);
+    try {
+      const key = acquireDeviceCommandKey(accountKey, operation, pairKey, oldVersion);
+      if (cancel) await deviceE3Api.cancelDeviceReplacement(payload, key);
+      else await deviceE3Api.replaceDevice(payload, key);
+      finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
+    } catch (error) {
+      if (isSettledRejection(error)) {
+        finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
+        if (isCurrentAccountScope(scope)) void app.refreshRemoteFleet();
+        if (currentPage()) toast.warn(replacementCopy.value.retry);
+        return;
+      }
+      // The command may have committed. Keep its key until a fresh read confirms the outcome.
+    }
+    if (!isCurrentAccountScope(scope) || !await app.refreshRemoteFleet() || !currentPage()) return;
+    const latestNew = app.visibleDevices.find(device => device.id === newDevice.id);
+    const latestOld = app.visibleDevices.find(device => device.id === oldDevice.id);
+    if (!latestNew || !latestOld) return;
+    const pair = latestNew.replacement;
+    if (!cancel && pair?.oldDeviceId === payload.oldDeviceId && pair.newDeviceId === payload.newDeviceId) {
+      toast.info(replacementCopy.value.pending);
+    } else if (!cancel && latestNew.activatedAt !== null && latestOld.activatedAt === null && !latestOld.activationUnconfirmed) {
+      toast.success(replacementCopy.value.completed);
+    } else if (cancel && latestNew.activatedAt === null && !latestNew.replacement
+      && latestOld.activatedAt !== null && !latestOld.pendingDeactivate && !latestOld.replacement
+      && latestOld.rowVersion != null && latestOld.rowVersion > oldVersion) {
+      toast.success(replacementCopy.value.cancelled);
+    } else {
+      return;
+    }
     finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
-    if (!isCurrentAccountScope(scope)) return;
-    const read = await app.refreshRemoteFleet();
-    if (!currentPage()) return;
-    const device = read ? app.visibleDevices.find(item => item.id === newDevice.id) : undefined;
-    if (!cancel && device?.replacement) toast.info(replacementCopy.value.pending);
-    else if (!cancel && device?.activatedAt != null) toast.success(replacementCopy.value.completed);
-    else if (cancel && device?.activatedAt === null && !device.replacement) toast.success(replacementCopy.value.cancelled);
-    else toast.warn(replacementCopy.value.retry);
-  } catch (error) {
-    if (isSettledRejection(error)) finishDeviceCommand(accountKey, operation, pairKey, oldVersion);
-    if (!isCurrentAccountScope(scope)) return;
-    void app.refreshRemoteFleet();
-    if (currentPage()) toast.warn(replacementCopy.value.retry);
   } finally {
     replacementBusy.value = false;
     replacementSubmitting.value = false;
