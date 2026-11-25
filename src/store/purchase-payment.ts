@@ -43,6 +43,7 @@ export type PurchasePaymentContext = { kind: PurchaseKind; payload: Record<strin
   claimNo?: string;
   legacyTrialExpiry?: boolean;
   onTrialRefusal?: (refusal: TrialExternalRefusal) => void;
+  onTrialWalletRequired?: () => void;
   refusedPaymentKey?: string; tradeinKey?: string; onReplacementRefused?: (reason: NonNullable<ReturnType<typeof tradeinPaymentRejection>>) => void; orderNo?: string; deadlineAt?: number | null; image?: string; reorder?: () => void; navigate?: (href: string, replace?: boolean) => void };
 export type PurchaseContextCheck = 'current' | 'changed' | 'abandoned';
 type PendingExternal = { fingerprint: string; kind: PurchaseKind; commandKey: string; paymentQuoteId: string;
@@ -787,6 +788,12 @@ async function select(method: PurchaseMethod, step?: PurchaseStep) {
     if (!owns(version, accountKey)) return;
     if (expected.scopeCurrent?.() === false) { finish(null); return; }
     const cause = asApiError(error);
+    if (expected.kind === 'TRIAL_CONVERT' && expected.onTrialWalletRequired
+        && isApiRefusal(cause, 409, 'ZERO_PAYMENT_REQUIRES_WALLET')) {
+      finish(null);
+      expected.onTrialWalletRequired();
+      return;
+    }
     if (expected.kind === 'ORDER_PAY' && orderTopupMethod(method) && isApiRefusal(cause, 409, 'ORDER_USDT_USE_TOPUP')) {
       await redirectOrderUsdt(method, version, accountKey);
       return;

@@ -501,7 +501,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityStatus.value = "ready";
     authorityError.value = null;
     if (stateRead) {
-      checkoutState.value = displayState.value;
+      // Checkout needs the claim and SKU even when amounts are missing.
+      checkoutState.value = next;
       checkoutStateSequence = sequence;
       if (legacyClaimNo.value !== next.claimNo) {
         legacyClaimNo.value = next.claimNo;
@@ -537,21 +538,18 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         if (requestedEpoch !== accountBindingEpoch) return false;
         const applied = applyAuthority(next, sequence, true);
         const pending = currentLifecycle();
-        if (pending) {
-          if (!applied || displayState.value !== next) resetLifecycleStreak(pending);
-          else {
-            const answer = JSON.stringify([next.claimNo, next.serverState, next.canStart, next.eligibilityReason]);
-            if (answer !== pending.lastFallbackState) resetLifecycleStreak(pending);
-            pending.lastFallbackState = answer;
-            if (lifecycle?.pending === pending) settleLifecycleState(next, lifecycle);
-          }
+        if (pending && applied && displayState.value === next
+            && (pending.command.kind === "start" || next.claimNo === pending.command.previousClaimNo
+              || lifecycle?.mode === "succeeded")) {
+          const answer = JSON.stringify([next.claimNo, next.serverState, next.canStart, next.eligibilityReason]);
+          if (answer !== pending.lastFallbackState) resetLifecycleStreak(pending);
+          pending.lastFallbackState = answer;
+          if (lifecycle?.pending === pending) settleLifecycleState(next, lifecycle);
         }
         return applied;
       })
       .catch((error: unknown) => {
         if (requestedEpoch !== accountBindingEpoch) return false;
-        const pending = currentLifecycle();
-        if (pending) resetLifecycleStreak(pending);
         if (sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
           markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
@@ -681,13 +679,24 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return eligibility().ok;
   }
 
+  function latestCheckoutState() {
+    return displayState.value ?? (authorityIncomplete.value && checkoutState.value?.claimNo === authorityClaimNo.value
+      ? checkoutState.value : null);
+  }
+
+  function isOwnTrialDevice(productNo: string): boolean {
+    const latest = latestCheckoutState();
+    return !!latest?.claimNo && (latest.status === "active" || latest.status === "grace")
+      && !!productNo && productNo === resolveTrialCheckoutProductId(latest.config.trialProductId);
+  }
+
   /**
    * Only /state can establish the claim identity used by ordinary checkout. The backend sells the claimed trial
    * device at full price through an ordinary order, so the one product that may be that device waits for authority;
    * every other product is an ordinary purchase (R13), also while a conversion of this claim is still in progress.
    */
   function canConfirmOrdinaryProduct(productNo: string): boolean {
-    const snapshot = checkoutState.value, latest = displayState.value;
+    const snapshot = checkoutState.value, latest = latestCheckoutState();
     if (!snapshot || !latest || !productNo || snapshot.claimNo !== latest.claimNo
         || (lastReadFailed.value && !transientReadFailure.value)) return false;
     const snapshotLive = snapshot.status === "active" || snapshot.status === "grace";
@@ -1162,8 +1171,16 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   async function readLegacyResult(submission: LegacyConversion, epoch: number) {
     const command = await readPaymentCommand(apiClient, "trial-convert", submission.key);
     if (epoch !== accountBindingEpoch || !legacyConversions.value.includes(submission)
-        || (command.claimNo && command.claimNo !== submission.claimNo)
         || (command.paymentMethod && command.paymentMethod !== "WALLET")) return;
+    if (command.status === "NOT_SEEN") {
+      // The server projects the current claim on NOT_SEEN, rather than the key's original claim.
+      const currentClaim = command.claimNo || (authorityStatus.value === "ready" ? checkoutState.value?.claimNo : null);
+      if (currentClaim && currentClaim !== submission.claimNo) {
+        releaseLegacyConversion(submission);
+        return;
+      }
+    } else if ((command.claimNo && command.claimNo !== submission.claimNo)
+        || (command.productNo && command.productNo !== submission.productNo)) return;
     if (command.status === "SUCCEEDED") {
       await confirmLegacyConversion(submission, parseTrialConvertReceipt(command.receipt), epoch);
     } else if (command.status === "REJECTED") {
@@ -1307,7 +1324,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
-    eligibility, canStart, canConfirmOrdinaryProduct, showPromo, showHeroPromo, confirmedOfferState,
+    eligibility, canStart, canConfirmOrdinaryProduct, isOwnTrialDevice, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
     refreshRemote, refreshEligibilityRemote, refreshVisible, refreshAtBoundary, serverTimeAt,

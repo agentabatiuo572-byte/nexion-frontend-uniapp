@@ -80,6 +80,10 @@ const fixtureFor=(url,request)=>{
 };
 const trialLifecycle=createTrialLifecyclePreview(state,(url,request,mode)=>{
   if(state.trialReadState==='user-not-found')throw Object.assign(new Error('USER_NOT_FOUND'),{status:404});
+  if(mode==='rejected-unknown'&&url.pathname==='/api/trial/start'){
+    state.trialStartPhaseClosed=true;
+    throw Object.assign(new Error('TRIAL_START_PREVIEW_UNKNOWN_DENIAL'),{status:409});
+  }
   if(mode==='rejected'){
     if(url.pathname==='/api/trial/start')state.trialStartPhaseClosed=true;
     else if(state.trialRow?.state==='ACTIVE'&&!checkoutFlow?.originalTrialPurchase())
@@ -329,10 +333,13 @@ const server=http.createServer(async(req,res)=>{
           delete state.trialAccrualReductionUsdt;
           delete state.trialNextWalletRefusal;
           delete state.trialDropNextExternalRefusal;
+          delete state.trialExternalRefusalReadDelayMs;
           state.trialOriginalPurchaseState='none';
         }
-        if(Number.isInteger(update.trialLifecycleAdvanceDays)&&update.trialLifecycleAdvanceDays>=0&&update.trialLifecycleAdvanceDays<=90)
+        if(Number.isInteger(update.trialLifecycleAdvanceDays)&&update.trialLifecycleAdvanceDays>=0&&update.trialLifecycleAdvanceDays<=90) {
           state.trialLifecycleAdvanceDays=update.trialLifecycleAdvanceDays;
+          checkoutFlow?.observePayments();
+        }
         // API-only: make the retained App-mode sample job due. Lite compute cycles use their own settlement clock.
         if(update.finishSlotReplacementTask===true)for(const pair of Object.values(state.slotReplacements??{}))
           if(!pair.computeCycle)pair.taskEndsAt=Math.min(pair.taskEndsAt,now);
@@ -393,6 +400,8 @@ const server=http.createServer(async(req,res)=>{
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
+        if(Number.isInteger(update.trialExternalRefusalReadDelayMs)&&update.trialExternalRefusalReadDelayMs>=0
+            &&update.trialExternalRefusalReadDelayMs<=6000)state.trialExternalRefusalReadDelayMs=update.trialExternalRefusalReadDelayMs;
         if([3,4].includes(update.trialPaymentFeePolicyVersion))state.trialPaymentFeePolicyVersion=update.trialPaymentFeePolicyVersion;
         if(['price-change','amount-mismatch','product-unlisted'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
@@ -621,8 +630,12 @@ const server=http.createServer(async(req,res)=>{
         const result=trialLifecycle.submit(url,trialLifecyclePath[1],req.headers,JSON.parse(body||'{}'));
         return sendJson(res,result.body,result.status);
       }
-      if(/^\/api\/trial\/(state|eligibility|purchase-options|convert)$/.test(url.pathname))
-        return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
+      if(/^\/api\/trial\/(state|eligibility|purchase-options|convert)$/.test(url.pathname)) {
+        const data=fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers});
+        if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='slow')
+          await new Promise(resolve=>setTimeout(resolve,2800));
+        return sendJson(res,{code:0,message:'success',data});
+      }
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {
         if(route.matcher!=='**/*'&&!route.matcher(url))continue;

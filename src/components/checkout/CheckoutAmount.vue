@@ -4,8 +4,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { formatGroupedAmount } from '@/lib/amount-display';
-const props = withDefaults(defineProps<{ value: string | number | null | undefined; currency?: 'USD' | 'USDT'; showCurrency?: boolean; precision?: 2 | 4 | 6 | 'full' }>(), { currency: 'USD', showCurrency: true, precision: 2 });
+const props = withDefaults(defineProps<{ value: string | number | null | undefined; currency?: 'USD' | 'USDT'; showCurrency?: boolean; precision?: 2 | 4 | 6 | 'full'; belowCent?: boolean }>(), { currency: 'USD', showCurrency: true, precision: 2 });
 const parts = computed(() => {
+  if (props.belowCent) return { whole: '<0', fraction: '01', known: true };
   const formatted = formatGroupedAmount(props.value, props.precision);
   if (formatted === '-') return { whole: '—', fraction: '', known: false };
   const [whole, fraction] = formatted.split('.');

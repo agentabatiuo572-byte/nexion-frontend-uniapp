@@ -1,6 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef, watch } from "vue";
 import { useApp } from "./app";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+
+const REFUSALS_KEY = "nexgrid-trial-shown-refusals-v1";
+const REFUSAL_LIMIT = 64;
 
 type TrialPurchaseResult =
   | { status: "settled"; claimNo: string; orderNo: string }
@@ -22,6 +26,12 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
   const announcedRefusals = new Set<string>();
   const presenters = new Set<(claimNo: string) => boolean>();
   const visibilityRevision = ref(0);
+  function savedRefusals() {
+    const keys = readAccountRow<{ keys: string[] }>(REFUSALS_KEY, app.accountKey)?.keys;
+    return Array.isArray(keys) ? keys.filter(key => typeof key === "string").slice(-REFUSAL_LIMIT) : [];
+  }
+  const wasDelivered = (key: string) => delivered.has(key)
+    || (key.startsWith('["refused",') && savedRefusals().includes(key));
   const outsidePage = computed(() => {
     void visibilityRevision.value;
     return pending.value.filter(result => !openingOrders.has(resultKey(result))
@@ -38,14 +48,16 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
 
   function publish(result: TrialPurchaseResult) {
     const key = resultKey(result);
-    if (!delivered.has(key) && !pending.value.some(item => resultKey(item) === key))
+    if (!wasDelivered(key) && !pending.value.some(item => resultKey(item) === key))
       pending.value = [...pending.value, result];
   }
 
   function consume(key: string, announcedRefusal = false) {
-    if (delivered.has(key)) return false;
+    if (wasDelivered(key)) return false;
     delivered.add(key);
     if (announcedRefusal) announcedRefusals.add(key);
+    if (key.startsWith('["refused",'))
+      writeAccountRow(REFUSALS_KEY, app.accountKey, { keys: [...savedRefusals(), key].slice(-REFUSAL_LIMIT) });
     pending.value = pending.value.filter(item => resultKey(item) !== key);
     return true;
   }
@@ -97,5 +109,5 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     };
   }
 
-  return { outsidePage, publish, consume, announceOrder, deliverOrder, takeAnnouncedRefusal, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
+  return { outsidePage, publish, consume, announceOrder, deliverOrder, takeAnnouncedRefusal, registerPresenter, resultKey, wasDelivered };
 });
