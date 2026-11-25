@@ -289,6 +289,7 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
       vault.save(renewed);
       return renewed;
     },
+    restoreEndedReason: () => undefined,
     discardSessionIfCurrent(expectedRevision) {
       discardSessionIfCurrent(expectedRevision);
     },

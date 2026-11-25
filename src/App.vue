@@ -677,6 +677,7 @@ function beginServerSessionRestore(): Promise<boolean> {
     const restored = await authApi.restore();
     if (!restored) {
       reportNativeSessionStage("RESTORE_NO_SESSION");
+      if (authApi.restoreEndedReason() === "APP_REPLACED") sessionEndNotice = "session-replaced";
       const hadServerAccount = hasServerAuthenticatedAccountTrace(useAuth());
       pendingServerSessionRecovery = pendingServerSessionRecovery || hadServerAccount;
       serverAuthenticatedAccountTraceAtBoot = false;

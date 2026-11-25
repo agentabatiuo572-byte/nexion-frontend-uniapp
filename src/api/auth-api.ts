@@ -110,6 +110,8 @@ export interface AuthApi {
   oauthExchange(request: OAuthExchangeRequest): Promise<OAuthExchangeResult>;
   completeProviderLogin(request: OAuthProviderLoginRequest, expectedRevision: number): Promise<LoginResult>;
   restore(): Promise<SessionSnapshot | null>;
+  /** Why the last restore was refused; a cold H5 start has no session to report through onUnauthorized. */
+  restoreEndedReason(): string | undefined;
   /** Consume only the exact vault epoch issued by a failed sign-in completion. */
   discardSessionIfCurrent(expectedRevision: number): void;
   /** Fallback for legacy callers: never consume a session owned by another user. */
@@ -323,6 +325,7 @@ export function createAuthApi(
 ): AuthApi {
   const refreshCredentialMode = options.refreshCredentialMode ?? "token";
   let restoreInFlight: Promise<SessionSnapshot | null> | null = null;
+  let restoreEndedReason: string | undefined;
   const cookieHeaders = refreshCredentialMode === "cookie"
     ? { "X-Nexion-Refresh-Mode": "cookie" }
     : undefined;
@@ -645,6 +648,7 @@ export function createAuthApi(
     restore() {
       if (refreshCredentialMode === "token" && !vault.read()?.refreshToken) return Promise.resolve(null);
       if (!restoreInFlight) {
+        restoreEndedReason = undefined;
         // Bootstrap and ordinary token renewal share one rotation request.
         restoreInFlight = client.refreshSession().catch((error: unknown) => {
           // Only an authoritative rejection means that no session can be
@@ -654,6 +658,7 @@ export function createAuthApi(
               && (error.kind === "auth" || error.status === 401 || error.status === 403)
               && error.message !== "SESSION_CHANGED_DURING_REFRESH"
               && !vault.read()) {
+            restoreEndedReason = error.sessionEndedReason;
             discardRotationNonce();
             return null;
           }
@@ -664,6 +669,7 @@ export function createAuthApi(
       }
       return restoreInFlight;
     },
+    restoreEndedReason: () => restoreEndedReason,
     discardSessionIfCurrent(expectedRevision) {
       discardSessionIfCurrent(expectedRevision);
     },
