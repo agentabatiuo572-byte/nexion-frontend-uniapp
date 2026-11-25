@@ -143,6 +143,7 @@ const environmentCurrent = () => !environmentInvalidated && readEnvironment[0] =
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const guideCopy = computed(() => teamRuleGuideCopy(locale.code));
 const state = ref<CommissionsHowState>({ loading: true, error: false, snapshot: null });
+const rereadFailed = ref(false);
 const publicationFallback = computed(() => !!state.value.snapshot && state.value.snapshot.document.locale.split(/[-_]/)[0].toLowerCase() !== locale.code.split(/[-_]/)[0].toLowerCase());
 const commissionGuideApi = createCommissionGuideApi(apiClient, expectedApiEnvironment);
 const directReferralApi = createDirectReferralApi(apiClient, expectedApiEnvironment);
@@ -163,6 +164,9 @@ function makeResource() {
   apply: next => {
     if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
     if (next.loading && state.value.snapshot) { state.value = { ...state.value, loading: true, error: false }; return; }
+    // 重读整体失败：已读到的说明照常显示，继续按失败恢复。
+    rereadFailed.value = next.error && !!state.value.snapshot;
+    if (rereadFailed.value) { state.value = { ...state.value, loading: false, error: false }; return; }
     // 同一账户和环境里已读到的比例，重读失败时保留，同时按失败继续恢复。
     const kept = next.snapshot?.ratesFailed ? state.value.snapshot?.rates : undefined;
     state.value = next.snapshot && kept ? { ...next, snapshot: { ...next.snapshot, rates: kept } } : next;
@@ -298,7 +302,7 @@ function goBack() {
 }
 useAutoRecovery({ failed: () => {
   const { loading, error, snapshot } = state.value;
-  return !loading && (error || (snapshot !== null && (!snapshot.directPolicy || !snapshot.guide || !snapshot.ranks || snapshot.ratesFailed)));
+  return !loading && (error || rereadFailed.value || (snapshot !== null && (!snapshot.directPolicy || !snapshot.guide || !snapshot.ranks || snapshot.ratesFailed)));
 }, retry: reload });
 </script>
 <style scoped>

@@ -98,8 +98,8 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block" :style="rowTitleStyle">{{ rewardTypeLabel(b) }}</text>
-              <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
-              <text v-else class="block" :style="rowSubStyle">{{ b.memo }}</text>
+              <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo ? b.memo + ' · ' : '' }}{{ b.ref }}</text>
+              <text v-else-if="b.memo" class="block" :style="rowSubStyle">{{ b.memo }}</text>
               <text v-if="courseRewardId(b)" class="block active:opacity-70 nx-after-chevron" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }}</text>
               <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: var(--v5-space-1)" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
               <NxCodeValue v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward' && b.ref" full :value="b.ref" :label="t.bills.detailRef" :copyable="false" style="color: var(--v5-ink-3); font-size: 12px" />
@@ -223,7 +223,8 @@ const records = computed(() => fundsServerEnabled
   : bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
 const visibleCount = ref(PAGE_SIZE);
 const visibleRecords = computed(() => (fundsServerEnabled ? records.value : records.value.slice(0, visibleCount.value))
-  .map((bill) => ({ ...bill, memo: bill.type === "refer" && bill.memoKey !== "vrankSalary" && bill.status !== "posted"
+  // 等级月薪的名字已在标题里，下面一行不再重复。
+  .map((bill) => ({ ...bill, memo: bill.memoKey === "vrankSalary" ? "" : bill.type === "refer" && bill.status !== "posted"
     ? t.value.rewards.typeRefer
     : resolveWalletBillMemo(bill, t.value.bills.memo as Record<string, string>, courseTitles.value) })));
 const hasMore = computed(() => fundsServerEnabled ? activePager.value.hasMore : visibleCount.value < records.value.length);

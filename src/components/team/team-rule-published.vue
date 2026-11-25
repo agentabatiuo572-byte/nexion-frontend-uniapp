@@ -65,7 +65,8 @@ async function load() {
     failureShown.value = false;
   } catch (failure) {
     if (!requestFence.isCurrent(generation)) return;
-    if (!(failure instanceof ApiError && failure.kind === 'network')) content.value = null;
+    // 断网和服务端故障时已读到的正文照常显示；发布内容本身不合格才清掉。
+    if (!(failure instanceof ApiError && (failure.kind === 'network' || (failure.kind === 'http' && (failure.status ?? 0) >= 500)))) content.value = null;
     error.value = true;
     failureShown.value = true;
   } finally {
