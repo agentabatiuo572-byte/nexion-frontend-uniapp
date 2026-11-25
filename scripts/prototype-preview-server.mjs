@@ -232,6 +232,7 @@ const server=http.createServer(async(req,res)=>{
         updatePreviewHomeDisplay(state,update,Date.now());
         // A live trial conversion policy change keeps existing quotes and payment intents.
         if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
+        if(['original','revised'].includes(update.rankGuideEdition))state.rankGuideEdition=update.rankGuideEdition;
         // Physical stock can run out while a payment quote is open, independently of E1.
         if(update.outOfStockProductNo===null)delete state.outOfStockProductNo;
         else if(typeof update.outOfStockProductNo==='string'&&demoProducts(state).some(product=>

@@ -4,30 +4,30 @@
     <view class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader :title="t.headerTitles.teamCommissions + t.headerTitles.howItWorksSuffix" back="/pages/team/commissions" />
 
-      <HowHero v-if="!state.error && !content.incomplete" kind="ledger" :title="s(sectionId.hero).title" :sub="s(sectionId.hero).body" :sections="directory.length <= 6 ? directory : undefined" :nav-label="guideCopy.contents" />
+      <HowHero v-if="hero" kind="ledger" :title="hero.title" :sub="hero.body" :sections="directory.length <= 6 ? directory : undefined" :nav-label="guideCopy.contents" />
 
       <view v-if="state.loading && !state.snapshot" class="commission-guide-state" role="status" aria-busy="true"><text>{{ content.copy.loading }}</text></view>
-      <EmptyState v-else-if="state.error || content.incomplete" kind="recoverable-error" page :title="content.copy.unavailable" :cta-label="t.ui.reload" @cta="reload" />
+      <EmptyState v-else-if="state.error || !content.blocks.length" kind="recoverable-error" page :title="content.copy.unavailable" :cta-label="t.ui.reload" @cta="reload" />
 
-      <template v-if="!state.error && !content.incomplete">
-        <HowSection anchor="overview" :title="s(sectionId.overview).title" :body="s(sectionId.overview).body" />
+      <template v-if="content.blocks.length">
+        <HowSection v-if="overview" anchor="overview" :title="overview.title" :body="overview.body" />
 
         <!-- F1 (DESIGN F1, 11.2-15): friend purchase reward, per-rank purchase rates and friend device earnings, between 概览 and 奖励渠道. -->
         <template v-if="state.snapshot">
-          <HowSection anchor="friend-purchase" :title="rankCopy.f1Sec" :lead="rankCopy.f1Lead" list>
+          <HowSection v-if="policy" anchor="friend-purchase" :title="rankCopy.f1Sec" :lead="rankCopy.f1Lead" list>
             <HowItem :n="1" :title="rankCopy.f1I1T" :body="rankCopy.f1I1D" />
             <HowItem :n="2" :title="rankCopy.f1I2T" :body="rankCopy.f1I2D" />
             <HowItem :n="3" :title="creditsAtOnce(purchaseDays) ? rankCopy.f1NowT : rankCopy.f1I3T" :body="creditsAtOnce(purchaseDays) ? rankCopy.f1NowD : fmt(rankCopy.f1I3D, { d: purchaseDays ?? '—' })" />
           </HowSection>
 
-          <HowSection anchor="purchase-rates" :title="rankCopy.f1RatesT" :lead="myRankCode ? fmt(rankCopy.f1RatesLead, { r: myRankCode }) : undefined">
+          <HowSection v-if="rateRows.length" anchor="purchase-rates" :title="rankCopy.f1RatesT" :lead="myRankCode ? fmt(rankCopy.f1RatesLead, { r: myRankCode }) : undefined">
             <view class="commission-rates" role="table" :aria-label="rankCopy.f1RatesT">
               <view class="commission-rates__row commission-rates__row--head" role="row"><text role="columnheader">{{ rankCopy.f1Rank }}</text><text role="columnheader">{{ rankCopy.l1 }}</text><text role="columnheader">{{ rankCopy.l2 }}</text></view>
               <view v-for="row in rateRows" :key="row.v" class="commission-rates__row" :class="{ 'commission-rates__row--me': row.mine }" role="row"><text class="commission-rates__rank" role="cell">V{{ row.v }}</text><text role="cell">{{ row.l1 }}</text><text role="cell">{{ row.l2 }}</text></view>
             </view>
           </HowSection>
 
-          <HowSection anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="devicePaused ? t.directReferral.disabled : deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
+          <HowSection v-if="policy" anchor="device-earnings" :title="rankCopy.f1DevSec" :lead="devicePaused ? t.directReferral.disabled : deviceL2On ? rankCopy.f1DevLead : guideCopy.deviceBody" list>
             <template v-if="!devicePaused">
               <HowItem :n="1" :title="deviceRateTitle" :body="rankCopy.f1DevI1D" />
               <HowItem :n="2" :title="rankCopy.f1DevI2T" :body="fmt(rankCopy.f1DevI2D, { u: deviceSplit.u, n: deviceSplit.n })" />
@@ -36,52 +36,48 @@
           </HowSection>
         </template>
 
-        <HowSection anchor="channels" :title="s(sectionId.channels).title" :lead="s(sectionId.channels).body" list>
+        <HowSection v-if="channelIntro || channels.length" anchor="channels" :title="channelIntro?.title" :lead="channels.length ? channelIntro?.body : undefined" :body="channels.length ? undefined : channelIntro?.body" :list="!!channels.length">
           <HowItem v-for="(item, index) in channels" :key="item.id" :n="index + 1" :title="item.title" :body="item.body" />
         </HowSection>
 
-        <HowSection anchor="lifecycle" :title="s(sectionId.lifecycle).title" :lead="s(sectionId.lifecycle).body" list>
-          <view class="commission-guide-statuses">
+        <HowSection v-if="lifecycle || statuses.length || coolingNote" anchor="lifecycle" :title="lifecycle?.title" :lead="hasStatuses ? lifecycle?.body : undefined" :body="hasStatuses ? undefined : lifecycle?.body" :list="hasStatuses">
+          <view v-if="statuses.length" class="commission-guide-statuses">
             <template v-for="(status, index) in statuses" :key="status.id">
               <view class="commission-guide-status__tag" :class="{ 'commission-guide-status--next': index > 0 }"><NxTag :tone="status.tone">{{ status.title }}</NxTag></view>
               <text class="commission-guide-status__body" :class="{ 'commission-guide-status--next': index > 0 }">{{ status.body }}</text>
             </template>
           </view>
-          <HowNote tone="note" :title="s(sectionId.coolingNote).title" :body="s(sectionId.coolingNote).body" />
+          <HowNote v-if="coolingNote" tone="note" :title="coolingNote.title" :body="coolingNote.body" />
         </HowSection>
 
-        <HowSection anchor="example" :title="s(sectionId.example).title" :lead="s(sectionId.example).body">
+        <HowSection v-if="example || exampleBase || exampleRows.length || exampleTotal || exampleNote" anchor="example" :title="example?.title" :lead="example?.body">
           <view class="commission-guide-example">
-            <view class="commission-guide-example__base">
-              <view class="commission-guide-example__row"><text class="commission-guide-example__label">{{ s(sectionId.exampleDay).title }}</text><text v-if="exampleBase.amount" class="commission-guide-example__base-value">{{ exampleBase.amount }}</text></view>
+            <view v-if="exampleBase" class="commission-guide-example__base">
+              <view class="commission-guide-example__row"><text class="commission-guide-example__label">{{ exampleBase.title }}</text><text v-if="exampleBase.amount" class="commission-guide-example__base-value">{{ exampleBase.amount }}</text></view>
               <text v-if="exampleBase.note" class="commission-guide-example__detail">{{ exampleBase.note }}</text>
             </view>
             <view v-for="row in exampleRows" :key="row.id" class="commission-guide-example__row">
               <view class="commission-guide-example__name"><text class="commission-guide-example__label">{{ row.label }}</text><text v-if="row.detail" class="commission-guide-example__detail">{{ row.detail }}</text></view>
-              <text class="commission-guide-example__value" :style="{ color: row.color }">{{ row.amount }}</text>
+              <text v-if="row.amount" class="commission-guide-example__value" :style="{ color: row.color }">{{ row.amount }}</text>
             </view>
-            <view class="commission-guide-example__row commission-guide-example__total">
-              <text class="commission-guide-example__label">{{ s(sectionId.exampleTotal).title }}</text>
-              <text class="commission-guide-example__total-value">{{ content.exampleTotal }}</text>
+            <view v-if="exampleTotal" class="commission-guide-example__row commission-guide-example__total">
+              <text class="commission-guide-example__label">{{ exampleTotal.title }}</text>
+              <text class="commission-guide-example__total-value">{{ exampleTotal.body }}</text>
             </view>
-            <text class="commission-guide-example__note">{{ s(sectionId.exampleNote).body }}</text>
+            <text v-if="exampleNote" class="commission-guide-example__note">{{ exampleNote.body }}</text>
           </view>
         </HowSection>
 
-        <HowSection anchor="faq" :title="s(sectionId.faq).title" list>
-          <HowFaqRow :q="s(sectionId.faqOrder).title" :a="s(sectionId.faqOrder).body" initial-open />
-          <HowFaqRow :q="s(sectionId.faqWithdraw).title" :a="s(sectionId.faqWithdraw).body" />
-          <HowFaqRow :q="s(sectionId.faqReversal).title" :a="s(sectionId.faqReversal).body" />
-          <HowFaqRow :q="s(sectionId.faqCultivation).title" :a="s(sectionId.faqCultivation).body" />
+        <HowSection v-if="faq || faqs.length" anchor="faq" :title="faq?.title" :body="faqs.length ? undefined : faq?.body" :list="!!faqs.length">
+          <HowFaqRow v-for="item in faqs" :key="item.id" :q="item.title" :a="item.body" :initial-open="item.id === 'faq-order'" />
         </HowSection>
 
         <TeamRuleSection :title="guideCopy.fullText" fold>
           <view v-if="publicationFallback" class="commission-guide-publication-note" role="status"><text>{{ t.howPublished.languageFallback }}</text></view>
-          <TeamRuleDocument v-if="publishedBlocks" :blocks="publishedBlocks" compact />
-          <view v-else class="commission-guide-publication-note"><text>—</text></view>
+          <TeamRuleDocument :blocks="content.blocks" compact />
         </TeamRuleSection>
 
-        <text class="commission-guide-footer">{{ s(sectionId.footer).body }}</text>
+        <text v-if="footer" class="commission-guide-footer">{{ footer.body }}</text>
       </template>
 
       <view class="mx-4 mt-4">
@@ -109,7 +105,6 @@ import TeamRuleSection from "@/components/team/team-rule-section.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import TeamRuleDocument from "@/components/team/team-rule-document.vue";
 import { teamRuleGuideCopy } from "@/components/team/team-rule-guide-copy";
-import { commissionPublishedBlocks } from "@/components/team/team-rule-commission-copy";
 import { useT } from "@/i18n/use-t";
 import { useApp } from '@/store/app';
 import { useAuth } from '@/store/auth';
@@ -140,7 +135,6 @@ const environmentCurrent = () => !environmentInvalidated && readEnvironment[0] =
 const auditCopy = computed(() => networkReauditCopy(locale.code));
 const guideCopy = computed(() => teamRuleGuideCopy(locale.code));
 const state = ref<CommissionsHowState>({ loading: true, error: false, snapshot: null });
-const publishedBlocks = computed(() => state.value.snapshot ? commissionPublishedBlocks(state.value.snapshot, locale.code) : null);
 const publicationFallback = computed(() => !!state.value.snapshot && state.value.snapshot.document.locale.split(/[-_]/)[0].toLowerCase() !== locale.code.split(/[-_]/)[0].toLowerCase());
 const commissionGuideApi = createCommissionGuideApi(apiClient, expectedApiEnvironment);
 const directReferralApi = createDirectReferralApi(apiClient, expectedApiEnvironment);
@@ -152,11 +146,11 @@ function makeResource() {
   async read(language) {
     const [document, directPolicy, guide, ladder] = await Promise.all([
       howContentApi.published("team-commissions-how", serverLanguage(language)),
-      directReferralApi.policy(), commissionGuideApi.read(), vRankApi.ladder(),
+      directReferralApi.policy().catch(() => null), commissionGuideApi.read().catch(() => null), vRankApi.ladder().catch(() => null),
     ]);
-    const needsRates = ladder.ranks.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined);
+    const needsRates = ladder?.ranks.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined);
     const rates = needsRates ? await commissionGuideApi.rates().catch(() => undefined) : undefined;
-    return { document, directPolicy, guide, ranks: ladder.ranks, rates };
+    return { document, directPolicy, guide, ranks: ladder?.ranks ?? null, rates };
   },
   apply: next => {
     if (!isCurrentAccountScope(owner) || language !== locale.code || !environmentCurrent()) return;
@@ -165,29 +159,29 @@ function makeResource() {
 });
 }
 let resource = makeResource();
-const content = computed(() => buildCommissionsHowContent(state.value.snapshot, locale.code));
-const s = (id: string, fallback?: string) => content.value.section(id, fallback);
-const sectionId = {
-  hero: "hero", overview: "overview", channels: "channels", lifecycle: "lifecycle",
-  cooling: "cooling", unlocked: "unlocked", withdrawn: "withdrawn", coolingNote: "cooling-note",
-  example: "example", exampleDay: "example-day", exampleNetwork: "example-network",
-  exampleCultivation: "example-cultivation", examplePeer: "example-peer",
-  exampleLeadership: "example-leadership", exampleTotal: "example-total", exampleNote: "example-note",
-  faq: "faq", faqOrder: "faq-order", faqWithdraw: "faq-withdraw", faqReversal: "faq-reversal",
-  faqCultivation: "faq-cultivation", footer: "footer",
-} as const;
-const channels = computed(() => ["network", "binary", "peer", "cultivation", "leadership", "genesis"].map(id => ({
-  ...s(id),
-})));
-// Design system 04.7: a directory of the expanded sections, statuses as semantic chips, and
-// example rows named by their published title. A status amount needs no qualifier line.
-// 04.7: a directory with more than six sections is too long and is not shown; the F1 sections take this page to eight.
-const directory = computed(() => [
-  { id: "overview", title: s("overview").title },
-  ...(state.value.snapshot ? [{ id: "friend-purchase", title: rankCopy.value.f1Sec }, { id: "purchase-rates", title: rankCopy.value.f1RatesT }, { id: "device-earnings", title: rankCopy.value.f1DevSec }] : []),
-  ...["channels", "lifecycle", "example", "faq"].map(id => ({ id, title: s(id).title })),
-]);
 const rankCopy = computed(() => t.value.myRank);
+const content = computed(() => buildCommissionsHowContent(state.value.snapshot, locale.code, rankCopy.value.f1DevI1T));
+const s = (id: string) => content.value.sections.get(id);
+const hero = computed(() => s("hero"));
+const overview = computed(() => s("overview"));
+const channelIntro = computed(() => s("channels"));
+const lifecycle = computed(() => s("lifecycle"));
+const coolingNote = computed(() => s("cooling-note"));
+const example = computed(() => s("example"));
+const exampleTotal = computed(() => s("example-total"));
+const exampleNote = computed(() => s("example-note"));
+const faq = computed(() => s("faq"));
+const footer = computed(() => s("footer"));
+const channels = computed(() => ["network", "binary", "peer", "cultivation", "leadership", "genesis"].flatMap(id => s(id) ?? []));
+const faqs = computed(() => ["faq-order", "faq-withdraw", "faq-reversal", "faq-cultivation"].flatMap(id => s(id) ?? []));
+// Directory chips only when the publication is short enough to scan (design system 04.7).
+const directory = computed(() => [
+  ...(overview.value ? [{ id: "overview", title: overview.value.title }] : []),
+  ...(policy.value ? [{ id: "friend-purchase", title: rankCopy.value.f1Sec }] : []),
+  ...(rateRows.value.length ? [{ id: "purchase-rates", title: rankCopy.value.f1RatesT }] : []),
+  ...(policy.value ? [{ id: "device-earnings", title: rankCopy.value.f1DevSec }] : []),
+  ...[channelIntro.value, lifecycle.value, example.value, faq.value].flatMap(section => section ? [{ id: section.id, title: section.title }] : []),
+]);
 const vrank = useVRank();
 const visibility = useDataVisibility();
 const policy = computed(() => state.value.snapshot?.directPolicy ?? null);
@@ -216,21 +210,28 @@ const deviceSplit = computed(() => {
   return share === undefined ? { u: "—", n: "—" } : { u: formatHowNumber(share, dateLocale()), n: formatHowNumber(100 - share, dateLocale()) };
 });
 const deviceCoolingDays = computed(() => policy.value?.deviceEarning.coolingDays ?? null);
-const statuses = computed(() => ([["cooling", "warning"], ["unlocked", "success"], ["withdrawn", "neutral"]] as const).map(([id, tone]) => ({ ...s(id), tone })));
-// The demo template folds its scope sentence and the order base into one body; split them so
-// only the amount takes figure styling. A plain published sentence stays a note.
+const statuses = computed(() => ([["cooling", "warning"], ["unlocked", "success"], ["withdrawn", "neutral"]] as const).flatMap(([id, tone]) => {
+  const section = s(id);
+  return section ? [{ ...section, tone }] : [];
+}));
+const hasStatuses = computed(() => !!(statuses.value.length || coolingNote.value));
 const exampleBase = computed(() => {
-  const body = s(sectionId.exampleDay).body, scope = content.value.copy.exampleScope;
-  // The scope ends by introducing the amount ("…基数："); that lead-in moves with the amount.
-  return body.startsWith(scope) ? { amount: body.slice(scope.length).trim(), note: scope.replace(/[^。.!?！？]*[:：]\s*$/, "").trim() } : { amount: "", note: body };
+  const section = s("example-day");
+  if (!section) return null;
+  return section.body === content.value.exampleBase
+    ? { title: section.title, amount: section.body, note: "" }
+    : { title: section.title, amount: "", note: section.body };
 });
 const exampleRows = computed(() => {
   const copy = content.value.copy;
   const statusAmounts = new Set([copy.pendingAmount, copy.notOpen, copy.notConfigured, copy.unknownAmount]);
-  return ([["network", sectionId.exampleNetwork], ["cultivation", sectionId.exampleCultivation], ["peer", sectionId.examplePeer], ["leadership", sectionId.exampleLeadership]] as const).map(([key, id]) => {
-    const section = s(id), amount = content.value.amounts[key];
+  const hasContext = !!(example.value && exampleBase.value && exampleNote.value);
+  return (["network", "cultivation", "peer", "leadership"] as const).flatMap(key => {
+    const section = s(`example-${key}`);
+    if (!section) return [];
+    const amount = hasContext ? content.value.amounts[key] : "";
     const color = amount === copy.pendingAmount ? "var(--v5-warning-ink)" : statusAmounts.has(amount) ? "var(--v5-ink-3)" : amount.includes("UVT") ? "var(--v5-nex-ink)" : "var(--v5-ink)";
-    return { id, label: section.title, detail: statusAmounts.has(amount) || section.body === amount ? "" : section.body, amount, color };
+    return [{ id: section.id, label: section.title, detail: section.body === amount ? "" : section.body, amount, color }];
   });
 });
 function reload() {
@@ -250,7 +251,10 @@ onUnmounted(() => resource.dispose());
 function goBack() {
   navBack("/pages/team/commissions");
 }
-useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry: reload });
+useAutoRecovery({ failed: () => {
+  const { loading, error, snapshot } = state.value;
+  return !loading && (error || (snapshot !== null && (!snapshot.directPolicy || !snapshot.guide || !snapshot.ranks)));
+}, retry: reload });
 </script>
 <style scoped>
 .commission-guide-state { margin: 16px 16px 0; padding: 18px 0; border-block: 1px solid var(--v5-border); color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); }

@@ -931,8 +931,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(pathname==='/api/exchange')finance.wallet.nexAvailable=demoWalletNex(state,now);
     return finance;
   }
-  const rankPolicy=rankPolicyDemo(url,locale);if(rankPolicy!==undefined)return rankPolicy;
-  const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request));if(teamGuides!==undefined)return teamGuides;
+  const rankPolicy=rankPolicyDemo(url,locale,state.rankGuideEdition);if(rankPolicy!==undefined)return rankPolicy;
+  const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),state.rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
   const walletBills=()=>{

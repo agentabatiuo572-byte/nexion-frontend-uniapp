@@ -229,7 +229,9 @@ const ruleDescription = computed(() => {
   const p = policy.value;
   if (!p) return "";
   if (filter.value !== "device_earning") {
-    if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || p.sevenLayerReference?.baseRatePct === null || p.sevenLayerReference?.coolingDays === null)) return t.value.directReferral.purchaseUnconfigured;
+    const reference = p.sevenLayerReference;
+    if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || !reference || reference.coolingDays === null
+      || (reference.purchaseBaseRateSource !== "BENEFICIARY_RANK" && reference.baseRatePct === null))) return t.value.directReferral.purchaseUnconfigured;
     const current = currentRank.value;
     const legacy = commission.config?.unilevelUsdt;
     return fmt(creditsAtOnce(purchaseDays.value) ? rankCopy.value.f2RuleNow : rankCopy.value.f2Rule, {

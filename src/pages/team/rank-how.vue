@@ -27,7 +27,6 @@
             </TeamRuleSection>
             <TeamRuleSection v-else :anchor="group.id" :title="group.title" :lead="group.hint" list>
               <TeamRuleSection v-if="group.id === 'overview' && state.policy?.hero" item :body="state.policy.hero" />
-              <TeamRuleSection v-if="group.id === 'steps' && !content.example" item :body="content.copy.noExample" />
               <TeamRuleSection v-for="item in group.sections" :key="item.id" :item="stepNumber(item) === undefined" :n="stepNumber(item)" :title="item.title" :body="item.body" :data-rule-section="item.id" />
             </TeamRuleSection>
           </template>
@@ -78,7 +77,7 @@ const readEnvironment = [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl]
 let environmentInvalidated = false;
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => { environmentInvalidated = true; }, { flush: 'sync' });
 const environmentCurrent = () => !environmentInvalidated && readEnvironment[0] === apiRuntimeConfig.environment && readEnvironment[1] === apiRuntimeConfig.baseUrl;
-const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } });
+const state = ref<RankHowResourceState>({ loading: true, error: false, policy: null, ranks: [], capabilities: null });
 const policyApi = createRankHowPolicyApi(apiClient, expectedApiEnvironment);
 let resourceOwner = captureAccountScope();
 function makeResource() {
@@ -91,30 +90,7 @@ function makeResource() {
 }
 let resource = makeResource();
 const content = computed(() => buildRankHowContent(state.value.policy, state.value.ranks, state.value.capabilities, locale.code, t.value.rank.cond));
-const s = (id: string, fallbackTitle?: string) => content.value.section(id, fallbackTitle);
-const sectionId = {
-  overview: "overview", overviewDetail: "overview-detail", ladder: "ladder", promotion: "promotion",
-  stepwise: "stepwise", protection: "protection", rewards: "rewards", example: "example",
-  exampleStart: "example-start", exampleTrigger: "example-trigger", exampleResults: "example-results",
-} as const;
-const requirements = computed(() => ["requirement-self", "requirement-direct", "requirement-team", "requirement-legs"].map(id => s(id)));
-const unlocks = computed(() => ["network", "peer", "leadership", "cultivation"].map(name => s(`unlock-${name}`)));
-const phases = computed(() => ["self", "team", "legs"].map((name, index) => ({ ...s(`example-${name}`), n: index + 1 })));
-const results = computed(() => ["network", "peer", "leadership", "cultivation"].map(name => s(`result-${name}`)));
-const faqs = computed(() => ["members", "rank", "rewards"].map(name => s(`faq-${name}`)));
-// Preserve additional published sections instead of silently dropping new rules.
-const extraSections = computed(() => {
-  const known = new Set([
-    ...Object.values(sectionId), ...requirements.value.map(item => item.id), ...unlocks.value.map(item => item.id),
-    ...phases.value.map(item => item.id), ...results.value.map(item => item.id), ...faqs.value.map(item => item.id),
-  ]);
-  return (state.value.policy?.sections ?? []).filter(item => !known.has(item.id)).map(item => s(item.id));
-});
-const incomplete = computed(() => state.value.error || [
-  ...requirements.value, ...unlocks.value, ...faqs.value, ...extraSections.value,
-  ...["overview", "overview-detail", "ladder", "promotion", "stepwise", "protection", "rewards"].map(id => s(id)),
-  ...(content.value.example ? [...phases.value, ...results.value, ...["example", "example-start", "example-trigger", "example-results"].map(id => s(id))] : []),
-].some(section => !section.available));
+const incomplete = computed(() => content.value.sections.length === 0);
 const statusText = computed(() => state.value.loading ? content.value.copy.loading : content.value.copy.unavailable);
 function reload() {
   if (!isCurrentAccountScope(resourceOwner)) { resource.dispose(); resource = makeResource(); }
@@ -125,30 +101,38 @@ onShow(reload);
 onHide(() => { resource.dispose(); resource = makeResource(); });
 const resourceInputs = () => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const;
 watch(resourceInputs, () => {
-  resource.dispose(); state.value = { loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } }; resource = makeResource();
+  resource.dispose(); state.value = { loading: true, error: false, policy: null, ranks: [], capabilities: null }; resource = makeResource();
 }, { flush: 'sync' });
 // Clear old content synchronously, then read after completeSignIn has rebound
 // both app state and account-scoped stores. reload recaptures that final owner.
 watch(resourceInputs, reload);
 onUnmounted(() => resource.dispose());
 
-const ruleGroups = computed(() => [
-  { id: 'overview', title: guide.value.overview, hint: guide.value.overviewHint,
-    sections: [s(sectionId.overview), s(sectionId.overviewDetail), s(sectionId.ladder)] },
-  { id: 'promotion', title: guide.value.conditions, hint: guide.value.conditionsHint,
-    sections: [s(sectionId.promotion), ...requirements.value, s(sectionId.stepwise)] },
-  { id: 'steps', title: guide.value.steps, hint: guide.value.stepsHint,
-    sections: content.value.example ? [s(sectionId.example), s(sectionId.exampleStart), ...phases.value, s(sectionId.exampleTrigger)] : [] },
-  { id: 'rewards', title: guide.value.rewards, hint: guide.value.rewardsHint,
-    sections: [s(sectionId.rewards), ...unlocks.value, s(sectionId.protection),
-      ...(content.value.example ? [s(sectionId.exampleResults), ...results.value] : [])] },
-  { id: 'faq', title: guide.value.faq, hint: guide.value.faqHint, sections: faqs.value },
-  ...(extraSections.value.length ? [{ id: 'more', title: guide.value.more, hint: guide.value.moreHint, sections: extraSections.value }] : []),
-]);
+const ruleGroups = computed(() => {
+  const groups = [
+    { id: 'overview', title: guide.value.overview, hint: guide.value.overviewHint,
+      ids: ['overview', 'overview-detail', 'ladder'] },
+    { id: 'promotion', title: guide.value.conditions, hint: guide.value.conditionsHint,
+      ids: ['promotion', 'requirement-self', 'requirement-direct', 'requirement-team', 'requirement-legs', 'stepwise'] },
+    { id: 'steps', title: guide.value.steps, hint: guide.value.stepsHint,
+      ids: ['example', 'example-start', 'example-self', 'example-team', 'example-legs', 'example-trigger'] },
+    { id: 'rewards', title: guide.value.rewards, hint: guide.value.rewardsHint,
+      ids: ['rewards', 'unlock-network', 'unlock-peer', 'unlock-leadership', 'unlock-cultivation', 'protection',
+        'example-results', 'result-network', 'result-peer', 'result-leadership', 'result-cultivation'] },
+    { id: 'faq', title: guide.value.faq, hint: guide.value.faqHint, ids: ['faq-members', 'faq-rank', 'faq-rewards'] },
+  ];
+  const sections = new Map(content.value.sections.map(section => [section.id, section]));
+  const known = new Set(groups.flatMap(group => group.ids));
+  return [
+    ...groups.map(({ ids, ...group }) => ({ ...group, sections: ids.flatMap(id => sections.get(id) ?? []) })),
+    { id: 'more', title: guide.value.more, hint: guide.value.moreHint, sections: content.value.sections.filter(section => !known.has(section.id)) },
+  ].filter(group => group.sections.length);
+});
 // Expanded sections with an in-page directory replace the collapsed groups (design system 04.7).
-const stepNumber = (item: object) => ("n" in item && typeof item.n === "number" ? item.n : undefined);
+const exampleSteps = new Map([['example-self', 1], ['example-team', 2], ['example-legs', 3]]);
+const stepNumber = (item: { id: string }) => exampleSteps.get(item.id);
 const directory = computed(() => [{ id: "ladder", title: guide.value.ladder }, ...ruleGroups.value.map(group => ({ id: group.id, title: group.title }))]);
-useAutoRecovery({ failed: () => state.value.error && !state.value.loading, retry: reload });
+useAutoRecovery({ failed: () => !state.value.loading && (state.value.error || !state.value.capabilities), retry: reload });
 </script>
 
 <style src="@/components/team/team-rule-type.css"></style>

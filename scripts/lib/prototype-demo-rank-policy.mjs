@@ -31,8 +31,34 @@ const rows = [
   ["faq-rewards",["在哪里看进度和奖励？", "Where can I see progress and rewards?", "Xem tiến độ và phần thưởng ở đâu?"],["等级页可查看当前进度和差距，奖励到账情况见奖励明细。", "The rank page shows your progress and gaps; see your reward history for payouts.", "Trang hạng hiển thị tiến độ và phần còn thiếu; xem khoản thưởng đã nhận trong lịch sử thưởng."]],
 ];
 export const demoV1SelfComputePoints=320;
-export function rankPolicyDemo(url,locale) {
+const revisedRemovals = new Set([
+  'overview-detail', 'stepwise', 'rewards', 'protection', 'unlock-network', 'unlock-peer', 'unlock-leadership', 'unlock-cultivation',
+  'example-results', 'result-network', 'result-peer', 'result-leadership', 'result-cultivation',
+  'faq-members', 'faq-rank', 'faq-rewards',
+]);
+const revisedRows = [
+  ['overview', ['什么是等级', 'What ranks are', 'Hạng là gì'], [
+    '等级按自购算力点、团队算力点、一二级已购人数和下级领导者逐级评定。',
+    'Ranks are assessed in order using your own compute points, team compute points, buyers in the first two levels, and eligible leaders.',
+    'Hạng được xét lần lượt theo điểm tính toán cá nhân, điểm của nhóm, số người mua ở hai cấp đầu và số người dẫn dắt đủ điều kiện.',
+  ]],
+  ['requirement-direct', ['2. 一二级已购人数', '2. Buyers in the first two levels', '2. Người mua ở hai cấp đầu'], [
+    '一二级成员只要有一笔有效付款订单就计入，含 Cloud Share。',
+    'Members in the first two levels count once they have a valid paid order, including Cloud Share.',
+    'Thành viên ở hai cấp đầu được tính khi có đơn đã thanh toán hợp lệ, kể cả Cloud Share.',
+  ]],
+];
+const revisedSections = rows.filter(([id]) => !revisedRemovals.has(id))
+  .map(row => revisedRows.find(([id]) => id === row[0]) ?? row)
+  .concat([['monthly-salary', ['等级月薪', 'Monthly rank salary', 'Lương hạng hằng tháng'], [
+    'V2 及以上每个自然月可手动领取一次 USDT 月薪，金额按当月到达过的最高等级锁定。',
+    'At V2 and above, you can claim one USDT salary per calendar month. The amount is locked to the highest rank you reached that month.',
+    'Từ V2, bạn có thể nhận lương USDT một lần mỗi tháng. Số tiền được khóa theo hạng cao nhất bạn đạt trong tháng.',
+  ]]]);
+
+export function rankPolicyDemo(url,locale,edition) {
   if(url.pathname!=='/api/config/v-rank-policy')return undefined;
   const lang=url.searchParams.get('locale')||locale,index=lang==='zh'?0:lang==='vi'?2:1;
-  return {status:'PUBLISHED',version:'default-2026.10.29',locale:lang,hero:["等级越高，可获得的奖励越多。", "The higher your rank, the more rewards you can earn.", "Hạng càng cao, phần thưởng bạn có thể nhận càng nhiều."][index],source:'server',sourceEnvironment:'PRODUCTION',runId:'',rules:{permanentProtection:true,qualifiedReferralSelfComputePoints:demoV1SelfComputePoints,leadershipConfigured:true},sections:rows.map(([id,titles,bodies],order)=>({id,title:titles[index],body:bodies[index],order}))};
+  const revised=edition==='revised';
+  return {status:'PUBLISHED',version:revised?'demo-rank-rules-2026.11.25':'default-2026.10.29',locale:lang,hero:["等级越高，可获得的奖励越多。", "The higher your rank, the more rewards you can earn.", "Hạng càng cao, phần thưởng bạn có thể nhận càng nhiều."][index],source:'server',sourceEnvironment:'PRODUCTION',runId:'',rules:{permanentProtection:true,qualifiedReferralSelfComputePoints:revised?null:demoV1SelfComputePoints,leadershipConfigured:true},sections:(revised?revisedSections:rows).map(([id,titles,bodies],order)=>({id,title:titles[index],body:bodies[index],order}))};
 }
