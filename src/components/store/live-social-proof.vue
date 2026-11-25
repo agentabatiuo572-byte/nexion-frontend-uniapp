@@ -56,7 +56,12 @@ import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
 
-const props = defineProps<{ product: Product }>();
+const props = withDefaults(defineProps<{
+  product: Product;
+  /** top-right: the detail art is shortened for the trial-credit entry, so the rows move to the free band above the machine
+   *  (two rows, right-aligned) instead of crossing its base (04 商城入口). */
+  placement?: "bottom-left" | "top-right";
+}>(), { placement: "bottom-left" });
 const t = useT();
 const locale = useLocaleStore();
 const app = useApp();
@@ -208,28 +213,29 @@ const flat = computed<FlatRow[]>(() => {
 const doubled = computed(() => [...flat.value, ...flat.value]);
 const duration = computed(() => flat.value.length * 2);
 
-const rootStyle: CSSProperties = {
+const rootStyle = computed<CSSProperties>(() => ({
   position: "absolute",
-  left: "4px",
-  bottom: "12px",
+  ...(props.placement === "top-right"
+    ? { top: "12px", right: "12px", height: "44px" } // 2 rows × 22px
+    : { left: "4px", bottom: "12px", height: "66px" }), // 3 rows × 22px
   width: "156px",
-  height: "66px", // 3 rows × 22px
   overflow: "hidden",
   maskImage: "linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%)",
   WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%)",
   pointerEvents: "none",
   zIndex: 5,
-};
+}));
 const listStyle = computed<CSSProperties>(() => ({
   animation: mounted.value ? `dnk-scroll ${duration.value}s linear infinite` : "none",
 }));
-const rowStyle: CSSProperties = {
+const rowStyle = computed<CSSProperties>(() => ({
+  justifyContent: props.placement === "top-right" ? "flex-end" : undefined,
   gap: "5px",
   height: "22px",
   lineHeight: "22px",
   whiteSpace: "nowrap",
   overflow: "hidden",
-};
+}));
 const unavailableStyle: CSSProperties = { color: "var(--v5-ink-3)", fontSize: "12px" };
 function dotStyle(color: string): CSSProperties {
   return {

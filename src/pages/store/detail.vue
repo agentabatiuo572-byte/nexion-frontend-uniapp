@@ -73,7 +73,7 @@
             <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <ProductBadge v-if="copy.badge" :label="copy.badge" :kind="copy.badgeKind" detail />
             <!-- Live activity danmaku -->
-            <LiveSocialProof :product="product" />
+            <LiveSocialProof :product="product" :placement="trialCreditEntry ? 'top-right' : 'bottom-left'" />
           </view>
 
           <view class="detail-summary relative">
@@ -926,10 +926,12 @@ const faqQStyle: CSSProperties = {
 .detail-returns__note { display: block; padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 /* One outer corner clip; the catalog image and its pedestal keep their full size. */
 .detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
-/* The trial-credit entry stays clear of the purchase tray: the art gives up the height the screen lacks, down to 216px
-   (04 商城入口). 510 = header, name block with a two-line entry and the tray with its note; Chinese needs 488. */
-.detail-hero--credit :deep(.detail-product-render) { max-height:max(216px, calc(100vh - 510px)); max-height:max(216px, calc(100dvh - 510px)); }
-:lang(zh) .detail-hero--credit :deep(.detail-product-render) { max-height:max(216px, calc(100vh - 488px)); max-height:max(216px, calc(100dvh - 488px)); }
+/* The trial-credit entry stays clear of the purchase tray: the art gives up the height the screen lacks, down to 216px,
+   and down to 184px when less than 700px is visible (04 商城入口). 510 = header, name block with a two-line entry and the
+   tray with its note; Chinese needs 488. The clamp() is the floor: 216px, stepping to 184px below a 699px visible height.
+   No custom property: a dvh value inside one would void the vh fallback where dvh is unsupported. */
+.detail-hero--credit :deep(.detail-product-render) { max-height:max(clamp(184px, calc(184px + (100vh - 699px) * 1000), 216px), calc(100vh - 510px)); max-height:max(clamp(184px, calc(184px + (100dvh - 699px) * 1000), 216px), calc(100dvh - 510px)); }
+:lang(zh) .detail-hero--credit :deep(.detail-product-render) { max-height:max(clamp(184px, calc(184px + (100vh - 699px) * 1000), 216px), calc(100vh - 488px)); max-height:max(clamp(184px, calc(184px + (100dvh - 699px) * 1000), 216px), calc(100dvh - 488px)); }
 .detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {
   background:linear-gradient(to top, var(--v5-content-surface) 0%, color-mix(in srgb, var(--v5-content-surface) 60%, transparent) 50%, transparent 100%) !important;
 }

@@ -150,7 +150,7 @@ export const trialDetailCopy = {
     earlySubtitle: 'Весь доход за пробный период — досрочно', earlyEstimate: ' (оценка)',
     graceTitle: "Не дайте доходу за пробный период сгореть",
     totalBreakdown: 'Скидка {discount} на заказ + {credit} после покупки', totalDiscountOnly: 'Скидка {discount} на заказ', totalLabel: 'Общая выгода',
-    unitPrice: 'Цена устройства', promoRow: 'Скидка за пробный период ({pct}%, до {cap})', promoRowNoCap: 'Скидка за пробный период ({pct}%)', limitedTag: 'Срок ограничен',
+    unitPrice: 'Цена устройства', promoRow: 'Скидка за пробу ({pct}%,\u00a0до\u00a0{cap})', promoRowNoCap: 'Скидка за пробу ({pct}%)', limitedTag: 'Срок ограничен',
     earlyRow: 'Особая скидка', offsetRow: 'Пробный бонус',
     discountTotal: 'Всего скидок', finalPrice: 'Итоговая цена', creditRow: 'Расчётный доход', creditNote: 'Сумму к выводу смотрите в кошельке',
     rulesRow: 'Правила зачёта и возврата', earnRow: 'В «Заработке»', buyCta: 'Купить с бонусом · {amount}', freeDays: 'Бесплатно {n} дн.',
