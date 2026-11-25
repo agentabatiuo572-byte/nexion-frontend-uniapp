@@ -221,6 +221,8 @@ function product(value: unknown): CatalogProduct {
     computePoints: optionalInteger(source.computePoints),
     price: finiteNumber(source.price, Number.EPSILON),
     sold: integer(source.sold),
+    // Absent on catalogues that predate the per-product switch: the live-activity overlay stays on.
+    liveActivityVisible: source.liveActivityVisible === undefined ? true : booleanValue(source.liveActivityVisible),
     imageUrl: productMediaUrl(source.imageUrl),
     videoUrl: productMediaUrl(source.videoUrl),
     productType,
