@@ -197,5 +197,6 @@ export function salaryView(input: {
 
 /** 气泡每句一段（03 §3.5.1）：按句末标点切开，中文按「。」。 */
 export function splitSentences(text: string): string[] {
-  return text.split(/(?<=[。！？])|(?<=[.!?])\s+/).map(line => line.trim()).filter(Boolean);
+  // Older iOS WebViews cannot parse regex lookbehind.
+  return text.replace(/([。！？])|([.!?])\s+/g, "$1$2\n").split("\n").map(line => line.trim()).filter(Boolean);
 }

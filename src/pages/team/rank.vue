@@ -136,7 +136,7 @@
         <view v-else class="rank-state" role="status" aria-live="polite" aria-busy="true"><text>{{ t.rank.loading }}</text></view>
       </view>
     </view>
-    <!-- 底部操作栏（DESIGN 2.1）的非领取状态：补差距最有效的一步。领取月薪的按钮、托盘和确认框由月薪项接在 dockAction 的 claim 分支。 -->
+    <!-- 底部操作栏（DESIGN 2.1）：有可领月薪时按 salaryDock，否则是补差距最有效的一步（dockAction）。 -->
     <template #pageFixed>
       <!-- 领取（2.1）：悬浮按钮「领取 N USDT」；晋升当天为托盘；领取中为灰色禁用按钮；结果确认中为状态胶囊。 -->
       <view v-if="salaryDock?.kind === 'claim'" class="rank-dock nx-glass-bar"><NxButton variant="primary" @click="claimSalary">{{ salaryDock.label }}</NxButton></view>
