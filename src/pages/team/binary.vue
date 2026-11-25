@@ -175,9 +175,10 @@ const pageState = computed(() => binaryPageState({
   binaryStatus: commission.binaryStatus === 'error' && snapshot.value !== null ? 'ready' : commission.binaryStatus,
   networkStatus: network.remoteStatus,
 }));
-// Member details show only from a healthy read: a retry after a failed read must not bring back cached members.
+// Member details read once stay through a temporary failure and its retries (03 §3.4); a rejected read or an account or
+// environment change clears the network snapshot, so nothing from before comes back.
 const memberDetailsReadable = computed(() => pageState.value.memberDetails === 'ready'
-  || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot && !network.remoteTransientFailure));
+  || (network.hasRemoteSnapshot && (pageState.value.memberDetails === 'loading' || network.remoteTransientFailure)));
 const remoteTrackA = computed(() => snapshot.value?.trackA ?? 0);
 const remoteTrackB = computed(() => snapshot.value?.trackB ?? 0);
 const settlePeriod = computed(() => remoteApiEnabled ? snapshot.value?.settlePeriod ?? "monthly" : BINARY_SETTLE_PERIOD);
