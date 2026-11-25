@@ -13,14 +13,18 @@ export interface RankRequirement {
 }
 const known = (value: number | undefined): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
+export function rankRequirementStatus(current: number | undefined, required: number): RankRequirement['status'] {
+  return !known(current) || !known(required) ? 'unknown' : current >= required ? 'met' : 'missing';
+}
+
 /** Display projection only. Never recalculates or writes the protected current rank. */
 export function teamRankRequirements(state: VRankData, ladder: readonly VRankDef[]) {
   const next = ladder.find(rank => rank.v > state.myRank);
   const rows: RankRequirement[] = [];
-  if (next) for (const rank of ladder.filter(rank => rank.v <= next.v)) {
+  if (next) for (const rank of ladder.filter(rank => rank.v > 0 && rank.v <= next.v)) {
     const c = rank.conditions;
     const add = (kind: RankGap['kind'], current: number | undefined, required: number, conditions: VRankConditions, vLevel?: number) => {
-      const status = !known(current) || !known(required) ? 'unknown' : current >= required ? 'met' : 'missing';
+      const status = rankRequirementStatus(current, required);
       const remaining = status === 'missing' ? required - current! : 0;
       const gap: RankGap | null = status !== 'missing' ? null
         : kind === 'directRefs' ? { kind, n: remaining }
@@ -28,17 +32,20 @@ export function teamRankRequirements(state: VRankData, ladder: readonly VRankDef
         : { kind, amount: remaining };
       rows.push({ tier: rank.v, key: `${rank.v}-${kind}-${vLevel ?? ''}`, kind, current, required, conditions, vLevel, status, gap });
     };
-    if (c.selfComputePoints !== undefined) add('selfComputePoints', state.selfComputePoints, c.selfComputePoints, { selfComputePoints: c.selfComputePoints });
+    if (c.selfComputePoints) add('selfComputePoints', state.selfComputePoints, c.selfComputePoints, { selfComputePoints: c.selfComputePoints });
     if (c.directRefs) add('directRefs', state.directRefs, c.directRefs, { directRefs: c.directRefs });
-    if (c.teamComputePoints !== undefined) add('teamComputePoints', state.teamComputePoints, c.teamComputePoints, { teamComputePoints: c.teamComputePoints });
+    if (c.teamComputePoints) add('teamComputePoints', state.teamComputePoints, c.teamComputePoints, { teamComputePoints: c.teamComputePoints });
     for (const [level, required] of Object.entries(c.vDownlines ?? {})) {
       if (required) add('vDownlines', state.vDownlineCounts[Number(level)] ?? 0, required, { vDownlines: { [level]: required } }, Number(level));
     }
   }
-  return { next: next ?? null, rows, missing: rows.filter(row => row.status === 'missing'), unknown: rows.filter(row => row.status === 'unknown') };
+  const unmet = rows.filter(row => row.status !== 'met');
+  const missing = unmet.filter(row => row.status === 'missing');
+  const reviewPending = state.myRank === 7 && next?.v === 8 && next.reviewRequired === true && unmet.length === 0;
+  return { next: next ?? null, rows, unmet, missing, unmetCount: unmet.length, reviewPending };
 }
 
-/** Next-rank progress as pages show it: the API's exact L1 rank buckets are counted at or above each required rank. */
+/** The API's exact rank buckets are counted at or above each required rank. */
 export function teamRankProgress(state: VRankData, ladder: readonly VRankDef[]) {
   const vDownlineCounts = Object.fromEntries(ladder.map(({ v }) => [v,
     Object.entries(state.vDownlineCounts).reduce((sum, [level, count]) => sum + (Number(level) >= v ? count : 0), 0),

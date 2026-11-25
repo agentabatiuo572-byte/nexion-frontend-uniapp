@@ -30,7 +30,7 @@ function open(){if(canOpen.value)emit('open');}
 <style scoped>
 .team-summary { container: team-summary / inline-size; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); color: var(--v5-ink); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
 .team-summary__header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
-.team-summary__title { min-width: 0; overflow-wrap: break-word; font: 600 14px/20px var(--font-v5); }
+.team-summary__title { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .team-summary__arrow { flex: none; font-size: 18px; color: var(--v5-ink-4); }
 .team-summary__body { --team-art-size: 64px; display: flex; flex-direction: column; flex: 1; justify-content: flex-end; }
 .team-summary__body :deep(.team-art) { position: absolute; top: 30px; right: -10px; opacity: .9; pointer-events: none; }

@@ -1,6 +1,6 @@
 <template>
-  <view v-if="open" class="nx-notice-mask nx-sheet-fade-in">
-    <view :id="id" class="nx-glass-sheet nx-notice nx-dialog-pop-in" role="alertdialog" aria-modal="true" :aria-label="title" :class="`nx-notice--${tone}`">
+  <view v-if="open" class="nx-notice-mask nx-sheet-fade-in" @click="maskExit">
+    <view :id="id" class="nx-glass-sheet nx-notice nx-dialog-pop-in" role="alertdialog" aria-modal="true" :aria-label="title" :class="`nx-notice--${tone}`" @click="sheetTap = true">
       <view class="nx-notice__icon" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <template v-if="icon === 'clock'"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></template>
@@ -34,9 +34,19 @@ const props = withDefaults(defineProps<{ open: boolean; title: string; body?: st
   // A decision whose primary is the destructive step (03 §3.1: the last step of a confirm may use the error colour).
   primaryTone?: 'danger';
   // Opening focus on the title instead of the first button, so Enter on open does not run the primary (03 §3.5).
-  focusTitle?: boolean }>(), { icon: 'alert', tone: 'warning' });
+  focusTitle?: boolean;
+  // A tap on the mask takes the quiet exit, like Esc and back; only flows that allow it opt in (03 §3.5). A tap inside the
+  // sheet marks itself on the way up instead (uni H5 normalizes event.target, so a .self check never matches, and stopping
+  // propagation would hide the tap from document listeners).
+  maskSecondary?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
+let sheetTap = false;
+function maskExit() {
+  const inside = sheetTap;
+  sheetTap = false;
+  if (!inside && props.maskSecondary && props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary');
+}
 // Esc / Android back take the quiet action when there is one; a notice without one must be answered. With focusTitle the
 // layer's first focus is the title itself (no control is focused first); Tab still cycles through the buttons (the title
 // has tabindex -1 and is no Tab stop).

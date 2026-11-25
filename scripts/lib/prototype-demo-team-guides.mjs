@@ -6,7 +6,7 @@ const PROOF = { source: 'server', sourceEnvironment: 'PRODUCTION', runId: '' };
 // Existing direct-referral-runtime.mjs illustration; explicitly labelled below.
 const DEMO_POOL_MONTHLY_CAP_USDT = 1000;
 
-export function teamGuidesDemo(url, locale, request, read) {
+export function teamGuidesDemo(url, locale, request, read, edition) {
   if (request.method() !== 'GET') return undefined;
   const key = url.pathname.startsWith('/api/content/how-it-works/') ? url.pathname.slice('/api/content/how-it-works/'.length) : '';
   const isGuide = url.pathname === '/api/config/commission/guide';
@@ -34,8 +34,122 @@ export function teamGuidesDemo(url, locale, request, read) {
   // Same text as the backend default publications (APP-COPY-AUDIT 2026-10-29), so the
   // prototype shows what users see before operations publish their own version.
   const block = (id, kind, title, body, items) => ({ id, kind, title, body, ...(items ? { items } : {}) });
+  const slot = (id, titles, bodies, kind = 'text') => block(id, kind, text(...titles), text(...bodies));
+  const revised = edition === 'revised' && key !== 'team-binary-how';
   let blocks;
-  if (key === 'team-unilevel-how') {
+  // Approved A3 publications (team-rank/how-texts.md §二–三).
+  if (revised && key === 'team-unilevel-how') {
+    blocks = [
+      slot('hero', ["团队奖励", "Team rewards", "Thưởng nhóm"], [
+        "好友和团队成员购买设备，按当前规则你能获得奖励；好友的设备产生收益时，你还能额外获得奖励。",
+        "You can earn under the current rules when friends and team members buy devices, and extra when your friends' devices earn.",
+        "Theo quy tắc hiện hành, bạn nhận thưởng khi bạn bè và thành viên nhóm mua thiết bị, và nhận thêm khi thiết bị của bạn bè có thu nhập.",
+      ]),
+      slot('seven-layer-scope', ["购买奖励", "Purchase rewards", "Thưởng mua hàng"], [
+        "好友和好友的好友付款买设备时，你按算奖励时自己的等级从订单金额中获得奖励，比例见等级页；其他团队成员的购买按当前规则，以实际发放为准。",
+        "When your friends or their friends pay for a device, you get a share of the order at the rate for your rank when the reward is calculated (see the rank page). Purchases by other team members follow the current rules and are subject to actual payout.",
+        "Khi bạn bè hoặc bạn của bạn bè thanh toán mua thiết bị, bạn nhận thưởng theo tỷ lệ của hạng bạn khi tính thưởng (xem trang hạng). Đơn mua của thành viên khác theo quy tắc hiện hành và theo chi trả thực tế.",
+      ]),
+      slot('direct-referral-scope', ["好友设备收益奖励", "Friend device earnings reward", "Thưởng thu nhập thiết bị của bạn bè"], [
+        "好友的设备产生收益时，平台额外发给你奖励，不影响好友的收益；好友的好友是否计入，以当前规则为准。",
+        "When a friend's device earns, the platform pays you an extra reward without reducing their earnings. Whether friends of friends count follows the current rules.",
+        "Khi thiết bị của bạn bè có thu nhập, nền tảng chi trả thêm cho bạn mà không làm giảm thu nhập của họ. Bạn của bạn bè có được tính hay không theo quy tắc hiện hành.",
+      ]),
+      slot('payout', ["到账", "Payouts", "Chi trả"], [
+        "奖励的币种（USDT 或 UVT）和等待期按奖励类型，等待期结束后进入可用余额；月薪领取后直接进入可用余额。",
+        "The currency (USDT or UVT) and waiting period depend on the reward; after it, rewards go to your available balance. Claimed monthly rewards go straight to your available balance.",
+        "Đồng thanh toán (USDT hoặc UVT) và thời gian chờ tùy loại thưởng; sau đó thưởng vào số dư khả dụng. Thưởng tháng khi nhận vào thẳng số dư khả dụng.",
+      ]),
+      slot('note', ["需要了解", "Good to know", "Lưu ý"], [
+        "金额以奖励明细为准；规则如有调整，以平台最新公布为准。",
+        "Amounts follow your reward history. If the rules change, the latest published rules apply.",
+        "Số tiền theo lịch sử thưởng. Nếu quy tắc thay đổi, quy tắc mới nhất do nền tảng công bố sẽ áp dụng.",
+      ], 'callout'),
+    ];
+  } else if (revised) {
+    blocks = [
+      slot('hero', ["奖励明细说明", "About your reward history", "Giới thiệu lịch sử thưởng"], [
+        "这里记录你的全部奖励，按来源和状态分别显示。",
+        "All your rewards are recorded here, shown by source and status.",
+        "Tất cả khoản thưởng được ghi nhận tại đây, hiển thị theo nguồn và trạng thái.",
+      ]),
+      slot('overview', ["奖励从哪来", "Where rewards come from", "Thưởng đến từ đâu"], [
+        "好友购买、团队购买、好友设备收益、晋级奖励和月薪。",
+        "Friend purchases, team purchases, friends' device earnings, rank-up rewards and monthly rewards.",
+        "Bạn bè mua hàng, nhóm mua hàng, thu nhập thiết bị của bạn bè, thưởng thăng hạng và thưởng tháng.",
+      ]),
+      slot('channels', ["分别查看", "Shown separately", "Hiển thị riêng"], [
+        "不同来源的奖励分开记录，金额以每条记录为准。",
+        "Rewards from each source are recorded separately; each record shows the amount.",
+        "Thưởng từ mỗi nguồn được ghi nhận riêng; số tiền theo từng bản ghi.",
+      ]),
+      slot('network', ["好友和团队购买", "Friend and team purchases", "Bạn bè và nhóm mua hàng"], [
+        "好友购买：{directPurchaseRules}。团队购买（含好友的好友）：{networkPurchaseRules}。好友设备收益：{directDeviceRules}。",
+        "Friend purchases: {directPurchaseRules}. Team purchases (including friends of friends): {networkPurchaseRules}. Friends' device earnings: {directDeviceRules}.",
+        "Bạn bè mua hàng: {directPurchaseRules}. Nhóm mua hàng (gồm bạn của bạn bè): {networkPurchaseRules}. Thu nhập thiết bị của bạn bè: {directDeviceRules}.",
+      ]),
+      slot('rank-reward', ["晋级奖励", "Rank-up reward", "Thưởng thăng hạng"], [
+        "升到新等级时发放 UVT，发给你本人，冷却后可用。",
+        "A UVT reward paid to you when you reach a new rank, usable after the cooling period.",
+        "Thưởng UVT trả cho bạn khi lên hạng mới, dùng được sau thời gian chờ.",
+      ]),
+      slot('salary', ["月薪", "Monthly reward", "Thưởng tháng"], [
+        "设有月薪的等级每月领取，领取后进入可用余额，规则见等级说明。",
+        "Ranks with a monthly reward claim it each month; it goes to your available balance. See the rank guide.",
+        "Các hạng có thưởng tháng nhận mỗi tháng; vào số dư khả dụng. Xem hướng dẫn hạng.",
+      ]),
+      slot('lifecycle', ["状态怎么看", "Record status", "Trạng thái bản ghi"], [
+        "每条奖励都会标出状态，金额以记录为准。",
+        "Each reward shows its status; the amount follows the record.",
+        "Mỗi khoản thưởng hiển thị trạng thái; số tiền theo bản ghi.",
+      ]),
+      slot('cooling', ["待到账", "Pending", "Chờ ghi nhận"], [
+        "等待期结束后进入可用余额，不同来源的等待期可能不同。",
+        "Goes to your available balance after the waiting period, which can differ by source.",
+        "Vào số dư khả dụng sau thời gian chờ; thời gian chờ có thể khác nhau tùy nguồn.",
+      ]),
+      slot('unlocked', ["已到账", "Credited", "Đã ghi nhận"], [
+        "已进入可用余额，提现按提现规则。",
+        "In your available balance; withdrawals follow the withdrawal rules.",
+        "Đã vào số dư khả dụng; việc rút theo quy định rút tiền.",
+      ]),
+      slot('withdrawn', ["已提现", "Withdrawn", "Đã rút"], [
+        "已转入提现，到账情况见提现记录。",
+        "Moved into a withdrawal; see your withdrawal records.",
+        "Đã chuyển vào lệnh rút; xem lịch sử rút tiền.",
+      ]),
+      slot('cooling-note', ["已撤销", "Reversed", "Đã hủy"], [
+        "订单全额退款等情况下，对应的购买奖励会撤销。",
+        "A purchase reward is reversed if, for example, its order is fully refunded.",
+        "Thưởng mua hàng sẽ bị hủy nếu, chẳng hạn, đơn hàng được hoàn tiền toàn bộ.",
+      ]),
+      slot('faq', ["常见问题", "Common questions", "Câu hỏi thường gặp"], [
+        "关于奖励到账的常见疑问。",
+        "Questions about receiving rewards.",
+        "Các thắc mắc thường gặp về việc nhận thưởng.",
+      ]),
+      slot('faq-order', ["为什么没看到奖励？", "Why don't I see a reward?", "Vì sao chưa thấy thưởng?"], [
+        "购买奖励在订单确认后生成，设备收益奖励按收益产生，晋级奖励在升级后发放，月薪需在等级页领取。奖励可能还在待到账状态，可在奖励明细中查看。",
+        "Purchase rewards are created after an order is confirmed, device rewards as earnings are generated, and rank-up rewards after you rank up; monthly rewards must be claimed on the rank page. A reward may still be pending. Check your reward history.",
+        "Thưởng mua hàng được tạo sau khi đơn hàng được xác nhận, thưởng thiết bị theo thu nhập phát sinh, thưởng thăng hạng sau khi lên hạng; thưởng tháng cần nhận tại trang hạng. Thưởng có thể vẫn đang chờ ghi nhận. Xem lịch sử thưởng.",
+      ]),
+      slot('faq-withdraw', ["什么时候可以提现？", "When can I withdraw?", "Khi nào có thể rút?"], [
+        "奖励到账后进入可用余额，可按提现规则申请提现；待到账的奖励还不能使用。",
+        "Once a reward is credited, it's in your available balance and you can request a withdrawal under the withdrawal rules. Pending rewards can't be used yet.",
+        "Sau khi được ghi nhận, thưởng vào số dư khả dụng và bạn có thể yêu cầu rút theo quy định. Thưởng đang chờ chưa dùng được.",
+      ]),
+      slot('faq-reversal', ["退款后奖励会怎样？", "What happens after a refund?", "Điều gì xảy ra khi hoàn tiền?"], [
+        "订单全额退款后，对应的购买奖励会撤销；设备之后退款，已产生的设备收益奖励不会因此自动撤销。",
+        "If an order is fully refunded, its purchase reward is reversed. A later device refund doesn't automatically reverse device earnings rewards already generated.",
+        "Khi đơn hàng được hoàn tiền toàn bộ, thưởng mua hàng tương ứng sẽ bị hủy. Nếu sau đó thiết bị được hoàn tiền, thưởng thu nhập thiết bị đã phát sinh không tự động bị hủy.",
+      ]),
+      slot('footer', ["返回奖励明细", "Back to reward history", "Quay lại lịch sử thưởng"], [
+        "金额以奖励记录为准；规则如有调整，以平台最新公布为准。",
+        "Amounts follow your reward records. If the rules change, the latest published rules apply.",
+        "Số tiền theo lịch sử thưởng. Nếu quy tắc thay đổi, quy tắc mới nhất do nền tảng công bố sẽ áp dụng.",
+      ]),
+    ];
+  } else if (key === 'team-unilevel-how') {
     blocks = [
       block('hero', 'text', text('团队奖励', 'Team rewards', 'Thưởng nhóm'), text(
         '好友和团队成员购买设备，你都能获得奖励；好友的设备产生收益时，你还能额外获得奖励。',
@@ -79,8 +193,7 @@ export function teamGuidesDemo(url, locale, request, read) {
         'Số tiền hiển thị là ước tính; thưởng thực nhận theo bản ghi chi trả. Nếu quy tắc thay đổi, quy tắc mới nhất do nền tảng công bố sẽ được áp dụng.')),
     ];
   } else {
-    // commissions-v2 renders fixed slots, so every slot id stays; only the wording is the default copy.
-    const slot = (id, titles, bodies) => block(id, 'text', text(...titles), text(...bodies));
+    // Keep the original commissions-v2 publication for compatibility previews.
     blocks = [
       slot('hero', ['奖励明细说明', 'About your reward history', 'Giới thiệu lịch sử thưởng'], ['这里记录你的全部奖励，按来源和状态分别显示。', 'All your rewards are recorded here, shown by source and status.', 'Tất cả khoản thưởng của bạn được ghi nhận tại đây, hiển thị theo nguồn và trạng thái.']),
       slot('overview', ['奖励从哪来', 'Where rewards come from', 'Thưởng đến từ đâu'], ['好友购买、团队购买、好友设备收益、团队平衡奖励、同级奖励、好友升级奖励和团队激励池。', 'Friend purchases, team purchases, friends\u2019 device earnings, the Team Balance Reward, same-rank rewards, friend rank-up rewards and the team incentive pool.', 'Bạn bè mua hàng, nhóm mua hàng, thu nhập thiết bị của bạn bè, thưởng cân bằng nhóm, thưởng đồng cấp, thưởng khi bạn bè lên hạng và quỹ thưởng nhóm.']),
@@ -113,7 +226,7 @@ export function teamGuidesDemo(url, locale, request, read) {
     ];
   }
   return {
-    ...PROOF, contentKey: key, locale: language, version: 'default-2026.10.29', versionSource: 'ENTRY', status: 'PUBLISHED', blocks,
+    ...PROOF, contentKey: key, locale: language, version: revised ? 'demo-rank-rules-2026.11.25' : 'default-2026.10.29', versionSource: 'ENTRY', status: 'PUBLISHED', blocks,
     ...(key === 'team-binary-how' ? {} : { schemaVersion: 2, templateId: key === 'team-unilevel-how' ? 'unilevel-v2' : 'commissions-v2' }),
   };
 }

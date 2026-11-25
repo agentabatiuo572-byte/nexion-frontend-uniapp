@@ -3,6 +3,7 @@ import { accountDeletionWallet, demoDeletionHistory } from './prototype-demo-acc
 import { demoH4Credits, demoH4Savers, demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoDeletionStake } from './prototype-demo-staking.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
+import { rankDevicePolicies, rankSalaryPaidFacts } from './prototype-demo-rank-presets.mjs';
 
 const day=86400000;
 const timeZone='Asia/Shanghai';
@@ -73,7 +74,47 @@ export function demoCommissionGroups(state,at) {
     amountUSDT:legacy?100:120,amountNEX:0,status:legacy?'frozen':'unlocked',
     ts:matchedAt,unlockAt:Math.min(at,matchedAt+7*day),
   };
+  if(state.rankPreset&&state.rankPreset!=='follow')return [...demoRankPresetRewardRows(state,at),binary].sort((a,b)=>b.ts-a.ts);
   return [purchase,device,network,binary].sort((a,b)=>b.ts-a.ts);
+}
+
+// Team-reward rows for the my-rank boards F2 / F2b / F3 and the monthly-reward row (DESIGN F2, 5, 6):
+// friends' purchases (layer 1), friends-of-friends' purchases (layer 2), device earnings on both layers, and
+// credited monthly rewards from the same facts as the rank page. Only used with a rank preset.
+function demoRankPresetRewardRows(state,at) {
+  const hour=3600000;
+  const {current,previous}=rankDevicePolicies(state,at);
+  const row=(id,kind,name,layer,h,usdt,uvt,status,extra={})=>({id:'demo-rank-'+id,kind,sourceUserName:name,layer,
+    orderId:'DEMO-RANK-'+id,sourceRef:'DEMO-RANK-'+id,orderAmountUSD:299,amountUSDT:usdt,amountNEX:uvt,status,
+    ts:at-h*hour,unlockAt:status==='cooling'?at+20*day:at-h*hour,...extra});
+  const device=(id,name,layer,sourceDeviceId,basis,ts,policy)=>{
+    const rate=layer===1?policy.totalRatePct:policy.level2RatePct;
+    const reward=basis*rate/100;
+    const unlockAt=ts+policy.coolingDays*day;
+    const usdt=money(reward*policy.usdtSharePct/100);
+    const nex=money(reward*(100-policy.usdtSharePct)/100/.128);
+    return row(id,'direct_device_earning',name,layer,0,usdt,nex,unlockAt<=at?'unlocked':'cooling',
+      {sourceDeviceId,orderAmountUSD:basis,ts,unlockAt,policyVersion:policy.policyVersion});
+  };
+  const l1Policy=current.enabled?current:previous;
+  const l2Policy=current.enabled&&current.level2RatePct>0?current:previous;
+  return [
+    row('p1','direct_purchase','Lina',1,1,13.16,2.6,'cooling'),
+    row('p2','direct_purchase','Kai',1,4,6.56,1.3,'unlocked'),
+    row('p3','direct_purchase','Omar',1,6,4.7,0,'unlocked'),
+    row('t1','unilevel','Minh Anh',2,2,6.58,1.3,'cooling'),
+    row('t2','unilevel','Rustam Abdullayev',2,7,3.28,0.66,'unlocked'),
+    device('d1','Lina',1,'DEMO-LINA-S1',100,current.enabled?at-hour:current.effectiveAt-day-hour,l1Policy),
+    device('d2','Minh Anh',2,'DEMO-MINH-S1',80,l2Policy===current?at-2*hour:current.effectiveAt-day-2*hour,l2Policy),
+    device('d3','Kai',1,'DEMO-KAI-S1',40,current.enabled?current.effectiveAt+hour:current.effectiveAt-2*day,l1Policy),
+    device('d4','Rustam Abdullayev',2,'DEMO-RUSTAM-S1',25,current.effectiveAt-2*day-hour,previous),
+    ...rankSalaryPaidFacts(state,Date.now()).map(item=>({
+      id:item.claimNo, kind:'vrank_salary', sourceUserName:'System', layer:0,
+      ...(!item.legacyProjection && {salaryMonth:item.month, salaryRank:item.rankCode}),
+      amountUSDT:Number(item.amountUsdt), amountNEX:0, status:'unlocked',
+      ts:Date.parse(item.claimedAt), unlockAt:Date.parse(item.claimedAt),
+    })),
+  ];
 }
 
 export function demoCommissionEvents(state,at) {
@@ -319,9 +360,10 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
     ['COMPUTE_EARNING','USDT','IN',128.5,'earn',seedAt-4*day],
     ['COMPUTE_EARNING','USDT','IN',.00032,'earn',seedAt-5*day],
     // Saved legacy ledgers keep their original pending row and identity.
-    ...(state.walletLegacySeed?[['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING']]:[]),
+    ...(state.walletLegacySeed&&cooling?[['TEAM_COMMISSION','UVT','IN',cooling.amountNEX,'refer',cooling.ts,'PENDING']]:[]),
     ...tasks.filter(task=>!task.deliveryCycle).map(task=>['COMPUTE_TASK_REWARD','USDT','IN',task.amount,'bonus',task.postedAt,'SUCCESS',task.taskNo,task.batchNo]),
-    ...commissions.flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
+    ...commissions.filter(event=>event.kind!=='vrank_salary'||!posted.has(`${event.id}-RELEASE`))
+      .flatMap(event=>[['USDT',event.amountUSDT],['UVT',event.amountNEX]].filter(([,amount])=>amount>0)
       .map(([asset,amount])=>['TEAM_COMMISSION',asset,'IN',amount,'refer',event.unlockAt,'SUCCESS',`${event.id}-RELEASE`])),
     ...demoStreakMilestones.flatMap(([milestoneDay,asset,amount],index)=>{
       const id=index+1,bizNo='DAILY-MS:900001:'+id;

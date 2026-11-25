@@ -8,6 +8,7 @@ import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { installNativePush, refreshNativePush, flushNativePushClick, showJPushPrivacyPrompt } from "@/services/native-push";
 // #ifdef APP-PLUS
+import { refreshNativeRankFxFlags } from "@/lib/native-rank-fx";
 import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
 // #endif
 import { navReset } from "@/lib/route";
@@ -1421,6 +1422,7 @@ onShow(() => {
   useLocaleStore().ensureSystemDetected();
   appReadForeground.value = true;
   // #ifdef APP-PLUS
+  refreshNativeRankFxFlags();
   useTheme().refreshSystemTheme();
   void checkUpdate();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");
