@@ -30,8 +30,8 @@
         <text class="pin-change__hint">{{ hint }}</text>
         <PaymentPasswordInput :key="step" v-model="passwords[stepField]" class="pin-change__input" :label="heading" :adjust-position="false"
           :auto-focus="!inputDisabled" :disabled="inputDisabled" @complete="completeStep" />
-        <!-- In-place result line under the digits: lock (with time) wins, then the error, then the busy status. -->
-        <text v-if="step === 'verify' && (pin.locked() || ui.changeLockUnconfirmed)" class="pin-change__error" role="alert">{{ lockMessage }}</text>
+        <!-- The in-place result explains the current lock, read or input state. -->
+        <text v-if="step === 'verify' && pin.locked()" class="pin-change__error" role="alert">{{ lockMessage }}</text>
         <text v-else-if="stepError" id="pin-change-error" class="pin-change__error" role="alert">{{ stepError }}</text>
         <text v-else-if="stepStatus" id="pin-change-status" class="pin-change__status" role="status">{{ stepStatus }}</text>
         <view v-if="step === 'verify'" class="pin-change__links">
@@ -100,7 +100,6 @@ const error = computed(() => !ui.changeError || ui.changeError === "locked" ? ""
 const changeLocked = computed(() => ui.changeLockUnconfirmed || !!state.value?.lockedUntil);
 const lockNeedsRead = computed(() => changeLocked.value && !pin.locked());
 const lockMessage = computed(() => {
-  if (!pin.locked()) return t.value.paymentPin.lockedLabel;
   const seconds = Math.max(0, Math.ceil((Date.parse(state.value?.lockedUntil ?? "") - ui.now) / 1000));
   return fmt(t.value.paymentPin.locked, { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` });
 });
@@ -120,12 +119,11 @@ const proofUsable = computed(() => {
 });
 const inputDisabled = computed(() => loading.value || statusReadFailed.value || actionBusy.value || (step.value === "verify" && (changeLocked.value || retryVerification.value)));
 const stepError = computed(() => {
-  if (submittingChange.value || verifying.value) return "";
+  if (submittingChange.value || verifying.value || loading.value) return "";
+  if (statusReadFailed.value) return t.value.paymentPin.unavailable;
   if (retryVerification.value) return t.value.paymentPin.verifyUnavailable;
-  if (step.value === "verify" && lockNeedsRead.value) {
-    return statusReadFailed.value && !loading.value ? t.value.paymentPin.unavailable : "";
-  }
-  return validation.value || error.value || (statusReadFailed.value ? t.value.paymentPin.unavailable : "");
+  if (step.value === "verify" && lockNeedsRead.value) return "";
+  return validation.value || error.value;
 });
 const stepStatus = computed(() => {
   if (submittingChange.value) return t.value.paymentPin.changing;
@@ -238,7 +236,10 @@ watch(() => ui.changeError, key => {
     return;
   }
   clear();
-  if (key === "samePassword") ui.changeError = "changeProofExpired";
+  if (key === "samePassword") {
+    ui.changeError = "changeProofExpired";
+    if (active.value && !ui.visible) void readStatus(true);
+  }
 });
 watch(() => ui.changeRecheckRevision, () => {
   if (active.value && !ui.visible) void readStatus(true);

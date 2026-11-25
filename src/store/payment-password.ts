@@ -5,6 +5,7 @@ import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { createPaymentPasswordApi, validPaymentPassword, type PaymentPasswordApi, type PaymentPasswordAuthorization, type PaymentPasswordChallenge, type PaymentPasswordChangeCommand, type PaymentPasswordChangeVerification, type PaymentPasswordProof, type PaymentPasswordReceipt, type PaymentPasswordState } from "@/api/payment-password-api";
 import { ApiError, asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { projectServerNow, readTrustedMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
 export type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
@@ -67,6 +68,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   let pending: (PendingCommand & { owner: string }) | null = null;
   let promptError: ErrorKey = "";
   let serverOffset = 0;
+  let statusClock: { serverTime: number; receivedAt: number } | null = null;
   let receiptRead: Promise<void> | null = null;
   async function waitForQuery() { await receiptRead?.catch(() => {}); }
   function restorePendingRead() {
@@ -108,6 +110,18 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     display.loading = false;
     display.state = { configured: state.configured, lockedUntil: state.lockedUntil, serverTime: state.serverTime };
   }
+  function sampleStatusClock(state: PaymentPasswordState) {
+    const receivedAt = readTrustedMonotonicNowMs();
+    statusClock = receivedAt === null ? null : { serverTime: Date.parse(state.serverTime), receivedAt };
+  }
+  function statusServerNow(): number | null {
+    const now = readTrustedMonotonicNowMs();
+    return statusClock && now !== null ? projectServerNow(statusClock.serverTime, statusClock.receivedAt, now) : null;
+  }
+  function applyStatusRead(state: PaymentPasswordState) {
+    sampleStatusClock(state);
+    setState(state);
+  }
   function cancel() {
     generation++; statusReadInProgress = false; promptError = "";
     clearSecrets(); ui.visible = false; ui.busy = false; ui.context = null; ui.error = ""; ui.notice = "";
@@ -116,6 +130,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   function accountChanged() {
     cancel(); pending = null; ui.pendingOperation = ""; ui.state = null; ui.changeError = "";
     ui.changeLockUnconfirmed = false;
+    statusClock = null;
     invalidatePassiveTabRead("payment-password-display");
     displayReadEpoch++; display.state = null; display.loading = false;
   }
@@ -134,6 +149,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     try {
       const state = await api.status();
       if (!currentRead()) return false;
+      sampleStatusClock(state);
       display.state = { configured: state.configured, lockedUntil: state.lockedUntil, serverTime: state.serverTime };
       serverOffset = Date.parse(state.serverTime) - Date.now(); ui.now = Date.now() + serverOffset;
       return true;
@@ -147,7 +163,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     const account = identity(), token = generation;
     const currentRead = () => account === identity() && token === generation && (options.isCurrent?.() ?? true);
     if (!currentRead()) return null;
-    try { const result = await api.status(); if (!currentRead()) return null; setState(result); return result; }
+    try { const result = await api.status(); if (!currentRead()) return null; applyStatusRead(result); return result; }
     catch (error) {
       if (currentRead() && !options.silent && !(options.keepTransientSnapshot && isTransientReadFailure(error))) ui.state = null;
       return null;
@@ -161,7 +177,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     try {
       restorePending();
       if (pending?.owner === owner) { ui.stage = "pending"; ui.error = ""; promptError = ""; return; }
-      const state = await api.status(); if (!current(token)) return; setState(state);
+      const state = await api.status(); if (!current(token)) return; applyStatusRead(state);
       // A background re-read (lock expiry, read-failure recovery) only settles the step it started from; a step the user
       // has moved on to (recovery) keeps its own flow.
       if (!showLoading && ui.stage !== startStage) return;
@@ -260,7 +276,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     if (ui.context) void load();
     else {
       ui.visible = false;
-      if (error !== "changeNotCompleted" && (error !== "locked" || ui.changeLockUnconfirmed)) ui.changeRecheckRevision++;
+      if (error !== "changeNotCompleted" && error !== "samePassword" && (error !== "locked" || ui.changeLockUnconfirmed)) ui.changeRecheckRevision++;
     }
     return true;
   }
@@ -272,18 +288,30 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     ui.reading = true;
     const read = Promise.resolve().then(async () => {
       if (!currentRead()) return;
+      // Legacy records keep their previous NOT_SEEN policy. For a dated record, establish
+      // expiry before dispatching the receipt read so a pre-expiry NOT_SEEN cannot settle it.
+      let mayRetireUnseenChange = command.operation === "change" && !command.expiresAt;
+      if (command.operation === "change" && command.expiresAt) {
+        let serverNow = statusServerNow();
+        if (serverNow === null) {
+          const state = await refreshStatus({ isCurrent: currentRead, silent: true });
+          if (!currentRead()) return;
+          if (state) serverNow = Date.parse(state.serverTime);
+        }
+        mayRetireUnseenChange = serverNow !== null
+          && serverNow >= Date.parse(command.expiresAt) + CHANGE_PROOF_EXPIRY_GRACE_MS;
+      }
       const result = await api.receipt(command.commandKey);
       if (!currentRead()) return;
       if (finishMutation(result)) return;
-      // A change record without a stored expiry predates it (the product is not launched); it settles as the old build did.
-      const expiredChangeNotSeen = command.operation === "change" && result.status === "NOT_SEEN"
-        && (!command.expiresAt || Date.parse(command.expiresAt) + CHANGE_PROOF_EXPIRY_GRACE_MS <= Date.now() + serverOffset);
+      const expiredChangeNotSeen = mayRetireUnseenChange && result.status === "NOT_SEEN";
       if (result.status === "REJECTED" || expiredChangeNotSeen) {
         const error = expiredChangeNotSeen ? "changeNotCompleted" : paymentPasswordErrorKey(new ApiError({
           kind: "business", message: result.message ?? "PAYMENT_PASSWORD_UPDATE_REJECTED",
         }));
         if (command.operation === "change") {
-          if (!settleChangeRejection(error, result.state)) throw new Error("PAYMENT_PASSWORD_COMMAND_RETIRE_FAILED");
+          // A rejected receipt describes the old command, including any lock at the time of rejection.
+          if (!settleChangeRejection(error)) throw new Error("PAYMENT_PASSWORD_COMMAND_RETIRE_FAILED");
           return;
         }
         if (!retirePending()) throw new Error("PAYMENT_PASSWORD_COMMAND_RETIRE_FAILED");
@@ -317,7 +345,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     if (ui.busy || ui.resendAt > ui.now) return;
     const token = generation; ui.busy = true; ui.error = "";
     try {
-      const state = await api.status(); if (!current(token)) return; setState(state);
+      const state = await api.status(); if (!current(token)) return; applyStatusRead(state);
       const challenge = await api.challenge(); if (!current(token)) return;
       ui.challenge = challenge; ui.resendAt = Date.now() + serverOffset + challenge.resendAfterSec * 1000;
     } catch (error) { if (current(token)) ui.error = paymentPasswordErrorKey(error); }
