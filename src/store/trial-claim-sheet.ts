@@ -46,14 +46,14 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
   });
   function failureText(reason: TrialStartFailure | undefined): string {
     const t = getT();
-    if (reason === "rejected") return t.weeklyQuest.claimFailed;
+    if (reason === "rejected") return copy.value.claimRejected;
     if (reason === "capacity-full") return copy.value.capacityFull;
     if (reason === "converted") return t.trial.eligReasonConverted;
     if (reason === "used") return t.trial.eligReasonUsed;
     if (reason === "in-progress") return t.trial.eligReasonInProgress;
     if (reason === "quota-exhausted") return t.trial.eligReasonQuota;
     if (reason === "risk") return t.trial.eligReasonRisk;
-    if (reason === "product-unavailable") return t.store.trialProductUnavailable;
+    if (reason === "product-unavailable") return copy.value.deviceUnclaimable;
     if (reason === "unknown") return t.trial.eligReasonUnknown;
     return t.trial.eligReasonClosed;
   }

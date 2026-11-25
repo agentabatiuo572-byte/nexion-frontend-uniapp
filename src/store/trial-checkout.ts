@@ -234,7 +234,8 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
   async function readRoutedResult(claimNo: string, productNo: string, submissionNo: string, amount: number | null) {
     const current = currentAccount();
     const reply = await readPaymentCommand(apiClient, "trial-convert", submissionNo);
-    if (!current() || authority.value?.claimNo !== claimNo || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
+    if (!current() || authority.value?.claimNo !== claimNo || (reply.paymentMethod && reply.paymentMethod !== "WALLET")
+        || (workingSubmission.value && workingSubmission.value.submissionNo !== submissionNo)) return;
     const result = terminalResult(reply);
     if (!result) return;
     const receiptClaim = result.status === "settled" ? result.receipt.claimNo : result.claimNo;

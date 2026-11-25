@@ -1182,7 +1182,9 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
           && trialOriginalLocked.value) return true;
       let outcome = activeTrialOutcome.value;
       if (outcome?.status !== "refused" || outcome.submissionNo !== routedKey) {
-        if (!state.claimNo || state.originalPurchase || (!trialsCanConvert(state.status) && state.status !== "converted")) {
+        // Another original of this claim comes first, also one only this device remembers; the detail shows it.
+        if (!state.claimNo || state.originalPurchase || (submission && submission.submissionNo !== routedKey)
+            || (!trialsCanConvert(state.status) && state.status !== "converted")) {
           leaveTrialReview(null);
           return true;
         }

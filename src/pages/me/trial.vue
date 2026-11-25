@@ -594,7 +594,7 @@ const ineligibleReasonText = computed(() => {
   if (r === "in-progress") return w.value.eligReasonInProgress;
   if (r === "risk") return w.value.eligReasonRisk;
   if (r === "quota-exhausted") return w.value.eligReasonQuota;
-  if (r === "product-unavailable") return t.value.store.trialProductUnavailable;
+  if (r === "product-unavailable") return lifecycle.value.deviceUnclaimable;
   if (r === "capacity-full") return lifecycle.value.capacityFull;
   return w.value.eligReasonClosed;
 });
