@@ -1021,7 +1021,7 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trs-list { display:flex;flex-direction:column;gap:10px;margin-top:14px; }
 .trs-line { display:flex;align-items:flex-start;gap:8px; }
 .trs-line__dot { flex:none;width:6px;height:6px;margin-top:8px;border-radius:50%;background:var(--v5-brand); }
-.trs-line__text { flex:1;min-width:0;color:var(--v5-ink-2);font:var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5);overflow-wrap:break-word;text-wrap:pretty; }
+.trs-line__text { flex:1;min-width:0;color:var(--v5-ink-2);font:var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5);overflow-wrap:break-word;text-wrap:balance; }
 .trs-got { display:flex;width:100%;margin-top:18px; }
 @keyframes trs-fade {
   from { opacity: 0; }

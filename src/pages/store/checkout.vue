@@ -2045,7 +2045,8 @@ const trialPreviousTotal = computed(() => trialPriceChanged.value && trialQuoteC
 const trialTrayWarning = computed(() => {
   const status = activeTrialOutcome.value?.status;
   if (status === "storage-error") return t.value.errors.txNotSavedTitle;
-  if (trialQuotePending.value && trialReviewStatus.value === "failed") return purchaseCopy.value.coQuoteFailed;
+  if (trialQuotePending.value && trialReviewStatus.value === "failed")
+    return trialResumeNo || trialRefusalNo ? purchaseCopy.value.coConfirming : purchaseCopy.value.coQuoteFailed;
   if (trialNeedsTopup.value) {
     const shortfall = trialBalanceShortfallUSD.value;
     if (shortfall === null || shortfall <= 0) return t.value.errors.insufficientBalanceTitle;

@@ -641,7 +641,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const requestedEpoch = accountBindingEpoch;
       // Each submit reports its own refusal, also the same one twice.
       confirmedStartDenial.value = undefined;
-      if (!await refreshEligibilityRemote() || requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
+      const answered = await refreshEligibilityRemote();
+      if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
+      // A newer state read may have answered first; its answer decides this claim.
+      if (!answered && authorityStatus.value !== "ready") return { ok: false, reason: "read-failed" };
       if (recovering && !pendingStart.value && !confirmedStartDenial.value) return { ok: true };
       const remoteEligibility = eligibility();
       if (!remoteEligibility.ok) {
