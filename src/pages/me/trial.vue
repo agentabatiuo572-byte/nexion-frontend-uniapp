@@ -217,7 +217,9 @@
           <view v-if="barNoteWarn" class="trial-bar__note trial-bar__note--warn nx-tray-note" role="status"><svg class="trial-bar__note-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg><text>{{ barNote }}</text></view>
           <text v-else-if="barNote" class="trial-bar__note nx-tray-note" role="status">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
-          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
+          <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the read runs on its own, the tray only says so. -->
+          <view v-if="originalConfirming" class="nx-tray-status trial-bar__status" role="status"><text>{{ purchase.coConfirming }}</text></view>
+          <NxButton v-else class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
             <!-- Reading the list keeps the label beside the spinner (board S6a); a press in progress uses the shared busy state. -->
             <view v-if="listLoading" class="trial-bar__spinner" aria-hidden="true" />
             <svg v-else-if="isActiveCycle && !originalPurchase && !trialBuyDisabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
@@ -571,6 +573,8 @@ const listLoading = computed(() => purchaseOptionLoading.value && !originalPurch
 const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalPurchase.value ? false
   : usePurchaseOptions.value ? !selectedOption.value || !purchaseQuote.value
     : trialProductUnavailable.value && !trialCatalogLoading.value));
+// A balance payment whose result is still being read: no button in the tray, only its status (03 §3.5.2 提交结果未知).
+const originalConfirming = computed(() => originalPurchase.value?.kind === "BALANCE" && originalPurchase.value.status !== "RESUMABLE");
 const trialBuyCtaText = computed(() => {
   const original = originalPurchase.value;
   if (original) return original.status === "AWAITING_PAYMENT" || original.status === "RESUMABLE"
@@ -690,8 +694,6 @@ async function goCheckout() {
       const legacy = freeTrial.pendingConversion(original.device.productNo)?.key === original.submissionNo;
       if (original.status === "RESUMABLE") await navTo(checkoutHref(original.device.productNo,
         legacy ? undefined : { kind: "resume", submissionNo: original.submissionNo }));
-      else if (legacy) await freeTrial.recoverLegacyConversion();
-      else await checkout.readSubmission();
     } else if (productNo) {
       if (usePurchaseOptions.value) {
         await trialOptions.refresh();

@@ -65,8 +65,11 @@ const t = useT();
 const localExpanded = ref(false);
 // The warehouse card is always open; Earn keeps its disclosure.
 const isExpanded = computed(() => props.variant === "inventory" || (props.expanded ?? localExpanded.value));
-const isOnline = computed(() => !trialConfirming.value && presentation.presentationReady.value && presentation.status.value === "active");
-const statusText = computed(() => trialConfirming.value ? lifecycleCopy.value.resultConfirming
+// The status slot is the device's state. Only an unknown start or cancel result replaces it with 「试用结果确认中」; a payment
+// still confirming keeps Online and is said where the cancel entry sits (04 §4.6 设备页试用行).
+const lifecycleConfirming = computed(() => !!trial.pendingStart || !!trial.pendingCancel);
+const isOnline = computed(() => !lifecycleConfirming.value && presentation.presentationReady.value && presentation.status.value === "active");
+const statusText = computed(() => lifecycleConfirming.value ? lifecycleCopy.value.resultConfirming
   : !presentation.presentationReady.value ? copy.value.statusUnknown
   : isOnline.value ? t.value.earn.online : copy.value.grace);
 // Cents render dimmer on the inventory card; masked values have no decimal part.

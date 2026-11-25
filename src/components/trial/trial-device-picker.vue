@@ -13,14 +13,14 @@
     <!-- The lock is said on every radio (aria-disabled) and once for the group (describedby): an aria-disabled group would also
          disable the conditions link, which is the radio's sibling and stays usable (03 §3.5 单选行). -->
     <view v-else class="tdp__list" role="radiogroup" :aria-label="copy.selectTitle" :aria-describedby="locked ? 'tdp-lock-note' : undefined">
-      <view v-for="row in rows" :key="row.option.productNo" class="tdp-row" :class="{ 'tdp-row--on': row.checked, 'tdp-row--off': !row.option.canBuy, 'tdp-row--tag': row.option.isTrialProduct, 'tdp-row--link': row.link, 'tdp-row--claim': row.claimPrice }">
+      <view v-for="row in rows" :key="row.option.productNo" class="tdp-row" :class="{ 'tdp-row--on': row.checked, 'tdp-row--off': !row.option.canBuy, 'tdp-row--tag': row.option.isTrialProduct, 'tdp-row--link': row.link, 'tdp-row--claim': row.claimPrice, 'tdp-row--stack': stackedClaims.includes(row.productNo) }">
         <view class="tdp-row__body" role="radio" :data-product-no="row.option.productNo" :aria-checked="row.checked ? 'true' : 'false'" :aria-disabled="row.selectable ? undefined : 'true'" :aria-label="row.aria" :tabindex="row.productNo === tabStop ? 0 : -1"
           @click="choose(row)" @keydown.space.stop.prevent="choose(row)" @keydown.enter.stop.prevent="choose(row)"
           @keydown.down.stop.prevent="move(row, 1)" @keydown.right.stop.prevent="move(row, 1)" @keydown.up.stop.prevent="move(row, -1)" @keydown.left.stop.prevent="move(row, -1)">
           <view class="tdp-row__thumb" aria-hidden="true"><image v-if="row.option.imageUrl" class="tdp-row__img" :src="row.option.imageUrl" mode="aspectFit" /></view>
-          <view class="tdp-row__main">
-            <text class="tdp-row__name">{{ row.option.productName }}</text>
-            <view v-if="row.option.isTrialProduct" class="tdp-row__tagline"><NxTag tone="neutral">{{ copy.thisTrialTag }}</NxTag></view>
+          <view class="tdp-row__main" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="main">
+            <text class="tdp-row__name" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="name">{{ row.option.productName }}</text>
+            <view v-if="row.option.isTrialProduct" class="tdp-row__tagline" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="tag"><NxTag tone="neutral">{{ copy.thisTrialTag }}</NxTag></view>
             <text v-if="row.reason" class="tdp-row__meta">{{ row.reason }}</text>
             <text v-else-if="row.estimate" class="tdp-row__meta"><text class="tdp-row__est-line">{{ row.estimate.label }}<text class="tdp-row__est">{{ row.estimate.value }}</text></text></text>
             <!-- Room for the conditions link, which is the radio's sibling (03 §3.5 单选行). -->
@@ -29,7 +29,7 @@
           <view v-if="row.due" class="tdp-row__price">
             <text class="tdp-row__due"><text class="tdp-row__cur">$</text>{{ row.due.whole }}<text class="tdp-row__dec">{{ row.due.decimals }}</text></text>
             <!-- A view, not a text: a uni <text> wraps its children in one span, which would leave the flex line with a single item. -->
-            <view class="tdp-row__was" :class="{ 'tdp-row__was--claim': row.claimPrice }"><text v-if="row.claimPrice" class="tdp-row__claim">{{ copy.claimPrice }}</text><text class="tdp-row__strike">{{ row.was }}</text></view>
+            <view class="tdp-row__was" :class="{ 'tdp-row__was--claim': row.claimPrice }"><text v-if="row.claimPrice" class="tdp-row__claim tdp-measure" :data-row="row.productNo" data-part="label">{{ copy.claimPrice }}</text><text class="tdp-row__strike">{{ row.was }}</text></view>
           </view>
           <text v-else-if="row.quoteFailed" class="tdp-row__unknown">—</text>
           <view class="tdp-row__radio" aria-hidden="true" />
@@ -47,7 +47,7 @@
 <script setup lang="ts">
 // 试用详情「专享限时折扣设备」选择区 (04 §4.6 试用详情与试用抵扣购买; 03 §3.5 单选行). Display only: the parent owns the
 // read, the selection and the rule for when the section is shown at all; this renders what it is given.
-import { computed } from "vue";
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import type { TrialPurchaseOption } from "@/api/trial-api";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
@@ -98,6 +98,35 @@ const rows = computed(() => props.options.map(option => {
     due ? `${copy.value.finalPrice} $${due.whole}${due.decimals}` : "", due ? `${claimPrice ? copy.value.claimPrice : copy.value.unitPrice} ${was}` : ""].filter(Boolean).join(", ");
   return { option, productNo: option.productNo, selectable, quoteFailed, reason, estimate, due, was, claimPrice, link, checked, aria };
 }));
+// 「领取时价格」 sits beside the struck price (board S11) unless, on its own line, it would run into the name or the tag or
+// past the text column; that row takes it on a line of its own above the price. Read from the screen (H5 and App alike),
+// so the width and the language decide, not the character count.
+const stackedClaims = ref<string[]>([]);
+const instance = getCurrentInstance();
+type MeasuredBox = { left: number; right: number; top: number; bottom: number; dataset: Record<string, string> };
+let placeRun = 0;
+async function placeClaimLabels() {
+  const run = ++placeRun;
+  stackedClaims.value = [];
+  if (!rows.value.some(row => row.claimPrice)) return;
+  await nextTick();
+  uni.createSelectorQuery().in(instance?.proxy).selectAll(".tdp-measure").fields({ dataset: true, rect: true }, (nodes) => {
+    if (run !== placeRun) return;
+    const byRow = new Map<string, Record<string, MeasuredBox>>();
+    for (const box of (nodes ?? []) as unknown as MeasuredBox[]) {
+      const parts = byRow.get(box.dataset.row) ?? {};
+      parts[box.dataset.part] = box;
+      byRow.set(box.dataset.row, parts);
+    }
+    const hits = (a: MeasuredBox, b?: MeasuredBox) => !!b && a.left < b.right + 4 && b.left < a.right + 4 && a.top < b.bottom && b.top < a.bottom;
+    stackedClaims.value = [...byRow].filter(([, part]) => part.label
+      && (hits(part.label, part.name) || hits(part.label, part.tag) || (!!part.main && part.label.left < part.main.left))).map(([row]) => row);
+  }).exec();
+}
+const onWindowResize = () => { void placeClaimLabels(); };
+onMounted(() => { void placeClaimLabels(); uni.onWindowResize(onWindowResize); });
+onUnmounted(() => uni.offWindowResize(onWindowResize));
+watch(() => [rows.value.map(row => `${row.productNo}:${row.claimPrice}:${row.was}`).join(), copy.value.claimPrice, copy.value.thisTrialTag], () => { void placeClaimLabels(); }, { flush: "post" });
 // Roving tab stop: the checked row, else the first selectable one (03 §3.5).
 const tabStop = computed(() => rows.value.find(row => row.checked)?.productNo ?? rows.value.find(row => row.selectable)?.productNo ?? null);
 const showBalanceNote = computed(() => !showSkeleton.value && props.options.some(option => !option.isTrialProduct) && props.options.some(option => option.canBuy));
@@ -144,11 +173,11 @@ function move(row: { productNo: string }, delta: number) {
 .tdp-row__thumb { position: relative; flex: none; width: 76px; height: 48px; }
 .tdp-row__img { position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; transform: translate(-50%, calc(-50% - 7px)); pointer-events: none; }
 .tdp-row__main { flex: 1; min-width: 0; }
-/* With 「领取时价格」 the name column is never narrower than its estimate line, so the price column, not the estimate, gives way. */
-.tdp-row--claim .tdp-row__main { min-width: auto; }
+/* With 「领取时价格」 stacked, the name column is never narrower than its estimate line, so the price column gives way instead. */
+.tdp-row--stack .tdp-row__main { min-width: auto; }
 .tdp-row__name { display: block; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
 /* The trial tag holds its own line under the name in every language and width (03 §3.5). */
-.tdp-row__tagline { display: flex; margin-top: 4px; }
+.tdp-row__tagline { display: flex; width: fit-content; margin-top: 4px; }
 .tdp-row__meta { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
 /* Label, dot and amount never break apart (04 §4.6 商品卡预估). */
 .tdp-row__est-line, .tdp-row__est { white-space: nowrap; }
@@ -160,11 +189,12 @@ function move(row: { productNo: string }, delta: number) {
 .tdp-row__cur { margin-right: 1px; color: var(--v5-ink-3); font-size: var(--ui-type-meta); }
 .tdp-row__dec { color: var(--v5-ink-3); }
 .tdp-row__was { margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space: nowrap; }
-/* 「领取时价格」 sits beside the struck price while the row has the room and moves to its own line above it when it does
-   not: the price column only takes what the name column leaves, so the measured width decides, in every language.
-   The label breaks only between words. */
-.tdp-row__was--claim { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: 4px; white-space: normal; }
-.tdp-row__claim { white-space: normal; text-align: right; }
+/* 「领取时价格」 beside the struck price, hanging left over the free end of the tag line (board S11); placeClaimLabels moves
+   it above the price, breaking only between words, when it would run into the name or tag on its line. */
+.tdp-row__was--claim { position: relative; }
+.tdp-row__claim { position: absolute; top: 0; right: calc(100% + 4px); white-space: nowrap; }
+.tdp-row--stack .tdp-row__was--claim { display: flex; flex-direction: column; align-items: flex-end; }
+.tdp-row--stack .tdp-row__claim { position: static; white-space: normal; text-align: right; }
 .tdp-row__strike { text-decoration: line-through; white-space: nowrap; }
 .tdp-row__unknown { flex: none; color: var(--v5-ink-3); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-v5); }
 .tdp-row__radio { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); display: grid; place-items: center; }

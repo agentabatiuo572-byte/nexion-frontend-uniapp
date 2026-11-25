@@ -2526,7 +2526,7 @@ export const ms: Messages = {
     coBillVoucherPart: "baucar −${amount}",
     coBillTradeinPart: "tukar beli {name} −${amount}",
     coBillCardFeePart: "termasuk caj kad {rate} ${amount}",
-    coRowTrialDiscount: "Diskaun percubaan ({pct}%, maks. {cap})",
+    coRowTrialDiscount: "Diskaun percubaan ({pct}%,\u00a0maks.\u00a0{cap})",
     coRowTrialDiscountNoCap: "Diskaun percubaan ({pct}%)",
     coRowTrialOffset: "Kredit percubaan",
     coTrialZeroNote: "Jumlah perlu dibayar $0.00 — kredit melebihi harga tidak dibayar balik atau dikeluarkan.",

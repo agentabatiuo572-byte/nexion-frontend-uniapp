@@ -2526,7 +2526,7 @@ export const uz: Messages = {
     coBillVoucherPart: "vaucher −${amount}",
     coBillTradeinPart: "almashtirish {name} −${amount}",
     coBillCardFeePart: "jumladan {rate} karta haqi ${amount}",
-    coRowTrialDiscount: "Sinov chegirmasi ({pct}%, koʻpi bilan {cap})",
+    coRowTrialDiscount: "Sinov chegirmasi ({pct}%,\u00a0koʻpi\u00a0bilan\u00a0{cap})",
     coRowTrialDiscountNoCap: "Sinov chegirmasi ({pct}%)",
     coRowTrialOffset: "Sinov mablagʻi",
     coTrialZeroNote: "Toʻlanadigan summa $0.00 — narxdan ortgan sinov mablagʻi qaytarilmaydi va toʻlab berilmaydi.",

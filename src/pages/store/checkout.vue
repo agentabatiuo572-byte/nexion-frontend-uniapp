@@ -97,9 +97,19 @@
               <view v-if="voucherDetailsOpen && !multiTrialCheckout" class="checkout-voucher-details">
                 <text v-if="voucherMatch" class="checkout-row-description checkout-voucher-match">{{ voucherMatch.def.name }}</text>
                 <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher">
-                  <view v-for="choice in [{ automatic: true, label: reviewCopy.automaticVoucher }, { automatic: false, label: t.promotion.noVoucher }]" :key="String(choice.automatic)" class="checkout-voucher-choice" role="radio" :aria-checked="voucherAutomatic === choice.automatic" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(choice.automatic)">
-                    <text class="checkout-voucher-choice__label">{{ choice.label }}</text>
-                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === choice.automatic }" aria-hidden="true" />
+                  <!-- Single-select rows (03 §3.5): the checked row is the one tab stop; arrows move to the other choice and select it; Space/Enter select.
+                       Written out (no v-for) so the radio-group keyboard gate sees both members. -->
+                  <view class="checkout-voucher-choice" role="radio" data-automatic="true" :aria-checked="voucherAutomatic === true" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === true ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(true)"
+                    @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)"
+                    @keydown.down.stop.prevent="moveVoucherChoice(true)" @keydown.right.stop.prevent="moveVoucherChoice(true)" @keydown.up.stop.prevent="moveVoucherChoice(true)" @keydown.left.stop.prevent="moveVoucherChoice(true)">
+                    <text class="checkout-voucher-choice__label">{{ reviewCopy.automaticVoucher }}</text>
+                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === true }" aria-hidden="true" />
+                  </view>
+                  <view class="checkout-voucher-choice" role="radio" data-automatic="false" :aria-checked="voucherAutomatic === false" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === false ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(false)"
+                    @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)"
+                    @keydown.down.stop.prevent="moveVoucherChoice(false)" @keydown.right.stop.prevent="moveVoucherChoice(false)" @keydown.up.stop.prevent="moveVoucherChoice(false)" @keydown.left.stop.prevent="moveVoucherChoice(false)">
+                    <text class="checkout-voucher-choice__label">{{ t.promotion.noVoucher }}</text>
+                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === false }" aria-hidden="true" />
                   </view>
                 </view>
                 <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
@@ -295,13 +305,17 @@
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
       <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
-        <template v-if="multiTrialCheckout">
-          <view v-if="trialTrayWarning" class="nx-tray-note w-full checkout-tray-warning" role="status"><svg class="checkout-tray-warning__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg><text>{{ trialTrayWarning }}</text></view>
-          <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
+        <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the tray holds only its status line. -->
+        <view v-if="trialProgressOnly" class="nx-tray-status checkout-tray-status" role="status"><text>{{ purchaseCopy.coConfirming }}</text></view>
+        <template v-else>
+          <template v-if="multiTrialCheckout">
+            <view v-if="trialTrayWarning" class="nx-tray-note w-full checkout-tray-warning" role="status"><svg class="checkout-tray-warning__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg><text>{{ trialTrayWarning }}</text></view>
+            <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
+          </template>
+          <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
+          <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
+          <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
         </template>
-        <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
-        <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
-        <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
            the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
@@ -1858,6 +1872,14 @@ const checkoutBackHref = computed(() => promotionRoute.value
 const { imageSrc: checkoutImage, imageError: checkoutImageError } = useProductImage(
   () => trialOriginal.value ? trialOriginal.value.device.imageUrl ?? undefined : product.value?.imageUrl);
 const voucherDetailsOpen = ref(false);
+/** Arrow keys on the voucher choices: two choices, so any arrow selects the other one and moves focus with it (03 §3.5). */
+function moveVoucherChoice(automatic: boolean) {
+  if (!canChangeVoucher()) return;
+  void selectAutomaticVoucher(!automatic);
+  // uni-app hands handlers a normalized target: find the radio through the focused element's group.
+  const group = (document.activeElement as HTMLElement | null)?.closest('[role="radiogroup"]');
+  group?.querySelector<HTMLElement>(`[role="radio"][data-automatic="${!automatic}"]`)?.focus();
+}
 
 const step = ref<Step>("select-payment");
 const payment = ref<string>(remoteApiEnabled ? "nexgrid-wallet" : "usdt-bep20");
@@ -2084,6 +2106,13 @@ const trayDisabled = computed(() => {
   return trialQuoteUnavailable.value || trialCheckoutWorking.value || activeTrialOutcome.value?.status === "storage-error"
     || (trialWalletOnly.value && !trialZeroDue.value && (!checkoutWalletReadable.value || checkoutWalletRefreshing.value));
 });
+// A balance submission or original balance payment whose result is still being read: no button (03 §3.5.2 提交结果未知).
+const trialProgressOnly = computed(() => {
+  if (!multiTrialCheckout.value || legacyTrialResume.value) return false;
+  const outcome = activeTrialOutcome.value;
+  if (outcome?.status === "resumable" || trialOriginal.value?.status === "AWAITING_PAYMENT" || trialOriginal.value?.status === "RESUMABLE") return false;
+  return outcome?.status === "processing" || (outcome?.status === "original" && trialOriginal.value?.kind === "BALANCE");
+});
 const trayLabel = computed(() => {
   if (legacyTrialResume.value) return t.value.orders.pendingContinue;
   if (multiTrialCheckout.value) {
@@ -2091,7 +2120,7 @@ const trayLabel = computed(() => {
     if (outcome?.status === "resumable" || trialOriginal.value?.status === "AWAITING_PAYMENT"
         || trialOriginal.value?.status === "RESUMABLE")
       return t.value.orders.pendingContinue;
-    if (outcome?.status === "processing" || outcome?.status === "original") return trialDetailCopy.value.viewProgress;
+    if (outcome?.status === "original") return trialDetailCopy.value.viewProgress;
     if (trialNeedsTopup.value) return purchaseCopy.value.coTopup;
     if (trialZeroDue.value) return t.value.store.coConfirmPurchase;
   }
@@ -2437,7 +2466,6 @@ async function submitMultiTrialReview() {
       const purchase = trialOriginal.value;
       if (purchase?.kind === "BALANCE" && purchase.status === "RESUMABLE")
         await navReplace(`/pages/store/checkout?product=${encodeURIComponent(purchase.device.productNo)}&source=trial`);
-      else await navReplace("/pages/me/trial");
       return;
     }
     if (original?.status === "original" && original.originalPurchase.kind === "EXTERNAL") {
