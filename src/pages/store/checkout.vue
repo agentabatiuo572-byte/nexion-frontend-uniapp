@@ -64,7 +64,7 @@
         <CheckoutPaying v-if="originalExternalPaying && createdCheckoutOrder && (step === 'select-payment' || step === 'confirm')" class="checkout-paying-card" :order-no="createdCheckoutOrder.orderNo" @view="navTo('/pages/store/order-detail?id=' + encodeURIComponent(createdCheckoutOrder.orderNo))" />
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
-          <view class="checkout-product-copy"><text class="checkout-product-name">{{ trialOriginal?.device.productName ?? product?.name }}</text><text v-if="checkoutTagline && !trialOriginal" class="checkout-product-meta">{{ checkoutTagline }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--price" aria-hidden="true" /><CheckoutAmount v-else class="checkout-product-price" :value="shownPurchaseSubtotal" currency="USD" /><view v-if="multiTrialCheckout && !trialOriginalLocked" class="checkout-change-device" role="link" tabindex="0" @click="changeTrialDevice" @keydown.enter.prevent="changeTrialDevice"><text class="nx-after-chevron">{{ purchaseCopy.coChangeDevice }}</text></view></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ trialOriginal?.device.productName ?? product?.name }}</text><text v-if="checkoutTagline && !trialOriginal" class="checkout-product-meta">{{ checkoutTagline }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--price" aria-hidden="true" /><CheckoutAmount v-else class="checkout-product-price" :value="shownPurchaseSubtotal" currency="USD" /><view v-if="multiTrialCheckout && !trialOriginalLocked && (!routedTerminalPaymentRead || freeTrial.conversionWindowOpen)" class="checkout-change-device" role="link" tabindex="0" @click="changeTrialDevice" @keydown.enter.prevent="changeTrialDevice"><text class="nx-after-chevron">{{ purchaseCopy.coChangeDevice }}</text></view></view>
           <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><text v-if="multiTrialCheckout" class="checkout-quantity-value">{{ trialShare ? checkoutQuantityLabel : fmt(purchaseCopy.coQtyDevice, { n: 1 }) }}</text><view v-else class="checkout-quantity-controls">
             <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">{{ checkoutQuantityLabel }}</text>
@@ -1106,7 +1106,7 @@ const trialQuoteChange = shallowRef<{ previousAmountUSD: number; quote: TrialCon
 const trialServerShortfall = ref(false);
 const trialExternalWalletOnly = ref(false);
 const routedTrialRefusal = shallowRef<Extract<Awaited<ReturnType<typeof trialCheckout.readRoutedResult>>, { status: "refused" }> | null>(null);
-let routedTerminalPaymentRead = false;
+const routedTerminalPaymentRead = ref(false);
 function clearTrialReviewQuote() {
   trialReviewClaimNo.value = null;
   trialReviewOption.value = null;
@@ -1121,7 +1121,7 @@ watch(() => app.accountBindingEpoch, () => {
   trialTopupWalletReady.value = false;
   handledTrialRefusalNo = undefined;
   routedTrialRefusal.value = null;
-  routedTerminalPaymentRead = false;
+  routedTerminalPaymentRead.value = false;
 }, { flush: "sync" });
 const trialDeviceNo = computed(() => resolveTrialCheckoutProductId(trialCfg.value.trialProductId));
 const hasLegacyTrialBalance = () => freeTrial.pendingConversion(productId.value) !== null;
@@ -1193,7 +1193,7 @@ function leaveTrialReview(message: string | null = trialDetailCopy.value.deviceG
 async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: TrialAuthorityState): Promise<boolean> {
   const claimNo = state.claimNo;
   if (!claimNo) return leaveTrialReview(null);
-  if (routedTerminalPaymentRead) return true;
+  if (routedTerminalPaymentRead.value) return true;
   const key = trialResumeNo ?? trialRefusalNo;
   const paymentNo = trialPaymentNo;
   const handleCurrentOriginal = async () => {
@@ -1222,9 +1222,10 @@ async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: Tria
       return true;
     }
     if (intent.trialPurchaseOutcome || intent.refundStatus === "REFUNDED") {
-      routedTerminalPaymentRead = await showTerminalTrialPurchasePayment(intent, claimNo, scope.productNo,
-        product.value?.name ?? scope.productNo);
-      if (!routedTerminalPaymentRead) throw new Error("TRIAL_ORIGINAL_PAYMENT_NOT_READY");
+      const shown = await showTerminalTrialPurchasePayment(intent, claimNo, scope.productNo, product.value?.name ?? scope.productNo);
+      if (!current()) return true;
+      if (!shown) throw new Error("TRIAL_ORIGINAL_PAYMENT_NOT_READY");
+      routedTerminalPaymentRead.value = true;
       return true;
     }
     if (trialCheckout.originalPurchase?.kind === "EXTERNAL" && trialCheckout.originalPurchase.paymentNo === paymentNo) return true;
