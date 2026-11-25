@@ -41,7 +41,12 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     else toast.success(copy.value.activationSuccessTitle);
   });
   watch(() => trial.confirmedStartDenial, reason => {
-    if (reason && !open.value) toast.error(getT().weeklyQuest.claimFailed);
+    if (!reason || open.value) return;
+    const t = getT();
+    // A settled refusal names its reason; only the rest may be tried again.
+    toast.error(reason === "quota-exhausted" ? t.trial.eligReasonQuota : reason === "risk" ? t.trial.eligReasonRisk
+      : reason === "product-unavailable" ? t.store.trialProductUnavailable : reason === "phase-closed" ? t.trial.eligReasonClosed
+      : t.weeklyQuest.claimFailed);
   });
   const lastClosedAt = ref(hydrateLastClosedAt());
   const sessionShownCount = ref(0);

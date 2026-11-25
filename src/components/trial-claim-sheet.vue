@@ -65,7 +65,7 @@ import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
-import { useFreeTrial, type TrialStartFailure } from "@/store/free-trial";
+import { isTrialStartDenied, useFreeTrial, type TrialStartFailure } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -100,9 +100,11 @@ const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
 const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
   "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
+// The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
+const claimDenied = computed(() => isTrialStartDenied(claimErrorReason.value));
 const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.displayState?.canStart === true
-  : claimError.value && !claimOpensAnotherPage.value);
-const claimDisabled = computed(() => claiming.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
+  : claimError.value && !claimOpensAnotherPage.value && !claimDenied.value);
+const claimDisabled = computed(() => claiming.value || claimDenied.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
   || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
 // View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
 // so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
