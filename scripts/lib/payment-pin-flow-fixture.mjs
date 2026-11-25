@@ -141,7 +141,10 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       proofs.set(resetProof,{expiresAt,version:state.version});
       return ok({resetProof,expiresAt:new Date(expiresAt).toISOString()});
     }
-    if(path.startsWith(pin+'/commands/'))return ok(commands.get('security:'+decodeURIComponent(path.split('/').at(-1)))??{commandKey:decodeURIComponent(path.split('/').at(-1)),status:'NOT_SEEN',canResumeSameKey:false});
+    if(path.startsWith(pin+'/commands/')){
+      const commandKey=decodeURIComponent(path.split('/').at(-1));
+      return ok(commands.get('security:'+commandKey)??{commandKey,status:'NOT_SEEN',canResumeSameKey:true});
+    }
     if(path==='/api/orders/quote'){
       const quotedAt=now();
       try { validateDemoOrderItems(body.items); }

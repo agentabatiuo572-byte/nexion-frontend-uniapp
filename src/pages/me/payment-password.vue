@@ -1,12 +1,13 @@
 <template>
   <AppChassis active="me">
-    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" :back-action="step === 'verify' ? undefined : backToVerify" />
+    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" :back-action="canBackToVerify ? backToVerify : undefined" />
     <view class="payment-pin-page">
       <text v-if="!state" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
-      <view v-if="loading && !state?.configured" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
-      <template v-else-if="ui.pendingOperation">
+      <template v-if="pendingVisible">
         <text class="payment-pin-page__note" role="status">{{ t.paymentPin.pending }}</text>
+        <view v-if="canResubmit" class="pin-change__link" role="button" tabindex="0" @click="resubmit">{{ t.paymentPin.resubmit }}</view>
       </template>
+      <view v-else-if="loading && !state?.configured" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
       <!-- Nothing to show (03 §3.4, §3.5.2): one sentence in the middle of the page and the page's single reload. -->
       <view v-else-if="!state" class="payment-pin-page__empty">
         <text class="payment-pin-page__empty-text" role="alert">{{ t.paymentPin.readFailed }}</text>
@@ -31,7 +32,7 @@
         <PaymentPasswordInput :key="step" v-model="passwords[stepField]" class="pin-change__input" :label="heading" :adjust-position="false"
           :auto-focus="!inputDisabled" :disabled="inputDisabled" @complete="completeStep" />
         <!-- In-place result line under the digits: lock (with time) wins, then the error, then the busy status. -->
-        <text v-if="step === 'verify' && pin.locked()" class="pin-change__error" role="alert">{{ lockMessage }}</text>
+        <text v-if="step === 'verify' && state.lockedUntil" class="pin-change__error" role="alert">{{ lockMessage }}</text>
         <text v-else-if="stepError" class="pin-change__error" role="alert">{{ stepError }}</text>
         <text v-else-if="stepStatus" class="pin-change__status" role="status">{{ stepStatus }}</text>
         <view v-if="step === 'verify'" class="pin-change__links">
@@ -59,12 +60,14 @@ import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import { onBackPress, onHide, onShow, onUnload } from "@dcloudio/uni-app";
-import { sha256 } from "js-sha256";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
+// #ifdef H5
+import { hasOpenDialog, registerBrowserPageBack } from "@/composables/use-dialog-a11y";
+// #endif
 import { usePaymentPinViewport } from "@/composables/use-payment-pin-viewport";
 import { usePaymentPassword, paymentPasswordErrorKey, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
 import { useT } from "@/i18n/use-t";
@@ -73,26 +76,25 @@ import { navBack, navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { sessionVault } from "@/api/runtime";
 import { isAmbiguousOutcome } from "@/api/errors";
-import type { PaymentPasswordChangeProof, PaymentPasswordChangeVerification } from "@/api/payment-password-api";
+import type { PaymentPasswordChangeCommand, PaymentPasswordChangeProof, PaymentPasswordChangeVerification } from "@/api/payment-password-api";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
 const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() => ui.state); const t = useT();
 const passwords = reactive({ current: "", new: "", confirm: "" }); const loading = ref(true);
 const active = ref(true);
+const statusReadFailed = ref(false);
 const verifying = ref(false);
 const verificationAttempt = shallowRef<PaymentPasswordChangeVerification>();
-const verifiedChange = shallowRef<PaymentPasswordChangeProof & { expectedCredentialVersion: number; currentPinDigest: string }>();
+const verifiedChange = shallowRef<PaymentPasswordChangeProof & { expectedCredentialVersion: number }>();
+const submittedChange = shallowRef<PaymentPasswordChangeCommand>();
 let pageGeneration = 0;
 const validation = computed(() => {
-  if (validPaymentPassword(passwords.new)) {
-    if (simplePaymentPassword(passwords.new)) return t.value.paymentPin.simple;
-    const verified = verifiedChange.value;
-    if (verified && sha256(`${verified.changeProof}:${passwords.new}`) === verified.currentPinDigest) return t.value.paymentPin.samePassword;
-  }
+  if (validPaymentPassword(passwords.new) && simplePaymentPassword(passwords.new)) return t.value.paymentPin.simple;
   if (validPaymentPassword(passwords.confirm) && passwords.confirm !== passwords.new) return t.value.paymentPin.mismatch;
   return "";
 });
 const error = computed(() => !ui.changeError || ui.changeError === "locked" ? "" : ui.changeError === "incorrect" ? fmt(t.value.paymentPin.incorrect, { n: state.value?.remainingAttempts ?? 0 }) : t.value.paymentPin[ui.changeError]);
 const lockMessage = computed(() => {
+  if (!pin.locked()) return t.value.paymentPin.lockedLabel;
   const seconds = Math.max(0, Math.ceil((Date.parse(state.value?.lockedUntil ?? "") - ui.now) / 1000));
   return fmt(t.value.paymentPin.locked, { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` });
 });
@@ -103,15 +105,28 @@ const heading = computed(() => step.value === "verify" ? t.value.paymentPin.veri
 const hint = computed(() => step.value === "verify" ? t.value.paymentPin.verifyHint : step.value === "new" ? t.value.paymentPin.rule : t.value.paymentPin.repeatDigits);
 const actionBusy = computed(() => ui.busy || verifying.value);
 const retryVerification = computed(() => !!verificationAttempt.value && !verifying.value);
-const inputDisabled = computed(() => loading.value || actionBusy.value || (step.value === "verify" && (!!state.value?.lockedUntil || retryVerification.value)));
-const stepError = computed(() => {
-  if (step.value !== "verify") return validation.value || error.value;
-  return retryVerification.value ? t.value.paymentPin.failed : error.value;
+const submittingChange = computed(() => !!submittedChange.value && ui.busy && !ui.visible && step.value === "confirm");
+const pendingVisible = computed(() => !!ui.pendingOperation && !submittingChange.value);
+const canBackToVerify = computed(() => step.value !== "verify" && !pendingVisible.value);
+const proofUsable = computed(() => {
+  const verified = verifiedChange.value;
+  return !!verified && Date.parse(verified.expiresAt) > ui.now && verified.expectedCredentialVersion === state.value?.credentialVersion;
 });
-const stepStatus = computed(() => loading.value ? t.value.paymentPin.loading : verifying.value ? t.value.paymentPin.verifying : "");
+const canResubmit = computed(() => proofUsable.value && !!submittedChange.value && ui.changeResumeKey === submittedChange.value.commandKey);
+const inputDisabled = computed(() => loading.value || statusReadFailed.value || actionBusy.value || (step.value === "verify" && (!!state.value?.lockedUntil || retryVerification.value)));
+const stepError = computed(() => {
+  if (submittingChange.value || verifying.value) return "";
+  if (retryVerification.value) return t.value.paymentPin.verifyUnavailable;
+  return validation.value || error.value || (statusReadFailed.value ? t.value.paymentPin.unavailable : "");
+});
+const stepStatus = computed(() => {
+  if (submittingChange.value) return t.value.paymentPin.changing;
+  if (verifying.value) return t.value.paymentPin.verifying;
+  return loading.value ? t.value.paymentPin.loading : "";
+});
 const canNext = computed(() => step.value === "new" && !inputDisabled.value && validPaymentPassword(passwords.new) && !validation.value);
 const canSave = computed(() => step.value === "confirm" && !!verifiedChange.value && !inputDisabled.value && validPaymentPassword(passwords.new) && validPaymentPassword(passwords.confirm) && !validation.value && !state.value?.lockedUntil && !ui.pendingOperation);
-const dockOpen = computed(() => active.value && !loading.value && !!state.value?.configured && !ui.pendingOperation && step.value !== "verify");
+const dockOpen = computed(() => active.value && !loading.value && !!state.value?.configured && canBackToVerify.value);
 const dockViewport = usePaymentPinViewport(dockOpen);
 function completeStep() {
   if (!active.value || step.value !== "verify" || inputDisabled.value || !state.value?.configured || !validPaymentPassword(passwords.current)) return;
@@ -138,9 +153,7 @@ async function verifyCurrent() {
       if (result) ui.changeError = result.error;
       return;
     }
-    // Keep only a proof-salted digest for the step-two equality check.
-    verifiedChange.value = { ...result, expectedCredentialVersion: attempt.expectedCredentialVersion,
-      currentPinDigest: sha256(`${result.changeProof}:${attempt.currentPassword}`) };
+    verifiedChange.value = { ...result, expectedCredentialVersion: attempt.expectedCredentialVersion };
     verificationAttempt.value = undefined;
     passwords.current = "";
     verifying.value = false;
@@ -153,12 +166,13 @@ async function verifyCurrent() {
     if (isCurrent()) verifying.value = false;
   }
 }
-function toConfirm() { if (canNext.value) step.value = "confirm"; }
+function toConfirm() { if (canNext.value) { ui.changeError = ""; step.value = "confirm"; } }
 function restartNew() { passwords.new = ""; passwords.confirm = ""; step.value = "new"; }
 function clear() {
   verifying.value = false;
   verificationAttempt.value = undefined;
   verifiedChange.value = undefined;
+  submittedChange.value = undefined;
   passwords.current = "";
   passwords.new = "";
   passwords.confirm = "";
@@ -168,7 +182,7 @@ function backToVerify() { if (!ui.busy) clear(); }
 const dialogHoldsBack = useDialogBackHeld();
 onBackPress(event => {
   if (event.from !== "backbutton" || dialogHoldsBack(event)) return false;
-  if (step.value !== "verify") {
+  if (canBackToVerify.value) {
     backToVerify();
     return true;
   }
@@ -181,21 +195,63 @@ onBackPress(event => {
   // #endif
   return false;
 });
-watch(() => ui.changeError, key => { if (key) clear(); });
-async function load() {
+// #ifdef H5
+let releaseBrowserBack: (() => void) | undefined;
+onMounted(() => {
+  releaseBrowserBack = registerBrowserPageBack(() => {
+    if (active.value && canBackToVerify.value && !hasOpenDialog()) return backToVerify;
+  });
+});
+onUnmounted(() => releaseBrowserBack?.());
+// #endif
+watch(() => ui.changeError, key => {
+  if (!key) return;
+  pin.tick();
+  if (key === "samePassword" && proofUsable.value) {
+    submittedChange.value = undefined;
+    restartNew();
+    return;
+  }
+  clear();
+  if (key === "samePassword") ui.changeError = "changeProofExpired";
+});
+async function readStatus() {
   const generation = pageGeneration;
-  loading.value = true; ui.changeError = "";
+  const isCurrent = () => active.value && generation === pageGeneration;
+  if (!isCurrent() || !sessionVault.read()) return;
+  loading.value = true;
+  const result = await pin.refreshStatus({ isCurrent, keepTransientSnapshot: true });
+  if (isCurrent()) {
+    statusReadFailed.value = !result;
+    loading.value = false;
+  }
+}
+async function load() {
   if (!sessionVault.read()) return;
   try { pin.restorePendingRead(); }
   catch { if (active.value) { ui.changeError = "failed"; loading.value = false; } return; }
-  await pin.refreshStatus({ isCurrent: () => active.value && generation === pageGeneration });
-  if (active.value && generation === pageGeneration) loading.value = false;
+  await readStatus();
 }
 useAutoRecovery({
-  failed: () => active.value && !loading.value && !ui.visible && !!ui.pendingOperation && !ui.busy && !ui.reading,
-  retry: () => {
+  active: () => active.value && !ui.visible,
+  failed: () => !loading.value && !ui.busy && !ui.pendingOperation && (statusReadFailed.value || (!!state.value?.lockedUntil && !pin.locked())),
+  retry: readStatus, repeatMs: 30_000,
+});
+useAutoRecovery({
+  active: () => active.value && !ui.visible,
+  failed: () => !loading.value && pendingVisible.value && !ui.busy && !ui.reading,
+  retry: async () => {
     const generation = pageGeneration;
-    return pin.query(() => active.value && generation === pageGeneration && !ui.visible);
+    const isCurrent = () => active.value && generation === pageGeneration && !ui.visible;
+    await pin.query(isCurrent);
+    if (!isCurrent()) return;
+    pin.tick();
+    const key = ui.changeResumeKey;
+    if (key && !canResubmit.value && pin.retireUnseenChange(key)) {
+      clear();
+      ui.changeError = "changeProofExpired";
+      await readStatus();
+    }
   }, repeatMs: 15_000,
 });
 async function setup() { await pin.waitForQuery(); if (!await pin.setup()) await load(); }
@@ -203,12 +259,17 @@ async function recover() { await pin.waitForQuery(); if (actionBusy.value) retur
 async function save() {
   await pin.waitForQuery();
   const verified = verifiedChange.value;
-  if (!canSave.value || !verified) return;
-  const result = pin.change({ changeProof: verified.changeProof, expectedCredentialVersion: verified.expectedCredentialVersion,
-    newPassword: passwords.new, confirmPassword: passwords.confirm });
-  verifiedChange.value = undefined;
-  await result;
-  if (pin.locked() || ui.visible) clear();
+  if (!active.value || !canSave.value || !verified) return;
+  try {
+    submittedChange.value = { changeProof: verified.changeProof, expectedCredentialVersion: verified.expectedCredentialVersion,
+      newPassword: passwords.new, confirmPassword: passwords.confirm, commandKey: requireCryptoUuid(), attemptNo: requireCryptoUuid() };
+  } catch { ui.changeError = "failed"; return; }
+  await pin.change(submittedChange.value);
+}
+async function resubmit() {
+  await pin.waitForQuery();
+  pin.tick();
+  if (active.value && canResubmit.value && submittedChange.value) await pin.change(submittedChange.value);
 }
 watch(() => ui.completedRevision, () => {
   if (!active.value || ui.context || !ui.completedOperation) return;
@@ -218,7 +279,12 @@ watch(() => ui.rejectedRevision, () => {
   if (active.value && !ui.visible) toast.error(t.value.paymentPin[ui.error || "failed"]);
 });
 // After an H5 reload the session is restored after the page shows: load() waits for it and reads here.
-const unsubscribe = sessionVault.subscribe?.((_previous, next, continuation) => { if (!continuation) { clear(); if (next && active.value) void load(); } });
+const unsubscribe = sessionVault.subscribe?.((_previous, next, continuation) => {
+  if (continuation) return;
+  clear();
+  statusReadFailed.value = false;
+  if (next && active.value) void load();
+});
 function hide() { pageGeneration++; active.value = false; clear(); }
 function visibility() { if (typeof document !== "undefined" && document.hidden) hide(); }
 onShow(() => { active.value = true; void load(); }); onHide(hide); onUnload(hide);

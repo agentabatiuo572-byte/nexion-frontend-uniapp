@@ -28,6 +28,12 @@ export interface PaymentPasswordProof { resetProof: string; expiresAt: string }
 export interface PaymentPasswordChangeProof { changeProof: string; expiresAt: string }
 interface PaymentPasswordChangeAttempt { expectedCredentialVersion: number; attemptNo: string }
 export interface PaymentPasswordChangeVerification extends PaymentPasswordChangeAttempt { currentPassword: string }
+export interface PaymentPasswordChangeCommand extends PaymentPasswordChangeAttempt {
+  changeProof: string;
+  newPassword: string;
+  confirmPassword: string;
+  commandKey: string;
+}
 type PaymentPasswordChangeVerificationResult = PaymentPasswordChangeProof | {
   reason: (typeof changeVerifyRefusals)[number]["message"];
   state: PaymentPasswordState;
@@ -36,7 +42,7 @@ export interface PaymentPasswordApi {
   status(): Promise<PaymentPasswordState>;
   setup(input: { newPassword: string; confirmPassword: string; commandKey: string }): Promise<PaymentPasswordReceipt>;
   changeVerify(input: PaymentPasswordChangeVerification): Promise<PaymentPasswordChangeVerificationResult>;
-  change(input: PaymentPasswordChangeAttempt & { changeProof: string; newPassword: string; confirmPassword: string; commandKey: string }): Promise<PaymentPasswordReceipt>;
+  change(input: PaymentPasswordChangeCommand): Promise<PaymentPasswordReceipt>;
   receipt(commandKey: string): Promise<PaymentPasswordReceipt>;
   challenge(): Promise<PaymentPasswordChallenge>;
   verify(challengeNo: string, code: string): Promise<PaymentPasswordProof>;
