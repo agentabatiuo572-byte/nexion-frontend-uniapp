@@ -3576,7 +3576,7 @@ export const ms: Messages = {
     remoteUnavailableToast: "Gagal dimuatkan. Sila cuba lagi nanti",
     swapFailed: "Pertukaran tidak berjaya. Sila cuba lagi sebentar lagi.",
     swapCancelledReason: "Pesanan pertukaran dibatalkan — tiada apa-apa ditukar.",
-    swapFailedReason: "Pertukaran gagal. Semak sejarah dan baki anda sebelum mencuba lagi.",
+    swapFailedReason: "Pertukaran gagal. |Semak sejarah |dan baki anda |sebelum mencuba lagi.",
     swapUserCapReason: "Had peribadi anda telah dicapai — tiada apa-apa ditukar.",
     swapPlatformCapReason: "Had pertukaran hari ini telah dicapai; pertukaran ini tidak berjaya",
     swapGeoBlockedReason: "Pertukaran tidak tersedia di wilayah anda",

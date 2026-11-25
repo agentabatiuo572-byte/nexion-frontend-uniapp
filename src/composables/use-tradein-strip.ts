@@ -23,7 +23,7 @@ import { confirm } from "@/store/ui";
 
 // ── FEAT-DEV02 升级置换条 ──────────────────────────────────────────────
 // 设备仓库行与赚取页设备操作面板共用同一资格判定与 retire 入口。
-// 总开关关 / 免费设备(paidPriceUsdt=0)/不在 applyTo 白名单 → 返回空对象 =
+// 总开关关 / 免费设备(paidPriceUsdt=0)/ Cloud Share → 返回空对象 =
 // 零痕迹；无合规目标也不显示入口，其余给「可抵 $X」chip + 置换 CTA。
 // 预览采用最低价合资格目标的实际报价；进入结算后重新确认最终报价。
 // `enabled` 为 false 时不读远端资格(操作面板只在打开时读取)。
@@ -158,7 +158,7 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
     }
     if (!DEFAULT_TRADEIN_CONFIG.enabled) return {};
     const paid = d.paidPriceUsdt ?? 0;
-    if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return {};
+    if (paid <= 0 || d.kind === "cloud-share") return {};
     const targets = PRODUCTS.filter(
       (p) =>
         p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&

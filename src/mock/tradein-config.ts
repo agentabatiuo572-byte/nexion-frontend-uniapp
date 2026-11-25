@@ -159,7 +159,7 @@ export function previousTier(kind: DeviceKind): DeviceKind | null {
 // /api/config/tradein payload, `creditLadder` + `ladderRules` keys; admin edits
 // via「升级置换阶梯」panel (E domain);canon 哨兵三端对账默认值。
 // Ladder semantics (FEAT-DEV02 ③, Aligned 2026-07-06): credit = paidPrice ×
-// creditPct(band of cumulative-output ÷ paid-price) × promoMult, checkout-only,
+// creditPct(band of cumulative-output ÷ paid-price), checkout-only,
 // NEVER credited to balance. Bands are left-closed right-open, contiguous from
 // 0%, strictly decreasing creditPct (structure enforced by
 // scripts/check-capacity-curve-parity.mjs).
@@ -186,24 +186,12 @@ export const TRADEIN_LADDER_RULES = {
   requireHigherPrice: true,
   /** Max devices credited against a single checkout. */
   maxDevicesPerOrder: 1,
-  /** Promo multiplier applied to the final credit. */
-  promoMult: 1.0,
-  /** Kinds eligible for retire-and-credit(与 paidPriceUsdt>0 双重门;镜像 admin
-   *  E.tradein.applyTo,phone/pc-gpu 免费天然排除但仍列显式白名单)。 */
-  applyTo: [
-    "cloud-share",
-    "stellarbox-s1",
-    "stellarbox-pro",
-    "stellarbox-pro-v2",
-    "stellarrack-p1",
-    "stellarrack-p2",
-  ] as DeviceKind[],
 } as const;
 
 /**
  * USD checkout credit for retiring a device against a higher-priced purchase.
  *
- *   credit = paidPrice × creditPct(band of cumulative ÷ paidPrice) × promoMult
+ *   credit = paidPrice × creditPct(band of cumulative ÷ paidPrice)
  *
  * paidPrice ≤ 0 (gifted/free device) → 0: NOT eligible at all (FEAT-DEV02A
  * 异常3 — not an Infinity-ratio band). Clamped to the target price so payable
@@ -230,7 +218,6 @@ export function computeTradeInCredit(
   cumulativeEarningsUsdt: number,
   targetPriceUsdt: number,
   ladder: CreditLadderRow[] = TRADEIN_CREDIT_LADDER,
-  promoMult: number = TRADEIN_LADDER_RULES.promoMult,
 ): number {
   if (paidPriceUsdt <= 0) return 0;
   const ratioPct = (Math.max(0, cumulativeEarningsUsdt) / paidPriceUsdt) * 100;
@@ -238,8 +225,8 @@ export function computeTradeInCredit(
     (r) => ratioPct >= r.minRatioPct && (r.maxRatioPct === null || ratioPct < r.maxRatioPct),
   );
   if (!row) return 0;
-  const raw = paidPriceUsdt * (row.creditPct / 100) * promoMult;
-  // Lower clamp guards operator-editable inputs (negative promoMult / target
-  // price) — credit may reduce payable, never increase it or go negative.
+  const raw = paidPriceUsdt * (row.creditPct / 100);
+  // Lower clamp guards operator-editable inputs (negative target price) —
+  // credit may reduce payable, never increase it or go negative.
   return +Math.max(0, Math.min(raw, targetPriceUsdt)).toFixed(2);
 }
