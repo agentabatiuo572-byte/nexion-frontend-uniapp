@@ -56,6 +56,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   let proof: PaymentPasswordProof | null = null;
   let owner = "";
   let generation = 0;
+  let statusReadInProgress = false;
   let resolve: ((auth: PaymentPasswordAuthorization | null) => void) | null = null;
   let personalResolve: ((success: boolean) => void) | null = null;
   let pending: (PendingCommand & { owner: string }) | null = null;
@@ -98,7 +99,7 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     display.state = { configured: state.configured, lockedUntil: state.lockedUntil, serverTime: state.serverTime };
   }
   function cancel() {
-    generation++; clearSecrets(); ui.visible = false; ui.busy = false; ui.context = null; ui.error = ""; ui.notice = "";
+    generation++; statusReadInProgress = false; clearSecrets(); ui.visible = false; ui.busy = false; ui.context = null; ui.error = ""; ui.notice = "";
     resolve?.(null); resolve = null; personalResolve?.(false); personalResolve = null;
   }
   function accountChanged() {
@@ -137,17 +138,20 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
     try { const result = await api.status(); if (!currentRead()) return null; setState(result); return result; }
     catch { if (currentRead() && !options.silent) ui.state = null; return null; }
   }
-  async function load() {
-    const token = generation; ui.stage = "loading"; ui.busy = true; ui.error = "";
+  async function load(showLoading = true) {
+    if (!ui.visible || statusReadInProgress) return;
+    const token = generation;
+    statusReadInProgress = true;
+    if (showLoading) { ui.stage = "loading"; ui.error = ""; }
     try {
       restorePending();
-      if (pending?.owner === owner) { ui.stage = "pending"; return; }
+      if (pending?.owner === owner) { ui.stage = "pending"; ui.error = ""; return; }
       const state = await api.status(); if (!current(token)) return; setState(state);
       if (state.configured && !ui.context) { const done = personalResolve; personalResolve = null; ui.visible = false; done?.(false); return; }
       ui.stage = state.configured ? "pay" : "setup";
       ui.error = lastPaymentError; lastPaymentError = "";
     } catch { if (current(token)) { ui.stage = "read-error"; ui.error = "readFailed"; } }
-    finally { if (current(token)) ui.busy = false; }
+    finally { if (current(token)) statusReadInProgress = false; }
   }
   function open(context: PaymentPasswordContext | null): void {
     cancel(); owner = identity(); ui.context = context ? { ...context, details: context.details?.map(item => ({ ...item })) } : null;

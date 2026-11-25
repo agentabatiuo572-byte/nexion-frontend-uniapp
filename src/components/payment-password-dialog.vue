@@ -18,7 +18,7 @@
           <text class="payment-pin-summary__name">{{ ui.context.summary }}</text>
           <view class="payment-pin-summary__amount"><text class="payment-pin-summary__label">{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" class="payment-pin-summary__value" :value="ui.context.amount" :currency="ui.context.currency" :precision="ui.context.precision" /><text v-else class="payment-pin-summary__value payment-pin-summary__value--plain">{{ formatGroupedAmount(ui.context.amount) }}<text class="payment-pin-summary__unit">&nbsp;{{ ui.context.currency }}</text></text></view>
           <view v-if="ui.context.details?.length" class="payment-pin-link" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded">{{ expanded ? t.paymentPin.hideDetails : t.paymentPin.details }}</view>
-          <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ formatGroupedAmount(item.amount) }}</template></text></view></view>
+          <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ detailAmount(item.amount) }}&nbsp;{{ ui.context.currency }}</template></text></view></view>
         </view>
         <text v-if="ui.stage === 'loading'" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
         <template v-else-if="ui.stage === 'pending'">
@@ -44,7 +44,7 @@
           <template v-if="ui.stage === 'pay'">
             <text class="payment-pin-note">{{ Number(ui.context?.amount) === 0 ? t.paymentPin.autoConfirm : t.paymentPin.autoSubmit }}</text>
             <text v-if="pin.locked()" class="payment-pin-error" role="alert">{{ lockMessage }}</text>
-            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load">{{ t.paymentPin.retry }}</view>
+            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load()">{{ t.paymentPin.retry }}</view>
             <view class="payment-pin-link" role="button" tabindex="0" @click="pin.startRecovery">{{ t.paymentPin.forgot }}</view>
           </template>
           <template v-else>
@@ -55,7 +55,7 @@
           </template>
         </template>
         <text v-if="errorMessage" class="payment-pin-error" role="alert">{{ errorMessage }}</text>
-        <view v-if="ui.stage === 'read-error'" class="nx-card-recovery-action" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load">{{ t.paymentPin.retry }}</view>
+        <view v-if="ui.stage === 'read-error'" class="nx-card-recovery-action" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load()">{{ t.paymentPin.retry }}</view>
         <view v-if="!standalone" class="payment-pin-link" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="requestClose">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
       </view>
     </view>
@@ -88,6 +88,11 @@ const active = ref(true); const password = ref(""); const code = ref(""); const 
 const standalone = computed(() => !ui.context && (ui.stage === "setup" || ui.stage === "confirm"));
 const statusHeight = (() => { try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); } })();
 const open = computed(() => ui.visible && active.value);
+useAutoRecovery({
+  active: () => open.value,
+  failed: () => ui.stage === "read-error" && !ui.busy,
+  retry: () => pin.load(false), repeatMs: 30_000,
+});
 useAutoRecovery({
   failed: () => open.value && ui.stage === "pending" && !!ui.pendingOperation && !ui.busy && !ui.reading,
   retry: () => pin.query(() => active.value), repeatMs: 15_000,
@@ -124,6 +129,11 @@ const errorMessage = computed(() => {
   if (!ui.error || (ui.error === "locked" && pin.locked())) return "";
   return ui.error === "incorrect" ? fmt(t.value.paymentPin.incorrect, { n: ui.state?.remainingAttempts ?? 0 }) : t.value.paymentPin[ui.error];
 });
+function detailAmount(value: number | string) {
+  const formatted = formatGroupedAmount(value, "full");
+  const fraction = typeof value === "string" ? /^\d+\.(\d+)$/.exec(value)?.[1] : undefined;
+  return fraction === undefined ? formatted : `${formatted.split(".")[0]}.${fraction}`;
+}
 watch(() => [ui.stage, ui.revision, ui.visible], () => { password.value = ""; code.value = ""; }, { flush: "sync" });
 watch(() => ui.visible, () => { expanded.value = false; });
 function complete(value: string) { if (ui.stage === "pay") { password.value = ""; uni.hideKeyboard(); pin.authorize(value); } }

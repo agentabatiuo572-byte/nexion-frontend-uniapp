@@ -759,8 +759,21 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
     await run(async()=>{
       const pending = session.record.pending;
       const walletOnly = session.retryOriginal && pending?.operation === 'payOrder' && pending.paymentMethod !== 'EXTERNAL';
+      const orderItems = expectedOrder.items ?? [];
+      const bundle = orderItems.length > 1;
+      // Older receipts omit amounts. Read the confirmed order's lines, using the same subtotal as checkout.
+      const needsOrderLines = bundle && orderItems.some(item => itemSubtotal(item) === undefined);
+      const orderLines = needsOrderLines
+        ? orders.getById(orderNo)?.lineItems ?? (await orders.ensureRemoteOrder(orderNo).catch(() => undefined))?.lineItems
+        : undefined;
+      if (!paymentCurrent()) return;
+      const details = orderItems.map(item => ({
+        name: item.productName,
+        quantity: item.quantity,
+        amount: bundle ? itemSubtotal(item) ?? orderLines?.find(line => line.sku === item.productNo && line.quantity === item.quantity)?.lineAmountUsdt : undefined,
+      }));
       await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,precision:topup?'full':undefined,
-        details:expectedOrder.items?.map(item=>({name:item.productName,quantity:item.quantity}))},
+        details},
         async authorization=>{
           try{
             updateClock();if(!paymentCurrent())return;
