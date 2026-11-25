@@ -237,6 +237,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // Display only. A transient GET failure still clears the live command authority.
   const displayState = shallowRef<TrialAuthorityState | null>(null);
   const checkoutState = shallowRef<TrialAuthorityState | null>(null);
+  // Request sequences: the /state read behind checkoutState, and the moment a start or cancel was found not to have run.
+  let checkoutStateSequence = 0;
+  let lifecycleRetrySequence = 0;
   const originalPurchase = computed(() => displayState.value?.originalPurchase ?? null);
   const purchasedDevice = computed(() => displayState.value?.status === "converted"
     ? displayState.value.purchasedDevice ?? null : null);
@@ -386,6 +389,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     if (!retainDisplay) {
       displayState.value = null;
       checkoutState.value = null;
+      checkoutStateSequence = 0;
+      lifecycleRetrySequence = 0;
     }
     load({ ...INITIAL });
     authoritativeShadowUSD.value = 0;
@@ -497,6 +502,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     authorityError.value = null;
     if (stateRead) {
       checkoutState.value = displayState.value;
+      checkoutStateSequence = sequence;
       if (legacyClaimNo.value !== next.claimNo) {
         legacyClaimNo.value = next.claimNo;
         legacyResumableKey.value = null;
@@ -675,24 +681,32 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return eligibility().ok;
   }
 
-  /** Only /state can establish the claim identity used by ordinary checkout. */
+  /**
+   * Only /state can establish the claim identity used by ordinary checkout. The backend sells the claimed trial
+   * device at full price through an ordinary order, so the one product that may be that device waits for authority;
+   * every other product is an ordinary purchase (R13), also while a conversion of this claim is still in progress.
+   */
   function canConfirmOrdinaryProduct(productNo: string): boolean {
     const snapshot = checkoutState.value, latest = displayState.value;
     if (!snapshot || !latest || !productNo || snapshot.claimNo !== latest.claimNo
-        || (lastReadFailed.value && !transientReadFailure.value) || pendingLifecycle.value
-        || legacyConversions.value.length) return false;
+        || (lastReadFailed.value && !transientReadFailure.value)) return false;
     const snapshotLive = snapshot.status === "active" || snapshot.status === "grace";
     const latestLive = latest.status === "active" || latest.status === "grace";
     if (snapshotLive !== latestLive) return false;
-    if (snapshotLive) {
-      const sku = resolveTrialCheckoutProductId(snapshot.config.trialProductId);
-      if (!sku || sku !== resolveTrialCheckoutProductId(latest.config.trialProductId) || productNo === sku) return false;
-    }
+    const sku = resolveTrialCheckoutProductId(snapshot.config.trialProductId);
+    if (snapshotLive) return !!sku && sku === resolveTrialCheckoutProductId(latest.config.trialProductId) && productNo !== sku;
+    // No claim in the snapshot. A start that is still being confirmed may already have claimed the trial device.
+    let command: LifecycleCommand | null;
     try {
-      return !readLifecycleCommand(boundKey, true) && readLegacyConversions().length === 0;
+      command = pendingLifecycle.value?.command ?? readLifecycleCommand(boundKey, true);
     } catch {
       return false;
     }
+    if (command?.kind !== "start") return true;
+    // A start known not to have run stops counting once a later /state read still shows no claim.
+    if (command.state === "retry" && !pendingLifecycle.value && checkoutStateSequence > lifecycleRetrySequence) return true;
+    const target = resolveTrialCheckoutProductId(useTrialConfig().config.trialProductId);
+    return !!sku && !!target && productNo !== sku && productNo !== target;
   }
 
   function showPromo(): boolean {
@@ -758,7 +772,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   function finishLifecycle(pending: PendingLifecycle, retry = false) {
     if (readLifecycleCommand(boundKey)?.key === pending.command.key) {
-      if (retry) writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, { ...pending.command, state: "retry" });
+      if (retry) {
+        writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, { ...pending.command, state: "retry" });
+        lifecycleRetrySequence = authorityRequestSequence;
+      }
       else removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey);
     }
     pendingLifecycle.value = null;

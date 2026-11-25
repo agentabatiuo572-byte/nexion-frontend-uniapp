@@ -409,7 +409,7 @@ import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from 
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
 import { executePaymentWithPassword } from "@/lib/authorized-payment";
-import { discoverOrderPayment, hasTradeinPurchaseIntent, hasUnsettledTrialExternalSubmission, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, readTrialPurchasePayment, refreshPendingPayments, refusedPurchasePayment, resumeTrialPurchasePayment, showTerminalTrialPurchasePayment, trialExternalCreatePending, unfinishedOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
+import { discoverOrderPayment, hasTradeinPurchaseIntent, pendingOrderPayment, markTradeinPurchaseExpired, onPurchaseRecordReleased, prepareTradeinPaymentRecovery, readTrialPurchasePayment, refreshPendingPayments, refusedPurchasePayment, resumeTrialPurchasePayment, showTerminalTrialPurchasePayment, trialExternalCreatePending, unfinishedOrderPayment, usePurchasePayment } from "@/store/purchase-payment";
 import { paidOrderReceipt } from "@/api/order-api";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt, trialPriceChanged as trialPriceRefused, type TrialAuthorityState, type TrialConversionQuote, type TrialOriginalPurchase, type TrialPurchaseOption } from "@/api/trial-api";
@@ -1133,11 +1133,9 @@ const legacyTrialResume = computed(() => freeTrial.legacyConversionResumable ? f
 const trialsCanConvert = (status: string) => status === "active" || status === "grace";
 const trialAuthorityCanConvert = computed(() => freeTrial.authorityServerState === "ACTIVE"
   || freeTrial.authorityServerState === "GRACE" || freeTrial.authorityServerState === "EXTENDED");
+// A conversion of this claim still in progress does not make another product a trial purchase (R13).
 function isConfirmedOrdinaryProduct() {
-  if (trialCheckoutSource.value || !freeTrial.canConfirmOrdinaryProduct(productId.value)
-      || trialCheckout.hasUnsettledBalanceSubmission() || hasUnsettledTrialExternalSubmission()) return false;
-  const original = trialCheckout.originalPurchase;
-  return original?.kind !== "EXTERNAL" || (original.status !== "CREATING" && original.status !== "SUBMIT_UNKNOWN");
+  return !trialCheckoutSource.value && freeTrial.canConfirmOrdinaryProduct(productId.value);
 }
 const confirmedOrdinaryProduct = computed(isConfirmedOrdinaryProduct);
 const trialRoute = computed(() => !hasOriginalCheckout.value && (trialCheckoutSource.value || hasLegacyTrialBalance()
@@ -1261,7 +1259,12 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
     leaveTrialReview();
     return true;
   }
-  if (trialReviewStatus.value === "unavailable" || trialReviewStatus.value === "terminal") return true;
+  if (trialReviewStatus.value === "unavailable") return true;
+  if (trialReviewStatus.value === "terminal") {
+    // The result closed without its own exit (another original opened, the page was hidden): do not stay on an idle page.
+    if (!usePurchasePayment().state.open) leaveTrialReview(null);
+    return true;
+  }
   if (!quiet || trialReviewStatus.value !== "ready") trialReviewStatus.value = "loading";
   try {
     if (!reuseEntryRead) await freeTrial.refreshRemote();
