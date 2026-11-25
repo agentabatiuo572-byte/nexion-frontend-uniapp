@@ -2599,6 +2599,7 @@ export const id: Messages = {
     trialCreditLimitDevice: "Maks. 1 unit, uji coba berakhir saat dibeli",
     trialCreditLimitShare: "Maks. 1 porsi, uji coba berakhir saat dibeli",
     plainBuyNote: "Beli sekarang dengan harga penuh, tanpa kredit uji coba",
+    trialDeviceNotOnSale: "Sedang tidak dijual",
     gateBlockedToast: "Belum memenuhi syarat — lihat cara membuka",
     gateSoldOutToast: "Kuota penjualan habis",
     purchaseEligibilityCheck: "Cek kelayakan pembelian",

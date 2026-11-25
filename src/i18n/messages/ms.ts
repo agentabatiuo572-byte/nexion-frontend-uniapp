@@ -2599,6 +2599,7 @@ export const ms: Messages = {
     trialCreditLimitDevice: "Had 1 unit, percubaan tamat selepas dibeli",
     trialCreditLimitShare: "Had 1 bahagian, percubaan tamat selepas dibeli",
     plainBuyNote: "Beli pada harga penuh, tanpa kredit percubaan",
+    trialDeviceNotOnSale: "Tidak dijual buat masa ini",
     gateBlockedToast: "Belum layak — lihat cara membuka",
     gateSoldOutToast: "Kuota jualan telah habis",
     purchaseEligibilityCheck: "Semak kelayakan pembelian",

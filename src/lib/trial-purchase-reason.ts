@@ -22,4 +22,6 @@ export function trialPurchaseReasonMessage(t: Messages, reason?: string): string
     case "PURCHASE_GATE_SOLD_OUT":
       return t.store.purchaseEligibilityQuotaDepleted;
   }
+  // Off sale, not released or held back by a listing rule: the store does not sell it now.
+  if (trialDeviceNeedsReselection(reason)) return t.store.trialDeviceNotOnSale;
 }

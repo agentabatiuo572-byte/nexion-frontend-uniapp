@@ -2599,6 +2599,7 @@ export const ru: Messages = {
     trialCreditLimitDevice: "Не больше 1 шт., пробный период завершится",
     trialCreditLimitShare: "Не больше 1 доли, пробный период завершится",
     plainBuyNote: "«Купить» — по полной цене, без пробного бонуса",
+    trialDeviceNotOnSale: "Сейчас не продаётся",
     gateBlockedToast: "Условия не выполнены — посмотрите, как открыть",
     gateSoldOutToast: "Квота продаж исчерпана",
     purchaseEligibilityCheck: "Проверить условия покупки",

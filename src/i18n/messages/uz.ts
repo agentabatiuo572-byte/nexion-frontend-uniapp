@@ -2599,6 +2599,7 @@ export const uz: Messages = {
     trialCreditLimitDevice: "Faqat 1 dona, xariddan soʻng sinov tugaydi",
     trialCreditLimitShare: "Faqat 1 ulush, xariddan soʻng sinov tugaydi",
     plainBuyNote: "«Sotib olish» toʻliq narxda, sinov mablagʻisiz",
+    trialDeviceNotOnSale: "Hozir sotuvda yoʻq",
     gateBlockedToast: "Shartlar bajarilmagan — qanday ochishni koʻring",
     gateSoldOutToast: "Sotuv kvotasi qolmadi",
     purchaseEligibilityCheck: "Xarid shartlarini tekshirish",

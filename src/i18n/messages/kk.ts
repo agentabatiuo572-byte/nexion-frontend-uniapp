@@ -2599,6 +2599,7 @@ export const kk: Messages = {
     trialCreditLimitDevice: "Тек 1 дана, сатып алған соң сынақ аяқталады",
     trialCreditLimitShare: "Тек 1 үлес, сатып алған соң сынақ аяқталады",
     plainBuyNote: "«Сатып алу» толық бағамен, сынақ бонусынсыз",
+    trialDeviceNotOnSale: "Қазір сатылымда жоқ",
     gateBlockedToast: "Шарт орындалмады — қалай ашуға болатынын қараңыз",
     gateSoldOutToast: "Сату квотасы қалмады",
     purchaseEligibilityCheck: "Сатып алу шарттарын тексеру",
