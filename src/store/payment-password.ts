@@ -147,18 +147,21 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
   }
   async function load(showLoading = true) {
     if (!ui.visible || statusReadInProgress) return;
-    const token = generation;
+    const token = generation, startStage = ui.stage;
     statusReadInProgress = true;
     if (showLoading) { ui.stage = "loading"; ui.error = ""; }
     try {
       restorePending();
       if (pending?.owner === owner) { ui.stage = "pending"; ui.error = ""; promptError = ""; return; }
       const state = await api.status(); if (!current(token)) return; setState(state);
+      // A background re-read (lock expiry, read-failure recovery) only settles the step it started from; a step the user
+      // has moved on to (recovery) keeps its own flow.
+      if (!showLoading && ui.stage !== startStage) return;
       const error = promptError; promptError = "";
       if (state.configured && !ui.context) { const done = personalResolve; personalResolve = null; ui.visible = false; done?.(false); return; }
       ui.stage = state.configured ? "pay" : "setup";
       ui.error = error;
-    } catch { if (current(token)) { ui.stage = "read-error"; ui.error = "readFailed"; } }
+    } catch { if (current(token) && (showLoading || ui.stage === startStage)) { ui.stage = "read-error"; ui.error = "readFailed"; } }
     finally { if (current(token)) statusReadInProgress = false; }
   }
   async function recoverDetailAmounts() {
