@@ -119,12 +119,14 @@
                   <view class="checkout-voucher-choice" role="radio" data-automatic="true" :aria-checked="voucherAutomatic === true" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === true ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(true)"
                     @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)"
                     @keydown.down.stop.prevent="moveVoucherChoice(true)" @keydown.right.stop.prevent="moveVoucherChoice(true)" @keydown.up.stop.prevent="moveVoucherChoice(true)" @keydown.left.stop.prevent="moveVoucherChoice(true)">
+                    <view class="checkout-voucher-choice__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M9 9h.01" /><path d="m15 9-6 6" /><path d="M15 15h.01" /></svg></view>
                     <text class="checkout-voucher-choice__label">{{ reviewCopy.automaticVoucher }}</text>
                     <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === true }" aria-hidden="true" />
                   </view>
                   <view class="checkout-voucher-choice" role="radio" data-automatic="false" :aria-checked="voucherAutomatic === false" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === false ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(false)"
                     @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)"
                     @keydown.down.stop.prevent="moveVoucherChoice(false)" @keydown.right.stop.prevent="moveVoucherChoice(false)" @keydown.up.stop.prevent="moveVoucherChoice(false)" @keydown.left.stop.prevent="moveVoucherChoice(false)">
+                    <view class="checkout-voucher-choice__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="m9.5 14.5 5-5" /><path d="m9.5 9.5 5 5" /></svg></view>
                     <text class="checkout-voucher-choice__label">{{ t.promotion.noVoucher }}</text>
                     <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === false }" aria-hidden="true" />
                   </view>
@@ -4900,10 +4902,13 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-chevron { display:grid; flex:none; width:16px; height:16px; color:var(--v5-ink-4); transition:transform 180ms ease; }
 .checkout-chevron--open { transform:rotate(180deg); }
 .checkout-voucher { cursor:pointer; }
-/* Voucher choice is a single-select list aligned with the row copy, then a muted link to the voucher list. */
+/* Voucher choice is a single-select list (03 §3.5 单选行), then a muted link to the voucher list. Each row leads with its own
+   line glyph in the 36/32 leading slot (10 §10.3): a discount ticket for the best voucher, a crossed ticket for none, flat
+   and auxiliary, so the 代金券 row's raised amber tile is not repeated beneath it. The slot sits where the indent was, so
+   the labels keep their 64px start and width. */
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
 .checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
-.checkout-voucher-choices { display:flex; flex-direction:column; gap:var(--v5-space-1); padding:var(--v5-space-1) var(--v5-space-1) var(--v5-space-2) 52px; }
+.checkout-voucher-choices { display:flex; flex-direction:column; gap:var(--v5-space-1); padding:var(--v5-space-1) var(--v5-space-1) var(--v5-space-2); }
 .checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; }
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
@@ -5031,7 +5036,8 @@ button.checkout-policy-link::after { border:0; }
 /* Row title = list title role in main ink, the same in both states (03 §3.5, 10.1). */
 .checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink); font:var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap:break-word; }
 .checkout-voucher-choice:active:not([aria-disabled="true"]) { opacity:.85; }
-@media (max-width:374px) { .checkout-voucher-choice { min-height:56px; } }
+.checkout-voucher-choice__icon { flex:none; display:grid; place-items:center; width:36px; height:36px; color:var(--v5-ink-3); }
+@media (max-width:374px) { .checkout-voucher-choice { min-height:56px; padding-left:var(--v5-space-4); } .checkout-voucher-choice__icon { width:32px; height:32px; } }
 .checkout-voucher-lock { display:flex; align-items:flex-start; gap:6px; padding:var(--v5-space-2) var(--v5-space-4) 0 64px; color:var(--v5-ink-3); font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .checkout-voucher-lock__icon { flex:none; width:16px; height:16px; margin-top:2px; }
 .checkout-voucher-choice[aria-disabled="true"] { opacity:.5; pointer-events:none; }
