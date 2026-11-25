@@ -34,15 +34,15 @@
         </view>
       </template>
 
-      <view v-if="claimError" class="tcs-error" role="alert"><text class="tcs-error-t">{{ claimErrorText }}</text></view>
-      <view v-else-if="!activated && freeTrial.authorityStatus === 'error'" class="tcs-error" role="status"><text class="tcs-error-t">{{ copy.unavailable }}</text></view>
+      <view v-if="claimError || freeTrial.pendingStart" class="tcs-error" role="alert"><text class="tcs-error-t">{{ claimErrorText }}</text></view>
+      <view v-else-if="!activated && stateReadFailed" class="tcs-error" role="status"><text class="tcs-error-t">{{ copy.unavailable }}</text></view>
 
       <view class="tcs-ctas">
         <template v-if="activated">
           <view class="tcs-claim" role="button" tabindex="0" :aria-label="copy.viewDevices" @click.stop="goDevices" @keydown.enter.stop.prevent="goDevices" @keydown.space.stop.prevent="goDevices"><text class="tcs-claim-t">{{ copy.viewDevices }}</text></view>
           <view class="tcs-secondary" role="button" tabindex="0" :aria-label="copy.buyEarly" @click.stop="goTrial" @keydown.enter.stop.prevent="goTrial" @keydown.space.stop.prevent="goTrial"><text>{{ copy.buyEarly }}</text></view>
         </template>
-        <view v-else class="tcs-claim" :class="{ 'tcs-claim--busy': claiming }" role="button" :tabindex="claiming ? -1 : 0" :aria-label="claimCtaLabel" :aria-disabled="claiming ? 'true' : 'false'" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim" @keydown.enter.stop.prevent="onClaim" @keydown.space.stop.prevent="onClaim"><text class="tcs-claim-t">{{ claimCtaLabel }}</text></view>
+        <view v-else class="tcs-claim" :class="{ 'tcs-claim--busy': claiming }" role="button" :tabindex="claiming ? -1 : 0" :aria-label="claimCtaLabel" :aria-disabled="claimDisabled ? 'true' : 'false'" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim" @keydown.enter.stop.prevent="onClaim" @keydown.space.stop.prevent="onClaim"><text class="tcs-claim-t">{{ claimCtaLabel }}</text></view>
         <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="activated ? copy.close : t.trial.sheetDismissCta" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ activated ? copy.close : t.trial.sheetDismissCta }}</text></view>
       </view>
     </view>
@@ -55,6 +55,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -67,29 +68,43 @@ import { useTrialLifecycleCopy, formatTrialRemaining } from '@/i18n/trial-lifecy
 
 const sheet = useTrialClaimSheet();
 const freeTrial = useFreeTrial();
-useAutoRecovery({ failed: () => remoteApiEnabled && sheet.open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
-const trialView = useTrialPresentation(() => sheet.open);
+const trialView = useTrialPresentation(() => sheet.open, { retainOnReadFailure: true });
 const app = useApp();
 const t = useT();
 const copy = useTrialLifecycleCopy();
 
-const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '-');
-const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '-' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
+// The result stays up while recovery re-reads, so a retry does not blink it away.
+const stateReadFailed = trialView.readFailedWithoutData;
+const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
+const estimateText = computed(() => trialView.estimatedOffsetUSD.value === null ? '—' : `$${formatAmount(trialView.estimatedOffsetUSD.value)}`);
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
-const estimateNote = computed(() => trialView.config.value
+const estimateNote = computed(() => freeTrial.transientReadFailure && trialView.displayReady.value ? t.value.exchange.staleSnapshot : trialView.config.value
   ? trialView.config.value.shadowDailyUSD === null ? '' : fmt(trialView.config.value.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote, {
   rate: formatAmount(trialView.config.value.shadowDailyUSD), days: trialView.config.value.trialDays,
   cap: formatAmount(trialView.config.value.trialOffsetCapUSD),
-}) : freeTrial.authorityStatus === 'error' ? copy.value.unavailable : copy.value.loading);
-const remainingText = computed(() => trialView.remainingMs.value === null ? '-' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
+}) : stateReadFailed.value ? '' : copy.value.loading);
+const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
 
 // Claim submission — loading guard against double taps (异常3; the store's
 // start() is idempotent underneath, this just keeps the UI honest) + inline
 // error with retry (spec ⑤: failure is never silent).
 const claiming = ref(false);
-const activated = ref(false);
+const { activated } = storeToRefs(sheet);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
+const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
+  "terms-required", "onboarding-required"].includes(claimErrorReason.value ?? ""));
+const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.displayState?.canStart === true
+  : claimError.value && !claimOpensAnotherPage.value);
+const claimDisabled = computed(() => claiming.value || (!!freeTrial.pendingStart && !freeTrial.canStart())
+  || (!claimOpensAnotherPage.value && !trialView.actionsReady.value));
+useAutoRecovery({
+  active: () => sheet.open && !claiming.value,
+  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown || freeTrial.authorityIncomplete),
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+});
 let claimSequence = 0;
 const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === 'capacity-full' ? copy.value.manageDevices
@@ -98,12 +113,12 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === 'used' ? copy.value.buyDevice
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
-  : claimError.value || freeTrial.authorityStatus === 'error' ? t.value.trial.claimRetryCta : copy.value.activateCta);
-const claimErrorText = computed(() => claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
+  : claimRetryable.value ? t.value.trial.claimRetryCta : copy.value.activateCta);
+const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
+  : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : claimErrorReason.value === 'capacity-full' ? copy.value.capacityFull
-  : claimErrorReason.value === "unknown"
-  ? t.value.trial.claimUnknownInline
+  : claimErrorReason.value === "rejected" ? t.value.weeklyQuest.claimFailed
   : reasonText(claimErrorReason.value));
 
 function reasonText(reason: TrialStartFailure | undefined): string {
@@ -127,7 +142,7 @@ function hide() {
 function goDevices() { hide(); navTo('/pages/me/devices'); }
 function goTrial() { hide(); navTo('/pages/me/trial'); }
 async function onClaim() {
-  if (claiming.value || !sheet.open || activated.value) return;
+  if (claimDisabled.value || !sheet.open || activated.value) return;
   if (claimErrorReason.value === 'capacity-full' || claimErrorReason.value === 'converted') { goDevices(); return; }
   if (claimErrorReason.value === 'in-progress' || claimErrorReason.value === 'used') { goTrial(); return; }
   if (claimErrorReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
@@ -137,26 +152,30 @@ async function onClaim() {
   const requestedSequence = ++claimSequence;
   claiming.value = true;
   claimError.value = false;
+  claimErrorReason.value = undefined;
   // Remote start first refreshes GET /api/trial/eligibility, then posts the
   // idempotent command and performs an authoritative readback.
   const r = await freeTrial.start();
   if (requestedSequence !== claimSequence) return;
   claiming.value = false;
   if (requestedEpoch !== app.accountBindingEpoch) return;
-  // A confirmed claim holds a slot even if the sheet was closed meanwhile; the count must follow it.
-  if (r.ok && remoteApiEnabled) void app.refreshRemoteFleet();
   if (!sheet.open) return;
   if (!r.ok) {
+    if (r.reason === "read-failed" || r.reason === "confirming") return;
     claimErrorReason.value = r.reason;
     claimError.value = true; // inline error + retry CTA, stay in the sheet
     return;
   }
   claimError.value = false;
   claimErrorReason.value = undefined;
-  // start() only resolves ok after the authoritative state readback succeeds.
-  activated.value = true;
+  if (!remoteApiEnabled) activated.value = true; // Local claims have no server claim number.
 }
 
+watch(() => freeTrial.confirmedStartDenial, reason => {
+  if (!sheet.open || !reason) return;
+  claimErrorReason.value = reason;
+  claimError.value = true;
+});
 watch(() => app.accountBindingEpoch, () => {
   claimSequence++;
   claiming.value = false;
@@ -169,10 +188,8 @@ watch(() => sheet.open, open => {
   if (!open) return;
   claimError.value = false;
   claimErrorReason.value = undefined;
-  activated.value = !claiming.value && freeTrial.authorityStatus === 'ready'
-    && (freeTrial.status === 'active' || freeTrial.status === 'grace');
+  activated.value = !claiming.value && !freeTrial.pendingStart && trialView.displayReady.value && trialView.active.value;
 });
-
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
 useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);

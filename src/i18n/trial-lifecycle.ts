@@ -21,7 +21,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: '购后到账',
     rulesEarly: '试用期内购买：完整试用权益照拿，再减 {discount}\u00A0USDT；试用到期后购买不享此立减。',
     rulesRefund: '确认退款时，实付金额全额退回，购机时发放的试用奖励随退款收回。',
-    retry: '重试', unavailable: '暂时无法读取，请重试。', loading: '正在读取试用…', close: '关闭',
+    retry: '重试', unavailable: '暂时无法读取，请重试。', pageUnavailable: '试用信息暂时无法加载', resultConfirming: '正在确认试用结果', resultConfirmingNote: '确认后自动更新', autoRetrying: '正在自动重试', loading: '正在读取试用…', close: '关闭',
   },
   en: {
     cardActiveTitle: 'Trial', cardGraceTitle: 'Credit',
@@ -41,7 +41,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Credited after purchase',
     rulesEarly: "Buy during the trial to keep your full trial benefits and get {discount}\u00A0USDT off. Buying after the trial ends doesn't include this discount.",
     rulesRefund: 'If the order is refunded, the full amount paid is returned and trial rewards paid at purchase are taken back.',
-    retry: 'Retry', unavailable: 'Unable to load your trial. Please retry.', loading: 'Loading your trial…', close: 'Close',
+    retry: 'Retry', unavailable: 'Unable to load your trial. Please retry.', pageUnavailable: "Your trial couldn't be loaded", resultConfirming: 'Confirming your trial', resultConfirmingNote: 'This page updates once confirmed', autoRetrying: 'Retrying automatically', loading: 'Loading your trial…', close: 'Close',
   },
   vi: {
     cardActiveTitle: 'Dùng thử', cardGraceTitle: 'Khấu trừ',
@@ -61,7 +61,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Nhận sau khi mua',
     rulesEarly: 'Mua trong thời gian dùng thử: giữ trọn quyền lợi và giảm thêm {discount}\u00A0USDT; mua sau khi hết hạn không được giảm.',
     rulesRefund: 'Khi đơn hàng được hoàn tiền, toàn bộ số tiền đã trả được hoàn lại và thưởng dùng thử trả lúc mua sẽ được thu hồi.',
-    retry: 'Thử lại', unavailable: 'Chưa thể tải lượt dùng thử. Vui lòng thử lại.', loading: 'Đang tải lượt dùng thử…', close: 'Đóng',
+    retry: 'Thử lại', unavailable: 'Chưa thể tải lượt dùng thử. Vui lòng thử lại.', pageUnavailable: 'Chưa thể tải thông tin dùng thử', resultConfirming: 'Đang xác nhận lượt dùng thử', resultConfirmingNote: 'Trang tự cập nhật sau khi xác nhận', autoRetrying: 'Đang tự động thử lại', loading: 'Đang tải lượt dùng thử…', close: 'Đóng',
   },
   id: {
     cardActiveTitle: 'Uji coba', cardGraceTitle: 'Potongan',
@@ -81,7 +81,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Masuk setelah pembelian',
     rulesEarly: "Beli selama uji coba untuk tetap mendapat seluruh manfaat uji coba ditambah potongan {discount}\u00A0USDT. Pembelian setelah uji coba berakhir tidak mendapat potongan ini.",
     rulesRefund: 'Jika pesanan dikembalikan dananya, seluruh jumlah yang dibayar dikembalikan dan hadiah uji coba yang diberikan saat pembelian ditarik kembali.',
-    retry: 'Coba lagi', unavailable: 'Uji coba Anda gagal dimuat. Coba lagi.', loading: 'Memuat uji coba Anda…', close: 'Tutup',
+    retry: 'Coba lagi', unavailable: 'Uji coba Anda gagal dimuat. Coba lagi.', pageUnavailable: 'Info uji coba belum dapat dimuat', resultConfirming: 'Mengonfirmasi uji coba Anda', resultConfirmingNote: 'Halaman diperbarui otomatis setelah dikonfirmasi', autoRetrying: 'Mencoba ulang otomatis', loading: 'Memuat uji coba Anda…', close: 'Tutup',
   },
   ms: {
     cardActiveTitle: 'Percubaan', cardGraceTitle: 'Kredit',
@@ -101,7 +101,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Dikreditkan selepas beli',
     rulesEarly: "Beli dalam tempoh percubaan untuk mengekalkan manfaat percubaan penuh dan dapat diskaun {discount}\u00A0USDT. Pembelian selepas percubaan tamat tidak termasuk diskaun ini.",
     rulesRefund: 'Jika pesanan dibayar balik, jumlah penuh yang dibayar dikembalikan dan ganjaran percubaan yang dibayar semasa pembelian ditarik balik.',
-    retry: 'Cuba lagi', unavailable: 'Percubaan anda gagal dimuatkan. Sila cuba lagi.', loading: 'Memuatkan percubaan anda…', close: 'Tutup',
+    retry: 'Cuba lagi', unavailable: 'Percubaan anda gagal dimuatkan. Sila cuba lagi.', pageUnavailable: 'Maklumat percubaan belum dapat dimuatkan', resultConfirming: 'Mengesahkan percubaan anda', resultConfirmingNote: 'Halaman dikemas kini automatik selepas disahkan', autoRetrying: 'Mencuba semula secara automatik', loading: 'Memuatkan percubaan anda…', close: 'Tutup',
   },
   fil: {
     cardActiveTitle: 'Trial', cardGraceTitle: 'Credit',
@@ -121,7 +121,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Papasok pagkatapos bumili',
     rulesEarly: "Bumili habang naka-trial para makuha ang buong benepisyo ng trial at {discount}\u00A0USDT na bawas. Walang ganitong discount kapag bumili pagkatapos ng trial.",
     rulesRefund: 'Kapag na-refund ang order, ibabalik ang buong halagang ibinayad at babawiin ang reward sa trial na ibinigay sa pagbili.',
-    retry: 'Subukan ulit', unavailable: 'Hindi ma-load ang trial mo. Subukan ulit.', loading: 'Nilo-load ang trial mo…', close: 'Isara',
+    retry: 'Subukan ulit', unavailable: 'Hindi ma-load ang trial mo. Subukan ulit.', pageUnavailable: 'Hindi pa ma-load ang trial mo', resultConfirming: 'Kinukumpirma ang trial mo', resultConfirmingNote: 'Kusang mag-a-update ang page kapag nakumpirma', autoRetrying: 'Awtomatikong sinusubukang muli', loading: 'Nilo-load ang trial mo…', close: 'Isara',
   },
   ru: {
     cardActiveTitle: 'Пробный период', cardGraceTitle: 'Бонус',
@@ -141,7 +141,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'После покупки',
     rulesEarly: "Купив во время пробного периода, вы сохраните все его привилегии и получите скидку {discount}\u00A0USDT. После окончания пробного периода эта скидка не действует.",
     rulesRefund: 'При возврате заказа оплаченная сумма возвращается полностью, а награды пробного периода, выданные при покупке, отзываются.',
-    retry: 'Повторить', unavailable: 'Не удалось загрузить пробный период. Повторите попытку.', loading: 'Загружаем пробный период…', close: 'Закрыть',
+    retry: 'Повторить', unavailable: 'Не удалось загрузить пробный период. Повторите попытку.', pageUnavailable: 'Не удалось загрузить пробный период', resultConfirming: 'Подтверждаем пробный период', resultConfirmingNote: 'Страница обновится после подтверждения', autoRetrying: 'Повторяем автоматически', loading: 'Загружаем пробный период…', close: 'Закрыть',
   },
   kk: {
     cardActiveTitle: 'Сынақ', cardGraceTitle: 'Бонус',
@@ -161,7 +161,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Сатып алғаннан кейін түседі',
     rulesEarly: "Сынақ кезінде сатып алсаңыз, сынақ артықшылықтары толық сақталып, қосымша {discount}\u00A0USDT жеңілдік аласыз. Сынақ біткеннен кейін сатып алғанда бұл жеңілдік берілмейді.",
     rulesRefund: 'Тапсырыс қайтарылса, төленген сома толық қайтарылады, ал сатып алғанда берілген сынақ сыйақылары кері алынады.',
-    retry: 'Қайталау', unavailable: 'Сынағыңыз жүктелмеді. Қайталап көріңіз.', loading: 'Сынағыңыз жүктелуде…', close: 'Жабу',
+    retry: 'Қайталау', unavailable: 'Сынағыңыз жүктелмеді. Қайталап көріңіз.', pageUnavailable: 'Сынақ ақпараты жүктелмеді', resultConfirming: 'Сынағыңыз расталуда', resultConfirmingNote: 'Расталған соң бет өзі жаңарады', autoRetrying: 'Автоматты түрде қайталануда', loading: 'Сынағыңыз жүктелуде…', close: 'Жабу',
   },
   uz: {
     cardActiveTitle: 'Sinov', cardGraceTitle: 'Chegirma',
@@ -181,7 +181,7 @@ export const trialLifecycleCopy = {
     afterPurchaseLabel: 'Xariddan keyin tushadi',
     rulesEarly: "Sinov davomida xarid qilsangiz, sinovning barcha imtiyozlari saqlanadi va {discount}\u00A0USDT chegirma olasiz. Sinov tugagach xarid qilsangiz, bu chegirma berilmaydi.",
     rulesRefund: 'Buyurtma puli qaytarilsa, toʻlangan summa toʻliq qaytariladi va xaridda berilgan sinov mukofotlari qaytarib olinadi.',
-    retry: 'Takrorlash', unavailable: 'Sinovingizni yuklab boʻlmadi. Qayta urining.', loading: 'Sinovingiz yuklanmoqda…', close: 'Yopish',
+    retry: 'Takrorlash', unavailable: 'Sinovingizni yuklab boʻlmadi. Qayta urining.', pageUnavailable: 'Sinov maʼlumotlari yuklanmadi', resultConfirming: 'Sinovingiz tasdiqlanmoqda', resultConfirmingNote: 'Tasdiqlangach, sahifa oʻzi yangilanadi', autoRetrying: 'Avtomatik qayta urinilmoqda', loading: 'Sinovingiz yuklanmoqda…', close: 'Yopish',
   },
 };
 

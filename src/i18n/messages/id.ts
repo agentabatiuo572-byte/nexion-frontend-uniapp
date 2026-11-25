@@ -2120,7 +2120,7 @@ export const id: Messages = {
     sheetCloseAria: "Tutup",
     sheetProp3Title: "Hemat hingga ${amount}",
     sheetDismissCta: "Nanti saja",
-    claimUnknownInline: "Aktivasi uji coba belum terkonfirmasi. Coba lagi.",
+    claimUnknownInline: "Aktivasi uji coba sedang dikonfirmasi. Diperbarui otomatis setelah dikonfirmasi.",
     claimOnboardingRequired: "Uji coba belum bisa diklaim saat ini. Hubungi layanan pelanggan.",
     claimOnboardingCta: "Hubungi CS",
     claimTermsRequired: "Uji coba belum dimulai. Setujui ketentuan layanan, lalu kembali untuk klaim.",

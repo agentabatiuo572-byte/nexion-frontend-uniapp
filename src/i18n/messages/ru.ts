@@ -2120,7 +2120,7 @@ export const ru: Messages = {
     sheetCloseAria: "Закрыть",
     sheetProp3Title: "Скидка до ${amount}",
     sheetDismissCta: "Позже",
-    claimUnknownInline: "Не удалось подтвердить запуск пробного периода. Повторите попытку.",
+    claimUnknownInline: "Подтверждаем запуск пробного периода. Обновится автоматически.",
     claimOnboardingRequired: "Пробный период сейчас нельзя начать. Обратитесь в поддержку.",
     claimOnboardingCta: "Поддержка",
     claimTermsRequired: "Пробный период не начат. Примите условия использования и вернитесь.",

@@ -18,10 +18,10 @@
     <view class="trial-page">
       <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="trialDeviceName || undefined" />
 
-      <view v-if="authorityScreenUnavailable" class="mx-4 trial-read-state" role="status" :aria-busy="freeTrial.authorityStatus === 'loading'">
-        <view v-if="freeTrial.authorityStatus === 'loading'" class="trial-read-skeleton" aria-hidden="true"><view/><view/><view/></view>
-        <text>{{ freeTrial.authorityStatus === 'loading' ? lifecycle.loading : lifecycle.unavailable }}</text>
-        <view v-if="freeTrial.authorityStatus !== 'loading'" role="button" tabindex="0" class="trial-read-retry" @click="freeTrial.refreshRemote(true)"><text>{{ lifecycle.retry }}</text></view>
+      <view v-if="authorityScreenUnavailable" class="mx-4 trial-read-state" role="status" :aria-busy="authorityReadPending">
+        <view v-if="authorityReadPending" class="trial-read-skeleton" aria-hidden="true"><view/><view/><view/></view>
+        <text>{{ authorityReadPending ? lifecycle.loading : freeTrial.authorityResultUnknown ? lifecycle.resultConfirming : lifecycle.unavailable }}</text>
+        <view v-if="!authorityReadPending && !freeTrial.authorityResultUnknown" role="button" tabindex="0" class="trial-read-retry" @click="freeTrial.refreshRemote(true)"><text>{{ lifecycle.retry }}</text></view>
       </view>
 
       <!-- ═══ active / grace — running cycle ═══ -->
@@ -164,7 +164,7 @@
         <view class="trial-terminal-copy trial-rise trial-rise--2">
           <text class="trial-terminal-copy__title">{{ purchase.refundedTitle }}</text>
           <text class="trial-terminal-copy__body">{{ purchase.refundedBody }}</text>
-          <text v-if="freeTrial.authoritativeConversion?.rewardsReversed" class="trial-terminal-copy__note">{{ purchase.refundedRewards }}</text>
+          <text v-if="displayState?.conversion?.rewardsReversed" class="trial-terminal-copy__note">{{ purchase.refundedRewards }}</text>
         </view>
       </view>
 
@@ -196,7 +196,7 @@
         <template v-if="isActiveCycle || (status === 'ended' && !claimVisible)">
           <text v-if="barNote" class="trial-bar__note nx-tray-note">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
-          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialProductUnavailable && !trialCatalogLoading" :busy="trialCatalogLoading" @click="goCheckout">
+          <NxButton class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="authorityUnavailable || (trialProductUnavailable && !trialCatalogLoading)" :busy="trialCatalogLoading" @click="goCheckout">
             <svg v-if="isActiveCycle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
             <text>{{ trialBuyCtaText }}</text>
           </NxButton>
@@ -207,7 +207,7 @@
           <NxButton class="trial-bar__main" variant="primary" :label="t.trial.idleCta" :disabled="!canStartNow" @click="claim" />
         </template>
         <template v-else-if="conversionRefunded">
-          <NxButton v-if="freeTrial.authoritativeConversion?.orderNo" class="trial-bar__side" variant="secondary" :label="purchase.refundOrderCta" @click="goRefundedOrder" />
+          <NxButton v-if="displayState?.conversion?.orderNo" class="trial-bar__side" variant="secondary" :label="purchase.refundOrderCta" @click="goRefundedOrder" />
           <NxButton class="trial-bar__wide" variant="primary" :label="purchase.shopCta" @click="goStore" />
         </template>
         <NxButton v-else class="trial-bar__main" variant="primary" :label="t.trial.convertedDevicesCta" @click="goDevices" />
@@ -251,11 +251,13 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import { appDeviceOffline } from "@/lib/foreground-read";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDeadline } from "@/lib/trial-date";
 import { geoPolicyErrorKind, geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
+import { useFreeTrial, liveShadowUSD, liveShadowNEX } from "@/store/free-trial";
 import { useTrialConfig, computeTrialOffset, formatTrialDiscountPercent, resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
@@ -272,21 +274,26 @@ import { useTrialDetailCopy } from "@/i18n/trial-detail";
 
 const t = useT();
 const freeTrial = useFreeTrial();
+const claimSheet = useTrialClaimSheet();
 onShow(() => { void freeTrial.refreshVisible(); });
 const trialConfig = useTrialConfig();
 const visibility = useDataVisibility();
 const lifecycle = useTrialLifecycleCopy();
 const purchase = useTrialPurchaseCopy();
 const detail = useTrialDetailCopy();
-const authorityIncomplete = computed(() => (freeTrial.status === "active" || freeTrial.status === "grace")
-  && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null));
-const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || authorityIncomplete.value));
-// Keep the confirmed page on screen during a trial read
-// meanwhile instead of swapping in the read state. Actions still wait on authorityUnavailable.
-const authorityScreenUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityServerState === null || authorityIncomplete.value));
+const authorityUnavailable = computed(() => remoteApiEnabled && (freeTrial.authorityStatus !== "ready" || freeTrial.authorityIncomplete));
+// The last complete snapshot belongs to this account and only supplies display values.
+const displayState = computed(() => freeTrial.displayState);
+const staleDisplay = computed(() => freeTrial.transientReadFailure && displayState.value !== null);
+const authorityScreenUnavailable = computed(() => remoteApiEnabled && (!displayState.value || (!!freeTrial.pendingStart && !displayState.value.canStart)));
+// A read is under way or about to start: the cold open before the first read, or a read with no failure behind it.
+// A failed or incomplete read keeps its result up while recovery re-reads; an observed disconnect has nothing to wait for.
+const authorityReadPending = computed(() => freeTrial.authorityStatus === "loading"
+  ? !freeTrial.lastReadFailed && !freeTrial.authorityIncomplete
+  : freeTrial.authorityStatus === "unknown" && freeTrial.authorityError === null && !appDeviceOffline.value);
 
 const cfg = computed(() => trialConfig.config);
-const status = computed(() => freeTrial.status);
+const status = computed(() => displayState.value?.status ?? freeTrial.status);
 
 const now = ref(Date.now());
 useVisibleInterval(() => { now.value = Date.now(); }, 1000);
@@ -307,22 +314,28 @@ const trialProductUnavailable = computed(() => {
     && product.inventoryMode === "FINITE"
     && (product.stock ?? 0) <= 0;
 });
-const shadowUSD = computed(() => liveShadowUSD(now.value));
-const shadowNEX = computed(() => liveShadowNEX(now.value));
-const remainingMsValue = computed(() => remainingMs(now.value));
+const shadowUSD = computed(() => displayState.value?.shadowUSD ?? liveShadowUSD(now.value));
+const shadowNEX = computed(() => displayState.value?.shadowNEX ?? liveShadowNEX(now.value));
+const startedAt = computed(() => displayState.value?.startedAt ?? freeTrial.startedAt);
+const expiresAt = computed(() => displayState.value?.expiresAt ?? freeTrial.expiresAt);
+const graceEndsAt = computed(() => displayState.value?.serverState === "EXTENDED"
+  ? displayState.value.extendedEndsAt ?? null : displayState.value?.graceEndsAt ?? freeTrial.graceEndsAt);
+const boundary = computed(() => isGrace.value ? graceEndsAt.value : expiresAt.value);
+const remainingMsValue = computed(() => boundary.value === null ? 0
+  : Math.max(0, boundary.value - freeTrial.serverTimeAt(now.value)));
 const trialOffset = computed(() => remoteApiEnabled
-  ? { offsetUSD: freeTrial.authoritativeOffsetUSD ?? 0, remainderUSD: freeTrial.authoritativeRemainderUSD ?? 0 }
+  ? { offsetUSD: displayState.value?.offsetUSD ?? 0, remainderUSD: displayState.value?.remainderUSD ?? 0 }
   : computeTrialOffset(cfg.value, shadowUSD.value));
 const estimatedOffsetUSD = computed(() => cfg.value.shadowDailyUSD === null
   ? null : computeTrialOffset(cfg.value, cfg.value.shadowDailyUSD * cfg.value.trialDays).offsetUSD);
 // FEAT-TRIAL05: the server quote convert() will settle. An early quote is shown only while
 // the original term is still running. App's boundary read supplies the next quote.
 const earlyQuoteLapsed = computed(() => {
-  const quote = freeTrial.authoritativeQuote;
+  const quote = displayState.value?.quote;
   return !!quote?.earlyPurchase && quote.earlyEndsAt !== null && freeTrial.serverTimeAt(now.value) >= quote.earlyEndsAt;
 });
 const purchaseQuote = computed(() => remoteApiEnabled && isActiveCycle.value && !earlyQuoteLapsed.value
-  ? freeTrial.authoritativeQuote : null);
+  ? displayState.value?.quote : null);
 const earlyQuote = computed(() => status.value === "active" && purchaseQuote.value?.earlyPurchase ? purchaseQuote.value : null);
 
 // Prices and discounts are dollars; earnings and credit are USDT (a quote counts 1 USDT as $1).
@@ -339,12 +352,12 @@ function amountParts(value: number): [string, string] {
 // ── Hero: ring = what is left of the current phase, from its real start and end ──
 const RING_LENGTH = 603.19; // 2π × 96
 const ribbon = computed(() => {
-  if (freeTrial.authorityServerState === "EXTENDED") return t.value.trial.countdownExtendedRibbon;
+  if (displayState.value?.serverState === "EXTENDED") return t.value.trial.countdownExtendedRibbon;
   return isGrace.value ? t.value.trial.countdownGraceRibbon : t.value.trial.countdownActiveRibbon;
 });
 const ringOffset = computed(() => {
-  const start = isGrace.value ? freeTrial.expiresAt : freeTrial.startedAt;
-  const end = isGrace.value ? freeTrial.graceEndsAt : freeTrial.expiresAt;
+  const start = isGrace.value ? expiresAt.value : startedAt.value;
+  const end = boundary.value;
   if (start === null || end === null) return RING_LENGTH;
   const left = Math.min(1, Math.max(0, (end - now.value) / (end - start)));
   return +(RING_LENGTH * (1 - left)).toFixed(2);
@@ -360,7 +373,7 @@ const countdownText = computed(() => {
   return [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60].map(v => String(v).padStart(2, "0")).join(":");
 });
 const deadlineText = computed(() => {
-  const at = isGrace.value ? freeTrial.graceEndsAt : freeTrial.expiresAt;
+  const at = boundary.value;
   if (at === null) return "";
   return fmt(isGrace.value ? detail.value.keptUntil : purchase.value.heroTermUntil, { time: formatTrialDeadline(at, dateLocale()) });
 });
@@ -399,18 +412,16 @@ const promoLabel = computed(() => {
   return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: usdShort(cap) });
 });
 const conversionRefunded = computed(() => remoteApiEnabled && status.value === "converted"
-  && freeTrial.authoritativeConversion?.refunded === true);
+  && displayState.value?.conversion?.refunded === true);
 
 const w = computed(() => t.value.trial);
 // B53: the header, claim title and owned note name the confirmed trial product: the current
 // offer while claimable, the claimed product once running or bought. Nothing shows before the
 // first confirmed read, so the boot default never flashes in; local mock keeps its own config.
-const trialDeviceName = computed(() => (freeTrial.authorityStatus === "mock"
-  ? cfg.value.trialProductName
-  : freeTrial.authoritativeProductIdentity?.name ?? ""));
+const trialDeviceName = computed(() => (!remoteApiEnabled || displayState.value ? cfg.value.trialProductName : ""));
 // Inside sentences the name never splits across lines ("UVELBox / Pro v2").
 const trialDeviceNameKept = computed(() => trialDeviceName.value.replace(/ /g, "\u00A0"));
-const idleBody = computed(() => freeTrial.authorityStatus === "mock" || freeTrial.authorityServerState !== null
+const idleBody = computed(() => !remoteApiEnabled || displayState.value
   ? fmt(w.value.idleBody, { n: String(cfg.value.trialDays) })
   : "");
 const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: visibility.mask(formatAmount(trialOffset.value.remainderUSD)) }));
@@ -426,7 +437,7 @@ const canStartNow = computed(() => {
   void now.value; // re-evaluate each tick (eligibility isn't reactive on config alone)
   return freeTrial.canStart();
 });
-const claimVisible = computed(() => status.value === "none" || (status.value === "ended" && canStartNow.value));
+const claimVisible = computed(() => status.value === "none" || (status.value === "ended" && (displayState.value?.canStart ?? canStartNow.value)));
 const ineligibleReasonText = computed(() => {
   const r = freeTrial.eligibility().reason;
   // PROD: this reason is served by GET /api/trial/eligibility, so a region
@@ -447,6 +458,9 @@ const ineligibleReasonText = computed(() => {
 const barRetry = computed(() => (isActiveCycle.value || status.value === "ended") && !claimVisible.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
+  if (freeTrial.pendingStart) return t.value.trial.claimUnknownInline;
+  if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
+  if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
   if ((isActiveCycle.value || status.value === "ended") && trialProductUnavailable.value && productCatalogState.status === "ready") {
     return t.value.store.trialProductUnavailable;
@@ -471,7 +485,7 @@ const rulesLines = computed(() => [
 
 function claim() {
   if (!canStartNow.value) return; // disabled CTA — reason line explains why
-  useTrialClaimSheet().show();
+  claimSheet.show();
 }
 
 // Conversion CTA → checkout. Trial pricing still derives from authoritative
@@ -483,7 +497,14 @@ function goCheckout() {
   if (!productId) return; // applyAuthoritative already rejects unknown policy ids
   navTo(`/pages/store/checkout?product=${productId}&source=trial`);
 }
-useAutoRecovery({ failed: () => remoteApiEnabled && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote(true) });
+useAutoRecovery({
+  active: () => !claimSheet.open,
+  failed: () => remoteApiEnabled && freeTrial.authorityStatus !== "loading"
+    && (freeTrial.authorityStatus === "error" || freeTrial.authorityResultUnknown || freeTrial.authorityIncomplete),
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+  repeatWhile: () => freeTrial.authorityResultUnknown || !hasVisiblePullRefresh(),
+});
 useAutoRecovery({ failed: () => productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 function retryCatalog() {
   if (productCatalogState.status !== "error") return;
@@ -499,7 +520,7 @@ function goStore() {
   navTo("/store");
 }
 function goRefundedOrder() {
-  const orderNo = freeTrial.authoritativeConversion?.orderNo;
+  const orderNo = displayState.value?.conversion?.orderNo;
   if (orderNo) navTo(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}`);
 }
 
