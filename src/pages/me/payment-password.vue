@@ -58,16 +58,17 @@
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { onHide, onShow, onUnload } from "@dcloudio/uni-app";
+import { onBackPress, onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import PaymentPasswordInput from "@/components/payment-password-input.vue";
+import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { usePaymentPinViewport } from "@/composables/use-payment-pin-viewport";
 import { usePaymentPassword, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { sessionVault } from "@/api/runtime";
 const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() => ui.state); const t = useT();
@@ -86,10 +87,6 @@ const lockMessage = computed(() => {
   const seconds = Math.max(0, Math.ceil((Date.parse(state.value?.lockedUntil ?? "") - ui.now) / 1000));
   return fmt(t.value.paymentPin.locked, { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` });
 });
-const canSave = computed(() => complete.value && !validation.value && !ui.busy && !state.value?.lockedUntil && !ui.pendingOperation);
-// Two-step change (PRD §4.6.6). PLACEHOLDER(Codex): `step` and its transitions are a local stand-in for the flow logic.
-// Until B95 (server check of the current PIN) ships, step 1 only keeps the digits in passwords.current and moves on; the
-// server checks it when step 2 submits (save), and a wrong or locked current PIN brings the user back to step 1 below.
 type Step = "verify" | "new" | "confirm";
 const step = ref<Step>("verify");
 const stepField = computed(() => step.value === "verify" ? "current" as const : step.value);
@@ -97,21 +94,43 @@ const heading = computed(() => step.value === "verify" ? t.value.paymentPin.veri
 const hint = computed(() => step.value === "verify" ? t.value.paymentPin.verifyHint : step.value === "new" ? t.value.paymentPin.rule : t.value.paymentPin.repeatDigits);
 const inputDisabled = computed(() => loading.value || ui.busy || (step.value === "verify" && !!state.value?.lockedUntil));
 const stepError = computed(() => step.value === "verify" ? error.value : validation.value || error.value);
-// PLACEHOLDER(Codex): "verifying" is the busy line for B95's verify call; today step 1 sends nothing, so it shows only while ui.busy.
-const stepStatus = computed(() => loading.value ? t.value.paymentPin.loading : step.value === "verify" && ui.busy ? t.value.paymentPin.verifying : "");
-const canNext = computed(() => validPaymentPassword(passwords.new) && !validation.value && !ui.busy);
+const stepStatus = computed(() => loading.value ? t.value.paymentPin.loading : "");
+const canNext = computed(() => step.value === "new" && !inputDisabled.value && validPaymentPassword(passwords.new) && !validation.value);
+const canSave = computed(() => step.value === "confirm" && !inputDisabled.value && complete.value && !validation.value && !state.value?.lockedUntil && !ui.pendingOperation);
 const dockOpen = computed(() => active.value && !loading.value && !!state.value?.configured && !ui.pendingOperation && step.value !== "verify");
 const dockViewport = usePaymentPinViewport(dockOpen);
-// PLACEHOLDER(Codex): step 1 completes on the sixth digit (B95 verify call goes here).
-function completeStep() { if (step.value === "verify" && !inputDisabled.value) { ui.changeError = ""; step.value = "new"; } }
+function completeStep() {
+  if (step.value !== "verify" || inputDisabled.value || !validPaymentPassword(passwords.current)) return;
+  // B95 交付后第一步改为调用验证接口。过渡期间仅在页面内存暂存当前密码，由修改命令校验。
+  ui.changeError = "";
+  step.value = "new";
+}
 function toConfirm() { if (canNext.value) step.value = "confirm"; }
 function restartNew() { passwords.new = ""; passwords.confirm = ""; step.value = "new"; }
-// Back from step 2 returns to step 1 with every input cleared (PRD §4.6.6); header back and system back both land here.
-function backToVerify() { if (ui.busy) return; passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
-// PLACEHOLDER(Codex): where a rejected change lands. save() has already dropped the current PIN, so any rejection starts
-// again at step 1 with every input cleared; the message (remaining attempts, same PIN, …) shows there.
-watch(() => ui.changeError, key => { if (key) { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; } });
-function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
+function clear() {
+  passwords.current = "";
+  passwords.new = "";
+  passwords.confirm = "";
+  step.value = "verify";
+}
+function backToVerify() { if (!ui.busy) clear(); }
+const dialogHoldsBack = useDialogBackHeld();
+onBackPress(event => {
+  if (event.from !== "backbutton" || dialogHoldsBack(event)) return false;
+  if (step.value !== "verify") {
+    backToVerify();
+    return true;
+  }
+  // #ifdef APP-PLUS
+  // Preserve the header's fallback when Android opened this page with no back stack.
+  if (getCurrentPages().length === 1) {
+    navBack("/pages/me/me");
+    return true;
+  }
+  // #endif
+  return false;
+});
+watch(() => ui.changeError, key => { if (key) clear(); });
 async function load() {
   const generation = pageGeneration;
   loading.value = true; ui.changeError = "";

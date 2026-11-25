@@ -253,11 +253,21 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
       if (!currentRead()) return;
       if (finishMutation(result)) return;
       if (result.status === "REJECTED") {
+        if (command.operation === "change") {
+          if (result.state) setState(result.state);
+          await refreshStatus({ isCurrent: currentRead, silent: !!result.state });
+          if (!currentRead()) return;
+        }
         if (!retirePending()) throw new Error("PAYMENT_PASSWORD_COMMAND_RETIRE_FAILED");
         clearSecrets();
         ui.error = paymentPasswordErrorKey(new ApiError({ kind: "business", message: result.message ?? "PAYMENT_PASSWORD_UPDATE_REJECTED" }));
+        if (command.operation === "change") {
+          ui.changeError = ui.error;
+          ui.visible = false;
+          return;
+        }
         ui.rejectedRevision++;
-        if (command.operation === "change" || !ui.visible) {
+        if (!ui.visible) {
           ui.changeError = ui.error; ui.visible = false; await refreshStatus({ isCurrent: readAllowed, silent: true }); return;
         }
         showMutationRejection(ui.error, command.operation === "reset");
@@ -314,10 +324,14 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
       ui.visible = true; ui.stage = "pending"; return false;
     } catch (error) {
       if (!current(token)) return false;
-      if (isAmbiguousOutcome(error)) { ui.visible = true; ui.stage = "pending"; }
+      const credentialRefusal = isApiRefusal(error, 409, "PAYMENT_PASSWORD_VERSION_CONFLICT", "PAYMENT_PASSWORD_NOT_CONFIGURED")
+        || isApiRefusal(error, 429, "PAYMENT_PASSWORD_LOCKED");
+      if (!credentialRefusal && isAmbiguousOutcome(error)) { ui.visible = true; ui.stage = "pending"; }
       else {
+        await refreshStatus();
+        if (!current(token)) return false;
         if (!retirePending()) { ui.visible = true; ui.stage = "pending"; ui.error = "failed"; return false; }
-        ui.changeError = paymentPasswordErrorKey(error); await refreshStatus();
+        ui.changeError = paymentPasswordErrorKey(error);
       }
       return false;
     } finally { if (current(token)) ui.busy = false; }
