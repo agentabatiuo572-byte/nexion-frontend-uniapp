@@ -131,22 +131,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
 const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
-  : claimErrorReason.value === 'capacity-full' ? copy.value.capacityFull
-  : claimErrorReason.value === "rejected" ? t.value.weeklyQuest.claimFailed
-  : reasonText(claimErrorReason.value));
-
-function reasonText(reason: TrialStartFailure | undefined): string {
-  const w = t.value.trial;
-  if (reason === 'capacity-full') return copy.value.capacityFull;
-  if (reason === "converted") return w.eligReasonConverted;
-  if (reason === "used") return w.eligReasonUsed;
-  if (reason === "in-progress") return w.eligReasonInProgress;
-  if (reason === "quota-exhausted") return w.eligReasonQuota;
-  if (reason === "risk") return w.eligReasonRisk;
-  if (reason === "product-unavailable") return t.value.store.trialProductUnavailable;
-  if (reason === "unknown") return w.eligReasonUnknown;
-  return w.eligReasonClosed;
-}
+  : sheet.failureText(claimErrorReason.value));
 
 function hide() {
   claimError.value = false;

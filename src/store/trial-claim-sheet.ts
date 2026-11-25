@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
-import { useFreeTrial } from "./free-trial";
+import { useFreeTrial, type TrialStartFailure } from "./free-trial";
 import { useApp } from "./app";
 import { toast } from "./ui";
 import { getT } from "@/i18n/use-t";
@@ -40,14 +40,23 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     if (open.value) activated.value = true;
     else toast.success(copy.value.activationSuccessTitle);
   });
+  // Refused at once or only by a later read, the reason reaches the user even with the sheet closed.
   watch(() => trial.confirmedStartDenial, reason => {
-    if (!reason || open.value) return;
-    const t = getT();
-    // A settled refusal names its reason; only the rest may be tried again.
-    toast.error(reason === "quota-exhausted" ? t.trial.eligReasonQuota : reason === "risk" ? t.trial.eligReasonRisk
-      : reason === "product-unavailable" ? t.store.trialProductUnavailable : reason === "phase-closed" ? t.trial.eligReasonClosed
-      : t.weeklyQuest.claimFailed);
+    if (reason && !open.value) toast.error(failureText(reason));
   });
+  function failureText(reason: TrialStartFailure | undefined): string {
+    const t = getT();
+    if (reason === "rejected") return t.weeklyQuest.claimFailed;
+    if (reason === "capacity-full") return copy.value.capacityFull;
+    if (reason === "converted") return t.trial.eligReasonConverted;
+    if (reason === "used") return t.trial.eligReasonUsed;
+    if (reason === "in-progress") return t.trial.eligReasonInProgress;
+    if (reason === "quota-exhausted") return t.trial.eligReasonQuota;
+    if (reason === "risk") return t.trial.eligReasonRisk;
+    if (reason === "product-unavailable") return t.store.trialProductUnavailable;
+    if (reason === "unknown") return t.trial.eligReasonUnknown;
+    return t.trial.eligReasonClosed;
+  }
   const lastClosedAt = ref(hydrateLastClosedAt());
   const sessionShownCount = ref(0);
 
@@ -91,5 +100,5 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     persist();
   }
 
-  return { open, activated, lastClosedAt, sessionShownCount, show, tryAutoPush, hide, closeTransient, resetCooldown };
+  return { open, activated, lastClosedAt, sessionShownCount, failureText, show, tryAutoPush, hide, closeTransient, resetCooldown };
 });

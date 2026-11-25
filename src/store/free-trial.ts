@@ -201,7 +201,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const purchasedDevice = computed(() => displayState.value?.status === "converted"
     ? displayState.value.purchasedDevice ?? null : null);
   const pendingStart = shallowRef<{ claimNo: string | null } | null>(null);
-  const confirmedStartDenial = ref<TrialIneligibleReason>();
+  const confirmedStartDenial = ref<TrialIneligibleReason | "rejected">();
   const confirmedStartClaimNo = ref<string | null>(null);
   const lastReadFailed = ref(false);
   const transientReadFailure = ref(false);
@@ -639,10 +639,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const recovering = !!pendingStart.value;
       if (recovering && !canStart()) return { ok: false, reason: "confirming" };
       const requestedEpoch = accountBindingEpoch;
+      // Each submit reports its own refusal, also the same one twice.
+      confirmedStartDenial.value = undefined;
       if (!await refreshEligibilityRemote() || requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
       if (recovering && !pendingStart.value && !confirmedStartDenial.value) return { ok: true };
       const remoteEligibility = eligibility();
-      if (!remoteEligibility.ok) return { ok: false, reason: remoteEligibility.reason };
+      if (!remoteEligibility.ok) {
+        if (remoteEligibility.reason !== "unknown") confirmedStartDenial.value = remoteEligibility.reason;
+        return { ok: false, reason: remoteEligibility.reason };
+      }
       const trialConfig = useTrialConfig().config;
       const deviceName = resolveTrialDeviceName(trialConfig.trialProductId, trialConfig.trialProductName);
       if (!deviceName) {
@@ -651,7 +656,6 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
       const intent = startIntent ??= { key: commandKey("start"), deviceName };
       let expectedClaimNo = pendingStart.value?.claimNo ?? null;
-      confirmedStartDenial.value = undefined;
       if (recovering) {
         pendingStart.value = null;
         authorityResultUnknown.value = false;
@@ -676,7 +680,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         const trialRefusal = isApiRefusal(failure, 409, failure.message) && failure.message.startsWith("TRIAL_");
         if (trialRefusal || !isAmbiguousEnvelopeOutcome(error)) {
           if (!isApiRefusal(failure, 409, "TRIAL_SERVICE_UNAVAILABLE")) startIntent = null;
-          return { ok: false, reason: reason === "unknown" ? "rejected" : reason };
+          confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
+          return { ok: false, reason: confirmedStartDenial.value };
         }
       }
       // Both a receipt and a lost response require a fresh read after this POST.
@@ -965,7 +970,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       case "TRIAL_COOLDOWN_ACTIVE": return "used";
       case "TRIAL_QUOTA_EXHAUSTED": return "quota-exhausted";
       case "TRIAL_CYCLE_RISK_BLOCKED": return "risk";
-      case "TRIAL_PRODUCT_NOT_AVAILABLE": return "product-unavailable";
+      case "TRIAL_PRODUCT_NOT_AVAILABLE":
+      case "TRIAL_PRODUCT_NOT_RELEASED":
+      case "TRIAL_PRODUCT_CONFIG_INVALID":
+      case "TRIAL_DAILY_YIELD_INVALID": return "product-unavailable";
       case "TRIAL_CAPACITY_FULL": return "capacity-full";
       case "TRIAL_PHASE_CLOSED":
       case "TRIAL_KILL_SWITCH_DISABLED": return "phase-closed";
