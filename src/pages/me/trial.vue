@@ -727,7 +727,7 @@ watch(() => hasScopedOptions.value ? trialOptions.current.invalidatedProductNo :
     const reason = outcome.refusal.reasonCode;
     const optionReason = trialOptions.current.options.find(option => option.productNo === invalidated)?.reasonCode;
     if ((reason === optionReason || reason === "TRIAL_PRODUCT_NOT_AVAILABLE" || trialDeviceNeedsReselection(reason))
-        && trialResults.takeOutsideRefusal(trialRefusalResultKey(outcome.claimNo, outcome.submissionNo))) return;
+        && trialResults.takeAnnouncedRefusal(trialRefusalResultKey(outcome.claimNo, outcome.submissionNo))) return;
   }
   toast.warn(detail.value.deviceGone);
 }, { flush: "post" });
@@ -771,10 +771,12 @@ watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () 
     void openTrialResult(legacyResult.orderNo);
     return;
   }
-  if (legacyDenial?.claimNo === state.claimNo
-      && trialResults.consume(trialRefusalResultKey(legacyDenial.claimNo, legacyDenial.key))) {
-    const reason = trialPurchaseReasonMessage(t.value, legacyDenial.reason, useLocaleStore().code);
-    if (reason) toast.warn(reason);
+  if (legacyDenial?.claimNo === state.claimNo) {
+    const key = trialRefusalResultKey(legacyDenial.claimNo, legacyDenial.key);
+    if (!trialResults.wasDelivered(key)) {
+      toast.warn(trialPurchaseReasonMessage(t.value, legacyDenial.reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable);
+      trialResults.consume(key, true);
+    }
   }
   if (outcome.status === "settled" && outcome.claimNo === state.claimNo) {
     void openTrialResult(outcome.receipt.orderNo);
@@ -787,18 +789,19 @@ watch([pageVisible, displayState, () => freeTrial.confirmedLegacyConversion, () 
     handledRefusal = outcome.submissionNo;
     const reason = outcome.refusal.reasonCode;
     if (trialDeviceNeedsReselection(reason)) {
-      trialResults.consume(key);
       if (trialOptions.claimNo === state.claimNo) trialOptions.invalidateSelection(outcome.productNo);
+      toast.warn(detail.value.deviceGone);
+      trialResults.consume(key, true);
       void optionsRead.refresh().catch(() => {});
     } else if (reason === "TRIAL_NOT_CONVERTIBLE") {
-      trialResults.consume(key);
+      toast.warn(trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable);
+      trialResults.consume(key, true);
       void freeTrial.refreshRemote();
     } else if (reason === "TRIAL_WALLET_INSUFFICIENT" || trialPriceChanged(reason) || reason === "TRIAL_PRODUCT_NOT_AVAILABLE") {
       void navTo(checkoutHref(outcome.productNo, { kind: "refusal", submissionNo: outcome.submissionNo }));
     } else {
-      trialResults.consume(key);
-      const message = trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code);
-      if (message) toast.warn(message);
+      toast.warn(trialPurchaseReasonMessage(t.value, reason, useLocaleStore().code) ?? purchase.value.coPurchaseUnavailable);
+      trialResults.consume(key, true);
       void optionsRead.refresh().catch(() => {});
     }
   }

@@ -256,10 +256,9 @@ export function trialExternalPaymentActive(claimNo: string): boolean {
     && isUnfinishedPurchaseRecord(row));
 }
 
-function trialCreateCutoff(row: PendingExternal) {
-  // Older rows lack the quote expiry. The server's 15-minute maximum life gives a conservative bound.
-  const expiresAt = row.quoteExpiresAt ?? (row.startedAt === undefined ? Infinity : row.startedAt + 15 * 60_000);
-  return expiresAt + 60_000;
+function canReleaseUncreatedTrialPayment(row: PendingExternal, notFoundAt?: number) {
+  return typeof row.quoteExpiresAt === 'number' && Number.isFinite(row.quoteExpiresAt)
+    && notFoundAt !== undefined && notFoundAt >= row.quoteExpiresAt + 60_000;
 }
 
 function finishUncreatedTrialPayment(pending: PendingExternal, accountKey: string) {
@@ -302,8 +301,9 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
   if (!records.length) return passiveRead ?? Promise.resolve();
   return sharedPassiveRead(() => Promise.allSettled(records.map(async pending => {
     const expired = pending.lastStatus === 'EXPIRED';
-    const readAt = Date.now();
-    const result = pending.structuredTrialRefusals && !pending.intentNo ? await api.findTrial(pending.commandKey)
+    const trialLookup = pending.kind === 'TRIAL_CONVERT' && !pending.intentNo
+      ? await api.findTrial(pending.commandKey, !!pending.structuredTrialRefusals) : undefined;
+    const result = trialLookup ? trialLookup.result
       : pending.intentNo && (expired || pending.kind === 'TRIAL_CONVERT')
       ? await api.snapshot(pending.intentNo) : await readIntent(pending);
     if (!sameAccount() || !current() || state.open || !shouldRead(pending)) return;
@@ -313,7 +313,7 @@ export function refreshPendingPayments(accountKey: string, current: () => boolea
         return;
       }
       if (!result && !pending.intentNo) {
-        if (readAt >= trialCreateCutoff(pending)) finishUncreatedTrialPayment(pending, accountKey);
+        if (canReleaseUncreatedTrialPayment(pending, trialLookup?.notFoundAt)) finishUncreatedTrialPayment(pending, accountKey);
         return;
       }
       if (result && (!pending.intentNo || (result.refundStatus === 'REFUNDED' ? 'REFUNDED' : result.status) !== pending.lastStatus
@@ -892,9 +892,10 @@ async function query(refreshTrialIntent = false) {
     }
     if (!pending) return;
     const checkoutRead = checkoutIntentRead;
-    const readAt = Date.now();
-    const result = await (refreshTrialIntent && pending.kind === 'TRIAL_CONVERT' && pending.intentNo ? api.get(pending.intentNo)
-      : pending.structuredTrialRefusals && !pending.intentNo ? api.findTrial(pending.commandKey)
+    const trialLookup = pending.kind === 'TRIAL_CONVERT' && !pending.intentNo
+      ? await api.findTrial(pending.commandKey, !!pending.structuredTrialRefusals) : undefined;
+    const result = trialLookup ? trialLookup.result
+      : await (refreshTrialIntent && pending.kind === 'TRIAL_CONVERT' && pending.intentNo ? api.get(pending.intentNo)
       : checkoutRead?.accountKey === accountKey && checkoutRead.commandKey === pending.commandKey ? checkoutRead.result : readIntent(pending));
     if (!owns(version, accountKey) || state.concluded) return;
     if (result?.status === 'refused') { finishTrialRefusal(result, pending); return; }
@@ -913,7 +914,7 @@ async function query(refreshTrialIntent = false) {
       conclude(pending.quotaRefusal);
     }
     else if (pending.kind === 'TRIAL_CONVERT' && !pending.intentNo) {
-      if (readAt >= trialCreateCutoff(pending)) {
+      if (canReleaseUncreatedTrialPayment(pending, trialLookup?.notFoundAt)) {
         finishUncreatedTrialPayment(pending, accountKey);
         finish(null);
       } else {

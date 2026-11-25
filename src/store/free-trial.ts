@@ -79,6 +79,13 @@ type LegacyConversion = {
   quoteVersion: string | null;
 };
 type ConversionResult = { ok: boolean; reason?: TrialConversionFailure; orderNo?: string };
+type TrialReadStreak = { consecutiveReads: number; lastCountedAt?: number };
+
+function confirmedByThreeReads(streak: TrialReadStreak, serverNow: number): boolean {
+  if (streak.lastCountedAt !== undefined && serverNow - streak.lastCountedAt < 5_000) return false;
+  streak.lastCountedAt = serverNow;
+  return ++streak.consecutiveReads >= 3;
+}
 
 // These structured refusals happen before settlement in the conversion contract.
 // Other 4xx/idempotency errors retain the original intent until its result is known.
@@ -210,20 +217,19 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const originalPurchase = computed(() => displayState.value?.originalPurchase ?? null);
   const purchasedDevice = computed(() => displayState.value?.status === "converted"
     ? displayState.value.purchasedDevice ?? null : null);
-  const pendingStart = shallowRef<{
+  const pendingStart = shallowRef<({
     intent: { key: string; deviceName: string };
     previousClaimNo: string | null;
     claimNo: string | null;
     readAfter: number;
-    consecutiveIneligible: number;
     refusal?: TrialIneligibleReason;
-  } | null>(null);
+  } & TrialReadStreak) | null>(null);
   const startRetryable = ref(false);
   const confirmedStartDenial = ref<TrialIneligibleReason | "rejected">();
   const confirmedStartClaimNo = ref<string | null>(null);
-  const pendingCancel = shallowRef<{
-    claimNo: string; key: string; readAfter: number; acknowledged: boolean; authenticationRejected: boolean; consecutiveActive: number;
-  } | null>(null);
+  const pendingCancel = shallowRef<({
+    claimNo: string; key: string; readAfter: number; authenticationRejected: boolean;
+  } & TrialReadStreak) | null>(null);
   const confirmedCancelClaimNo = ref<string | null>(null);
   const legacyConversions = shallowRef<LegacyConversion[]>([]);
   const legacyClaimNo = ref<string | null>(null);
@@ -497,8 +503,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
           lastAppliedSequence = sequence;
           const start = pendingStart.value, cancel = pendingCancel.value;
-          if (start && sequence >= start.readAfter) start.consecutiveIneligible = 0;
-          if (cancel && sequence >= cancel.readAfter) cancel.consecutiveActive = 0;
+          if (start && sequence >= start.readAfter) start.consecutiveReads = 0;
+          if (cancel && sequence >= cancel.readAfter) cancel.consecutiveReads = 0;
           markAuthorityReadFailure(asApiError(error).message, isTransientReadFailure(error));
         }
         return false;
@@ -674,7 +680,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     if (!pending || sequence < pending.readAfter || (pending.claimNo && pending.claimNo !== next.claimNo)) return;
     if ((next.status === "active" || next.status === "grace") && next.claimNo) {
       if (!pending.claimNo && next.claimNo === pending.previousClaimNo) {
-        pending.consecutiveIneligible = 0;
+        pending.consecutiveReads = 0;
         startRetryable.value = false;
         return;
       }
@@ -684,10 +690,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       startRetryable.value = sameClaim && !pending.refusal && next.canStart;
       const reason = pending.refusal ?? next.eligibilityReason;
       if (!sameClaim || !reason || reason === "unknown" || startRetryable.value) {
-        pending.consecutiveIneligible = 0;
+        pending.consecutiveReads = 0;
         return;
       }
-      if (!pending.refusal && ++pending.consecutiveIneligible < 3) return;
+      if (!pending.refusal && !confirmedByThreeReads(pending, next.serverNow)) return;
       confirmedStartDenial.value = reason;
     }
     startIntent = null;
@@ -730,7 +736,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const intent = pendingStart.value?.intent ?? (startIntent ??= { key: commandKey("start"), deviceName });
       const previousClaimNo = authorityClaimNo.value;
       startRetryable.value = false;
-      pendingStart.value = { intent, previousClaimNo, claimNo: null, readAfter: Infinity, consecutiveIneligible: 0 };
+      pendingStart.value = { intent, previousClaimNo, claimNo: null, readAfter: Infinity, consecutiveReads: 0 };
       let claimNo: string | null = null;
       let refusal: TrialIneligibleReason | undefined;
       const authRevision = sessionVault.revision();
@@ -763,7 +769,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
       // Both a receipt and a lost response require a fresh read after this POST.
       pendingStart.value = {
-        intent, previousClaimNo, claimNo, refusal, readAfter: authorityRequestSequence + 1, consecutiveIneligible: 0,
+        intent, previousClaimNo, claimNo, refusal, readAfter: authorityRequestSequence + 1, consecutiveReads: 0,
       };
       await refreshRemote(true);
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
@@ -990,17 +996,14 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const pending = pendingCancel.value;
     if (!pending || sequence < pending.readAfter) return;
     if (next.claimNo !== pending.claimNo) {
-      pending.consecutiveActive = 0;
+      pending.consecutiveReads = 0;
       return;
     }
     if (next.serverState === "CANCELLED" && next.endReason === "cancelled") {
       confirmedCancelClaimNo.value = pending.claimNo;
-    } else if (next.endReason !== "expired") {
-      if (next.serverState !== "ACTIVE") {
-        pending.consecutiveActive = 0;
-        return;
-      }
-      if (pending.acknowledged || (!pending.authenticationRejected && ++pending.consecutiveActive < 3)) return;
+    } else if ((next.status === "active" || next.status === "grace") && !pending.authenticationRejected
+        && !confirmedByThreeReads(pending, next.serverNow)) {
+      return;
     }
     pendingCancel.value = null;
   }
@@ -1019,9 +1022,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const key = `h2-cancel:${claimNo}`;
       const sequence = ++authorityRequestSequence;
       pendingCancel.value = {
-        claimNo, key, readAfter: Infinity, acknowledged: false, authenticationRejected: false, consecutiveActive: 0,
+        claimNo, key, readAfter: Infinity, authenticationRejected: false, consecutiveReads: 0,
       };
-      let acknowledged = false;
       let authenticationRejected = false;
       const authRevision = sessionVault.revision();
       try {
@@ -1037,7 +1039,6 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           await refreshRemote(true);
           return requestedEpoch === accountBindingEpoch ? { ok: false, reason: "payment-in-progress" } : { ok: false, reason: "unknown" };
         }
-        acknowledged = receipt.state.claimNo === claimNo && receipt.state.serverState === "CANCELLED";
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         authenticationRejected = asApiError(error).kind === "auth";
@@ -1050,7 +1051,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         }
       }
       pendingCancel.value = {
-        claimNo, key, acknowledged, authenticationRejected, readAfter: authorityRequestSequence + 1, consecutiveActive: 0,
+        claimNo, key, authenticationRejected, readAfter: authorityRequestSequence + 1, consecutiveReads: 0,
       };
       await refreshRemote(true);
       if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };

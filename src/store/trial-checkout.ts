@@ -107,7 +107,8 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     const current = outcome.value, original = next.originalPurchase;
     if (current.status === "submitting" || current.status === "settled") return;
     if (original?.kind === "BALANCE" && useFreeTrial().pendingConversion(original.device.productNo)?.key === original.submissionNo) {
-      if (current.status === "processing" && current.submission.submissionNo === original.submissionNo) outcome.value = { status: "idle" };
+      // The legacy store reads this key. Publish its lock without giving checkout a second reader.
+      outcome.value = { status: "original", originalPurchase: original };
     } else if (original) {
       if (original.kind === "BALANCE" && current.status === "refused" && current.submissionNo === original.submissionNo) return;
       adoptOriginal(original);
@@ -167,12 +168,13 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
         && snapshot.submissionNo === current.submissionNo) return null;
     if ("submission" in current && current.submission.claimNo === claimNo)
       return { ...current.submission, status: current.status === "resumable" ? "RESUMABLE" : "PROCESSING" };
-    if (current.status === "original" && current.originalPurchase.claimNo === claimNo) return current.originalPurchase;
-    if (snapshot?.claimNo === claimNo) {
-      if (snapshot.kind === "BALANCE" && trial.legacyConversionResumable
-          && trial.pendingConversion(snapshot.device.productNo)?.key === snapshot.submissionNo)
-        return { ...snapshot, status: "RESUMABLE" };
-      return snapshot;
+    const original = current.status === "original" && current.originalPurchase.claimNo === claimNo
+      ? current.originalPurchase : snapshot;
+    if (original?.claimNo === claimNo) {
+      if (original.kind === "BALANCE" && trial.legacyConversionResumable
+          && trial.pendingConversion(original.device.productNo)?.key === original.submissionNo)
+        return { ...original, status: "RESUMABLE" };
+      return original;
     }
     try {
       const saved = readLocal(claimNo);

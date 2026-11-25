@@ -63,11 +63,12 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if(switched&&originalProduct)Object.assign(claimConfig,previewTrialProductConfig({...originalProduct,name:previewDefaultTrialName}));
     const duration=Number(claimConfig.trialDays)*day,grace=Number(claimConfig.graceDays)*day;
     const ended=['ended','eligible-again'].includes(scenario);
+    const redeemed=['converted','refunded'].includes(scenario);
     const activeAge=pricing==='cloud-share-half-cent'?2*day:day;
     const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day
       :ended?duration+grace+(scenario==='eligible-again'?cooldown:0)+day:activeAge);
     state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE'
-      :ended?'CANCELLED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt,version:0};
+      :ended?'CANCELLED':redeemed?'REDEEMED':'ELIGIBLE',startedAt,version:redeemed?1:0};
     if(ended){
       const finishedAt=startedAt+duration+grace;
       Object.assign(state.trialRow,{endReason:'expired',finishedAt,cooldownUntil:finishedAt+cooldown,version:1});
@@ -110,7 +111,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const reportedState=liveStates.includes(row.state)&&trialNow>=row.startedAt+duration?'GRACE':row.state;
     const claimed=row.state!=='ELIGIBLE',live=liveStates.includes(row.state);
     const conversion=row.state==='REDEEMED'?conversionFacts():null;
-    const {shadow,nex}=claimed?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
+    const naturallyEnded=row.state==='CANCELLED'&&row.endReason==='expired';
+    const {shadow,nex}=claimed&&!naturallyEnded?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
     const eligible=!claimed||(['FAILED','CANCELLED'].includes(row.state)&&row.cooldownUntil!=null&&row.cooldownUntil<=now);
     // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
     const canStart=eligible&&available&&!capacityFull;
@@ -120,7 +122,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       ? {...purchase,deadlineAt:new Date(atTrialClock(Date.parse(purchase.deadlineAt))).toISOString()} : purchase;
     return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?row.claimNo:null,version:row.version??0,serverNowEpochMs:trialNow,endReason:row.endReason??null,
-      claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
+      claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,
+      graceEndsAtEpochMs:claimed&&!naturallyEnded?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
       cooldownUntilEpochMs:row.cooldownUntil??null,
       shadowUsdt:number(shadow),shadowNex:number(nex),
@@ -311,7 +314,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const order={...conversionOrder(orderNo,now,quote,device),inventoryUsedAt:now,hardwareQuotaUsedAt};
     if(paid)Object.assign(order,{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt});
     state.createdOrders??=[];state.createdOrders.unshift(order);state.trialOrderNo=orderNo;
-    Object.assign(row,{state:'REDEEMED',finishedAt:now,settlementAt:atTrialClock(now),version:(row.version||1)+1});
+    Object.assign(row,{state:'REDEEMED',finishedAt:now,settlementAt:atTrialClock(now),version:(row.version??0)+1});
     delete state.trialBalancePurchase;
     delete state.trialBalanceCanResume;
     state.trialOriginalPurchaseState='none';
