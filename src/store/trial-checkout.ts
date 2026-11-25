@@ -250,8 +250,6 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     RefusedTrialCheckout | Extract<TrialCheckoutOutcome, { status: "settled" }> | undefined
   > {
     const current = currentAccount();
-    const known = outcome.value;
-    const knownRefusal = known.status === "refused" && known.claimNo === claimNo && known.submissionNo === submissionNo ? known : null;
     const reply = await readPaymentCommand(apiClient, "trial-convert", submissionNo);
     if (!current() || authority.value?.claimNo !== claimNo || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
     const result = terminalResult(reply);
@@ -262,8 +260,8 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       if (result.receipt.productNo === productNo) return { status: "settled", claimNo, receipt: result.receipt };
       return;
     }
-    if ((result.productNo ?? knownRefusal?.productNo) !== productNo) return;
-    return { status: "refused", claimNo, submissionNo, productNo, confirmedAmountUSD: knownRefusal?.confirmedAmountUSD ?? null, refusal: result };
+    if (result.productNo !== productNo) return;
+    return { status: "refused", claimNo, submissionNo, productNo, confirmedAmountUSD: null, refusal: result };
   }
 
   function readSubmission(): Promise<void> {

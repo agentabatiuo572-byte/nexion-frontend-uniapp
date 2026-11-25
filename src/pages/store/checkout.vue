@@ -1106,7 +1106,7 @@ const trialQuoteChange = shallowRef<{ previousAmountUSD: number; quote: TrialCon
 const trialServerShortfall = ref(false);
 const trialExternalWalletOnly = ref(false);
 const routedTrialRefusal = shallowRef<Extract<Awaited<ReturnType<typeof trialCheckout.readRoutedResult>>, { status: "refused" }> | null>(null);
-let showingTerminalTrialPayment = false;
+let routedTerminalPaymentRead = false;
 function clearTrialReviewQuote() {
   trialReviewClaimNo.value = null;
   trialReviewOption.value = null;
@@ -1121,7 +1121,7 @@ watch(() => app.accountBindingEpoch, () => {
   trialTopupWalletReady.value = false;
   handledTrialRefusalNo = undefined;
   routedTrialRefusal.value = null;
-  showingTerminalTrialPayment = false;
+  routedTerminalPaymentRead = false;
 }, { flush: "sync" });
 const trialDeviceNo = computed(() => resolveTrialCheckoutProductId(trialCfg.value.trialProductId));
 const hasLegacyTrialBalance = () => freeTrial.pendingConversion(productId.value) !== null;
@@ -1193,7 +1193,7 @@ function leaveTrialReview(message: string | null = trialDetailCopy.value.deviceG
 async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: TrialAuthorityState): Promise<boolean> {
   const claimNo = state.claimNo;
   if (!claimNo) return leaveTrialReview(null);
-  if (showingTerminalTrialPayment) return true;
+  if (routedTerminalPaymentRead) return true;
   const key = trialResumeNo ?? trialRefusalNo;
   const paymentNo = trialPaymentNo;
   const handleCurrentOriginal = async () => {
@@ -1222,8 +1222,9 @@ async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: Tria
       return true;
     }
     if (intent.trialPurchaseOutcome || intent.refundStatus === "REFUNDED") {
-      showingTerminalTrialPayment = await showTerminalTrialPurchasePayment(intent, claimNo, scope.productNo,
+      routedTerminalPaymentRead = await showTerminalTrialPurchasePayment(intent, claimNo, scope.productNo,
         product.value?.name ?? scope.productNo);
+      if (!routedTerminalPaymentRead) throw new Error("TRIAL_ORIGINAL_PAYMENT_NOT_READY");
       return true;
     }
     if (trialCheckout.originalPurchase?.kind === "EXTERNAL" && trialCheckout.originalPurchase.paymentNo === paymentNo) return true;
@@ -1231,7 +1232,9 @@ async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: Tria
     throw new Error("TRIAL_ORIGINAL_PAYMENT_NOT_READY");
   }
   if (!key) return false;
-  const result = await trialCheckout.readRoutedResult(claimNo, scope.productNo, key);
+  const known = trialCheckout.outcome;
+  const result = known.status === "refused" && known.claimNo === claimNo && known.submissionNo === key && known.productNo === scope.productNo
+    ? known : await trialCheckout.readRoutedResult(claimNo, scope.productNo, key);
   if (!current() || await handleCurrentOriginal() || !current()) return true;
   if (!result) return leaveTrialReview(null);
   if (result.status === "settled") {
@@ -3779,12 +3782,6 @@ function isTopCheckoutPage(): boolean {
   return !!checkoutPage && (top === checkoutPage || top?.$vm === checkoutPage);
 }
 const purchasePayment = usePurchasePayment();
-watch(() => purchasePayment.state.open, (open, wasOpen) => {
-  if (!open && wasOpen && showingTerminalTrialPayment) {
-    showingTerminalTrialPayment = false;
-    if (isTopCheckoutPage()) leaveTrialReview(null);
-  }
-});
 let releaseTrialPresenter = () => {};
 function registerCheckoutTrialPresenter() {
   releaseTrialPresenter();

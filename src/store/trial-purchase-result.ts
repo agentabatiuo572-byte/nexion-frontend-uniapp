@@ -18,18 +18,21 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
   const pending = shallowRef<TrialPurchaseResult[]>([]);
   const delivered = new Set<string>();
   const openingOrders = new Set<string>();
+  const failedOrderNavigations = new Map<string, boolean>();
   const announcedRefusals = new Set<string>();
   const presenters = new Set<(claimNo: string) => boolean>();
   const visibilityRevision = ref(0);
   const outsidePage = computed(() => {
     void visibilityRevision.value;
     return pending.value.filter(result => !openingOrders.has(resultKey(result))
+      && failedOrderNavigations.get(resultKey(result)) !== true
       && ![...presenters].some(presents => presents(result.claimNo)));
   });
   watch(() => app.accountBindingEpoch, () => {
     pending.value = [];
     delivered.clear();
     openingOrders.clear();
+    failedOrderNavigations.clear();
     announcedRefusals.clear();
   }, { flush: "sync" });
 
@@ -47,6 +50,15 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     return true;
   }
 
+  function announceOrder(orderNo: string) {
+    const key = trialOrderResultKey(orderNo);
+    if (failedOrderNavigations.has(key)) {
+      // The notification can still be delivered off page. Keep the result available for another navigation attempt.
+      failedOrderNavigations.set(key, true);
+      visibilityRevision.value++;
+    } else consume(key);
+  }
+
   async function deliverOrder(orderNo: string, navigate: () => Promise<boolean>, replay = false) {
     const key = trialOrderResultKey(orderNo);
     if (openingOrders.has(key) || (!replay && delivered.has(key))) return false;
@@ -54,7 +66,13 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     openingOrders.add(key);
     visibilityRevision.value++;
     try {
-      if (!await navigate() || app.accountBindingEpoch !== epoch) return false;
+      const opened = await navigate();
+      if (app.accountBindingEpoch !== epoch) return false;
+      if (!opened) {
+        if (!failedOrderNavigations.has(key)) failedOrderNavigations.set(key, false);
+        return false;
+      }
+      failedOrderNavigations.delete(key);
       consume(key);
       return true;
     } finally {
@@ -79,5 +97,5 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     };
   }
 
-  return { outsidePage, publish, consume, deliverOrder, takeAnnouncedRefusal, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
+  return { outsidePage, publish, consume, announceOrder, deliverOrder, takeAnnouncedRefusal, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
 });

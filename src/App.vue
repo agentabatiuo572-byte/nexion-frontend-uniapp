@@ -549,6 +549,7 @@ if (remoteApiEnabled) {
       if (trialResults.wasDelivered(key)) continue;
       if (result.status === "settled") {
         toast.success(trialPurchaseCopy.value.resultTitle);
+        trialResults.announceOrder(result.orderNo);
         void useOrders().reconcileRemoteOrder(result.orderNo, () => app.accountBindingEpoch === epoch).catch(() => {});
       } else {
         const t = useT().value;
@@ -556,8 +557,8 @@ if (remoteApiEnabled) {
           : trialDeviceNeedsReselection(result.reason) ? trialDetailCopy.value.deviceGone
           : trialPurchaseReasonMessage(t, result.reason, useLocaleStore().code) ?? trialPurchaseCopy.value.coPurchaseUnavailable;
         toast.warn(reason);
+        trialResults.consume(key, true);
       }
-      trialResults.consume(key, result.status === "refused");
     }
   }, { flush: "post" });
   const repeatWithoutPull = () => !hasVisiblePullRefresh();
