@@ -312,11 +312,12 @@ const trialCancelLocked = computed(() => {
   const original = trial.originalPurchase;
   const current = trialCheckout.outcome;
   return original?.kind === "EXTERNAL" || original?.status === "PROCESSING"
-    || ((current.status === "processing" || current.status === "submitting") && current.submission.claimNo === state.claimNo)
+    || ((current.status === "processing" || current.status === "submitting" || current.status === "resumable" && current.accepted)
+      && current.submission.claimNo === state.claimNo)
     || (state.claimNo === trialCancelConflict.value?.claimNo && state.version === trialCancelConflict.value.version);
 });
 watch(() => trial.displayState, state => {
-  if (state && (state.originalPurchase || state.claimNo !== trialCancelConflict.value?.claimNo
+  if (state && (state.originalPurchase !== undefined || state.claimNo !== trialCancelConflict.value?.claimNo
       || state.version !== trialCancelConflict.value.version)) trialCancelConflict.value = null;
 });
 const quoteInfoDeviceId = ref<string | null>(null);

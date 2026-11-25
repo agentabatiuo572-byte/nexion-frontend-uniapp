@@ -72,11 +72,18 @@ export async function checkTrialTopup(target: TrialTopupReturn): Promise<
   const list = await trialApi.purchaseOptions();
   if (list.status === "ready" && list.claimNo !== state.claimNo) throw new Error("TRIAL_TOPUP_CLAIM_MISMATCH");
   const option = list.status === "ready" ? list.options.find(row => row.productNo === target.productNo) : undefined;
-  if (option?.reasonCode === "TRIAL_OPTION_QUOTE_UNAVAILABLE" || option?.reasonCode === "TRIAL_OPTION_DATA_UNAVAILABLE")
+  if (option?.reasonCode === "TRIAL_PRODUCT_QUOTE_UNAVAILABLE")
     throw new Error("TRIAL_TOPUP_QUOTE_UNAVAILABLE");
   const quote = list.status === "unsupported" && state.config.trialProductId === target.productNo ? state.quote
     : option?.canBuy ? option.quote : null;
   if (quote) return { status: "ready", amountUSD: quote.amountUSD };
+  if (list.status === "not-convertible") {
+    const next = await trialApi.state();
+    if (next.claimNo === target.claimNo && next.originalPurchase) return { status: "redirect", href: originalTrialCheckoutHref(next.originalPurchase) };
+    if (next.claimNo === target.claimNo && next.status === "converted" && next.conversion?.orderNo)
+      return { status: "redirect", href: `/pages/store/order-detail?id=${encodeURIComponent(next.conversion.orderNo)}&result=trial` };
+    return { status: "redirect", href: "/pages/me/trial" };
+  }
   if (list.status === "unsupported" && state.config.trialProductId === target.productNo)
     throw new Error("TRIAL_TOPUP_QUOTE_UNAVAILABLE");
   return { status: "redirect", href: `/pages/me/trial?product=${encodeURIComponent(target.productNo)}` };

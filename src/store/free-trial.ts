@@ -897,7 +897,16 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         const sequence = ++authorityRequestSequence;
         const receipt = await trialApi.cancel("explicit", key);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
-        applyAuthority(receipt, sequence, requestedEpoch);
+        if (receipt.status === "payment-in-progress") {
+          const state = displayState.value;
+          if (state?.claimNo === expectedClaimNo && receipt.originalPurchase?.claimNo === expectedClaimNo
+              && lastAppliedSequence <= sequence) {
+            displayState.value = { ...state, originalPurchase: receipt.originalPurchase };
+          }
+          await refreshRemote(true);
+          return requestedEpoch === accountBindingEpoch ? { ok: false, reason: "payment-in-progress" } : { ok: false, reason: "unknown" };
+        }
+        applyAuthority(receipt.state, sequence, requestedEpoch);
         const confirmed = await refreshRemote(true);
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         if (!confirmed || authorityClaimNo.value !== expectedClaimNo || status.value !== "ended") {
@@ -908,14 +917,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         const failure = asApiError(error);
-        const paymentInProgress = isApiRefusal(error, 409, "TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS");
         authorityError.value = failure.message;
         const reconciled = await refreshRemote();
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "unknown" };
         if (reconciled && authorityClaimNo.value === expectedClaimNo && status.value === "ended") {
           return { ok: true };
         }
-        if (paymentInProgress) return { ok: false, reason: "payment-in-progress" };
         return { ok: false, reason: commandFailureReason(error) };
       }
     }

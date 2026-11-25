@@ -269,6 +269,10 @@ const server=http.createServer(async(req,res)=>{
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
         if(scenarioChange){
           delete state.trialBalancePurchase;
+          delete state.trialBalanceCanResume;
+          delete state.trialAccrualReductionUsdt;
+          delete state.trialNextWalletRefusal;
+          delete state.trialDropNextExternalRefusal;
           state.trialOriginalPurchaseState='none';
         }
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
@@ -323,6 +327,7 @@ const server=http.createServer(async(req,res)=>{
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
+        if(['price-change','amount-mismatch'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
@@ -409,6 +414,8 @@ const server=http.createServer(async(req,res)=>{
       if(page&&page!==scenarioId())return refuseStale();
       if(req.method==='GET'&&url.pathname==='/api/deposits/policy'&&state.orderTopupState==='policy-loading')
         await new Promise(resolve=>setTimeout(resolve,2500));
+      if(req.method==='GET'&&url.pathname==='/api/trial/purchase-options'&&state.trialPurchaseReadState==='loading')
+        await new Promise(resolve=>setTimeout(resolve,2800));
       const orderTopup=req.method==='GET'?demoOrderTopupResponse(url,state,locale,Date.now(),req.headers,checkoutFlow):undefined;
       if(orderTopup)return sendJson(res,orderTopup.body,orderTopup.status);
       if(req.method==='GET'){
@@ -430,7 +437,9 @@ const server=http.createServer(async(req,res)=>{
         const response=await checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         if(response.drop){res.destroy();return;}
         const data=response.status===200?demoPromotionResponse(url,req.method,response.data,state):response.data;
-        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data},response.status);
+        const trialSuccess=response.status===200&&(url.pathname==='/api/trial/convert'
+          || data?.kind==='TRIAL_CONVERT'||data?.kind==='trial-convert');
+        return sendJson(res,{code:response.status===200?0:response.status,message:trialSuccess?'success':response.message,data},response.status);
       }
       if(req.method==='POST'&&authDemo.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
@@ -508,6 +517,8 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,result.body,result.status);
       }
       if(bankTopupEndpoint)return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
+      if(/^\/api\/trial\/(state|eligibility|purchase-options|start|cancel|convert)$/.test(url.pathname))
+        return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {
         if(route.matcher!=='**/*'&&!route.matcher(url))continue;

@@ -51,12 +51,14 @@ import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useT } from "@/i18n/use-t";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { formatEstimateRange } from "@/lib/estimate-display";
+import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialOptionReadFailed } from "@/store/trial-purchase-options";
 
 const props = withDefaults(defineProps<{
   /** Rows in display order (the store already puts the user's trial device first, the rest by price). */
   options: TrialPurchaseOption[];
   selectedProductNo: string | null;
-  status: "idle" | "unsupported" | "loading" | "ready" | "failed";
+  status: "idle" | "unsupported" | "not-convertible" | "loading" | "ready" | "failed";
   /** A payment for this trial is in progress: every row at 50%, nothing checked, the reason under the title. */
   locked?: boolean;
   /** Daily estimate per productNo from the catalog; rows without one show no estimate line. */
@@ -68,14 +70,6 @@ const emit = defineEmits<{ (event: "select", productNo: string): void; (event: "
 const copy = useTrialDetailCopy();
 const t = useT();
 
-const QUOTE_FAILED = new Set(["TRIAL_OPTION_QUOTE_UNAVAILABLE"]);
-function reasonText(code: string | undefined): string {
-  if (code && QUOTE_FAILED.has(code)) return copy.value.quoteFailed;
-  if (code === "TRIAL_PRODUCT_SOLD_OUT") return t.value.store.temporarilyOutOfStock;
-  if (code === "TRIAL_PRODUCT_QUOTA_EXHAUSTED") return t.value.store.purchaseMonthlyQuotaDepleted;
-  if (code === "TRIAL_PRODUCT_REQUIREMENTS_NOT_MET") return t.value.store.purchaseEligibilityIneligible;
-  return copy.value.optionUnavailable;
-}
 function amountParts(value: number) {
   const text = formatGroupedAmount(value, 2);
   const at = text.indexOf(".");
@@ -85,16 +79,17 @@ function amountParts(value: number) {
 const showSkeleton = computed(() => props.options.length === 0 && (props.status === "loading" || props.status === "failed" || props.status === "idle"));
 const rows = computed(() => props.options.map(option => {
   const selectable = option.canBuy && !props.locked;
-  const quoteFailed = !option.canBuy && !!option.reasonCode && QUOTE_FAILED.has(option.reasonCode);
-  const reason = option.canBuy ? "" : reasonText(option.reasonCode);
+  const quoteFailed = trialOptionReadFailed(option);
+  const reason = option.canBuy ? "" : quoteFailed ? copy.value.quoteFailed
+    : trialPurchaseReasonMessage(t.value, option.reasonCode) ?? copy.value.optionUnavailable;
   const range = props.estimates?.[option.productNo];
   // A symbol label (≈) reads without the separating dot (board note 14).
   const estimate = range ? { label: /^\p{L}/u.test(copy.value.estShort) ? `${copy.value.estShort} · ` : `${copy.value.estShort} `,
     value: `$${formatEstimateRange(range.low, range.high)}${t.value.store.cardPerDaySuffix}` } : null;
   const due = option.canBuy && option.quote ? amountParts(option.quote.amountUSD) : null;
-  const was = `$${formatGroupedAmount(option.priceUSD, 2)}`;
+  const was = option.priceUSD === null ? "" : `$${formatGroupedAmount(option.priceUSD, 2)}`;
   const claimPrice = option.isTrialProduct && option.marketPriceUSD !== undefined && option.marketPriceUSD !== option.priceUSD;
-  const link = option.reasonCode === "TRIAL_PRODUCT_REQUIREMENTS_NOT_MET" && (props.conditionLinks?.includes(option.productNo) ?? true);
+  const link = option.reasonCode === "PURCHASE_GATE_NOT_MET" && (props.conditionLinks?.includes(option.productNo) ?? true);
   const checked = !props.locked && option.canBuy && option.productNo === props.selectedProductNo;
   const aria = [option.productName, option.isTrialProduct ? copy.value.thisTrialTag : "", reason || (estimate ? estimate.label + estimate.value : ""),
     due ? `$${due.whole}${due.decimals}` : "", due ? (claimPrice ? `${copy.value.claimPrice} ${was}` : was) : ""].filter(Boolean).join(", ");

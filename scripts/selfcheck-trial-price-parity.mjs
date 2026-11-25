@@ -12,8 +12,12 @@ const purchaseOptions = () => {
   assert.equal(read.claimNo, claim.claimNo, "list and authority must share the claim");
   const trial = read.options.find(option => option.productNo === trialSku);
   const rack = read.options.find(option => option.productNo === "stellarrack-p1");
-  assert.ok(trial?.isTrialProduct && trial.canBuy && trial.quote, "missing buyable trial device");
-  assert.ok(rack && !rack.isTrialProduct && rack.canBuy && rack.quote, "missing buyable Rack P1");
+  assert.ok(trial?.originalTrialProduct && trial.canPurchase && trial.quote, "missing buyable trial device");
+  assert.ok(rack && !rack.originalTrialProduct && rack.canPurchase && rack.quote, "missing buyable Rack P1");
+  assert.equal(trial.quoteVersion, trial.quote.quoteVersion);
+  assert.equal(rack.quoteVersion, rack.quote.quoteVersion);
+  assert.deepEqual(trial.paymentMethods, ["WALLET", "CREGIS_USDT_BSC", "HDPAY_BANK"]);
+  assert.deepEqual(rack.paymentMethods, ["WALLET"]);
   return { trial, rack };
 };
 const claim = trialState();
@@ -25,7 +29,7 @@ assert.equal(before.trial.quote.quoteVersion, claim.quote.quoteVersion);
 
 state.trialPurchasePriceState = "trial-up";
 const raisedTrial = purchaseOptions().trial;
-assert.notEqual(raisedTrial.marketPriceUsdt, before.trial.marketPriceUsdt, "fixture must change the trial device's catalog price");
+assert.notEqual(raisedTrial.storePriceUsdt, before.trial.storePriceUsdt, "fixture must change the trial device's catalog price");
 assert.equal(raisedTrial.priceUsdt, before.trial.priceUsdt, "trial device must keep its locked price");
 assert.equal(Number(raisedTrial.quote.priceUsdt), Number(trialState().quote.priceUsdt));
 assert.equal(raisedTrial.quote.quoteVersion, before.trial.quote.quoteVersion, "catalog change must not reprice the claim");
@@ -46,7 +50,7 @@ function submit(productNo, quote, key) {
     headers: () => ({ "idempotency-key": key }),
     walletAuthorized: true,
     postDataJSON: () => ({ productNo, quoteVersion: quote.quoteVersion, expectedAmountUsdt: Number(amountCents) / 100,
-      paymentMethod: "UVEL_USDT_WALLET" }),
+      paymentMethod: "WALLET" }),
   });
 }
 assert.throws(() => submit(rack.productNo, trial.quote, "parity-mismatch"),
@@ -62,8 +66,10 @@ assert.equal(order?.lineItems[0]?.unitPriceUsdt, Number(rack.quote.priceUsdt));
 
 const detail = readFileSync(new URL("../src/pages/me/trial.vue", import.meta.url), "utf8");
 const checkout = readFileSync(new URL("../src/pages/store/checkout.vue", import.meta.url), "utf8");
-assert.match(detail, /if \(!usePurchaseOptions\.value\) return displayState\.value\?\.quote[^\n]*\n[^\n]*selectedOption\.value\?\.quote/,
-  "trial detail must use the selected SKU quote and only fall back on the legacy path");
+assert.match(detail, /if \(!usePurchaseOptions\.value\) return displayState\.value\?\.quote/,
+  "trial detail must preserve the 404 path's claim quote");
+assert.match(detail, /if \(purchaseOptionLoading\.value \|\| purchaseOptionsFailed\.value\) \{[^}]*!requested \|\| requested === trialProductId\.value \? displayState\.value\?\.quote[^}]*\}\s*return selectedOption\.value\?\.quote/,
+  "trial detail must keep the routed SKU quote or fall back to its own claim only while the list is unavailable");
 assert.match(checkout, /trialOptions\.current\.options\.find\(row => row\.productNo === scope\.productNo\)/,
   "checkout must read the routed SKU from the current claim's options");
 assert.match(checkout, /trialCheckout\.submit\(\{[\s\S]*?device:\s*\{\s*productNo[\s\S]*?quoteVersion:\s*shown\.quoteVersion/,

@@ -294,13 +294,14 @@ import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { useTrialCheckout } from "@/store/trial-checkout";
-import { useTrialPurchaseOptions } from "@/store/trial-purchase-options";
+import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 import { useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
-import { parseTrialConvertReceipt, type TrialOriginalPurchase } from "@/api/trial-api";
+import { parseTrialConvertReceipt, trialPriceChanged, type TrialOriginalPurchase } from "@/api/trial-api";
 import { resumeTrialPurchasePayment, TRIAL_PAYMENT_CARD_KEY, usePurchasePayment } from "@/store/purchase-payment";
 import TrialDevicePicker from "@/components/trial/trial-device-picker.vue";
 import TrialOriginalPurchaseCard from "@/components/trial/trial-original-purchase-card.vue";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
+import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 
 const t = useT();
 const app = useApp();
@@ -413,15 +414,12 @@ const purchaseOptionLoading = computed(() => usePurchaseOptions.value && !purcha
 const purchaseOptionsFailed = computed(() => usePurchaseOptions.value && purchaseOptionsView.value.status === "failed");
 const noBuyableDevices = computed(() => usePurchaseOptions.value && purchaseOptionsView.value.status === "ready"
   && !purchaseOptionsView.value.options.some(option => option.canBuy));
-function trialRefusalMessage(reason?: string) {
-  if (reason === "TRIAL_PRODUCT_SOLD_OUT") return t.value.store.temporarilyOutOfStock;
-  if (reason === "TRIAL_PRODUCT_QUOTA_EXHAUSTED") return t.value.store.purchaseMonthlyQuotaDepleted;
-  if (reason === "TRIAL_PRODUCT_REQUIREMENTS_NOT_MET") return t.value.store.purchaseEligibilityIneligible;
-  if (reason === "TRIAL_OPTION_QUOTE_UNAVAILABLE" || reason === "TRIAL_OPTION_DATA_UNAVAILABLE") return detail.value.quoteFailed;
-  return purchase.value.coPurchaseUnavailable;
-}
-const showDevicePicker = computed(() => usePurchaseOptions.value && (waitingForReselection.value
-  || purchaseOptionsView.value.options.length !== 1));
+const showDevicePicker = computed(() => {
+  if (!usePurchaseOptions.value) return false;
+  const { options, status } = purchaseOptionsView.value;
+  return options.length ? waitingForReselection.value || options.some(option => !option.isTrialProduct)
+    : (purchaseOptionLoading.value || status === "failed") && hasScopedOptions.value && trialOptions.remembered.hasOtherDevices;
+});
 const purchaseEstimates = computed(() => {
   const estimates: Record<string, { low: number; high: number }> = {};
   if (productCatalogState.status !== "ready") return estimates;
@@ -445,7 +443,12 @@ function selectDevice(productNo: string) {
 const ticketQuote = computed(() => {
   if (originalPurchase.value || !isActiveCycle.value) return null;
   if (!usePurchaseOptions.value) return displayState.value?.quote ?? null;
-  return !purchaseOptionsFailed.value ? selectedOption.value?.quote ?? null : null;
+  if (waitingForReselection.value) return null;
+  if (purchaseOptionLoading.value || purchaseOptionsFailed.value) {
+    const requested = entryProductNo.value ?? (hasScopedOptions.value ? trialOptions.remembered.productNo : null);
+    return !requested || requested === trialProductId.value ? displayState.value?.quote ?? null : null;
+  }
+  return selectedOption.value?.quote ?? null;
 });
 const earlyQuoteLapsed = computed(() => {
   const quote = ticketQuote.value;
@@ -567,14 +570,16 @@ const trialBuyBusy = computed(() => openingPurchase.value || (originalPurchase.v
   : usePurchaseOptions.value ? purchaseOptionLoading.value : trialCatalogLoading.value));
 const listLoading = computed(() => purchaseOptionLoading.value && !originalPurchase.value);
 const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalPurchase.value ? false
-  : usePurchaseOptions.value ? !purchaseQuote.value : trialProductUnavailable.value && !trialCatalogLoading.value));
+  : usePurchaseOptions.value ? purchaseOptionsView.value.status !== "ready" || !selectedOption.value || !purchaseQuote.value
+    : trialProductUnavailable.value && !trialCatalogLoading.value));
 const trialBuyCtaText = computed(() => {
   const original = originalPurchase.value;
   if (original) return original.status === "AWAITING_PAYMENT" || original.status === "RESUMABLE"
     ? t.value.orders.pendingContinue : detail.value.viewProgress;
   if (usePurchaseOptions.value) {
     if (waitingForReselection.value) return detail.value.chooseDevice;
-    return purchaseQuote.value ? fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
+    return purchaseOptionsView.value.status === "ready" && purchaseQuote.value
+      ? fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
   }
   if (productCatalogState.status === "error") return t.value.store.catalogErrorTitle;
   if (trialCatalogLoading.value) return w.value.buyCtaPlain;
@@ -613,10 +618,16 @@ const barNote = computed(() => {
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
-  if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? purchase.value.coNotSent : "";
+  if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? detail.value.origNotSent : "";
   if (usePurchaseOptions.value) {
+    const only = purchaseOptionsView.value.options[0];
+    if (noBuyableDevices.value && purchaseOptionsView.value.options.length === 1 && only?.isTrialProduct) {
+      return trialOptionReadFailed(only) ? detail.value.quoteFailed
+        : trialPurchaseReasonMessage(t.value, only.reasonCode) ?? detail.value.optionUnavailable;
+    }
     if (waitingForReselection.value) return "";
     if (purchaseOptionsFailed.value) return detail.value.listFailed;
+    if (purchaseOptionsView.value.status === "not-convertible") return detail.value.optionUnavailable;
     if (noBuyableDevices.value) return isGrace.value ? detail.value.noneBuyableGrace : detail.value.noneBuyable;
     return "";
   }
@@ -672,7 +683,7 @@ async function goCheckout() {
   openingPurchase.value = true;
   try {
     if (original?.kind === "EXTERNAL") {
-      await resumeTrialPurchasePayment(original.paymentNo, original.device.productNo, original.device.productName, visit.current, {
+      await resumeTrialPurchasePayment(original.paymentNo, original.claimNo, original.device.productNo, original.device.productName, visit.current, {
         onDelivered: completion => {
           if (visit.current()) checkout.settleExternal(original.claimNo, parseTrialConvertReceipt(completion.receipt));
         },
@@ -760,15 +771,16 @@ watch([pageVisible, displayState, () => checkout.outcome], ([visible, state, out
   } else if (outcome.status === "refused" && outcome.claimNo === state.claimNo && handledRefusal !== outcome.submissionNo) {
     handledRefusal = outcome.submissionNo;
     const reason = outcome.refusal.reasonCode;
-    if (reason === "TRIAL_PRODUCT_REMOVED") {
+    if (reason === "TRIAL_PRODUCT_NOT_ELIGIBLE") {
       if (trialOptions.claimNo === state.claimNo) trialOptions.invalidateSelection(outcome.productNo);
       void optionsRead.refresh().catch(() => {});
     } else if (reason === "TRIAL_NOT_CONVERTIBLE") {
       void freeTrial.refreshRemote();
-    } else if (reason === "TRIAL_WALLET_INSUFFICIENT" || reason === "TRIAL_QUOTE_CHANGED") {
+    } else if (reason === "TRIAL_WALLET_INSUFFICIENT" || trialPriceChanged(reason) || reason === "TRIAL_PRODUCT_NOT_AVAILABLE") {
       void navTo(checkoutHref(outcome.productNo, { kind: "refusal", submissionNo: outcome.submissionNo }));
     } else {
-      toast.warn(trialRefusalMessage(reason));
+      toast.warn(reason === "ORDER_MONTHLY_QUOTA_UNAVAILABLE" ? purchase.value.coPurchaseUnavailable
+        : trialPurchaseReasonMessage(t.value, reason) ?? purchase.value.coPurchaseUnavailable);
       void optionsRead.refresh().catch(() => {});
     }
   }

@@ -278,7 +278,7 @@ import { h5DevicePreviewStatusBarHeight } from '@/lib/device-preview';
 import { useTrialPurchaseCopy } from '@/i18n/trial-purchase';
 import { toast } from '@/store/ui';
 import { navTo } from '@/lib/route';
-import { TRIAL_LATE_RESELECT, type ExternalPaymentMethod } from '@/api/purchase-payment-api';
+import type { ExternalPaymentMethod } from '@/api/purchase-payment-api';
 import { useFreeTrial } from '@/store/free-trial';
 import { originalTrialCheckoutHref } from '@/lib/trial-topup-return';
 import qrcode from 'qrcode-generator';
@@ -465,38 +465,38 @@ type Notice = { title: string; body: string; primary: string; secondary?: string
 const dismiss = () => payment.notify('');
 const trialCopy = useTrialPurchaseCopy();
 const trial = useFreeTrial();
-const markedLateIntent = computed(() => active.value && s.open && s.intent?.trialLateDisposition === TRIAL_LATE_RESELECT
+const trialTerminalIntent = computed(() => active.value && s.open && s.intent?.kind === 'TRIAL_CONVERT' && s.intent.trialPurchaseOutcome
   ? s.intent.intentNo : null);
-const lateAuthority = ref<string | null>(null);
-async function readLateAuthority(intentNo: string) {
+const terminalAuthority = ref<string | null>(null);
+async function readTerminalAuthority(intentNo: string) {
   const binding = app.accountBindingEpoch;
   const ready = await trial.refreshRemote();
-  if (app.accountBindingEpoch === binding && markedLateIntent.value === intentNo)
-    lateAuthority.value = ready ? intentNo : null;
+  if (app.accountBindingEpoch === binding && trialTerminalIntent.value === intentNo)
+    terminalAuthority.value = ready ? intentNo : null;
 }
-watch(markedLateIntent, id => {
-  lateAuthority.value = null;
-  if (id) void readLateAuthority(id);
+watch(trialTerminalIntent, id => {
+  terminalAuthority.value = null;
+  if (id) void readTerminalAuthority(id);
 });
-const lateTrialExit = computed(() => {
-  if (!markedLateIntent.value || markedLateIntent.value !== lateAuthority.value || trial.authorityStatus !== 'ready') return null;
-  const state = trial.displayState, claimNo = s.intent?.trialClaimNo ?? s.pending?.trialClaimNo;
+const terminalTrialExit = computed(() => {
+  if (!trialTerminalIntent.value || trialTerminalIntent.value !== terminalAuthority.value || trial.authorityStatus !== 'ready') return null;
+  const state = trial.displayState, claimNo = s.intent?.claimNo;
   if (!state || !claimNo || state.claimNo !== claimNo) return null;
   if (state.originalPurchase) {
     const original = state.originalPurchase;
-    if (original.kind === 'EXTERNAL' && original.paymentNo === markedLateIntent.value) return null;
+    if (original.kind === 'EXTERNAL' && original.paymentNo === trialTerminalIntent.value) return null;
     return { label: original.status === 'AWAITING_PAYMENT' ? copy.value.continuePay : copy.value.viewProgress,
       href: originalTrialCheckoutHref(original) };
   }
   return state.status === 'active' || state.status === 'grace'
     ? { label: trialCopy.value.coChangeDevice, href: '/pages/me/trial' } : null;
 });
-async function openLateTrialExit() {
-  const id = markedLateIntent.value;
+async function openTerminalTrialExit() {
+  const id = trialTerminalIntent.value;
   if (!id) return;
-  await readLateAuthority(id);
-  const exit = lateTrialExit.value;
-  if (markedLateIntent.value === id && exit) {
+  await readTerminalAuthority(id);
+  const exit = terminalTrialExit.value;
+  if (trialTerminalIntent.value === id && exit) {
     payment.close();
     void navTo(exit.href);
   }
@@ -508,6 +508,9 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     ? { primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
     : { primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }) };
   const toOrder = { secondary: order ? c.viewOrder : c.close, onSecondary: order ? payment.openOrder : payment.close };
+  const trialExit = { primary: terminalTrialExit.value?.label ?? c.close,
+    onPrimary: terminalTrialExit.value ? openTerminalTrialExit : payment.close,
+    onSecondary: payment.close, ...(terminalTrialExit.value ? { secondary: c.close } : {}) };
   switch (kind) {
     // The order exists but no payment started yet: it stays for later and the close still ends on the store home.
     case 'keepOrder': return { icon: 'info', tone: 'warning', title: c.keepOrderTitle, body: c.keepOrderBody, primary: c.continuePay, secondary: c.leave, onPrimary: dismiss, onSecondary: leaveToStore };
@@ -519,15 +522,16 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
       ? s.coldResume
         ? { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.viewOrder, secondary: c.close, onPrimary: payment.openOrder, onSecondary: payment.close }
         : { icon: 'clock', tone: 'neutral', title: c.timeoutTitle, body: c.timeout, primary: c.reorder, secondary: c.viewOrder, onPrimary: payment.reorder, onSecondary: payment.openOrder }
-      : { icon: 'clock', tone: 'neutral', title: c.timeoutOtherTitle, body: c.timeoutOther, primary: c.ok, onPrimary: payment.close, onSecondary: payment.close };
-    case 'bankFailed': return s.coldResume
+      : { icon: 'clock', tone: 'neutral', title: c.timeoutOtherTitle, body: c.timeoutOther,
+        ...(trialTerminalIntent.value ? trialExit : { primary: c.ok, onPrimary: payment.close, onSecondary: payment.close }) };
+    case 'bankFailed': return trialTerminalIntent.value
+      ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, ...trialExit }
+      : s.coldResume
       ? { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: order ? c.continuePay : c.ok, secondary: order ? c.viewOrder : c.close, onPrimary: order ? () => payment.restart('methods') : payment.close, onSecondary: order ? payment.openOrder : payment.close }
       : { icon: 'failed', tone: 'danger', title: c.bankFailedTitle, body: c.bankFailed, primary: c.retryPay, secondary: c.switchMethod, onPrimary: () => payment.restart('bank'), onSecondary: () => payment.restart('methods') };
     case 'review': return { icon: 'info', tone: 'warning', title: c.reviewTitle, body: s.intent?.reason === 'PAYMENT_AMOUNT_MISMATCH' ? c.reviewMismatch : c.reviewOther, primary: c.support, onPrimary: payment.support, ...toOrder };
-    case 'late': return markedLateIntent.value
-      ? { icon: 'info', tone: 'warning', title: c.lateTitle, body: trialCopy.value.coLatePayment,
-        primary: lateTrialExit.value?.label ?? c.close, onPrimary: lateTrialExit.value ? openLateTrialExit : payment.close,
-        onSecondary: payment.close, ...(lateTrialExit.value ? { secondary: c.close } : {}) }
+    case 'late': return s.intent?.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW'
+      ? { icon: 'info', tone: 'warning', title: c.lateTitle, body: trialCopy.value.coLatePayment, ...trialExit }
       : { icon: 'info', tone: 'warning', title: c.lateTitle, body: c.late, primary: c.support, onPrimary: payment.support, ...toOrder };
     // Refunded to the original payment method (user 2026-11-24): the payment has ended, nothing is left to do here.
     case 'refunded': return { icon: 'info', tone: 'neutral', title: c.refundedTitle, body: c.refunded,

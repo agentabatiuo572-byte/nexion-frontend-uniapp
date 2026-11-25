@@ -3,7 +3,7 @@ import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
-import { parseTrialConversionQuote, parseTrialOriginalPurchase, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
+import { parseTrialChangedQuote, parseTrialOriginalPurchase, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
@@ -28,21 +28,29 @@ export type PurchaseQuote = {
 } & PurchaseFinancialSnapshot;
 export const purchasePaymentStatuses = ['CREATING', 'SUBMIT_UNKNOWN', 'AWAITING_PAYMENT', 'FUNDS_CONFIRMED', 'DELIVERED', 'MANUAL_REVIEW', 'EXPIRED'] as const;
 export type PurchasePaymentStatus = typeof purchasePaymentStatuses[number];
-export const TRIAL_LATE_RESELECT = 'LATE_REFUND_RESELECT_ALLOWED';
+export type TrialPurchaseOutcome = 'UNPAID_TERMINAL' | 'LATE_PAYMENT_REVIEW';
+const trialOriginalCodes = ['TRIAL_BALANCE_SUBMISSION_IN_PROGRESS', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'] as const;
+const trialRequoteCodes = ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_PRICING_CHANGED',
+  'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED'] as const;
+export function trialExternalRequote(message: string): boolean {
+  return trialRequoteCodes.some(code => code === message);
+}
 export type TrialExternalRefusal =
-  | { status: 'refused'; reasonCode: 'TRIAL_EXISTING_PURCHASE'; originalPurchase: TrialOriginalPurchase }
-  | { status: 'refused'; reasonCode: 'TRIAL_QUOTE_CHANGED'; quote: TrialConversionQuote };
+  | { status: 'refused'; action: 'original'; originalPurchase: TrialOriginalPurchase }
+  | { status: 'refused'; action: 'review'; reasonCode: string; quote?: TrialConversionQuote; claimNo?: string; productNo?: string }
+  | { status: 'refused'; action: 'wallet' }
+  | { status: 'refused'; action: 'unavailable'; reasonCode: string };
 export type PurchasePaymentIntent = {
   intentNo: string; commandKey: string; paymentQuoteId: string; kind: PurchaseKind; paymentMethod: ExternalPaymentMethod;
   network: string | null; status: PurchasePaymentStatus; subtotalUsdt: string; channelFeeUsdt: string;
   networkConfirmFeeUsdt: string; totalUsdt: string; amountVnd: string | null; paymentUrl: string | null;
   address: string | null; expiresAt: string; reason: string | null; receipt: unknown;
-  fulfilmentStatus?: 'DELIVERED';
+  fulfilmentStatus?: 'DELIVERED' | 'NOT_DELIVERED';
   paymentAllowed?: boolean; expirationTime?: string; createdAt?: string;
   /** A refunded payment still reports MANUAL_REVIEW to user clients; refundStatus says it has ended. */
   refundStatus?: 'REFUNDED';
-  trialLateDisposition?: typeof TRIAL_LATE_RESELECT;
-  trialClaimNo?: string;
+  trialPurchaseOutcome?: TrialPurchaseOutcome;
+  claimNo?: string | null;
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
 const object = (raw: unknown): Record<string, unknown> => {
@@ -119,13 +127,14 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
   if (expirationTime && fields.paymentMethod !== 'HDPAY_BANK') throw invalid();
   return { ...fields, intentNo: text(raw.intentNo), commandKey: text(raw.commandKey), status: raw.status as PurchasePaymentStatus,
     paymentUrl, address, reason: raw.reason == null || typeof raw.reason === 'string' && !raw.reason.trim() ? null : text(raw.reason), receipt: raw.receipt ?? null,
-    ...(raw.fulfilmentStatus === 'DELIVERED' ? { fulfilmentStatus: 'DELIVERED' as const } : {}),
+    ...(raw.fulfilmentStatus === 'DELIVERED' || raw.fulfilmentStatus === 'NOT_DELIVERED' ? { fulfilmentStatus: raw.fulfilmentStatus } : {}),
     ...(raw.paymentAllowed !== undefined ? { paymentAllowed: raw.paymentAllowed as boolean } : {}),
     ...(createdAt ? { createdAt } : {}),
     ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
-    ...(fields.kind === 'TRIAL_CONVERT' && raw.status === 'MANUAL_REVIEW' && raw.trialLateDisposition === TRIAL_LATE_RESELECT
-      ? { trialLateDisposition: TRIAL_LATE_RESELECT } : {}),
-    ...(fields.kind === 'TRIAL_CONVERT' && typeof raw.trialClaimNo === 'string' && raw.trialClaimNo.trim() ? { trialClaimNo: raw.trialClaimNo } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT' && (raw.claimNo === null || typeof raw.claimNo === 'string') ? { claimNo: raw.claimNo } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT' && typeof raw.claimNo === 'string' && raw.claimNo.trim()
+      && (raw.status === 'MANUAL_REVIEW' && raw.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW'
+        || raw.status === 'EXPIRED' && raw.trialPurchaseOutcome === 'UNPAID_TERMINAL') ? { trialPurchaseOutcome: raw.trialPurchaseOutcome } : {}),
     ...(expirationTime ? { expirationTime } : {}) };
 }
 function parseOrderTopup(value: unknown, orderNo: string, network: OrderTopupNetwork): OrderUsdtTopupRead {
@@ -159,15 +168,21 @@ export function createPurchasePaymentApi(client: ApiClient) {
   function trialRequest<T>(request: ApiRequest, parse: (data: unknown) => T) {
     return client.request<T | TrialExternalRefusal>({
       ...request,
-      acceptedResponses: ['TRIAL_EXISTING_PURCHASE', 'TRIAL_QUOTE_CHANGED'].map(message => ({ status: 409, code: 409, message })),
-      parseResponseData(data, status) {
-        if (status !== 409) return parse(data);
-        const row = object(data);
-        if (row.reasonCode === 'TRIAL_EXISTING_PURCHASE')
-          return { status: 'refused', reasonCode: row.reasonCode, originalPurchase: parseTrialOriginalPurchase(row.originalPurchase) };
-        if (row.reasonCode === 'TRIAL_QUOTE_CHANGED')
-          return { status: 'refused', reasonCode: row.reasonCode, quote: parseTrialConversionQuote(row.quote) };
-        throw invalid();
+      acceptedResponses: [
+        ...[...trialOriginalCodes, ...TRIAL_PRICE_CHANGES, ...trialRequoteCodes, 'ZERO_PAYMENT_REQUIRES_WALLET',
+          'TRIAL_NOT_CONVERTIBLE', 'TRIAL_PRODUCT_NOT_AVAILABLE', 'TRIAL_KILL_SWITCH_DISABLED', 'TRIAL_EXTERNAL_PAYMENT_METHOD_UNSUPPORTED',
+          'PRODUCT_OUT_OF_STOCK', 'PRODUCT_NOT_AVAILABLE'].map(message => ({ status: 409, code: 409, message })),
+        ...['ORDER_MONTHLY_QUOTA_UNAVAILABLE', 'TEST_CLOUD_RESOURCE_CAPACITY_UNAVAILABLE'].map(message => ({ status: 503, code: 503, message })),
+        { status: 422, code: 422, message: 'B1_COVERAGE_REDLINE_BLOCKED' },
+      ],
+      parseResponseData(data, _, { code, message }): T | TrialExternalRefusal {
+        if (code === 0) return parse(data);
+        if (trialOriginalCodes.some(value => value === message))
+          return { status: 'refused', action: 'original', originalPurchase: parseTrialOriginalPurchase(data) };
+        if (trialPriceChanged(message)) return { status: 'refused', action: 'review', reasonCode: message, ...parseTrialChangedQuote(data) };
+        if (trialExternalRequote(message)) return { status: 'refused', action: 'review', reasonCode: message };
+        if (message === 'ZERO_PAYMENT_REQUIRES_WALLET') return { status: 'refused', action: 'wallet' };
+        return { status: 'refused', action: 'unavailable', reasonCode: message };
       },
     });
   }
@@ -190,6 +205,8 @@ export function createPurchasePaymentApi(client: ApiClient) {
       return parsePurchaseQuote(await client.request({ method: 'POST', path: `${base}-quotes`, body: { kind, paymentMethod, payload } }));
     },
     trialQuote(paymentMethod: ExternalPaymentMethod, payload: Record<string, unknown>) {
+      if (typeof payload.quoteVersion !== 'string' || !payload.quoteVersion.trim())
+        return Promise.reject(new ApiError({ kind: 'protocol', message: 'TRIAL_QUOTE_VERSION_REQUIRED' }));
       return trialRequest({ method: 'POST', path: `${base}-quotes`, body: { kind: 'TRIAL_CONVERT', paymentMethod, payload } }, parsePurchaseQuote);
     },
     async create(paymentQuoteId: string, commandKey: string) {

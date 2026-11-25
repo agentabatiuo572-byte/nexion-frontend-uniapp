@@ -36,7 +36,7 @@ const ALLOWLIST = {
   "src/App.vue":
     "轮询编排:在 pollTrial 前后各取一次状态以判定「本 tick 是否发生迁移」,读的是 poll 推进**之后**的值,不参与任何金额计算",
   "src/pages/me/trial.vue":
-    "兼容没有远端快照的五态展示；转购读取绑定已确认的领取单，金额取所选设备报价或 404 时的试用报价",
+    "兼容没有远端快照的五态展示；转购读取绑定已确认的领取单，清单不可用时仅本人试用设备可显示领取单报价",
   "src/pages/me/devices.vue":
     "库存试用行、在线设备计数和取消入口；取消命令仍复核权威状态及原付款",
   "src/components/home/home-benefits.vue":

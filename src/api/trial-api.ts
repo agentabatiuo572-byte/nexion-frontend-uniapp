@@ -1,5 +1,5 @@
 import type { ApiClient } from "./api-client";
-import { ApiError } from "./errors";
+import { ApiError, isApiRefusal } from "./errors";
 import type { PaymentPasswordAuthorization } from "./payment-password-api";
 import type { TrialStatus } from "../store/trial-boundary";
 
@@ -48,14 +48,18 @@ export interface TrialPurchaseDevice {
   productNo: string;
   productName: string;
   imageUrl: string | null;
-  productType: "DEVICE" | "SHARE";
+  productType: "DEVICE" | "SERVER" | "SHARE";
 }
 
+type TrialExternalMethod = "HDPAY_BANK" | "CREGIS_USDT_BSC" | "CREGIS_USDT_ERC20" | "CREGIS_USDT_TRC20";
+export type TrialPaymentMethod = "WALLET" | TrialExternalMethod;
+
 export interface TrialPurchaseOption extends TrialPurchaseDevice {
-  inventoryMode: "FINITE" | "UNLIMITED";
+  inventoryMode: "FINITE" | "UNLIMITED" | null;
   isTrialProduct: boolean;
-  priceUSD: number;
+  priceUSD: number | null;
   marketPriceUSD?: number;
+  paymentMethods: TrialPaymentMethod[];
   canBuy: boolean;
   reasonCode?: string;
   quote?: TrialConversionQuote;
@@ -63,27 +67,28 @@ export interface TrialPurchaseOption extends TrialPurchaseDevice {
 
 export type TrialPurchaseOptionsRead =
   | { status: "unsupported" }
+  | { status: "not-convertible" }
   | { status: "ready"; claimNo: string; serverNow: number; options: TrialPurchaseOption[] };
 
 type TrialPurchaseSnapshot = {
   claimNo: string;
   device: TrialPurchaseDevice;
-  confirmedAmountUSD: number;
+  confirmedAmountUSD: number | null;
 };
 
 export type TrialOriginalPurchase = TrialPurchaseSnapshot & (
   | {
       kind: "EXTERNAL";
       paymentNo: string;
-      paymentMethod: "HDPAY_BANK" | "CREGIS_USDT_BSC" | "CREGIS_USDT_ERC20" | "CREGIS_USDT_TRC20";
+      paymentMethod: TrialExternalMethod;
       expiresAt: number;
-      status: "CREATING" | "SUBMIT_UNKNOWN" | "AWAITING_PAYMENT" | "CONFIRMING" | "FUNDS_CONFIRMED" | "MANUAL_REVIEW";
+      status: "CREATING" | "SUBMIT_UNKNOWN" | "AWAITING_PAYMENT" | "FUNDS_CONFIRMED" | "MANUAL_REVIEW" | "EXPIRED";
     }
   | {
       kind: "BALANCE";
       submissionNo: string;
-      paymentMethod: "UVEL_USDT_WALLET";
-      quoteVersion: string;
+      paymentMethod: "WALLET";
+      quoteVersion: string | null;
       status: "PROCESSING" | "RESUMABLE";
     }
 );
@@ -115,7 +120,7 @@ export interface TrialAuthorityState {
   quote?: TrialConversionQuote;
   /** Redeemed claims: the purchase may have been refunded since. Missing on older servers. */
   conversion?: TrialConversionOutcome;
-  originalPurchase?: TrialOriginalPurchase;
+  originalPurchase?: TrialOriginalPurchase | null;
   purchasedDevice?: TrialPurchaseDevice;
   source: string;
   serverCanonical: true;
@@ -132,6 +137,7 @@ export interface TrialAuthorityState {
 }
 
 export interface TrialConvertReceipt {
+  claimNo?: string;
   orderNo: string;
   paymentNo?: string;
   productNo: string;
@@ -139,8 +145,9 @@ export interface TrialConvertReceipt {
   discountUsdt: number;
   paymentStatus: "PENDING" | "PAID";
   orderStatus: "PENDING_PAYMENT" | "PAID";
+  purchasedDevice?: TrialPurchaseDevice;
   /** Present from FEAT-TRIAL05 servers: what this conversion actually settled. */
-  settlement?: {
+  settlement?: TrialConversionQuote | {
     settlementPolicy: TrialSettlementPolicy;
     earlyPurchase: boolean;
     remainderUSD: number;
@@ -161,18 +168,21 @@ export interface TrialConvertReceipt {
   };
 }
 
-const PURCHASE_REFUSALS = [
-  "TRIAL_QUOTE_CHANGED", "TRIAL_PRODUCT_REMOVED", "TRIAL_PRODUCT_SOLD_OUT",
-  "TRIAL_PRODUCT_QUOTA_EXHAUSTED", "TRIAL_PRODUCT_REQUIREMENTS_NOT_MET",
-  "TRIAL_WALLET_INSUFFICIENT", "TRIAL_PURCHASE_UNAVAILABLE", "TRIAL_BALANCE_ONLY",
-  "TRIAL_EXISTING_PURCHASE", "TRIAL_NOT_CONVERTIBLE",
-] as const;
-type TrialPurchaseRefusalCode = typeof PURCHASE_REFUSALS[number];
+export const TRIAL_PRICE_CHANGES = ["TRIAL_QUOTE_CHANGED", "TRIAL_AMOUNT_MISMATCH"] as const;
+const BALANCE_ORIGINAL_CODES = ["TRIAL_BALANCE_SUBMISSION_IN_PROGRESS", "TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS"] as const;
+const BALANCE_SERVICE_REFUSALS = ["ORDER_MONTHLY_QUOTA_UNAVAILABLE", "TEST_CLOUD_RESOURCE_CAPACITY_UNAVAILABLE"] as const;
+const AUTHORIZATION_REFUSALS = /^PAYMENT_PASSWORD_(?:REQUIRED|INVALID|INCORRECT|ATTEMPT_CONFLICT|ATTEMPT_ALREADY_USED|NOT_CONFIGURED|VERSION_CONFLICT|LOCKED|UNAVAILABLE)$/;
+
+export function trialPriceChanged(message: string): boolean {
+  return TRIAL_PRICE_CHANGES.some(code => code === message);
+}
 
 export type TrialPurchaseConvertResult =
   | { status: "settled"; receipt: TrialConvertReceipt }
-  | { status: "processing"; originalPurchase: TrialOriginalPurchase }
-  | { status: "refused"; reasonCode: TrialPurchaseRefusalCode; quote?: TrialConversionQuote; originalPurchase?: TrialOriginalPurchase };
+  | { status: "refused"; reasonCode: string; quote?: TrialConversionQuote; claimNo?: string; productNo?: string; originalPurchase?: TrialOriginalPurchase };
+
+export type TrialCancelResult = { status: "cancelled"; state: TrialAuthorityState }
+  | { status: "payment-in-progress"; originalPurchase?: TrialOriginalPurchase };
 
 export interface TrialApi {
   state(): Promise<TrialAuthorityState>;
@@ -183,7 +193,7 @@ export interface TrialApi {
     idempotencyKey: string, authorization?: PaymentPasswordAuthorization): Promise<TrialConvertReceipt>;
   convertPurchase(productNo: string, expectedAmountUsdt: number, quoteVersion: string,
     idempotencyKey: string, authorization: PaymentPasswordAuthorization): Promise<TrialPurchaseConvertResult>;
-  cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialAuthorityState>;
+  cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialCancelResult>;
 }
 
 const SERVER_STATES = new Set([
@@ -219,42 +229,54 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function purchaseProductType(value: unknown): TrialPurchaseDevice["productType"] | null {
+  return value === "DEVICE" || value === "SERVER" || value === "SHARE" ? value : null;
+}
+
+function purchaseDevice(row: Record<string, unknown>, productNo: string): TrialPurchaseDevice {
+  return {
+    productNo,
+    productName: text(row.name) ?? productNo,
+    imageUrl: text(row.imageUrl),
+    productType: purchaseProductType(row.productType) ?? "DEVICE",
+  };
+}
+
 function parseTrialPurchaseDevice(value: unknown): TrialPurchaseDevice {
   const row = record(value);
   const productNo = text(row?.productNo);
-  const productName = text(row?.productName);
-  const imageUrl = row?.imageUrl === null ? null : text(row?.imageUrl);
-  const productType = row?.productType;
-  if (!productNo || !productName || (imageUrl === null && row?.imageUrl !== null)
-      || (productType !== "DEVICE" && productType !== "SHARE")) return invalid();
-  return { productNo, productName, imageUrl, productType };
+  if (!row || !productNo || !text(row.name)) return invalid();
+  return purchaseDevice(row, productNo);
 }
 
 const EXTERNAL_METHODS = new Set(["HDPAY_BANK", "CREGIS_USDT_BSC", "CREGIS_USDT_ERC20", "CREGIS_USDT_TRC20"]);
 const EXTERNAL_PURCHASE_STATES = new Set([
-  "CREATING", "SUBMIT_UNKNOWN", "AWAITING_PAYMENT", "CONFIRMING", "FUNDS_CONFIRMED", "MANUAL_REVIEW",
+  "CREATING", "SUBMIT_UNKNOWN", "AWAITING_PAYMENT", "FUNDS_CONFIRMED", "MANUAL_REVIEW", "EXPIRED",
 ]);
 
 export function parseTrialOriginalPurchase(value: unknown): TrialOriginalPurchase {
   const row = record(value);
   const claimNo = text(row?.claimNo);
-  const confirmedAmountUSD = finiteNumber(row?.confirmedAmountUsdt);
-  if (!row || !claimNo || confirmedAmountUSD === null) return invalid();
-  const snapshot = { claimNo, device: parseTrialPurchaseDevice(row.device), confirmedAmountUSD };
+  const productNo = text(row?.productNo);
+  if (!row || !claimNo || !productNo) return invalid();
+  const confirmedAmountUSD = finiteNumber(row.expectedAmountUsdt);
+  if (row.expectedAmountUsdt != null && confirmedAmountUSD === null) return invalid();
   if (row.kind === "BALANCE") {
-    const submissionNo = text(row.submissionNo);
+    const submissionNo = text(row.commandKey);
     const quoteVersion = text(row.quoteVersion);
-    if (!submissionNo || !quoteVersion || row.paymentMethod !== "UVEL_USDT_WALLET" || row.status !== "PROCESSING") return invalid();
-    return { ...snapshot, kind: row.kind, paymentMethod: row.paymentMethod, status: row.status, submissionNo, quoteVersion };
+    if (!submissionNo || row.paymentMethod !== "WALLET" || row.status !== "PROCESSING") return invalid();
+    return { kind: row.kind, paymentMethod: row.paymentMethod, status: row.status, claimNo, submissionNo, quoteVersion,
+      confirmedAmountUSD, device: purchaseDevice(row, productNo) };
   }
-  const paymentNo = text(row.paymentNo);
-  const expiresAt = timestamp(row.expiresAt);
-  if (row.kind !== "EXTERNAL" || !paymentNo || expiresAt === null
+  const paymentNo = text(row.intentNo);
+  const expiresAt = timestamp(row.deadlineAt);
+  if (row.kind !== "EXTERNAL" || !paymentNo || expiresAt === null || !text(row.name)
       || !EXTERNAL_METHODS.has(row.paymentMethod as string)
       || !EXTERNAL_PURCHASE_STATES.has(row.status as string)) return invalid();
   type ExternalPurchase = Extract<TrialOriginalPurchase, { kind: "EXTERNAL" }>;
-  return { ...snapshot, kind: row.kind, paymentNo, expiresAt,
-    paymentMethod: row.paymentMethod as ExternalPurchase["paymentMethod"],
+  return { kind: row.kind, claimNo, paymentNo, expiresAt, confirmedAmountUSD,
+    device: { ...purchaseDevice(row, productNo), productType: "DEVICE" },
+    paymentMethod: row.paymentMethod as TrialExternalMethod,
     status: row.status as ExternalPurchase["status"] };
 }
 
@@ -283,27 +305,31 @@ export function parseTrialConversionQuote(value: unknown): TrialConversionQuote 
     earlyPurchase: row.earlyPurchase, ...amounts as { [K in keyof typeof amounts]: number }, earlyEndsAt };
 }
 
-function parsePurchaseOption(row: Record<string, unknown>): TrialPurchaseOption {
-  const device = parseTrialPurchaseDevice(row);
-  const { inventoryMode, isTrialProduct } = row;
-  const priceUSD = finiteNumber(row.priceUsdt);
-  if ((inventoryMode !== "FINITE" && inventoryMode !== "UNLIMITED") || typeof isTrialProduct !== "boolean"
-      || priceUSD === null || priceUSD === 0) return invalid();
-  const marketPriceUSD = finiteNumber(row.marketPriceUsdt);
-  const metadata = { ...device, inventoryMode, isTrialProduct, priceUSD,
-    ...(marketPriceUSD !== null ? { marketPriceUSD } : {}) } as const;
-  const unavailable = { ...metadata, canBuy: false };
-  let quote: TrialConversionQuote;
+const QUOTE_UNAVAILABLE = "TRIAL_PRODUCT_QUOTE_UNAVAILABLE";
+
+function parsePurchaseOption(row: Record<string, unknown>, productNo: string, isTrialProduct: boolean): TrialPurchaseOption {
+  const device = purchaseDevice(row, productNo);
+  const inventoryMode: TrialPurchaseOption["inventoryMode"] =
+    row.inventoryMode === "FINITE" || row.inventoryMode === "UNLIMITED" ? row.inventoryMode : null;
+  const priceUSD = finiteNumber(row.priceUsdt, 0.000001);
+  const marketPriceUSD = finiteNumber(row.storePriceUsdt);
+  const methods = Array.isArray(row.paymentMethods) ? row.paymentMethods : [];
+  const validMethods = methods.includes("WALLET") && methods.every(method => method === "WALLET" || EXTERNAL_METHODS.has(method));
+  const metadata: Omit<TrialPurchaseOption, "canBuy"> = { ...device, inventoryMode, isTrialProduct, priceUSD,
+    paymentMethods: validMethods ? methods as TrialPaymentMethod[] : [],
+    ...(marketPriceUSD !== null ? { marketPriceUSD } : {}) };
+  const reasonCode = text(row.unavailableReason);
+  if (!text(row.name) || !purchaseProductType(row.productType) || !inventoryMode || !validMethods
+      || (row.imageUrl !== null && !text(row.imageUrl)) || typeof row.canPurchase !== "boolean"
+      || (row.canPurchase ? row.unavailableReason !== null : !reasonCode))
+    return { ...metadata, canBuy: false, reasonCode: "PRODUCT_NOT_AVAILABLE" };
+  if (!row.canPurchase && reasonCode !== QUOTE_UNAVAILABLE) return { ...metadata, canBuy: false, reasonCode: reasonCode! };
   try {
-    quote = parseTrialConversionQuote(row.quote);
-  } catch {
-    return { ...unavailable, reasonCode: "TRIAL_OPTION_QUOTE_UNAVAILABLE" };
-  }
-  if (quote.priceUSD !== priceUSD) return { ...unavailable, reasonCode: "TRIAL_OPTION_QUOTE_UNAVAILABLE" };
-  const reasonCode = text(row.reasonCode);
-  if (row.canBuy === true && !reasonCode) return { ...metadata, canBuy: true, quote };
-  if (row.canBuy === false && reasonCode) return { ...unavailable, reasonCode, quote };
-  return { ...unavailable, reasonCode: "TRIAL_OPTION_DATA_UNAVAILABLE", quote };
+    const quote = parseTrialConversionQuote(row.quote);
+    if (row.canPurchase && quote.priceUSD === priceUSD && row.quoteVersion === quote.quoteVersion)
+      return { ...metadata, canBuy: true, quote };
+  } catch { /* An unreadable quote disables just this product. */ }
+  return { ...metadata, canBuy: false, reasonCode: QUOTE_UNAVAILABLE };
 }
 
 export function parseTrialPurchaseOptions(value: unknown): Extract<TrialPurchaseOptionsRead, { status: "ready" }> {
@@ -314,32 +340,44 @@ export function parseTrialPurchaseOptions(value: unknown): Extract<TrialPurchase
   const options: TrialPurchaseOption[] = [];
   for (const item of row.options) {
     const option = record(item);
-    if (!option || typeof option.visible !== "boolean" || (option.visible === false && option.isTrialProduct !== false))
-      return invalid();
-    if (option.visible) options.push(parsePurchaseOption(option));
+    const productNo = text(option?.productNo);
+    if (!option || !productNo || typeof option.originalTrialProduct !== "boolean") return invalid();
+    options.push(parsePurchaseOption(option, productNo, option.originalTrialProduct));
   }
   if (options.filter(option => option.isTrialProduct).length !== 1
       || new Set(options.map(option => option.productNo)).size !== options.length) return invalid();
   return { status: "ready", claimNo, serverNow, options };
 }
 
-export function parseTrialPurchaseConvertResult(value: unknown, status: number): TrialPurchaseConvertResult {
+export function parseTrialChangedQuote(value: unknown) {
   const row = record(value);
-  if (status === 202) {
-    const originalPurchase = parseTrialOriginalPurchase(row?.originalPurchase);
-    if (originalPurchase.kind !== "BALANCE" || originalPurchase.status !== "PROCESSING") return invalid();
-    return { status: "processing", originalPurchase };
-  }
-  if (status === 409) {
-    const reasonCode = row?.reasonCode as TrialPurchaseRefusalCode;
-    if (!PURCHASE_REFUSALS.includes(reasonCode)) return invalid();
+  const claimNo = text(row?.claimNo);
+  const productNo = text(row?.productNo);
+  const quote = parseTrialConversionQuote(row?.quote);
+  if (!claimNo || !productNo || row?.quoteVersion !== quote.quoteVersion) return invalid();
+  return { claimNo, productNo, quote };
+}
+
+export function parseTrialPurchaseConvertResult(value: unknown, code: number, reasonCode = ""): TrialPurchaseConvertResult {
+  if (code !== 0) {
     return { status: "refused", reasonCode,
-      ...(reasonCode === "TRIAL_QUOTE_CHANGED" ? { quote: parseTrialConversionQuote(row?.quote) } : {}),
-      ...(reasonCode === "TRIAL_EXISTING_PURCHASE" ? { originalPurchase: parseTrialOriginalPurchase(row?.originalPurchase) } : {}) };
+      ...(trialPriceChanged(reasonCode) ? parseTrialChangedQuote(value) : {}),
+      ...(BALANCE_ORIGINAL_CODES.some(message => message === reasonCode) ? { originalPurchase: parseTrialOriginalPurchase(value) } : {}) };
   }
   const receipt = parseTrialConvertReceipt(value);
   if (receipt.paymentStatus !== "PAID" || receipt.orderStatus !== "PAID") return invalid();
   return { status: "settled", receipt };
+}
+
+function isStructuredBalanceRefusal(cause: unknown): cause is ApiError {
+  return cause instanceof ApiError && cause.kind === "http" && cause.code === cause.status
+    && !AUTHORIZATION_REFUSALS.test(cause.message)
+    && ((cause.code === 503 && BALANCE_SERVICE_REFUSALS.some(message => message === cause.message))
+      || (cause.code !== undefined && cause.code >= 400 && cause.code < 500 && ![408, 425, 429].includes(cause.code)));
+}
+
+export function isTrialAuthorizationRefusal(message: string): boolean {
+  return AUTHORIZATION_REFUSALS.test(message);
 }
 
 function receiptSettlement(row: Record<string, unknown>): TrialConvertReceipt["settlement"] | null | undefined {
@@ -372,13 +410,17 @@ export function parseTrialConvertReceipt(value: unknown): TrialConvertReceipt {
   const source = row?.source === "nx_trial_claim + nx_order + nx_order_item" ? row.source : null;
   const provenance = record(row?.provenance);
   const paymentNo = row?.paymentNo == null ? undefined : String(row.paymentNo).trim();
-  const settlement = row ? receiptSettlement(row) : undefined;
+  const claimNo = text(row?.claimNo);
+  const purchasedDevice = row?.purchasedDevice == null ? undefined : parseTrialPurchaseDevice(row.purchasedDevice);
+  const settlement = row?.settlement != null ? parseTrialConversionQuote(row.settlement) : row ? receiptSettlement(row) : undefined;
   if (settlement === null || !/^TRC-[A-Z0-9]+$/.test(orderNo) || !productNo || amountUsdt === null || discountUsdt === null
       || !paymentStatus || !orderStatus || !source
       || row?.serverCanonical !== true || row?.sourceEnvironment !== "PRODUCTION" || row?.runId !== ""
       || provenance?.serverCanonical !== true || provenance.source !== source
       || provenance.sourceEnvironment !== "PRODUCTION" || provenance.runId !== "") return invalid();
+  if (purchasedDevice && purchasedDevice.productNo !== productNo) return invalid();
   return { orderNo, ...(paymentNo ? { paymentNo } : {}), productNo, amountUsdt, discountUsdt,
+    ...(claimNo ? { claimNo } : {}), ...(purchasedDevice ? { purchasedDevice } : {}),
     paymentStatus, orderStatus, ...(settlement ? { settlement } : {}), source, serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "",
     provenance: { source, serverCanonical: true, sourceEnvironment: "PRODUCTION", runId: "" } };
 }
@@ -457,7 +499,8 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
       rewardsReversed: row.conversionRewardsReversed === true,
     }
     : null;
-  const originalPurchase = row.originalPurchase == null ? undefined : parseTrialOriginalPurchase(row.originalPurchase);
+  const originalPurchase = row.originalPurchase === null ? null
+    : row.originalPurchase === undefined ? undefined : parseTrialOriginalPurchase(row.originalPurchase);
   const purchasedDevice = row.purchasedDevice == null ? undefined : parseTrialPurchaseDevice(row.purchasedDevice);
   if (originalPurchase && originalPurchase.claimNo !== claimNo) return invalid();
   if (["ACTIVE", "GRACE", "EXTENDED", "REDEEMED"].includes(serverState)
@@ -484,7 +527,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
     ...(hasAmounts ? { offsetUSD: offsetUSD!, remainderUSD: remainderUSD!, priceUSD: priceUSD! } : {}),
     ...(quote ? { quote } : {}),
     ...(conversion ? { conversion } : {}),
-    ...(originalPurchase ? { originalPurchase } : {}),
+    ...(originalPurchase !== undefined ? { originalPurchase } : {}),
     ...(purchasedDevice ? { purchasedDevice } : {}),
     source,
     serverCanonical: true,
@@ -521,7 +564,9 @@ export function createTrialApi(client: ApiClient): TrialApi {
       try {
         return parseTrialPurchaseOptions(await client.request({ method: "GET", path: "/api/trial/purchase-options" }));
       } catch (cause) {
-        if (cause instanceof ApiError && cause.kind === "http" && cause.status === 404) return { status: "unsupported" };
+        if (cause instanceof ApiError && cause.kind === "http" && cause.status === 404 && cause.message !== "USER_NOT_FOUND")
+          return { status: "unsupported" };
+        if (isApiRefusal(cause, 409, "TRIAL_NOT_CONVERTIBLE")) return { status: "not-convertible" };
         throw cause;
       }
     },
@@ -533,22 +578,29 @@ export function createTrialApi(client: ApiClient): TrialApi {
       idempotencyKey,
     }),
     convert: async (...args) => parseTrialConvertReceipt(await client.request(convertRequest(...args))),
-    convertPurchase: (...args) => {
-      if (!args[2].trim()) return Promise.reject(new Error("TRIAL_QUOTE_VERSION_REQUIRED"));
-      return client.request<TrialPurchaseConvertResult>({
-        ...convertRequest(...args),
-        acceptedResponses: [
-          ...PURCHASE_REFUSALS.map(message => ({ status: 409, code: 409, message })),
-          { status: 202, code: 202, message: "TRIAL_PURCHASE_PROCESSING" },
-        ],
-        parseResponseData: parseTrialPurchaseConvertResult,
-      });
+    async convertPurchase(...args) {
+      if (!args[2].trim()) throw new Error("TRIAL_QUOTE_VERSION_REQUIRED");
+      try {
+        return await client.request<TrialPurchaseConvertResult>({
+          ...convertRequest(...args),
+          acceptedResponses: [...TRIAL_PRICE_CHANGES, ...BALANCE_ORIGINAL_CODES].map(message => ({ status: 409, code: 409, message })),
+          parseResponseData: (data, _, { code, message }) => parseTrialPurchaseConvertResult(data, code, message),
+        });
+      } catch (cause) {
+        if (isStructuredBalanceRefusal(cause)) return { status: "refused", reasonCode: cause.message };
+        throw cause;
+      }
     },
-    cancel: (reason, idempotencyKey) => parse({
+    cancel: (reason, idempotencyKey) => client.request<TrialCancelResult>({
       method: "POST",
       path: "/api/trial/cancel",
       body: { reason },
       idempotencyKey,
+      acceptedResponses: BALANCE_ORIGINAL_CODES.map(message => ({ status: 409, code: 409, message })),
+      parseResponseData: (data, _, { code, message }): TrialCancelResult => code === 0
+        ? { status: "cancelled", state: parseTrialAuthorityState(data) }
+        : { status: "payment-in-progress", ...(message === "TRIAL_BALANCE_SUBMISSION_IN_PROGRESS"
+          ? { originalPurchase: parseTrialOriginalPurchase(data) } : {}) },
     }),
   };
 }

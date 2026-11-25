@@ -5,7 +5,7 @@
 import {demoAccountOrders,demoAssignablePurchaseSlots,demoCapacityReplacementSource,demoFixture,demoFleetFacts,demoHasAccountOrder,demoOrderDelivery,demoOrderPaymentDeadline,demoPaidOrderDelivery,demoProducts,demoReplacementSourceCheck,demoTimedOutOrder,paymentWindow,addDemoPaymentQuotaHold,removeDemoPaymentQuotaHold,requireDemoExternalPaymentQuota,requireDemoExternalOrderGate,requireDemoPurchase,requireDemoQuoteStock,reserveDemoPaymentQuotaHold} from './prototype-demo-data.mjs';
 import {demoPurchasingAccountId,previewAccountId} from './prototype-demo-identity.mjs';
 import {demoPaymentIntentMissing,demoPaymentScenario} from './prototype-demo-payment-mode.mjs';
-import {trialPurchaseDevice,trialPurchaseOptionsEnabled} from './prototype-demo-trial.mjs';
+import {trialPurchaseDevice,trialPurchaseOptionsEnabled,wireTrialQuote} from './prototype-demo-trial.mjs';
 
 export const previewPurchaseCashier = new URL('/__demo/purchase-cashier/', 'https://api.hdpayadmin.com');
 
@@ -40,8 +40,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   function existingIntentRefusal(intent, payload) {
     if (intent.kind === 'TRIAL_CONVERT') {
       if (trialPurchaseOptionsEnabled(state)) {
-        return {...refused(409,'TRIAL_EXISTING_PURCHASE'),
-          data:{reasonCode:'TRIAL_EXISTING_PURCHASE',originalPurchase:trialPurchaseSnapshot(intent)}};
+        return {status:409,message:'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED',data:trialPurchaseSnapshot(intent)};
       }
       const productNo = String(payload.productNo ?? '');
       if (!/^[A-Za-z0-9._-]{2,64}$/.test(productNo)) return refused(422, 'TRIAL_PRODUCT_REQUIRED');
@@ -117,12 +116,16 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const trial = demoFixture(new URL('/api/trial/state', url.origin), locale(), state, {...request, method: () => 'GET', pricingAt});
     if (!['ACTIVE', 'GRACE', 'EXTENDED'].includes(trial.state) || !trial.quote) reject('TRIAL_NOT_CONVERTIBLE');
     if (payload.productNo !== trial.config.trialProductId)
-      reject(trialPurchaseOptionsEnabled(state)?'TRIAL_BALANCE_ONLY':'TRIAL_PRODUCT_NOT_ELIGIBLE');
-    if (payload.quoteVersion !== trial.quote.quoteVersion)
-      reject('TRIAL_QUOTE_CHANGED',{reasonCode:'TRIAL_QUOTE_CHANGED',quote:trial.quote});
+      reject(trialPurchaseOptionsEnabled(state)?'TRIAL_EXTERNAL_PAYMENT_METHOD_UNSUPPORTED':'TRIAL_PRODUCT_NOT_ELIGIBLE');
+    if ((trialPurchaseOptionsEnabled(state)||payload.quoteVersion)&&payload.quoteVersion !== trial.quote.quoteVersion)
+      reject('TRIAL_QUOTE_CHANGED',trialPurchaseOptionsEnabled(state)?changedTrialQuote(trial,payload.productNo):null);
     // The claim's own SKU bypasses product purchase conditions. Release, stock and hardware quota still apply.
     requireDemoPurchase(state,demoProducts(state,url.origin),[{productNo:payload.productNo,quantity:1}],Date.now(),true,null,true);
     return trial;
+  }
+  function changedTrialQuote(trial,productNo) {
+    return {claimNo:trial.claimNo,productNo,quoteVersion:trial.quote.quoteVersion,
+      quote:{...wireTrialQuote(trial.quote),claimNo:trial.claimNo,productNo,sourceVersion:trial.version}};
   }
   const quotaItems = (subject, payload, order) => subject.kind === 'ORDER_PAY'
     ? order.lineItems.map(line => ({productNo: line.sku, quantity: line.quantity}))
@@ -192,22 +195,22 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Recover the latest open intent for the same purchase after a replacement attempt.
   const openIntent = (subject, excluding) => [...intents.values()].findLast(row => row !== excluding && sameSubject(row, subject)
-    && !row.receipt && !['DELIVERED', 'EXPIRED'].includes(row.status)
-    && row.trialLateDisposition!=='LATE_REFUND_RESELECT_ALLOWED');
+    && !row.receipt && row.status!=='DELIVERED' && row.refundStatus!=='REFUNDED'
+    && (row.status!=='EXPIRED'||row.kind==='TRIAL_CONVERT'&&row.reconciliationStatus==='QUERY_UNKNOWN')
+    && row.trialPurchaseOutcome!=='LATE_PAYMENT_REVIEW');
   function trialPurchaseSnapshot(intent) {
-    return {
-      claimNo:'DEMO-TRIAL',kind:'EXTERNAL',paymentNo:intent.intentNo,device:intent.trialDeviceSnapshot,
-      paymentMethod:intent.paymentMethod,confirmedAmountUsdt:intent.businessAmountUsdt,
-      expiresAt:intent.expiresAt,status:intent.status,
-    };
+    const {productNo,name,imageUrl}=intent.trialDeviceSnapshot;
+    const cutoff=Math.min(intent.deadline,intent.expirationTime?Date.parse(intent.expirationTime):Infinity);
+    return {claimNo:intent.claimNo,kind:'EXTERNAL',intentNo:intent.intentNo,productNo,name,imageUrl,
+      paymentMethod:intent.paymentMethod,expectedAmountUsdt:String(intent.payload.expectedAmountUsdt),
+      deadlineAt:new Date(cutoff).toISOString(),status:intent.status};
   }
   function originalTrialPurchase() {
     sync();
     const intent=openIntent({kind:'TRIAL_CONVERT',identity:state.trialRow?.startedAt});
     return intent?trialPurchaseSnapshot(intent):undefined;
   }
-  const balanceConflict=()=>({...refused(409,'TRIAL_EXISTING_PURCHASE'),
-    data:{reasonCode:'TRIAL_EXISTING_PURCHASE',originalPurchase:state.trialBalancePurchase}});
+  const balanceConflict=()=>({status:409,message:'TRIAL_BALANCE_SUBMISSION_IN_PROGRESS',data:state.trialBalancePurchase});
   // An old failed attempt cannot cancel a successor or change an already settled order.
   function closeUnpaidOrder(intent) {
     if (!intent.orderNo || openIntent(intent, intent)) return null;
@@ -217,7 +220,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   function expire(intent, reason) {
     removeDemoPaymentQuotaHold(state, intent.quotaHold);
-    return Object.assign(intent, {status: 'EXPIRED', reason});
+    return Object.assign(intent, {status: 'EXPIRED', reason,
+      ...(intent.kind==='TRIAL_CONVERT'&&{trialPurchaseOutcome:'UNPAID_TERMINAL',reconciliationStatus:'PROVIDER_FAILED'})});
   }
   function lateArrival(intent, now) {
     return Object.assign(intent, {status: 'MANUAL_REVIEW', reason: 'PAYMENT_LATE_REVIEW', paidAt: now});
@@ -246,7 +250,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     removeDemoPaymentQuotaHold(state, intent.quotaHold);
     return Object.assign(intent, {status: 'DELIVERED', fulfilmentStatus: 'DELIVERED', receipt: {
-      ...receipt, paymentNo: intent.intentNo, amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt,
+      ...receipt, ...(intent.kind!=='TRIAL_CONVERT'&&{paymentNo:intent.intentNo}), amountUsdt: intent.businessAmountUsdt, paymentSubtotalUsdt: intent.subtotalUsdt,
       roundingAdjustmentUsdt: intent.roundingAdjustmentUsdt, walletDebitUsdt: '0.00', paymentMethod: intent.paymentMethod,
       paymentRail: intent.paymentMethod, paidTotalUsdt: intent.totalUsdt,
     }});
@@ -324,7 +328,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialSample, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialSample, ...row} = intent, open = Date.now() < deadline;
     const networkEnabled = networkOpen(row.paymentMethod);
     return {...row, fulfilmentStatus: row.receipt ? 'DELIVERED' : 'NOT_DELIVERED', paymentAllowed: row.status === 'AWAITING_PAYMENT' && open && networkEnabled, address: open && networkEnabled ? row.address : null, paymentUrl: open && row.status === 'AWAITING_PAYMENT' ? row.paymentUrl : null};
   };
@@ -339,9 +343,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (typeof receipt !== 'object' || Array.isArray(receipt) || !Object.keys(receipt).length) {
         return {...original, status: 'INDETERMINATE', message: 'PURCHASE_PAYMENT_RECEIPT_UNAVAILABLE'};
       }
-      return {...original, status: 'SUCCEEDED', code: 0, receipt};
+      return {...original, status: 'SUCCEEDED', code: 0, message:'success', receipt};
     }
-    if (intent.status === 'EXPIRED') return {...original, status: 'REJECTED', message: 'PURCHASE_PAYMENT_EXPIRED'};
+    if (intent.status === 'EXPIRED' && (intent.kind!=='TRIAL_CONVERT'||intent.trialPurchaseOutcome==='UNPAID_TERMINAL'))
+      return {...original, status: 'REJECTED', code:409, message: 'PURCHASE_PAYMENT_EXPIRED'};
     return {...original, status: intent.status === 'DELIVERED' ? 'INDETERMINATE' : 'PROCESSING',
       message: intent.reason ?? 'PURCHASE_PAYMENT_PROCESSING'};
   }
@@ -409,10 +414,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const subtotal = trial ? Number((micros + 5000n) / 10000n) : cents(amount);
       if (trial && subtotal > cents(payload.expectedAmountUsdt)) {
         if (!trialPurchaseOptionsEnabled(state)) return refused(409,'TRIAL_AMOUNT_MISMATCH');
-        return {status:409,message:'TRIAL_QUOTE_CHANGED',data:{reasonCode:'TRIAL_QUOTE_CHANGED',quote:trial.quote}};
+        return {status:409,message:'TRIAL_AMOUNT_MISMATCH',data:changedTrialQuote(trial,payload.productNo)};
       }
+      if (trial&&subtotal<=0) return refused(409,'ZERO_PAYMENT_REQUIRES_WALLET');
       if (!configured(body.paymentMethod)) return refused(503, 'PURCHASE_PAYMENT_FEES_NOT_CONFIGURED');
-      const now = Date.now(), deadline = order ? demoOrderPaymentDeadline(order) : now + paymentWindow;
+      const now = Date.now(), deadline = order ? demoOrderPaymentDeadline(order)
+        : trial ? Math.min(now+paymentWindow,trial.graceEndsAtEpochMs) : now+paymentWindow;
       if (deadline <= now) return refused(409, 'ORDER_PAYMENT_EXPIRED');
       requireDemoExternalPaymentQuota(state, products, items, now);
       if (order) requireDemoExternalOrderGate(state, products, items, now);
@@ -423,7 +430,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: adjustment.toFixed(6), subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
         networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion: 3, pricingAsOf: new Date(now).toISOString(), expiresAt: new Date(Math.min(now + QUOTE_TTL, deadline)).toISOString(),
         deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(body.paymentMethod, deadline)).toISOString(),
-        fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null};
+        fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null,
+        ...(trial&&{currency:bank?'VND':'USDT',channelFeeRatePct:'1.25',channelFeeFixed:'0.50',paymentFeesConfigured:true,
+          trialOffsetBasis:'ACCRUED_B90',...(bank&&{fxVersion:1})})};
       const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
       quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote, trialDeviceSnapshot});
       return {status: 200, message: 'OK', data: quote};
@@ -432,7 +441,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const key = request.headers()['idempotency-key'], quoteId = request.postDataJSON().paymentQuoteId, source = quotes.get(quoteId);
       if (!key) return refused(422, 'IDEMPOTENCY_KEY_REQUIRED');
-      const refusal = refusedTrialCreates.get(key);
+      const refusal = source?.subject.kind==='TRIAL_CONVERT'&&refusedTrialCreates.get(key);
       if (refusal) return refusal.quoteId===quoteId?refusal.result:refused(409,'IDEMPOTENCY_KEY_CONFLICT');
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const {subject, deadline} = source, known = [...intents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
@@ -441,15 +450,15 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
       const rememberTrialRefusal = result => {
-        if (subject.kind!=='TRIAL_CONVERT'||!trialPurchaseOptionsEnabled(state)) return result;
+        if (subject.kind!=='TRIAL_CONVERT'||result.message!=='TRIAL_QUOTE_CHANGED'||!trialPurchaseOptionsEnabled(state)) return result;
         refusedTrialCreates.set(key,{quoteId,result});
         if (!state.trialDropNextExternalRefusal) return result;
         delete state.trialDropNextExternalRefusal;
-        return {...result,drop:true};
+        return refused(503,'TRIAL_CREATE_RESPONSE_UNAVAILABLE');
       };
       const existing = openIntent(subject);
-      if (existing) return rememberTrialRefusal(existingIntentRefusal(existing, source.payload));
-      if (subject.kind==='TRIAL_CONVERT'&&state.trialBalancePurchase) return rememberTrialRefusal(balanceConflict());
+      if (existing) return existingIntentRefusal(existing, source.payload);
+      if (subject.kind==='TRIAL_CONVERT'&&state.trialBalancePurchase) return balanceConflict();
       if (!historicalSeed && orderTopupEnabled() && orderUsdt(subject.kind, source.quote.paymentMethod)) return refused(409, 'ORDER_USDT_USE_TOPUP');
       if (!networkOpen(source.quote.paymentMethod)) return refused(409, 'CREGIS_DIRECT_PAYMENT_PAUSED');
       if (deadline <= Date.now()) return refused(409, 'ORDER_PAYMENT_EXPIRED');
@@ -462,7 +471,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       // Reprice the trial at the original quote time while applying the current policy.
       let trial = null;
       try {
-        if (subject.kind==='TRIAL_CONVERT') trial=trialPricing(url,request,source.payload,source.pricingAt);
+        if (subject.kind==='TRIAL_CONVERT') {
+          if (state.trialDropNextExternalRefusal&&state.trialQuoteState==='precision') state.trialQuoteState='precision-repriced';
+          trial=trialPricing(url,request,source.payload,source.pricingAt);
+        }
       } catch (error) {
         if (error.message!=='TRIAL_QUOTE_CHANGED'||!error.data) throw error;
         return rememberTrialRefusal({status:409,message:error.message,data:error.data});
@@ -483,7 +495,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? new URL(intentNo, previewPurchaseCashier).href : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin,
-        trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{trialClaimNo:trial.claimNo})};
+        trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{claimNo:trial.claimNo,version:1,reconciliationStatus:'PENDING'})};
       if (suspended) {
         suspendedIntents.delete(intentNo);
         addDemoPaymentQuotaHold(state, suspended.quotaHold);
@@ -497,10 +509,10 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     }
     if (path === `${base}-intents` && method === 'GET') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
-      const denial=url.searchParams.get('kind')==='TRIAL_CONVERT'&&refusedTrialCreates.get(url.searchParams.get('commandKey'));
-      if (denial) return denial.result;
       const intent = [...intents.values()].find(row => row.kind === url.searchParams.get('kind') && row.commandKey === url.searchParams.get('commandKey'));
-      return readIntent(intent);
+      if (intent) return readIntent(intent);
+      const denial=url.searchParams.get('kind')==='TRIAL_CONVERT'&&refusedTrialCreates.get(url.searchParams.get('commandKey'));
+      return denial?.result??readIntent(null);
     }
     const snapshot = path.match(/^\/api\/app\/purchase-payment-intents\/snapshots\/([^/]+)$/);
     if (snapshot && method === 'GET') {
@@ -521,7 +533,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     sync();
     const current=originalTrialPurchase();
     if (!enabled) {
-      const intent=intents.get(current?.paymentNo);
+      const intent=intents.get(current?.intentNo);
       if (intent?.trialSample) expire(intent,'PAYMENT_TIMEOUT');
       return {status:200};
     }
@@ -533,15 +545,18 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const now=Date.now(), deadline=now-graceEnd(intent.paymentMethod,0)-60000;
       Object.assign(intent,{deadline,expiresAt:new Date(deadline).toISOString(),deadlineAt:new Date(deadline).toISOString(),
         confirmationGraceEndsAt:new Date(graceEnd(intent.paymentMethod,deadline)).toISOString()});
+      delete intent.trialPurchaseOutcome;
       if (transition==='external-expired') {
-        delete intent.trialLateDisposition;
+        Object.assign(intent,{status:'EXPIRED',reason:'PAYMENT_TIMEOUT',reconciliationStatus:'QUERY_UNKNOWN'});
+      } else if (transition==='external-unpaid-terminal') {
         expire(intent,'PAYMENT_TIMEOUT');
       } else {
         lateArrival(intent,now);
+        Object.assign(intent,{confirmedAt:now,reconciliationStatus:'REVIEW'});
         if (transition==='external-late') {
-          intent.trialLateDisposition='LATE_REFUND_RESELECT_ALLOWED';
+          intent.trialPurchaseOutcome='LATE_PAYMENT_REVIEW';
           removeDemoPaymentQuotaHold(state,intent.quotaHold);
-        } else delete intent.trialLateDisposition;
+        }
       }
       return {status:200};
     }

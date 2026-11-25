@@ -41,7 +41,8 @@ export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProdu
   const failed = () => active() && (options.current.status === "failed"
     || (options.current.status === "ready" && options.current.options.some(trialOptionReadFailed)));
   async function read() {
-    if (active() && foregroundReadAllowed() && options.claimNo === claim.value) await options.refresh();
+    if (active() && foregroundReadAllowed() && options.claimNo === claim.value
+        && options.current.status !== "unsupported" && options.current.status !== "not-convertible") await options.refresh();
   }
   const recovery = useAutoRecovery({
     active, failed, retry: read, quiet: false, repeatMs: 30_000,

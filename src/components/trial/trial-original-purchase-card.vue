@@ -9,7 +9,7 @@
         <text class="tpc__method">{{ methodText }}</text>
       </view>
       <view class="tpc__side">
-        <text class="tpc__amount"><text class="tpc__cur">$</text>{{ amount.whole }}<text class="tpc__dec">{{ amount.decimals }}</text></text>
+        <text class="tpc__amount"><text v-if="amount" class="tpc__cur">$</text>{{ amount?.whole ?? '—' }}<text v-if="amount" class="tpc__dec">{{ amount.decimals }}</text></text>
         <view class="tpc__status" :class="{ 'tpc__status--warn': status.tone === 'warning' }">
           <view v-if="status.kind === 'confirming'" class="tpc__spinner" aria-hidden="true" />
           <text>{{ status.text }}</text>
@@ -50,7 +50,7 @@ const loopRef = loops.elRef;
 
 const methodText = computed(() => {
   switch (props.purchase.paymentMethod) {
-    case "UVEL_USDT_WALLET": return copy.value.balancePay;
+    case "WALLET": return copy.value.balancePay;
     case "HDPAY_BANK": return payCopy.value.bank;
     case "CREGIS_USDT_ERC20": return payCopy.value.erc20;
     case "CREGIS_USDT_TRC20": return payCopy.value.trc20;
@@ -58,6 +58,7 @@ const methodText = computed(() => {
   }
 });
 const amount = computed(() => {
+  if (props.purchase.confirmedAmountUSD === null) return null;
   const text = formatGroupedAmount(props.purchase.confirmedAmountUSD, 2);
   const at = text.indexOf(".");
   return at < 0 ? { whole: text, decimals: "" } : { whole: text.slice(0, at), decimals: text.slice(at) };

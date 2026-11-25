@@ -1,5 +1,9 @@
 import type { PurchasePaymentIntent } from '@/api/purchase-payment-api';
 
+export function isUnpaidPaymentTerminal(intent: PurchasePaymentIntent | null) {
+  return intent?.status === 'EXPIRED' && (intent.kind !== 'TRIAL_CONVERT' || intent.trialPurchaseOutcome === 'UNPAID_TERMINAL');
+}
+
 /** The confirmation window never grants additional time to send a payment. */
 export function purchasePaymentTiming(intent: PurchasePaymentIntent | null, now: number, orderDeadline: number | null = null) {
   const ends = [intent?.expiresAt, intent?.deadlineAt, intent?.expirationTime].filter((value): value is string => !!value).map(Date.parse);
@@ -12,5 +16,6 @@ export function purchasePaymentTiming(intent: PurchasePaymentIntent | null, now:
   return { cutoff, left: cutoff === null ? null : Math.max(0, cutoff - now),
     canPay: !!intent && intent.status === 'AWAITING_PAYMENT' && intent.paymentAllowed !== false && !pastDeadline,
     networkPaused,
-    confirming: pending && (pastDeadline || intent?.status === 'AWAITING_PAYMENT' && intent.paymentAllowed === false && !networkPaused) };
+    confirming: intent?.kind === 'TRIAL_CONVERT' && intent.status === 'EXPIRED' && !isUnpaidPaymentTerminal(intent)
+      || pending && (pastDeadline || intent?.status === 'AWAITING_PAYMENT' && intent.paymentAllowed === false && !networkPaused) };
 }

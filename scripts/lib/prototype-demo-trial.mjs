@@ -17,25 +17,15 @@ const capped=(amount,cap)=>String(cap??'').trim()===''?amount:min(amount,units(c
 const liveStates=['ACTIVE','GRACE','EXTENDED'];
 const day=86400000,proof={sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const refuse=(message,data,status=409)=>{throw Object.assign(new Error(message),{status,data});};
-const rejectPurchase=(reasonCode,details)=>refuse(reasonCode,{reasonCode,...details});
 const optionSku=['stellarrack-p1','cloud-share','stellarbox-pro','stellarbox-pro-v2','stellarbox-s1','stellarrack-p2'];
-const purchaseLimits={
-  PRODUCT_OUT_OF_STOCK:'TRIAL_PRODUCT_SOLD_OUT',
-  PURCHASE_GATE_SOLD_OUT:'TRIAL_PRODUCT_QUOTA_EXHAUSTED',
-  ORDER_MONTHLY_QUOTA_EXHAUSTED:'TRIAL_PRODUCT_QUOTA_EXHAUSTED',
-  PURCHASE_GATE_NOT_MET:'TRIAL_PRODUCT_REQUIREMENTS_NOT_MET',
-  ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET:'TRIAL_PRODUCT_REQUIREMENTS_NOT_MET',
-  PRODUCT_NOT_RELEASED:'TRIAL_PRODUCT_REMOVED',
-  ORDER_MONTHLY_QUOTA_PAUSED:'TRIAL_PURCHASE_UNAVAILABLE',
-};
 export const trialPurchaseOptionSku=state=>state.trialPurchaseOptionTarget==='trial-device'
   ? state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku) : 'stellarrack-p1';
 export const trialPurchaseOptionsEnabled=state=>state.trialPurchaseReadState!=='unsupported';
 export const trialPurchaseDevice=(product,productName=product.name)=>({
-  productNo:product.id,productName,productType:product.productType,imageUrl:product.imageUrl??null,
+  productNo:product.id,name:productName,productType:product.productType,imageUrl:product.imageUrl??null,
 });
-const wireQuote=quote=>Object.fromEntries(Object.entries(quote).map(([key,value])=>
-  typeof value==='number'&&/(Usdt|Nex)$/.test(key)?[key,fixed(units(value))]:[key,value]));
+export const wireTrialQuote=({trialOffsetCapUSD: _,...quote})=>Object.fromEntries(Object.entries(quote).map(([key,value])=>
+  typeof value==='number'&&/(Usdt|Nex)$/.test(key)?[key,value.toFixed(6)]:[key,value]));
 
 export function trialDemo(url,locale,state,request,capacityFull,products,requirePurchase){
   if(!url.pathname.startsWith('/api/trial/'))return undefined;
@@ -94,7 +84,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   },cfg.trialProductName);
   function accruedAt(at){
     const days=min(BigInt(Math.max(0,Math.floor((at-row.startedAt)/1000)))*100000000n/86400n,BigInt(cfg.trialDays)*100000000n);
-    return {shadow:units(cfg.shadowDailyUSD)*days/100000000n,nex:units(cfg.shadowDailyNEX)*days/100000000n};
+    const shadow=units(cfg.shadowDailyUSD)*days/100000000n;
+    return {shadow:max(0n,shadow-units(state.trialAccrualReductionUsdt??0)),nex:units(cfg.shadowDailyNEX)*days/100000000n};
   }
   const snapshot=()=>{
     if(row.state==='ACTIVE'&&now>=row.startedAt+duration)row.state='GRACE';
@@ -110,7 +101,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const quote=live?quoteFor(shadow,nex,reportedState==='ACTIVE'):undefined;
     const purchase=live&&usesOptions?originalPurchase():null;
     const purchaseSnapshot=purchase?.kind==='EXTERNAL'
-      ? {...purchase,expiresAt:new Date(atTrialClock(Date.parse(purchase.expiresAt))).toISOString()} : purchase;
+      ? {...purchase,deadlineAt:new Date(atTrialClock(Date.parse(purchase.deadlineAt))).toISOString()} : purchase;
     return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?'DEMO-TRIAL':null,version:row.version||1,serverNowEpochMs:trialNow,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
@@ -118,7 +109,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       cooldownUntilEpochMs:row.cooldownUntil??null,
       shadowUsdt:number(shadow),shadowNex:number(nex),
       offsetUsdt:quote?.offsetUsdt??0,remainderUsdt:quote?.remainderUsdt??0,priceUsdt:Number(cfg.trialPriceUSD),
-      ...(quote?{quote}:{}),...(conversion||{}),...(purchaseSnapshot?{originalPurchase:purchaseSnapshot}:{})};
+      ...(quote?{quote}:{}),...(conversion||{}),...(claimed&&usesOptions?{originalPurchase:purchaseSnapshot}: {})};
   };
   function quoteFor(shadow,nex,inTerm,sku=cfg.trialProductId,priceUsdt=cfg.trialPriceUSD){
       const discount=units(cfg.earlyPurchaseDiscountUSD)/10000n*10000n;
@@ -134,7 +125,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       const terms=usesOptions
         ? [row.startedAt,sku,fixed(price),cfg.discountRate,cfg.discountCapUSD,cfg.earlyPurchaseDiscountUSD,cfg.trialOffsetCapUSD]
         : early?['ACCRUED_OFFSET','DEMO-TRIAL',...[settled,reward,promo].map(fixed),fixed(discount).slice(0,-4),cfg.trialOffsetCapUSD==null?'null':fixed(units(cfg.trialOffsetCapUSD))]:null;
-      const quoteVersion=terms?settlementPolicy+':'+createHash('sha256').update(usesOptions?JSON.stringify(terms):terms.join('|')).digest('hex').slice(0,16):settlementPolicy;
+      const quoteVersion=terms?settlementPolicy+':'+createHash('sha256').update(usesOptions?JSON.stringify(terms):terms.join('|')).digest('hex').slice(0,usesOptions?24:16):settlementPolicy;
       return {settlementPolicy,quoteVersion,earlyPurchase:early,priceUsdt:number(price),accruedUsdt:number(shadow),accruedNex:number(nex),
         settledUsdt:number(settled),rewardNex:number(reward),earlyRewardUsdt:number(settled-shadow),earlyRewardNex:number(reward-nex),
         offsetUsdt:number(offset),remainderUsdt:number(settled-offset),promoDiscountUsdt:number(promo),earlyDiscountConfiguredUsdt:number(discount),earlyDiscountUsdt:number(earlyDiscount),
@@ -144,25 +135,26 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   function purchaseOption(item,isTrialProduct,current) {
     const device=isTrialProduct?trialDevice():trialPurchaseDevice(item);
     const priceUsdt=isTrialProduct?cfg.trialPriceUSD:item.price;
-    const option={...device,inventoryMode:item?.inventoryMode??'FINITE',visible:true,isTrialProduct,
-      priceUsdt:fixed(units(priceUsdt)),...(isTrialProduct&&{marketPriceUsdt:item?fixed(units(item.price)):null})};
+    const option={...device,inventoryMode:item?.inventoryMode??'FINITE',originalTrialProduct:isTrialProduct,
+      paymentMethods:isTrialProduct?['WALLET','CREGIS_USDT_BSC','HDPAY_BANK']:['WALLET'],
+      priceUsdt:fixed(units(priceUsdt)),...(isTrialProduct&&{storePriceUsdt:item?fixed(units(item.price)):null})};
     const simulatedFailure=state.trialPurchaseOptionState==='quote-error'&&device.productNo===trialPurchaseOptionSku(state);
     const missingTerms=cfg.shadowDailyUSD==null||cfg.shadowDailyNEX==null;
-    if(simulatedFailure||missingTerms)return {...option,canBuy:false,reasonCode:'TRIAL_OPTION_QUOTE_UNAVAILABLE'};
+    if(simulatedFailure||missingTerms)return {...option,canPurchase:false,unavailableReason:'TRIAL_PRODUCT_QUOTE_UNAVAILABLE'};
     const pricedAt=current.serverNowEpochMs,{shadow,nex}=accruedAt(pricedAt);
     const quote=quoteFor(shadow,nex,current.state==='ACTIVE',device.productNo,priceUsdt);
     let reasonCode=null;
-    if(!item||item.status!=='active'||!item.available)reasonCode='TRIAL_PRODUCT_REMOVED';
-    else if(state.trialConversionEnabled===false)reasonCode='TRIAL_PURCHASE_UNAVAILABLE';
+    if(!item||item.status!=='active'||!item.available)reasonCode='PRODUCT_NOT_AVAILABLE';
+    else if(state.trialConversionEnabled===false)reasonCode='TRIAL_KILL_SWITCH_DISABLED';
     else {
       try {
         requirePurchase(device.productNo,isTrialProduct);
       } catch(error) {
         if(!error.status)throw error;
-        reasonCode=purchaseLimits[error.message]??'TRIAL_PURCHASE_UNAVAILABLE';
+        reasonCode=error.message;
       }
     }
-    return {...option,canBuy:!reasonCode,reasonCode,quote};
+    return {...option,canPurchase:!reasonCode,unavailableReason:reasonCode,quoteVersion:quote.quoteVersion,quote};
   }
 
   function extraProducts() {
@@ -194,7 +186,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   function conversionOrder(orderNo,at,quote,device=trialDevice()){
     const price=quote.priceUsdt,amount=quote.amountUsdt;
     const productIndex=products.findIndex(product=>product.id===device.productNo);
-    const {productNo,productName,imageUrl}=device;
+    const {productNo,name:productName,imageUrl}=device;
     const paidTotalUsdt=(Number((units(amount)+5000n)/10000n)/100).toFixed(2);
     // Wallet conversion has no payment record for the order-history method.
     return {orderNo,productId:productIndex+1,productNo,productName,trialClaimedDeviceName:cfg.trialProductName,
@@ -228,38 +220,43 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(url.pathname==='/api/trial/cancel'){
     const purchase=originalPurchase();
     if(row.state!=='ACTIVE')refuse('TRIAL_NOT_CANCELLABLE');
-    if(purchase?.kind==='EXTERNAL'||purchase?.status==='PROCESSING')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS');
+    if(purchase?.kind==='EXTERNAL')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS');
+    if(purchase?.kind==='BALANCE')refuse('TRIAL_BALANCE_SUBMISSION_IN_PROGRESS',purchase);
     Object.assign(row,{state:'CANCELLED',finishedAt:now,version:(row.version||1)+1});return remember(snapshot());
   }
   if(url.pathname==='/api/trial/purchase-options'){
-    if(!usesOptions)refuse('TRIAL_PURCHASE_OPTIONS_NOT_SUPPORTED',null,404);
+    if(!usesOptions)refuse('RESOURCE_NOT_FOUND',null,404);
     if(state.trialPurchaseReadState==='error'&&!request.trialPurchaseSample)refuse('TRIAL_PURCHASE_OPTIONS_UNAVAILABLE',null,503);
     const current=snapshot();
-    if(!liveStates.includes(current.state)||!current.claimNo)rejectPurchase('TRIAL_NOT_CONVERTIBLE');
+    if(!liveStates.includes(current.state)||!current.claimNo)refuse('TRIAL_NOT_CONVERTIBLE');
     const options=[purchaseOption(trialProduct(),true,current),...extraProducts().map(item=>purchaseOption(item,false,current))]
-      .map(option=>option.quote?{...option,quote:wireQuote(option.quote)}:option);
+      .map(option=>option.quote?{...option,quote:wireTrialQuote(option.quote)}:option);
     return {claimNo:current.claimNo,serverTime:new Date(current.serverNowEpochMs).toISOString(),options};
   }
   if(url.pathname==='/api/trial/convert'){
     // An external payment settles the quote it was priced on (VerifiedPurchasePayment), with no wallet debit.
     const current=snapshot(),body=request.postDataJSON(),paid=request.verifiedPayment;
-    const deny=usesOptions?rejectPurchase:refuse;
     const purchase=originalPurchase();
-    if(!paid&&purchase&&!(purchase.kind==='BALANCE'&&purchase.submissionNo===key&&request.acceptedTrialSubmissionNo===key))
-      deny('TRIAL_EXISTING_PURCHASE',{originalPurchase:purchase});
-    if(!liveStates.includes(current.state))deny('TRIAL_NOT_CONVERTIBLE');
+    if(!paid&&purchase&&!(purchase.kind==='BALANCE'&&purchase.commandKey===key&&request.acceptedTrialSubmissionNo===key))
+      refuse(purchase.kind==='BALANCE'?'TRIAL_BALANCE_SUBMISSION_IN_PROGRESS':'TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS',purchase);
+    if(!liveStates.includes(current.state))refuse('TRIAL_NOT_CONVERTIBLE');
     if(usesOptions&&!paid&&!request.walletAuthorized)refuse('PAYMENT_PASSWORD_REQUIRED',null,422);
     const isTrialProduct=body.productNo===cfg.trialProductId;
     if(!usesOptions&&!isTrialProduct)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
-    if(!isTrialProduct&&paid)deny('TRIAL_BALANCE_ONLY');
-    if(!paid&&body.paymentMethod&&body.paymentMethod!=='UVEL_USDT_WALLET')
-      deny(isTrialProduct?'TRIAL_PURCHASE_UNAVAILABLE':'TRIAL_BALANCE_ONLY');
+    if(!isTrialProduct&&paid)refuse('TRIAL_EXTERNAL_PAYMENT_METHOD_UNSUPPORTED');
+    if(!paid&&body.paymentMethod&&body.paymentMethod!=='WALLET')
+      refuse('REQUEST_BODY_INVALID',null,400);
     if(body.voucherId||body.promotionQuoteId||body.replacementDeviceId||(body.quantity!=null&&body.quantity!==1))
-      deny('TRIAL_PURCHASE_UNAVAILABLE');
+      refuse('TRIAL_KILL_SWITCH_DISABLED');
     const selectedProduct=isTrialProduct?trialProduct():extraProducts().find(item=>item.id===body.productNo);
-    if(usesOptions&&!isTrialProduct&&!selectedProduct)deny('TRIAL_PRODUCT_REMOVED');
+    if(usesOptions&&!isTrialProduct&&!selectedProduct)refuse('TRIAL_PRODUCT_NOT_ELIGIBLE');
     const option=usesOptions&&!paid?purchaseOption(selectedProduct,isTrialProduct,current):null;
-    if(option&&!option.canBuy)deny(option.reasonCode==='TRIAL_OPTION_QUOTE_UNAVAILABLE'?'TRIAL_PURCHASE_UNAVAILABLE':option.reasonCode);
+    if(option&&!option.canPurchase) {
+      const reason=option.unavailableReason;
+      if(isTrialProduct&&['PRODUCT_NOT_AVAILABLE','PRODUCT_OUT_OF_STOCK','PRODUCT_PRICE_INVALID'].includes(reason))
+        refuse('TRIAL_PRODUCT_NOT_AVAILABLE');
+      refuse(reason==='TRIAL_PRODUCT_QUOTE_UNAVAILABLE'?'TRIAL_DAILY_YIELD_INVALID':reason);
+    }
     let quote=option?.quote??current.quote;
     if(paid){
       const pricedAt=atTrialClock(paid.pricingAt);
@@ -271,14 +268,11 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const expected=body.expectedAmountUsdt;
     if(typeof expected!=='number'||!Number.isFinite(expected)||expected<0||expected>1000000
       ||!/^\d+(?:\.\d{1,2})?$/.test(String(expected)))refuse('TRIAL_AMOUNT_INVALID');
-    if((usesOptions||body.quoteVersion)&&body.quoteVersion!==quote.quoteVersion)
-      deny('TRIAL_QUOTE_CHANGED',{quote:wireQuote(quote)});
-    if((units(amount)+5000n)/10000n>units(expected,2)) {
-      if(usesOptions)deny('TRIAL_QUOTE_CHANGED',{quote:wireQuote(quote)});
-      refuse('TRIAL_AMOUNT_MISMATCH');
-    }
+    const changed=usesOptions?{claimNo:current.claimNo,productNo:body.productNo,quoteVersion:quote.quoteVersion,quote:wireTrialQuote(quote)}:null;
+    if((usesOptions||body.quoteVersion)&&body.quoteVersion!==quote.quoteVersion) refuse('TRIAL_QUOTE_CHANGED',changed);
+    if((units(amount)+5000n)/10000n>units(expected,2)) refuse('TRIAL_AMOUNT_MISMATCH',changed);
     const hardwareQuotaUsedAt=requirePurchase(body.productNo,isTrialProduct);
-    if(!paid&&amount>0&&units(demoWalletUsdt(state))<units(amount))deny('TRIAL_WALLET_INSUFFICIENT');
+    if(!paid&&amount>0&&units(demoWalletUsdt(state))<units(amount))refuse('TRIAL_WALLET_INSUFFICIENT');
     const device=isTrialProduct?trialDevice():trialPurchaseDevice(selectedProduct);
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
     const orderNo='TRC-DEMO'+now;
@@ -293,12 +287,16 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     state.createdOrders??=[];state.createdOrders.unshift(order);state.trialOrderNo=orderNo;
     Object.assign(row,{state:'REDEEMED',finishedAt:now,settlementAt:atTrialClock(now),version:(row.version||1)+1});
     delete state.trialBalancePurchase;
+    delete state.trialBalanceCanResume;
     state.trialOriginalPurchaseState='none';
     const source='nx_trial_claim + nx_order + nx_order_item';
     const settled={amountUsdt:amount,discountUsdt:quote.discountUsdt,
       remainderUsdt:quote.remainderUsdt,rewardNex:quote.rewardNex,earlyRewardUsdt:quote.earlyRewardUsdt,
       earlyRewardNex:quote.earlyRewardNex,earlyDiscountUsdt:quote.earlyDiscountUsdt};
-    return remember({...proof,orderNo,productNo:body.productNo,...(usesOptions?wireQuote(settled):settled),paymentStatus:'PAID',orderStatus:'PAID',
+    return remember({...proof,orderNo,productNo:body.productNo,...settled,paymentStatus:'PAID',orderStatus:'PAID',
+      ...(usesOptions&&{claimNo:current.claimNo,quoteVersion:quote.quoteVersion,shadowUsdt:quote.accruedUsdt,shadowNex:quote.accruedNex,
+        offsetUsdt:quote.offsetUsdt,discountApplied:quote.promoDiscountUsdt,purchasedDevice:device,settlement:wireTrialQuote(quote),
+        deviceId:now}),
       paymentRail:paid?.paymentMethod??'UVEL_USDT_WALLET',...(!paid&&{paidTotalUsdt:order.paidTotalUsdt}),
       settlementPolicy:quote.settlementPolicy,earlyPurchase:quote.earlyPurchase,source,provenance:{...proof,source}});
   }
