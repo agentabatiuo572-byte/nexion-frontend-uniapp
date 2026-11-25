@@ -262,6 +262,9 @@ export function createPaymentPasswordCoordinator(api: PaymentPasswordApi, identi
         ui.error = changeNotSeen ? "changeNotCompleted" : paymentPasswordErrorKey(new ApiError({ kind: "business", message: result.message ?? "PAYMENT_PASSWORD_UPDATE_REJECTED" }));
         if (command.operation === "change") {
           ui.changeError = ui.error;
+          // A wallet payment that opened this layer owns it: settle the old change receipt quietly and hand the layer back
+          // to that payment's PIN input instead of hiding it with its authorization still waiting.
+          if (ui.context) { ui.error = ""; void load(); return; }
           ui.visible = false;
           return;
         }

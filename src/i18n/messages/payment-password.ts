@@ -31,7 +31,7 @@ export const paymentPinZH: typeof paymentPinEN = {
   current: "当前支付密码", new: "新支付密码", confirmNew: "确认新支付密码", save: "保存修改", forgot: "忘记支付密码", close: "关闭", cancel: "取消支付", back: "返回", incomplete: "请输入完整的 6 位数字",
   due: "应付", autoSubmit: "输入完成后将提交支付", autoConfirm: "输入完成后将确认购买／置换", details: "展开明细", hideDetails: "收起明细", detailsAmount: "金额（{unit}）",
   readFailed: "暂时无法读取支付密码状态，请重试", failed: "暂时无法完成操作，请重试", mismatch: "两次输入的新支付密码不一致，请重新输入", simple: "请勿使用重复或连续的简单数字。", incorrect: "支付密码不正确，还可尝试 {n} 次", locked: "输入错误次数过多，请在 {time} 后重试", lockedLabel: "暂时锁定", versionChanged: "支付密码已发生变化，请重新读取状态后再试", samePassword: "新支付密码不能与当前支付密码相同",
-  pending: "正在确认设置结果，请勿重复提交修改", retry: "重试", returnMe: "返回个人中心",
+  pending: "正在确认支付密码更新结果，请勿重复提交", retry: "重试", returnMe: "返回个人中心",
   recoveryIntro: "验证身份后，可设置新的支付密码", code: "短信验证码", sendCode: "获取验证码", resend: "重新发送", verify: "验证身份", phoneUnavailable: "手机不可用", recoveryUnavailable: "当前无法通过短信验证，请联系客服协助核实身份", support: "联系客服", codeInvalid: "验证码验证失败，请检查或重新获取验证码", proofExpired: "身份验证已过期，请重新验证身份", newTitle: "设置新支付密码", confirmNewTitle: "确认新支付密码", confirmReset: "确认重置", entered: "已输入 {n} 位，共 6 位",
   verifyTitle: "验证当前支付密码", verifyHint: "输入完成后自动验证", verifying: "正在验证…", reload: "重新加载",
   changeProofExpired: "验证已失效，请重新输入当前支付密码。",
