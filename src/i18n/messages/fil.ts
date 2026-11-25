@@ -4717,6 +4717,7 @@ export const fil: Messages = {
     todayTag: "Huling araw",
     expiredToast: "Lampas na ang claim date ng reward para sa {m}",
     resendNote: "Hindi umabot ang huling claim",
+    salaryStaleNote: "Hindi pa ma-load ang buwanang reward. Awtomatiko itong mag-a-update.",
     resendBtn: "Ipadala muli ang claim",
     topRank: "Pinakamataas na rank",
     trayNow: "I-claim ang {b}",

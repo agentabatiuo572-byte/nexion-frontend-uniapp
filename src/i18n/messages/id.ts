@@ -4717,6 +4717,7 @@ export const id: Messages = {
     todayTag: "Hari terakhir",
     expiredToast: "Batas klaim hadiah bulan {m} sudah lewat",
     resendNote: "Klaim sebelumnya tidak terkirim",
+    salaryStaleNote: "Hadiah bulanan belum dapat dimuat. Data akan diperbarui otomatis.",
     resendBtn: "Kirim ulang klaim",
     topRank: "Peringkat tertinggi",
     trayNow: "Klaim {b}",
