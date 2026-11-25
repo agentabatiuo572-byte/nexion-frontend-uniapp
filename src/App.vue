@@ -12,6 +12,10 @@ import { refreshNativeRankFxFlags } from "@/lib/native-rank-fx";
 import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
 // #endif
 import { navReset } from "@/lib/route";
+// #ifdef APP-PLUS
+import { navReplace } from "@/lib/route";
+import { pendingTrialTopupHref } from "@/lib/trial-topup-return";
+// #endif
 import { logicalNativePage } from "@/lib/native-tab-navigation";
 import { ApiError } from "@/api/errors";
 import { reportNativeSessionStage, reportNativeSessionTiming } from "@/api/native-session-storage";
@@ -366,13 +370,18 @@ function stopTrialPoll() {
 }
 
 const IDLE_READ_MS = 30 * 60_000;
-const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/me", "pages/me/devices", "pages/me/trial"]);
+const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/me", "pages/me/devices", "pages/me/trial",
+  "pages/store/store", "pages/store/detail"]);
 let scheduledReadBinding = "";
 let idleReadOffset = 0;
 let lastIdleSlot = 0;
 let trialExpiryAttempt = "";
 let lastTrialNoticeEpoch = -1;
 let lastTrialNoticeStatus: ReturnType<typeof useFreeTrial>["status"] = "none";
+// #ifdef APP-PLUS
+let nativeTrialTopupRestored = false;
+let nativeTrialTopupReadPending = false;
+// #endif
 
 function refreshVisibleResource(route: string) {
   if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible(false, route === "pages/me/devices");
@@ -390,6 +399,22 @@ function runScheduledReads(route: string, reconnected = false) {
   if (!canRefreshRemoteAccount(auth) || app.accountKey !== auth.accountId) return;
   const binding = `${app.accountKey}:${app.accountBindingEpoch}`;
   const resumed = binding !== scheduledReadBinding;
+  // #ifdef APP-PLUS
+  if (route !== "pages/index/index") nativeTrialTopupRestored = true;
+  if (!nativeTrialTopupRestored && !nativeTrialTopupReadPending && (resumed || reconnected)) {
+    nativeTrialTopupReadPending = true;
+    const accountKey = app.accountKey, accountEpoch = app.accountBindingEpoch;
+    const current = () => !nativeTrialTopupRestored && app.accountKey === accountKey && app.accountBindingEpoch === accountEpoch
+      && readCurrentRoute() === "pages/index/index" && foregroundReadAllowed();
+    void pendingTrialTopupHref(accountKey, current).then(href => {
+      if (!current()) return;
+      nativeTrialTopupRestored = true;
+      if (href) void navReplace(href);
+    }).catch(() => {
+      // The next foreground or reconnect read can recover this saved return.
+    }).finally(() => { nativeTrialTopupReadPending = false; });
+  }
+  // #endif
   const now = Date.now();
   if (resumed) {
     let hash = 2166136261;

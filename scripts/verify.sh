@@ -2172,16 +2172,13 @@ trial02_machine_invariants() {
 }
 trial02_machine_invariants
 
-# 哨兵D:试用价双源等值 —— checkout 促销折扣行算自 trial-config.trialPriceUSD,
-# 结算基数用商品目录 products[trialProductId].price;后台独立改任意一边即静默
-# 脱节。运行时不耦合(生产 = 两张后端表),mock 侧焊值 parity 机器门;提取失败
-# (字段/商品被删、指针悬空)同样转红,不允许「找不到 = 静默全过」。
+# 哨兵D:试用设备保持领取锁价，其他设备走商城现价，同一笔转购绑定同一款的报价和版本。
 trial02_price_parity() {
   local out
   if out=$("$NODE_BIN" scripts/selfcheck-trial-price-parity.mjs 2>&1); then
-    ok "TRIAL02 trial price dual-source parity: $out"
+    ok "TRIAL02 trial quote identity and claim price: $out"
   else
-    bad "TRIAL02 trial price dual-source parity broken"
+    bad "TRIAL02 trial SKU quote or claim price drift"
     echo "$out" | sed 's/^/        /'
   fi
 }

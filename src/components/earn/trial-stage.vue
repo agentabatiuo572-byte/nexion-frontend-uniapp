@@ -63,7 +63,7 @@ const gaugeProgress = computed(() => visibility.hidden || presentation.offsetPro
 function money(value: number | null) {
   return visibility.mask(value === null ? "—" : `$${formatAmount(value)}`);
 }
-const buyText = computed(() => presentation.status.value === "grace" ? copy.value.buy : copy.value.buyEarly);
+const buyText = computed(() => copy.value.buy);
 // A failed trial read shows no strip (03 §3.4); the dimmed buy pill still tells screen readers why.
 const buyLabel = computed(() => trial.lastReadFailed && !presentation.actionsReady.value ? `${buyText.value} · ${copy.value.unknown}` : undefined);
 function goDetails() { navTo("/pages/me/trial"); }

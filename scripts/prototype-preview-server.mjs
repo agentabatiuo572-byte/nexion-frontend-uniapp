@@ -6,7 +6,7 @@ import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRe
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
-import { demoChainDepositAddress, initializeDemoWalletHistory, initializeLegacyStreakSavers, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, demoChainDepositFee, demoWalletUsdt, initializeDemoWalletHistory, initializeLegacyStreakSavers, postDemoWalletEntries, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { demoLongContentAvailable, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
@@ -63,7 +63,9 @@ let scenarioEpoch=state.scenarioEpoch??0;
 const checkoutFlow=process.env.DEMO_CHECKOUT_FLOW!=='0'?createCheckoutFlowFixture(state,()=>locale,meEntryDots.orderProjection):null;
 const fixtureFor=(url,request)=>{
   if(['/api/app/team/quota','/api/store/purchase-eligibility'].includes(url.pathname))checkoutFlow?.observePayments();
-  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,request),state);
+  return demoPromotionResponse(url,request.method(),demoFixture(url,locale,state,{
+    ...request,originalTrialPurchase:checkoutFlow?.originalTrialPurchase,
+  }),state);
 };
 const messages=createPrototypeMessages({state,fixtureFor});
 const realtime=createPrototypeRealtime({state,messages,fixtureFor});
@@ -77,7 +79,7 @@ const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,
 // Browser records a scenario owns (design rule at demoSeedFleet): the App's account-scoped order, checkout, payment,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
-const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1','uvel-event-pending-accounts-v1'];
+const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-purchase-preselection-accounts-v1','nexgrid-trial-convert-accounts-v1','nexgrid-trial-checkout-accounts-v1','nexgrid-trial-topup-return-accounts-v1','uvel-event-pending-accounts-v1'];
 scenarioStorageKeys.push('nexgrid-rank-salary-command-v1');
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
@@ -252,7 +254,7 @@ const server=http.createServer(async(req,res)=>{
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
         if(['normal','device-limit'].includes(update.registrationState))state.registrationState=update.registrationState;
         if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
-        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState','trialOriginalPurchaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         // A waiting slot replacement is a full-fleet scene.
         if(update.slotReplacementState==='pending')state.fleetState='full';
         else if(state.fleetState!=='full')state.slotReplacementState='none';
@@ -273,6 +275,14 @@ const server=http.createServer(async(req,res)=>{
         const tradeinRecoverySelection=tradeinRecoveryStates.includes(update.tradeinRecoveryState)?update.tradeinRecoveryState:null;
         const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||state.contentState!==wasContent||['fleetState','slotReplacementState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','slotReplacements','slotReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
+        if(scenarioChange){
+          delete state.trialBalancePurchase;
+          delete state.trialBalanceCanResume;
+          delete state.trialAccrualReductionUsdt;
+          delete state.trialNextWalletRefusal;
+          delete state.trialDropNextExternalRefusal;
+          state.trialOriginalPurchaseState='none';
+        }
         if(scenarioChange)for(const key of ['rankSalaryClaims','rankSalaryCommands','rankSalaryTransitions','rankSalaryExpirations'])delete state[key];
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
@@ -314,6 +324,19 @@ const server=http.createServer(async(req,res)=>{
         if(update.eventState)delete state.raffleEntries;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         const now=Date.now();
+        // Preview-only provider callback for trial checkout funding without a store order.
+        if(Number.isFinite(update.trialTopupDepositUsdt)&&Number(update.trialTopupDepositUsdt.toFixed(6))===update.trialTopupDepositUsdt
+          &&update.trialTopupDepositUsdt>0&&update.trialTopupDepositUsdt<=1000000){
+          recordDemoChainDeposit(state,{network:'BEP20',
+            grossAmountUsdt:(update.trialTopupDepositUsdt+Number(demoChainDepositFee)).toFixed(6),
+            creditedUsdt:update.trialTopupDepositUsdt.toFixed(6),createdAt:now});
+        }
+        if(Number.isSafeInteger(update.trialWalletDebitUsdt)&&update.trialWalletDebitUsdt>0&&update.trialWalletDebitUsdt<=demoWalletUsdt(state)){
+          postDemoWalletEntries(state,{bizNo:'TRIAL-PREVIEW-WALLET-'+now,bizType:'TRIAL_PREVIEW_WALLET',
+            asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
+        }
+        if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
+        if(['price-change','amount-mismatch','product-unlisted'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
         if(update.promotionTiming)setDemoH4PromotionTiming(state,now);
@@ -353,6 +376,16 @@ const server=http.createServer(async(req,res)=>{
           tradeinRecoverySeed={accountId,entries};
           state.tradeinRecoveryState=tradeinRecoverySelection;
         }
+        const trialSample=demoOptions.trialOriginalPurchaseState.find(([value])=>value===update.trialOriginalPurchaseState);
+        if(trialSample&&checkoutFlow){
+          let result;
+          try { result=checkoutFlow.setTrialPurchaseSample(url.origin,trialSample[0]); }
+          catch(error){
+            if(!error.status)throw error;
+            result={status:error.status,message:error.message};
+          }
+          if(result.status!==200)return sendJson(res,{state,options:demoOptions,simulation:true,message:result.message},result.status);
+        }
         if(state.paymentState==='remote-in-progress'&&(scenarioChange||wasPaymentMode!=='remote-in-progress')) {
           const payment=checkoutFlow?.seedRemoteOrderPayment(url.origin);
           if(payment&&payment.status!==200)throw Object.assign(new Error(payment.message),{status:payment.status});
@@ -390,6 +423,8 @@ const server=http.createServer(async(req,res)=>{
       if(page&&page!==scenarioId())return refuseStale();
       if(req.method==='GET'&&url.pathname==='/api/deposits/policy'&&state.orderTopupState==='policy-loading')
         await new Promise(resolve=>setTimeout(resolve,2500));
+      if(req.method==='GET'&&url.pathname==='/api/trial/purchase-options'&&state.trialPurchaseReadState==='loading')
+        await new Promise(resolve=>setTimeout(resolve,2800));
       const orderTopup=req.method==='GET'?demoOrderTopupResponse(url,state,locale,Date.now(),req.headers,checkoutFlow):undefined;
       if(orderTopup)return sendJson(res,orderTopup.body,orderTopup.status);
       if(req.method==='GET'){
@@ -411,7 +446,9 @@ const server=http.createServer(async(req,res)=>{
         const response=await checkoutFlow.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         if(response.drop){res.destroy();return;}
         const data=response.status===200?demoPromotionResponse(url,req.method,response.data,state):response.data;
-        return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data},response.status);
+        const trialSuccess=response.status===200&&(url.pathname==='/api/trial/convert'
+          || data?.kind==='TRIAL_CONVERT'||data?.kind==='trial-convert');
+        return sendJson(res,{code:response.status===200?0:response.status,message:trialSuccess?'success':response.message,data},response.status);
       }
       if(req.method==='POST'&&authDemo.handles(url.pathname)){
         let raw='';for await(const chunk of req)raw+=chunk;
@@ -500,6 +537,8 @@ const server=http.createServer(async(req,res)=>{
         return sendJson(res,result.body,result.status);
       }
       if(bankTopupEndpoint)return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
+      if(/^\/api\/trial\/(state|eligibility|purchase-options|start|cancel|convert)$/.test(url.pathname))
+        return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {
         if(route.matcher!=='**/*'&&!route.matcher(url))continue;
@@ -516,7 +555,7 @@ const server=http.createServer(async(req,res)=>{
     const attemptSeed=savedAttempt?'<script>sessionStorage.setItem("uvel-login-attempt",'+JSON.stringify(JSON.stringify(savedAttempt))+');</script>':'';
     const clearAuth=state.sessionState==='signed-out'?'<script>localStorage.removeItem("nexgrid-auth-v1");</script>':'';
     res.end(path.extname(file)==='.html'?bytes.toString().replace('<head>','<head>'+scenarioSeed(url)+seed()+attemptSeed+clearAuth):bytes);
-  }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
+  }catch(error){console.error(req.method,req.url,error.message);if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return sendJson(res,{code:error.status,message:error.message,data:error.data??null},error.status);res.writeHead(error.code==='ENOENT'?404:500);res.end('Preview resource unavailable');}
 });
 realtime.attach(server);
 // QA can pause the provider clock and use POST /__checkout/state to observe on demand.

@@ -67,7 +67,7 @@
       <template v-else>
         <!-- === Section 1: Hero === -->
         <!-- Tinted brand: the hero's colour used to come from a three-layer aurora wash. -->
-        <view class="mx-4 nx-glass-card nx-tint overflow-hidden relative detail-hero" style="--nx-tint: var(--v5-brand)">
+        <view class="mx-4 nx-glass-card nx-tint overflow-hidden relative detail-hero" :class="{ 'detail-hero--credit': trialCreditEntry }" style="--nx-tint: var(--v5-brand)">
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
             <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
@@ -79,6 +79,18 @@
           <view class="detail-summary relative">
             <text class="detail-summary__name">{{ product.name }}</text>
             <text class="detail-summary__tagline">{{ copy.tagline }}</text>
+
+            <!-- Trial credit can buy this product (PLAN §2.3): an in-card info block (01 §1.3) that opens the trial detail with
+                 this product chosen. The amount is the server quote for one unit, never recalculated here. -->
+            <view v-if="trialCreditEntry" class="detail-trial-credit" data-testid="detail-trial-credit" role="link" tabindex="0"
+              :aria-label="trialCreditEntry.ariaLabel" @click="openTrialCredit" @keydown.enter.prevent="openTrialCredit">
+              <view class="detail-trial-credit__copy">
+                <text class="detail-trial-credit__title">{{ t.store.buyWithTrialCredit }}</text>
+                <text class="detail-trial-credit__note">{{ trialCreditEntry.limit }}</text>
+              </view>
+              <text class="detail-trial-credit__amount" aria-hidden="true"><text class="detail-trial-credit__currency">$</text>{{ trialCreditEntry.whole }}<text class="detail-trial-credit__fraction">{{ trialCreditEntry.fraction }}</text></text>
+              <svg class="detail-trial-credit__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+            </view>
 
             <view class="detail-sales-proof">
               <view class="detail-sales-stat detail-sales-stat--sold">
@@ -214,9 +226,9 @@
           </view>
         </view>
 
-        <!-- Bottom spacer — clears the chassis-level <StickyCtaBar> (driven by
+        <!-- Bottom spacer — clears the chassis-level <StickyCtaBar> (+24 for its one-line trial-credit note) (driven by
              useStickyCTA below; renders inside the bezel, absolute not fixed). -->
-        <view aria-hidden data-testid="detail-cta-clearance" style="height: calc(180px + env(safe-area-inset-bottom)); flex-shrink: 0" />
+        <view aria-hidden data-testid="detail-cta-clearance" :style="{ height: `calc(${trialCreditEntry ? 204 : 180}px + env(safe-area-inset-bottom))`, flexShrink: 0 }" />
       </template>
     </view>
   </AppChassis>
@@ -228,11 +240,11 @@ import { foregroundReadAllowed } from "@/lib/foreground-read";
 function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
   return formatPlainAmount(value).replace(/\B(?=(\d{3})+\.)/g, ",");
 }
-import { formatAmount as formatPlainAmount } from "@/lib/amount-display";
+import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange, productDailyUvtRange } from "@/lib/product-estimates";
 import { estimateRangeParts, formatEstimate, formatEstimateRange } from "@/lib/estimate-display";
 import NxIcon from "@/components/ui/nx-icon.vue";
-import { navTo, takeNavigationQuery } from "@/lib/route";
+import { navTo, takeNavigationParameters } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -277,6 +289,8 @@ import { trustNumberedRows } from "@/lib/trust-fields";
 import { usePublishedTrust } from "@/composables/use-published-trust";
 import { uiLocale, serverLanguage } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
+import { useTrialCreditOption, useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -326,8 +340,8 @@ async function refreshDetailFacts(): Promise<void> {
 
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
-  const fallback = new URLSearchParams(takeNavigationQuery("/pages/store/detail"));
-  id.value = (o.id || fallback.get('id') || "").trim();
+  const fallback = takeNavigationParameters("/pages/store/detail", ["id"]);
+  id.value = (fallback.get('id') || o.id || "").trim();
   activityId.value=(o.activityId||fallback.get('activityId')||'').trim();
   voucherContext.value=voucherEntryContext({voucherId:o.voucherId||fallback.get('voucherId')||undefined,upgradeActivityId:o.upgradeActivityId||fallback.get('upgradeActivityId')||undefined});
   if(voucherContext.value.voucherId)activityId.value='';
@@ -602,6 +616,27 @@ const annualPctText = computed(() =>
 );
 const priceText = computed(() => product.value ? `$${formatAmount(product.value.price * qty.value)}` : "-");
 
+// Trial-credit entry (PLAN §2.3, R13): only on the plain product page, not an activity or voucher entry, whose buy
+// button is not the full-price purchase the tray note describes.
+const trialCreditReadVisible = () => stickyPageVisible.value && !publicOnly.value;
+const trialCreditRead = useTrialCreditOptionsRead(trialCreditReadVisible);
+watch(trialCreditReadVisible, (visible, _, onCleanup) => {
+  if (visible) onCleanup(registerActivePageRefresh(trialCreditRead.refresh, "pages/store/detail"));
+}, { immediate: true });
+const trialCredit = useTrialCreditOption(() => product.value?.id);
+const trialCreditEntry = computed(() => {
+  const option = trialCredit.value;
+  if (!option?.quote || activityId.value || voucherContext.value.voucherId) return null;
+  const [whole, fraction] = formatGroupedAmount(option.quote.amountUSD).split(".");
+  const limit = option.productType === "SHARE" ? t.value.store.trialCreditLimitShare : t.value.store.trialCreditLimitDevice;
+  return { productNo: option.productNo, limit, whole, fraction: fraction === undefined ? "" : `.${fraction}`,
+    ariaLabel: `${t.value.store.buyWithTrialCredit} · ${limit} · $${whole}${fraction === undefined ? "" : `.${fraction}`}` };
+});
+function openTrialCredit() {
+  // The trial detail chooses this product from the query; that preselection is the trial-detail item's.
+  if (trialCreditEntry.value) navTo(`/pages/me/trial?product=${encodeURIComponent(trialCreditEntry.value.productNo)}`);
+}
+
 function dec() {
   if (qty.value > 1) qty.value -= 1;
 }
@@ -701,12 +736,14 @@ function publishStickyCTA() {
       quantity: { value:qty.value,min:1,max:maxQuantity.value,decrease:dec,increase:inc },
       amount: `${priceText.value}`,
       amountSubtext: dailyEstimateLine.value,
+      // With the trial-credit entry on this page, say once that this button is the plain full-price purchase (PLAN §2.3).
+      note: trialCreditEntry.value ? t.value.store.plainBuyNote : undefined,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry],
   publishStickyCTA,
   { immediate: true },
 );
@@ -834,6 +871,19 @@ const faqQStyle: CSSProperties = {
 /* Chinese takes no negative tracking (01 §1.2). */
 :lang(zh) .detail-summary__name { letter-spacing: 0; }
 .detail-summary__tagline { display: block; margin-top: var(--v5-space-1); font-size: var(--ui-type-list-subtitle); line-height: var(--v5-type-body-s-lh); color: var(--v5-ink-3); }
+/* Trial-credit entry: an in-card info block (01 §1.3: 12 radius, surface-2) laid out as a list row (10 §10.3: 64 high),
+   title in the content-row list-title role, limit in the list-subtitle role, the quote as the card figure (10 §10.1, Montserrat
+   per 01 §1.2) with the currency sign and decimals in supporting ink, chevron in disabled ink (03 §3.5). No scale on press. */
+.detail-trial-credit { display: flex; align-items: center; gap: var(--v5-space-3); box-sizing: border-box; min-height: 64px; margin-top: var(--v5-space-4); padding: var(--v5-space-3) var(--v5-space-3) var(--v5-space-3) var(--v5-space-4); border-radius: 12px; background: var(--v5-surface-2); cursor: pointer; }
+.detail-trial-credit:active { opacity: .6; }
+.detail-trial-credit:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.detail-trial-credit__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.detail-trial-credit__title { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.detail-trial-credit__note { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); overflow-wrap: break-word; }
+.detail-trial-credit__amount { flex: none; color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.detail-trial-credit__currency, .detail-trial-credit__fraction { color: var(--v5-ink-3); }
+.detail-trial-credit__currency { font-size: max(12px, .55em); }
+.detail-trial-credit__chevron { flex: none; color: var(--v5-ink-4); }
 .detail-sales-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--v5-space-6); margin-top: var(--v5-space-5); }
 .detail-sales-stat { display: flex; flex-direction: column; gap: var(--v5-space-1); min-width: 0; }
 .detail-sales-stat--sold { color: var(--v5-success); }
@@ -871,6 +921,10 @@ const faqQStyle: CSSProperties = {
 .detail-returns__note { display: block; padding-top: var(--v5-space-3); border-top: 1px solid var(--v5-border); color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 /* One outer corner clip; the catalog image and its pedestal keep their full size. */
 .detail-hero :deep(.detail-product-render) { border-radius:0 !important; }
+/* The trial-credit entry stays clear of the purchase tray: the art gives up the height the screen lacks, down to 216px
+   (04 商城入口). 510 = header, name block with a two-line entry and the tray with its note; Chinese needs 488. */
+.detail-hero--credit :deep(.detail-product-render) { max-height:max(216px, calc(100vh - 510px)); max-height:max(216px, calc(100dvh - 510px)); }
+:lang(zh) .detail-hero--credit :deep(.detail-product-render) { max-height:max(216px, calc(100vh - 488px)); max-height:max(216px, calc(100dvh - 488px)); }
 .detail-hero :deep(.detail-product-render > [aria-hidden]:not(:first-child)) {
   background:linear-gradient(to top, var(--v5-content-surface) 0%, color-mix(in srgb, var(--v5-content-surface) 60%, transparent) 50%, transparent 100%) !important;
 }

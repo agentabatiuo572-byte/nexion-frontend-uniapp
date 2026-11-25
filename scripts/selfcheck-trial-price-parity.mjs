@@ -1,52 +1,78 @@
 #!/usr/bin/env node
-// TRIAL02 试用价双源等值哨兵 — node 直跑,零依赖,不起 dev server:
-//   node scripts/selfcheck-trial-price-parity.mjs
-//
-// 守什么:checkout 促销折扣行算自 trial-config 的 trialPriceUSD(subtotal,
-// checkout.vue computeDiscountedPrice),结算基数用商品目录 products.ts 里
-// trialProductId 对应商品的 price(checkout.vue p.price)。今天两侧相等
-// (649/649)没有任何机器门看守;后台将来独立改任意一侧即静默脱节 ——
-// 页面显示的折扣算基 ≠ 实际结算基数。
-// 运行时保持双源不耦合(生产 = 目录表 + 试用配置表两张后端表,一致性由后端
-// 保证)——mock 侧焊这道值 parity 机器门代替耦合。
-//
-// 防删除盲区(gates-blind-to-deletion):任何一侧提取不到(字段被删/商品
-// 下架/改名/悬空指针)一律 exit 1 转红,不允许「找不到 = 静默全过」。
+// Keep the claim's locked price and the selected SKU's quote bound to its order.
+import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { demoDefaults, demoFixture, demoProducts } from "./lib/prototype-demo-data.mjs";
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const die = (msg) => {
-  console.error(`FAIL ${msg}`);
-  process.exit(1);
+const origin = "http://localhost";
+const state = { ...demoDefaults, trialState: "active", trialPurchaseListState: "five" };
+const trialState = () => demoFixture(new URL("/api/trial/state", origin), "zh", state, { method: () => "GET" });
+const purchaseOptions = () => {
+  const read = demoFixture(new URL("/api/trial/purchase-options", origin), "zh", state, { method: () => "GET" });
+  assert.equal(read.claimNo, claim.claimNo, "list and authority must share the claim");
+  const trial = read.options.find(option => option.productNo === trialSku);
+  const rack = read.options.find(option => option.productNo === "stellarrack-p1");
+  assert.ok(trial?.originalTrialProduct && trial.canPurchase && trial.quote, "missing buyable trial device");
+  assert.ok(rack && !rack.originalTrialProduct && rack.canPurchase && rack.quote, "missing buyable Rack P1");
+  assert.equal(trial.quoteVersion, trial.quote.quoteVersion);
+  assert.equal(rack.quoteVersion, rack.quote.quoteVersion);
+  assert.deepEqual(trial.paymentMethods, ["WALLET", "CREGIS_USDT_BSC", "HDPAY_BANK"]);
+  assert.deepEqual(rack.paymentMethods, ["WALLET"]);
+  return { trial, rack };
 };
+const claim = trialState();
+const trialSku = claim.config.trialProductId;
+assert.ok(claim.claimNo && trialSku && claim.quote, "preview has no live trial quote");
+const before = purchaseOptions();
+assert.equal(Number(before.trial.priceUsdt), Number(claim.quote.priceUsdt));
+assert.equal(before.trial.quote.quoteVersion, claim.quote.quoteVersion);
 
-// ── 侧 1:trial-config.ts 的 DEFAULT_TRIAL_CONFIG ──
-const cfgSrc = readFileSync(path.join(root, "src", "store", "trial-config.ts"), "utf8");
-const defIdx = cfgSrc.indexOf("DEFAULT_TRIAL_CONFIG");
-if (defIdx < 0) die("trial-config.ts: DEFAULT_TRIAL_CONFIG 不存在(被改名/删除?)");
-const defBlock = cfgSrc.slice(defIdx);
-const pidM = defBlock.match(/trialProductId:\s*"([^"]+)"/);
-if (!pidM) die("trial-config.ts: DEFAULT_TRIAL_CONFIG 里提取不到 trialProductId");
-const priceCfgM = defBlock.match(/trialPriceUSD:\s*([0-9]+(?:\.[0-9]+)?)/);
-if (!priceCfgM) die("trial-config.ts: DEFAULT_TRIAL_CONFIG 里提取不到 trialPriceUSD 数值");
-const pid = pidM[1];
-const cfgPrice = Number(priceCfgM[1]);
+state.trialPurchasePriceState = "trial-up";
+const raisedTrial = purchaseOptions().trial;
+assert.notEqual(raisedTrial.storePriceUsdt, before.trial.storePriceUsdt, "fixture must change the trial device's catalog price");
+assert.equal(raisedTrial.priceUsdt, before.trial.priceUsdt, "trial device must keep its locked price");
+assert.equal(Number(raisedTrial.quote.priceUsdt), Number(trialState().quote.priceUsdt));
+assert.equal(raisedTrial.quote.quoteVersion, before.trial.quote.quoteVersion, "catalog change must not reprice the claim");
 
-// ── 侧 2:products.ts 目录里该商品的 price ──
-const prodSrc = readFileSync(path.join(root, "src", "mock", "products.ts"), "utf8");
-const idIdx = prodSrc.indexOf(`id: "${pid}"`);
-if (idIdx < 0) die(`products.ts: 找不到 id: "${pid}" 的商品(trialProductId 悬空指针)`);
-// 搜索范围钉死在当前商品对象内(到下一个 id: " 为止),防「本商品缺 price 时
-// 静默读到下一个商品的价」;monthlyPrice 大写 P 不会误中(前置非字母守卫)。
-const nextIdIdx = prodSrc.indexOf('id: "', idIdx + 1);
-const objSlice = prodSrc.slice(idIdx, nextIdIdx > 0 ? nextIdIdx : undefined);
-const priceProdM = objSlice.match(/(?:^|[^a-zA-Z])price:\s*([0-9]+(?:\.[0-9]+)?)/);
-if (!priceProdM) die(`products.ts: "${pid}" 商品对象内提取不到 price`);
-const prodPrice = Number(priceProdM[1]);
+state.trialPurchasePriceState = "extra-up";
+const { trial, rack } = purchaseOptions();
+const rackProduct = demoProducts(state, origin).find(product => product.id === rack.productNo);
+assert.equal(trial.priceUsdt, before.trial.priceUsdt);
+assert.ok(rackProduct && Number(rack.priceUsdt) > Number(before.rack.priceUsdt), "fixture must reprice Rack P1");
+assert.equal(Number(rack.priceUsdt), rackProduct.price);
+assert.equal(Number(rack.quote.priceUsdt), rackProduct.price);
+assert.notEqual(rack.quote.quoteVersion, before.rack.quote.quoteVersion);
 
-if (cfgPrice !== prodPrice) {
-  die(`试用价双源脱节: trial-config.trialPriceUSD=${cfgPrice} != products[${pid}].price=${prodPrice}`);
+function submit(productNo, quote, key) {
+  const amountCents = (BigInt(quote.amountUsdt.replace(".", "")) + 5000n) / 10000n;
+  return demoFixture(new URL("/api/trial/convert", origin), "zh", state, {
+    method: () => "POST",
+    headers: () => ({ "idempotency-key": key }),
+    walletAuthorized: true,
+    postDataJSON: () => ({ productNo, quoteVersion: quote.quoteVersion, expectedAmountUsdt: Number(amountCents) / 100,
+      paymentMethod: "WALLET" }),
+  });
 }
-console.log(`trialPriceUSD=${cfgPrice} == products[${pid}].price=${prodPrice}`);
+assert.throws(() => submit(rack.productNo, trial.quote, "parity-mismatch"),
+  error => error.status === 409 && error.message === "TRIAL_QUOTE_CHANGED", "a different SKU's quote cannot settle Rack P1");
+const receipt = submit(rack.productNo, rack.quote, "parity-confirmed");
+const order = state.createdOrders?.find(order => order.orderNo === receipt.orderNo);
+assert.equal(receipt.productNo, rack.productNo);
+assert.ok(Number(receipt.amountUsdt) <= Number(rack.quote.amountUsdt), "accrual can only reduce the confirmed amount");
+assert.equal(Number(receipt.amountUsdt), order?.amountUsdt);
+assert.equal(state.lastTrialConversion?.serverQuoteVersion, rack.quote.quoteVersion);
+assert.equal(order?.lineItems[0]?.sku, rack.productNo);
+assert.equal(order?.lineItems[0]?.unitPriceUsdt, Number(rack.quote.priceUsdt));
+
+const detail = readFileSync(new URL("../src/pages/me/trial.vue", import.meta.url), "utf8");
+const checkout = readFileSync(new URL("../src/pages/store/checkout.vue", import.meta.url), "utf8");
+assert.match(detail, /if \(!usePurchaseOptions\.value\) return displayState\.value\?\.quote/,
+  "trial detail must preserve the 404 path's claim quote");
+assert.match(detail, /if \(purchaseOptionLoading\.value \|\| purchaseOptionsFailed\.value\) \{[^}]*!requested \|\| requested === trialProductId\.value \? displayState\.value\?\.quote[^}]*\}\s*return selectedOption\.value\?\.quote/,
+  "trial detail must keep the routed SKU quote or fall back to its own claim only while the list is unavailable");
+assert.match(checkout, /trialOptions\.current\.options\.find\(row => row\.productNo === scope\.productNo\)/,
+  "checkout must read the routed SKU from the current claim's options");
+assert.match(checkout, /trialCheckout\.submit\(\{[\s\S]*?device:\s*\{\s*productNo[\s\S]*?quoteVersion:\s*shown\.quoteVersion/,
+  "checkout submission must keep the reviewed SKU and version together");
+
+console.log("PASS trial price parity: claim price survives catalog changes; Rack P1 quote, version and order agree");
