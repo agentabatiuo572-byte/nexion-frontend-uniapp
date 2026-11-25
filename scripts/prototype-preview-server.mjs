@@ -344,6 +344,7 @@ const server=http.createServer(async(req,res)=>{
             asset:'USDT',direction:'OUT',amount:update.trialWalletDebitUsdt,at:now,category:'purchase'});
         }
         if(typeof update.trialDropNextExternalRefusal==='boolean')state.trialDropNextExternalRefusal=update.trialDropNextExternalRefusal;
+        if([3,4].includes(update.trialPaymentFeePolicyVersion))state.trialPaymentFeePolicyVersion=update.trialPaymentFeePolicyVersion;
         if(['price-change','amount-mismatch','product-unlisted'].includes(update.trialNextWalletRefusal))state.trialNextWalletRefusal=update.trialNextWalletRefusal;
         if(state.catalogState==='available'&&(update.catalogState==='available'||update.reset||scenarioChange))
           state.catalogAvailableAt=now;
@@ -489,6 +490,8 @@ const server=http.createServer(async(req,res)=>{
       if(req.method!=='GET'&&!securityRevoke&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='error')
         return sendJson(res,{code:503,message:'TRIAL_STATE_UNAVAILABLE',data:null},503);
+      if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='user-not-found')
+        return sendJson(res,{code:404,message:'USER_NOT_FOUND',data:null},404);
       if(req.method==='GET'&&url.pathname==='/api/notifications'&&url.searchParams.has('cursor')&&state.notificationPageState==='error')
         return sendJson(res,{code:503,message:'NOTIFICATION_PAGE_UNAVAILABLE',data:null},503);
       const tradeinQuoteRead=req.method==='POST'&&url.pathname==='/api/app/trade-in/quote';

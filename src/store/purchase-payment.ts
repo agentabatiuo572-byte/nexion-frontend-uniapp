@@ -16,7 +16,6 @@ import { legacyTrialExternalMatches, PURCHASE_PAYMENT_RECORDS_TABLE, releasePurc
 import { isTrialPaymentReviewPending, isUnpaidPaymentTerminal, purchasePaymentTiming } from '@/lib/purchase-payment-timing';
 import { originalTrialCheckoutHref } from '@/lib/trial-topup-return';
 import { useTrialCheckout } from './trial-checkout';
-import { trialRefusalResultKey, useTrialPurchaseResult } from './trial-purchase-result';
 import { useTrialPurchaseOptions } from './trial-purchase-options';
 import { useFreeTrial } from './free-trial';
 import { orderTopupHref } from '@/lib/order-usdt-topup';
@@ -532,17 +531,16 @@ function finishTrialRefusal(refusal: TrialExternalRefusal, pending?: PendingExte
       || refusal.action === 'original' && refusal.originalPurchase.claimNo !== claimNo) throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
   if (pending) releaseUncreatedPayment(pending, state.accountKey);
   finish(null);
-  if (owner?.onTrialRefusal && owner.scopeCurrent?.() !== false) {
-    if (claimNo && pending && refusal.action !== 'original')
-      useTrialPurchaseResult().consume(trialRefusalResultKey(claimNo, pending.commandKey));
+  if (refusal.action !== 'original' && pending && claimNo && payload
+      && typeof payload.productNo === 'string' && typeof payload.expectedAmountUsdt === 'number') {
+    const reason = refusal.action === 'wallet' ? 'ZERO_PAYMENT_REQUIRES_WALLET' : refusal.reasonCode;
+    useTrialCheckout().rememberExternalRefusal(claimNo, payload.productNo, pending.commandKey, payload.expectedAmountUsdt,
+      { status: 'refused', reasonCode: reason, ...(refusal.action === 'review' && refusal.quote ? { quote: refusal.quote } : {}) });
+  } else if (owner?.onTrialRefusal && owner.scopeCurrent?.() !== false) {
     owner.onTrialRefusal(refusal);
   } else if (refusal.action === 'original') {
     useTrialCheckout().adoptOriginal(refusal.originalPurchase);
     if (!owner) void navTo(originalTrialCheckoutHref(refusal.originalPurchase));
-  } else if (pending && claimNo && payload && typeof payload.productNo === 'string' && typeof payload.expectedAmountUsdt === 'number') {
-    const reason = refusal.action === 'wallet' ? 'ZERO_PAYMENT_REQUIRES_WALLET' : refusal.reasonCode;
-    useTrialCheckout().rememberExternalRefusal(claimNo, payload.productNo, pending.commandKey, payload.expectedAmountUsdt,
-      { status: 'refused', reasonCode: reason, ...(refusal.action === 'review' && refusal.quote ? { quote: refusal.quote } : {}) });
   }
 }
 /** The payment ended with an answer: nothing of it stays behind the notice and no further read or write runs. */
@@ -1273,6 +1271,24 @@ export async function resumeTrialPurchasePayment(
   if (!intent || intent.intentNo !== paymentNo || intent.kind !== 'TRIAL_CONVERT' || intent.claimNo && intent.claimNo !== claimNo)
     throw new Error('PURCHASE_PAYMENT_RESPONSE_INVALID');
   if (isUnpaidPaymentTerminal(intent) || intent.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW') { checkout.onExpired(); return; }
+  await resumeTrialIntent(intent, claimNo, productNo, summary, checkout);
+}
+
+/** Explicit recovery links read the authenticated original without refreshing the provider. */
+export async function readTrialPurchasePayment(paymentNo: string, claimNo: string) {
+  const intent = await api.snapshot(paymentNo);
+  return intent?.intentNo === paymentNo && intent.kind === 'TRIAL_CONVERT' && intent.claimNo === claimNo ? intent : null;
+}
+
+export async function showTerminalTrialPurchasePayment(intent: PurchasePaymentIntent, claimNo: string, productNo: string, summary: string) {
+  if (state.open || !isVisiblePayment(intent)
+      || (!intent.trialPurchaseOutcome && intent.refundStatus !== 'REFUNDED')) return false;
+  await resumeTrialIntent(intent, claimNo, productNo, summary);
+  return true;
+}
+
+async function resumeTrialIntent(intent: PurchasePaymentIntent, claimNo: string, productNo: string, summary: string, checkout?: CheckoutCapacityResume) {
+  const paymentNo = intent.intentNo;
   const existing = rows(account()).records[intent.commandKey];
   await resume(existing?.kind === 'TRIAL_CONVERT' && (!existing.intentNo || existing.intentNo === paymentNo) ? { ...existing, intentNo: paymentNo } : {
     fingerprint: JSON.stringify(['TRIAL_CONVERT', { productNo, expectedAmountUsdt: intent.subtotalUsdt }, claimNo]),

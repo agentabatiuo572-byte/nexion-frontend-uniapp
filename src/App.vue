@@ -545,7 +545,8 @@ if (remoteApiEnabled) {
   watch(() => trialResults.outsidePage, results => {
     const app = useApp(), epoch = app.accountBindingEpoch;
     for (const result of results) {
-      if (!trialResults.consume(trialResults.resultKey(result), result.status === "refused")) continue;
+      const key = trialResults.resultKey(result);
+      if (trialResults.wasDelivered(key)) continue;
       if (result.status === "settled") {
         toast.success(trialPurchaseCopy.value.resultTitle);
         void useOrders().reconcileRemoteOrder(result.orderNo, () => app.accountBindingEpoch === epoch).catch(() => {});
@@ -556,6 +557,7 @@ if (remoteApiEnabled) {
           : trialPurchaseReasonMessage(t, result.reason, useLocaleStore().code) ?? trialPurchaseCopy.value.coPurchaseUnavailable;
         toast.warn(reason);
       }
+      trialResults.consume(key, result.status === "refused");
     }
   }, { flush: "post" });
   const repeatWithoutPull = () => !hasVisiblePullRefresh();

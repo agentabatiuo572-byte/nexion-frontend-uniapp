@@ -30,7 +30,7 @@ export function useTrialCreditOption(productNo: () => string | undefined, forCon
   const confirming = useTrialPurchaseConfirmation();
   return computed<TrialPurchaseOption | null>(() => {
     const state = trial.displayState;
-    if (!state?.claimNo || (state.status !== "active" && state.status !== "grace") || options.claimNo !== state.claimNo
+    if (!state?.claimNo || !trial.conversionWindowOpen || options.claimNo !== state.claimNo
         || options.current.status !== "ready") return null;
     if (forConfirmationNote ? !confirming.value
       : state.claimNo !== trial.authorityClaimNo || checkout.originalPurchase || confirming.value || trial.authorityResultUnknown) return null;

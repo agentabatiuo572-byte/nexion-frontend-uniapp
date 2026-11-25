@@ -3,7 +3,7 @@ import { hasExternalTrialPaymentRecord, TRIAL_CONVERT_COMMANDS_TABLE } from '@/l
 import { invalidateBeforePassiveTabRead, runForegroundStoreRead, runPassiveTabRead } from "@/lib/passive-tab-read";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef, watch } from "vue";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName } from "./trial-config";
 import { useTrialPurchaseResult } from "./trial-purchase-result";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
@@ -317,6 +317,20 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   function getBindingEpoch(): number { return accountBindingEpoch; }
 
   function serverTimeAt(localNow: number): number { return localNow + serverClockOffsetMs.value; }
+
+  const conversionWindowOpen = ref(false);
+  watch([displayState, serverClockOffsetMs], ([state], _, onCleanup) => {
+    const deadline = state?.status === "active" || state?.status === "grace"
+      ? state.serverState === "EXTENDED" ? state.extendedEndsAt : state.graceEndsAt : null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
+      const remaining = (deadline ?? 0) - serverTimeAt(Date.now());
+      conversionWindowOpen.value = remaining > 0;
+      if (remaining > 0) timer = setTimeout(update, Math.min(remaining, 2_147_483_647));
+    };
+    update();
+    onCleanup(() => clearTimeout(timer));
+  });
 
   function takeExpiryNotice(expectedEpoch: number): boolean {
     if (expectedEpoch !== accountBindingEpoch || authorityStatus.value !== "ready"
@@ -1226,7 +1240,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     deniedLegacyConversion, recoverLegacyConversion, clearLegacyConversionResult,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
-    displayState, originalPurchase, purchasedDevice, pendingStart, startRetryable, confirmedStartClaimNo, confirmedStartDenial,
+    displayState, conversionWindowOpen, originalPurchase, purchasedDevice, pendingStart, startRetryable, confirmedStartClaimNo, confirmedStartDenial,
     pendingCancel, confirmedCancelClaimNo, confirmedCancelDenial, lifecycleReadbackPending, recoverLifecycleCommand, confirmedHomeOffer,
     authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,

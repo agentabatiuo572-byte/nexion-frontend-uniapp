@@ -66,8 +66,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const redeemed=['converted','refunded'].includes(scenario);
     const activeAge=pricing==='cloud-share-half-cent'?2*day:day;
     const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day
+      :scenario==='grace-ending'?duration+grace-45000
       :ended?duration+grace+(scenario==='eligible-again'?cooldown:0)+day:activeAge);
-    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE'
+    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':['grace','grace-ending'].includes(scenario)?'GRACE'
       :ended?'CANCELLED':redeemed?'REDEEMED':'ELIGIBLE',startedAt,version:redeemed?1:0};
     if(ended){
       const finishedAt=startedAt+duration+grace;
@@ -156,6 +157,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const option={...device,inventoryMode:item?.inventoryMode??'FINITE',originalTrialProduct:isTrialProduct,
       paymentMethods:isTrialProduct?['WALLET','CREGIS_USDT_BSC','HDPAY_BANK']:['WALLET'],
       priceUsdt:fixed(units(priceUsdt)),...(isTrialProduct&&{storePriceUsdt:item?fixed(units(item.price)):null})};
+    if(state.trialPurchaseOptionState==='image-missing'&&device.productNo===trialPurchaseOptionSku(state))option.imageUrl=null;
     const simulatedFailure=state.trialPurchaseOptionState==='quote-error'&&device.productNo===trialPurchaseOptionSku(state);
     const missingTerms=cfg.shadowDailyUSD==null||cfg.shadowDailyNEX==null;
     if(simulatedFailure||missingTerms)return {...option,canPurchase:false,unavailableReason:'TRIAL_PRODUCT_QUOTE_UNAVAILABLE'};

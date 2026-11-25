@@ -17,16 +17,19 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
   const app = useApp();
   const pending = shallowRef<TrialPurchaseResult[]>([]);
   const delivered = new Set<string>();
+  const openingOrders = new Set<string>();
   const announcedRefusals = new Set<string>();
   const presenters = new Set<(claimNo: string) => boolean>();
   const visibilityRevision = ref(0);
   const outsidePage = computed(() => {
     void visibilityRevision.value;
-    return pending.value.filter(result => ![...presenters].some(presents => presents(result.claimNo)));
+    return pending.value.filter(result => !openingOrders.has(resultKey(result))
+      && ![...presenters].some(presents => presents(result.claimNo)));
   });
   watch(() => app.accountBindingEpoch, () => {
     pending.value = [];
     delivered.clear();
+    openingOrders.clear();
     announcedRefusals.clear();
   }, { flush: "sync" });
 
@@ -44,6 +47,24 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     return true;
   }
 
+  async function deliverOrder(orderNo: string, navigate: () => Promise<boolean>, replay = false) {
+    const key = trialOrderResultKey(orderNo);
+    if (openingOrders.has(key) || (!replay && delivered.has(key))) return false;
+    const epoch = app.accountBindingEpoch;
+    openingOrders.add(key);
+    visibilityRevision.value++;
+    try {
+      if (!await navigate() || app.accountBindingEpoch !== epoch) return false;
+      consume(key);
+      return true;
+    } finally {
+      if (app.accountBindingEpoch === epoch) {
+        openingOrders.delete(key);
+        visibilityRevision.value++;
+      }
+    }
+  }
+
   // A selection invalidation can use the same refusal notification already shown.
   function takeAnnouncedRefusal(key: string) {
     return announcedRefusals.delete(key);
@@ -58,5 +79,5 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     };
   }
 
-  return { outsidePage, publish, consume, takeAnnouncedRefusal, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
+  return { outsidePage, publish, consume, deliverOrder, takeAnnouncedRefusal, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
 });

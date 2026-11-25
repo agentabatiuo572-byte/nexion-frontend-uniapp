@@ -492,7 +492,7 @@ const terminalTrialExit = computed(() => {
     return { label: original.status === 'AWAITING_PAYMENT' ? copy.value.continuePay : copy.value.viewProgress,
       href: originalTrialCheckoutHref(original) };
   }
-  return state.status === 'active' || state.status === 'grace'
+  return trial.conversionWindowOpen
     ? { label: trialCopy.value.coChangeDevice, href: '/pages/me/trial' } : null;
 });
 async function openTerminalTrialExit() {
