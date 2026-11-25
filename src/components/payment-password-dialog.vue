@@ -48,7 +48,9 @@
           <template v-if="ui.stage === 'pay'">
             <text class="payment-pin-note">{{ Number(ui.context?.amount) === 0 ? t.paymentPin.autoConfirm : t.paymentPin.autoSubmit }}</text>
             <text v-if="pin.locked()" class="payment-pin-error" role="alert">{{ lockMessage }}</text>
-            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load()">{{ t.paymentPin.retry }}</view>
+            <!-- The lock has run out: the layout stays while the server confirms it (03 §3.4); input opens only after that read. -->
+            <text v-else-if="unlockReady" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
+            <view v-if="unlockReady" class="payment-pin-link" role="button" tabindex="0" @click="pin.load(false)">{{ t.paymentPin.retry }}</view>
             <view class="payment-pin-link" role="button" tabindex="0" @click="pin.startRecovery">{{ t.paymentPin.forgot }}</view>
           </template>
           <template v-else>
@@ -96,7 +98,7 @@ const unlockReady = computed(() => !!ui.state?.lockedUntil && !pin.locked());
 useAutoRecovery({
   active: () => open.value,
   failed: () => !ui.busy && (ui.stage === "read-error" || (ui.stage === "pay" && unlockReady.value)),
-  retry: () => pin.load(ui.stage === "pay"), repeatMs: 30_000,
+  retry: () => pin.load(false), repeatMs: 30_000,
 });
 useAutoRecovery({
   active: () => open.value,
