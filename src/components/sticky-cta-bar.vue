@@ -15,7 +15,7 @@
   <view v-if="cta" class="scb-outer" :style="outerStyle">
     <view class="scb-bar nx-glass-bar">
       <text v-if="cta.note" class="scb-note nx-tray-note" role="status">{{ cta.note }}</text>
-      <view class="scb-info nx-tray-copy">
+      <view v-if="cta.amount" class="scb-info nx-tray-copy">
         <!-- Eyebrow — explicitly labels the number as PRICE so it isn't
              confused with yield/earnings shown elsewhere on the page. -->
         <text class="scb-eyebrow">{{ t.stickyCta.priceLabel }}</text>
@@ -36,6 +36,7 @@
         <NxButton size="small" :label="t.uiChrome.increaseQty" :disabled="cta.quantity.value >= cta.quantity.max || cta.disabled" @click="cta.quantity.increase"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg></NxButton>
       </view>
       <view
+        v-if="cta.buttonLabel"
         class="scb-cta"
         :style="ctaStyle"
         role="button"
@@ -68,8 +69,8 @@ const accentColor = computed(() => cta.value?.accentColor ?? "var(--v5-brand)");
 const subColor = computed(() => cta.value?.subtextColor ?? "var(--v5-ink-3)");
 
 
-const hasDollarPrefix = computed(() => cta.value?.amount.startsWith("$") ?? false);
-const amountBody = computed(() => (cta.value ? cta.value.amount.slice(1) : ""));
+const hasDollarPrefix = computed(() => cta.value?.amount?.startsWith("$") ?? false);
+const amountBody = computed(() => cta.value?.amount?.slice(1) ?? "");
 
 // Floating tray (04 §4.0): where the nav pill sits, or 8px above it when the tab bar shows.
 const outerStyle = computed<CSSProperties>(() => ({

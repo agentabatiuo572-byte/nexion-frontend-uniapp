@@ -11,12 +11,12 @@ export interface StickyCTAPayload {
   /** Target route, e.g. "/pages/store/store". Navigated via uni.navigateTo. */
   href: string;
   /** Price string; a leading "$" is split into a small dim prefix. */
-  amount: string;
+  amount?: string;
   amountSubtext?: string;
   /** A reason or status shown above the button (04 §4.0 .nx-tray-note), e.g. why the button is disabled. */
   note?: string;
   quantity?: { value: number; min: number; max: number; decrease: () => void; increase: () => void };
-  buttonLabel: string;
+  buttonLabel?: string;
   /** Disabled CTA remains visible but never navigates or vibrates. */
   disabled?: boolean;
   /** Defaults to brand blue. */

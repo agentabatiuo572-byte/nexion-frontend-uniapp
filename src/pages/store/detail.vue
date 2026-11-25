@@ -293,11 +293,13 @@ import { useTrialCreditOption, useTrialCreditOptionsRead } from "@/composables/u
 import { useFreeTrial } from "@/store/free-trial";
 import { resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { useTrialCheckout } from "@/store/trial-checkout";
+import { originalTrialCheckoutHref } from "@/lib/trial-topup-return";
 import { trialExternalPaymentActive } from "@/store/purchase-payment";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useTrialLifecycleCopy } from "@/i18n/trial-lifecycle";
+import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 
 const t = useT();
@@ -635,6 +637,7 @@ const trialCredit = useTrialCreditOption(() => product.value?.id);
 const trialConfirmationOption = useTrialCreditOption(() => product.value?.id, true);
 const trialLifecycleCopy = useTrialLifecycleCopy();
 const trialDetailCopy = useTrialDetailCopy();
+const trialPurchaseCopy = useTrialPurchaseCopy();
 const freeTrial = useFreeTrial();
 const trialCheckout = useTrialCheckout();
 const trialOptions = useTrialPurchaseOptions();
@@ -643,6 +646,10 @@ const ownTrialClaim = computed(() => {
   if (!remoteApiEnabled || !state?.claimNo || (state.status !== "active" && state.status !== "grace")
       || qty.value !== 1 || activityId.value || voucherContext.value.voucherId) return null;
   return resolveTrialCheckoutProductId(state.config.trialProductId) === product.value?.id ? state.claimNo : null;
+});
+const ownTrialOriginal = computed(() => {
+  const original = trialCheckout.originalPurchase;
+  return original?.claimNo === ownTrialClaim.value && original.device.productNo === product.value?.id ? original : null;
 });
 const ownTrialBlock = computed(() => {
   const claim = ownTrialClaim.value;
@@ -720,13 +727,16 @@ function publishStickyCTA() {
     }
     if (ownTrialBlock.value || (!ownTrialClaim.value && remoteApiEnabled
         && (eligibility.value.status !== "ready" || purchaseEligibilityMessage.value === "error"))) {
+      const original = ownTrialOriginal.value;
+      const continuing = original?.kind === "EXTERNAL" && original.status === "AWAITING_PAYMENT" ? original : null;
+      const checkingBalance = original?.kind === "BALANCE" && original.status === "PROCESSING";
       sticky.show({
-        href: `/pages/store/detail?id=${product.value.id}`,
-        amount: `${priceText.value}`,
+        href: continuing ? originalTrialCheckoutHref(continuing) : `/pages/store/detail?id=${product.value.id}`,
+        amount: checkingBalance ? undefined : `${priceText.value}`,
         // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
-        note: ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
-        buttonLabel: t.value.store.cardBuyNow,
-        disabled: true,
+        note: checkingBalance ? trialPurchaseCopy.value.coConfirming : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
+        buttonLabel: checkingBalance ? undefined : continuing ? t.value.orders.pendingContinue : t.value.store.cardBuyNow,
+        disabled: !continuing,
         showTabBar: false,
       }, stickyOwner);
       return;
@@ -779,7 +789,7 @@ function publishStickyCTA() {
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption,ownTrialClaim,ownTrialBlock],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption,ownTrialClaim,ownTrialBlock,ownTrialOriginal],
   publishStickyCTA,
   { immediate: true },
 );
