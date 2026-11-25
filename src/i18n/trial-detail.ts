@@ -16,7 +16,7 @@ export const trialDetailCopy = {
     earlyRow: '专享立减', offsetRow: '试用抵扣金',
     discountTotal: '总折扣额', finalPrice: '换算后购买价', creditRow: '预估收益', creditNote: '可提现金额以钱包为准',
     rulesRow: '抵扣与退款规则', earnRow: '在赚取页查看', buyCta: '抵扣购机 · {amount}', freeDays: '免费 {n} 天',
-    rulesBeforeNoCap: '购买前，试用抵扣金只能买一款可选设备，仅限一次。',
+    rulesBeforeNoCap: '购买前，试用抵扣金只能用于购买一款可选设备，仅限一次。',
     rulesEarly: '试用期内购买：最高立减 {discount}；到期后购买不享此立减。',
     rulesEarlyFull: '试用期内购买：最高立减 {discount}，完整试用权益照拿；到期后购买不享此立减。',
     selectTitle: '专享限时折扣设备', selectSubtitle: '任选一款，价格已抵扣 · 新设备接替试用机位',
