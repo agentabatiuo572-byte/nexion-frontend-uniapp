@@ -97,9 +97,9 @@
               <svg width="18.5" height="18.5" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block" :style="rowTitleStyle">{{ rewardTypeLabel(b.type) }}</text>
-              <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo }} · {{ b.ref }}</text>
-              <text v-else class="block" :style="rowSubStyle">{{ b.memo }}</text>
+              <text class="block" :style="rowTitleStyle">{{ rewardTypeLabel(b) }}</text>
+              <text v-if="b.ref && b.memoKey !== 'learningReward'" class="block truncate" :style="rowSubStyle">{{ b.memo ? b.memo + ' · ' : '' }}{{ b.ref }}</text>
+              <text v-else-if="b.memo" class="block" :style="rowSubStyle">{{ b.memo }}</text>
               <text v-if="courseRewardId(b)" class="block active:opacity-70 nx-after-chevron" style="color: var(--v5-brand); font-size: 12px; margin-top: var(--v5-space-1)" role="link" tabindex="0" :aria-label="t.rewards.courseDetail" @click="openCourseReward(b)">{{ t.rewards.courseDetail }}</text>
               <text v-if="b.memoKey === 'learningReward' && b.ref" class="block active:opacity-70" style="color: var(--v5-ink-3); font-size: 12px; margin-top: var(--v5-space-1)" role="button" tabindex="0" :aria-label="sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId" @click="toggleSourceRef(b.id)">{{ sourceRefOpen === b.id ? t.rewards.hideSourceId : t.rewards.showSourceId }}</text>
               <NxCodeValue v-if="sourceRefOpen === b.id && b.memoKey === 'learningReward' && b.ref" full :value="b.ref" :label="t.bills.detailRef" :copyable="false" style="color: var(--v5-ink-3); font-size: 12px" />
@@ -223,7 +223,8 @@ const records = computed(() => fundsServerEnabled
   : bills.bills.filter((b) => isRewardBill(b) && b.symbol === symbol.value));
 const visibleCount = ref(PAGE_SIZE);
 const visibleRecords = computed(() => (fundsServerEnabled ? records.value : records.value.slice(0, visibleCount.value))
-  .map((bill) => ({ ...bill, memo: bill.type === "refer" && bill.status !== "posted"
+  // 等级月薪的名字已在标题里，下面一行不再重复。
+  .map((bill) => ({ ...bill, memo: bill.memoKey === "vrankSalary" ? "" : bill.type === "refer" && bill.status !== "posted"
     ? t.value.rewards.typeRefer
     : resolveWalletBillMemo(bill, t.value.bills.memo as Record<string, string>, courseTitles.value) })));
 const hasMore = computed(() => fundsServerEnabled ? activePager.value.hasMore : visibleCount.value < records.value.length);
@@ -303,7 +304,9 @@ function scopeText(v: VoucherDef): string {
 function expiryText(v: VoucherDef): string {
   return v.endAt === 0 ? t.value.rewards.noExpiry : fmt(t.value.rewards.validUntil, { date: formatDate(v.endAt) });
 }
-function rewardTypeLabel(type: BillType): string {
+function rewardTypeLabel({ type, memoKey }: { type: BillType; memoKey?: string }): string {
+  // 等级月薪的账单行归在邀请奖励类里，按展示码单独叫名。
+  if (memoKey === "vrankSalary") return t.value.bills.memo.vrankSalary;
   if (type === "refer") return t.value.rewards.typeRefer;
   if (type === "achievement") return t.value.rewards.typeAchievement;
   return t.value.rewards.typeBonus;

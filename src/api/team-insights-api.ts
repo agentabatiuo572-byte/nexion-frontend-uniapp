@@ -131,7 +131,26 @@ function commissions(value: unknown, mode: ApiEnvironment): TeamCommissionSnapsh
   if (source.factStatus !== undefined && source.factStatus !== "CANONICAL") return invalid();
   if (source.withdrawable !== undefined && typeof source.withdrawable !== "boolean") return invalid();
   if (source.payoutStatus !== undefined && source.payoutStatus !== "CANONICAL") return invalid();
-  const events=source.events.map((item):CommissionEvent=>{const v=row(item);const rawStatus=String(v.status);if(Object.prototype.hasOwnProperty.call(v,"sourceUserId")||!KINDS.has(v.kind as CommissionEvent["kind"])||!STATUSES.has(rawStatus)) return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);const state=settlement(v);return {id:text(v.id),kind:v.kind as CommissionEvent["kind"],sourceUserName:text(v.sourceUserName),layer:v.layer===null||v.layer===undefined?undefined:num(v.layer,true),orderId:v.orderId===null||v.orderId===undefined?undefined:text(v.orderId),orderAmountUSD:v.orderAmountUSD===null||v.orderAmountUSD===undefined?undefined:num(v.orderAmountUSD),sourceRef:v.sourceRef==null?undefined:text(v.sourceRef),sourceDeviceId:v.sourceDeviceId===null||v.sourceDeviceId===undefined?undefined:text(v.sourceDeviceId),recoveryPendingUSDT:v.recoveryPendingUSDT==null?undefined:num(v.recoveryPendingUSDT),recoveryPendingNEX:v.recoveryPendingNEX==null?undefined:num(v.recoveryPendingNEX),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),ts,unlockAt,status:rawStatus as CommissionEvent["status"],...state};});
+  const events = source.events.map((item): CommissionEvent => {
+    const v = row(item);
+    const kind = v.kind as CommissionEvent["kind"], status = String(v.status) as CommissionEvent["status"];
+    if (Object.prototype.hasOwnProperty.call(v, "sourceUserId") || !KINDS.has(kind) || !STATUSES.has(status)) return invalid();
+    const { salaryMonth, salaryRank } = v;
+    const salary = kind === "vrank_salary" && typeof salaryMonth === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(salaryMonth)
+      && typeof salaryRank === "string" && /^V[0-8]$/.test(salaryRank) ? { salaryMonth, salaryRank } : {};
+    return {
+      id: text(v.id), kind, sourceUserName: text(v.sourceUserName), ...salary,
+      layer: v.layer == null ? undefined : num(v.layer, true),
+      orderId: v.orderId == null ? undefined : text(v.orderId),
+      orderAmountUSD: v.orderAmountUSD == null ? undefined : num(v.orderAmountUSD),
+      sourceRef: v.sourceRef == null ? undefined : text(v.sourceRef),
+      sourceDeviceId: v.sourceDeviceId == null ? undefined : text(v.sourceDeviceId),
+      recoveryPendingUSDT: v.recoveryPendingUSDT == null ? undefined : num(v.recoveryPendingUSDT),
+      recoveryPendingNEX: v.recoveryPendingNEX == null ? undefined : num(v.recoveryPendingNEX),
+      amountUSDT: num(v.amountUSDT), amountNEX: num(v.amountNEX), ts: num(v.ts, true), unlockAt: num(v.unlockAt, true),
+      status, ...settlement(v),
+    };
+  });
   const aggregate=row(source.aggregate);
   const rawKinds=row(aggregate.byKind);
   const byKind = {} as TeamCommissionSnapshot["aggregate"]["byKind"];

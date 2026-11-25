@@ -4,7 +4,7 @@ import { runPassiveTabRead, invalidatePassiveTabRead, invalidateBeforePassiveTab
 import { defineStore } from "pinia";
 import { onScopeDispose, ref, watch } from "vue";
 import { apiRuntimeConfig, remoteApiEnabled, vRankApi } from "@/api/runtime";
-import type { CanonicalVRankLadder, CanonicalVRankState } from "@/api/v-rank-api";
+import type { CanonicalVRankLadder, CanonicalVRankState, RankSalary } from "@/api/v-rank-api";
 import { asApiError } from "@/api/errors";
 import { isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
@@ -19,9 +19,7 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
  * Promotion judging (nextRankProgress / nextRankGap) is preview-only; server is
  * the sole canonical authority for V-rank promotion (PRD §13.2).
  *
- * V0→V8 9 阶,每升一阶解锁 unilevel 深度 +1 / 平级奖(V3+) / 领导池权重 / 培育奖 NEX。
- * 晋级条件、权益与奖励应完整展示；正式等级以服务端发布的阶梯为准。
- * 奖励为可配 NEX(cultivationBonus);实物奖品已删(与运营后台 F1 同步,2026-06)。
+ * Local preview values follow the nine-level rank rules agreed on 2026-11-24.
  */
 
 /** Rank IDs are validated at the API boundary; never clamp an existing account rank. */
@@ -30,7 +28,7 @@ export type VRank = number;
 export interface VRankConditions {
   selfComputePoints?: number; // 自购算力点
   teamComputePoints?: number; // 团队算力点
-  directRefs?: number;        // 直推数
+  directRefs?: number;        // 一二级已购人数
   vDownlines?: Record<VRank, number>; // 下面需要 N 个 V 级
 }
 
@@ -40,6 +38,10 @@ export interface VRankDef {
   cnTitle: string;            // 中文头衔
   conditions: VRankConditions;
   directBonus: number;        // L1 直推奖比例
+  purchaseL1Rate?: string;
+  purchaseL2Rate?: string;
+  monthlySalaryUsdt?: string;
+  reviewRequired?: boolean;
   unilevelDepth: number;      // unilevel 覆盖深度 (1=只有L1, 7=L1-L7)
   peerBonus: number;          // 平级奖比例
   leadershipVotes: number;    // 领导池票数(单源,与 leadership-pool.ts V_VOTES 一致)
@@ -69,67 +71,68 @@ export type VRankReward = MonetaryVRankReward | EntitlementVRankReward;
 export const V_RANKS: VRankDef[] = [
   {
     v: 0, title: "Cadet", cnTitle: "学员",
-    conditions: {}, directBonus: 0.05, unilevelDepth: 1,
-    peerBonus: 0, leadershipVotes: 0,
-    cultivationBonus: 0, rewards: [],
+    conditions: {},
+    directBonus: 0.04, purchaseL1Rate: "0.04", purchaseL2Rate: "0.02", monthlySalaryUsdt: "0",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [],
   },
   {
     v: 1, title: "Pilot", cnTitle: "飞行员",
-    conditions: { selfComputePoints: 2990, directRefs: 3 },
-    directBonus: 0.10, unilevelDepth: 2,
-    peerBonus: 0, leadershipVotes: 0,
-    cultivationBonus: 500, rewards: [],
+    conditions: { selfComputePoints: 149 },
+    directBonus: 0.04, purchaseL1Rate: "0.04", purchaseL2Rate: "0.02", monthlySalaryUsdt: "0",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 100 }],
   },
   {
     v: 2, title: "Operator", cnTitle: "操作员",
-    conditions: { teamComputePoints: 50_000 },
-    directBonus: 0.10, unilevelDepth: 3,
-    peerBonus: 0, leadershipVotes: 0,
-    cultivationBonus: 2000, rewards: [],
+    conditions: { selfComputePoints: 299, teamComputePoints: 1_499, directRefs: 5, vDownlines: { 1: 5 } },
+    directBonus: 0.042, purchaseL1Rate: "0.042", purchaseL2Rate: "0.021", monthlySalaryUsdt: "20",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 500 }],
   },
   {
     v: 3, title: "Captain", cnTitle: "舰长",
-    conditions: { teamComputePoints: 200_000, vDownlines: { 1: 2 } },
-    directBonus: 0.10, unilevelDepth: 4,
-    peerBonus: 0.05, leadershipVotes: 1,
-    cultivationBonus: 10_000, rewards: [],
+    conditions: { selfComputePoints: 1_599, teamComputePoints: 15_999, directRefs: 19, vDownlines: { 2: 1 } },
+    directBonus: 0.044, purchaseL1Rate: "0.044", purchaseL2Rate: "0.022", monthlySalaryUsdt: "50",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 2_000 }],
   },
   {
     v: 4, title: "Commander", cnTitle: "指挥官",
-    conditions: { teamComputePoints: 500_000, vDownlines: { 2: 3 } },
-    directBonus: 0.10, unilevelDepth: 5,
-    peerBonus: 0.05, leadershipVotes: 2,
-    cultivationBonus: 50_000, rewards: [],
+    conditions: { selfComputePoints: 2_999, teamComputePoints: 74_999, directRefs: 49, vDownlines: { 2: 3 } },
+    directBonus: 0.047, purchaseL1Rate: "0.047", purchaseL2Rate: "0.025", monthlySalaryUsdt: "150",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 5_000 }],
   },
   {
     v: 5, title: "Wing Leader", cnTitle: "翼领",
-    conditions: { teamComputePoints: 1_500_000, vDownlines: { 3: 4 } },
-    directBonus: 0.10, unilevelDepth: 6,
-    peerBonus: 0.05, leadershipVotes: 4,
-    cultivationBonus: 200_000, rewards: [],
+    conditions: { selfComputePoints: 5_999, teamComputePoints: 279_999, directRefs: 99, vDownlines: { 3: 2 } },
+    directBonus: 0.052, purchaseL1Rate: "0.052", purchaseL2Rate: "0.029", monthlySalaryUsdt: "500",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 10_000 }],
   },
   {
     v: 6, title: "Squadron", cnTitle: "中队长",
-    conditions: { teamComputePoints: 5_000_000, vDownlines: { 4: 5 } },
-    directBonus: 0.10, unilevelDepth: 7,
-    peerBonus: 0.05, leadershipVotes: 8,
-    cultivationBonus: 800_000, rewards: [],
+    conditions: { selfComputePoints: 9_999, teamComputePoints: 899_999, directRefs: 199, vDownlines: { 3: 4 } },
+    directBonus: 0.058, purchaseL1Rate: "0.058", purchaseL2Rate: "0.035", monthlySalaryUsdt: "1500",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 20_000 }],
   },
   {
     v: 7, title: "Fleet Cmdr", cnTitle: "舰队司令",
-    conditions: { teamComputePoints: 10_000_000, vDownlines: { 5: 6 } },
-    directBonus: 0.10, unilevelDepth: 8,
-    peerBonus: 0.05, leadershipVotes: 16,
-    cultivationBonus: 3_200_000, rewards: [],
+    conditions: { selfComputePoints: 15_999, teamComputePoints: 1_799_999, directRefs: 299, vDownlines: { 4: 2 } },
+    directBonus: 0.066, purchaseL1Rate: "0.066", purchaseL2Rate: "0.042", monthlySalaryUsdt: "4000",
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 30_000 }],
   },
   {
     v: 8, title: "Star Admiral", cnTitle: "星上将",
-    conditions: { teamComputePoints: 30_000_000, vDownlines: { 6: 7 } },
-    directBonus: 0.10, unilevelDepth: 9,
-    peerBonus: 0.05, leadershipVotes: 32,
-    cultivationBonus: 10_000_000, rewards: [],
+    conditions: { selfComputePoints: 29_999, teamComputePoints: 3_999_999, directRefs: 399, vDownlines: { 4: 3 } },
+    directBonus: 0.08, purchaseL1Rate: "0.08", purchaseL2Rate: "0.055", monthlySalaryUsdt: "15000",
+    reviewRequired: true,
+    unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+    rewards: [{ type: "UVT", amount: 50_000 }],
   },
-
 ];
 
 /**
@@ -163,6 +166,8 @@ function canonicalRank(row: Awaited<ReturnType<typeof vRankApi.ladder>>["ranks"]
   return {
     v: row.v as VRank, title: row.title, cnTitle: row.cnTitle, conditions,
     directBonus: row.directBonus, unilevelDepth: row.unilevelDepth, peerBonus: row.peerBonus,
+    purchaseL1Rate: row.purchaseL1Rate, purchaseL2Rate: row.purchaseL2Rate,
+    monthlySalaryUsdt: row.monthlySalaryUsdt, reviewRequired: row.reviewRequired,
     leadershipVotes: row.leadershipVotes, cultivationBonus: row.cultivationBonus, rewards: row.rewards,
   };
 }
@@ -206,6 +211,7 @@ export const useVRank = defineStore("vRank", () => {
   const directRefs = ref(init.directRefs);
   const vDownlineCounts = ref<Record<VRank, number>>(init.vDownlineCounts);
   const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
+  const salary = ref<RankSalary | null>();
   // 服务端能力位:某类收益今天是否真的会派发(与佣金指南同源)。等级阶梯里的
   // peerBonus 是「配置比例」,不是「已生效权益」—— 渲染时必须靠这个位区分(#79)。
   // 本地(mock)模式没有服务端能力位,按「会派发」处理,与 V_RANKS 的展示一致。
@@ -227,6 +233,7 @@ export const useVRank = defineStore("vRank", () => {
     directRefs.value = 0;
     vDownlineCounts.value = {};
     ladder.value = [];
+    salary.value = undefined;
     capabilities.value = { peer: false, genesis: false };
     prizeName.value = "";
     remoteReady.value = false;
@@ -311,11 +318,13 @@ export const useVRank = defineStore("vRank", () => {
       vDownlineCounts.value = Object.fromEntries(
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Record<VRank, number>;
+      salary.value = remoteCurrent.salary;
       remoteReady.value = true;
       remoteError.value = null; retryAt = 0; remoteRateLimited.value = false; remoteTransientFailure.value = false;
       const progress = teamRankProgress({ myRank: myRank.value, selfComputePoints: selfComputePoints.value, directRefs: directRefs.value, teamComputePoints: teamComputePoints.value, vDownlineCounts: vDownlineCounts.value }, ladder.value);
-      saveTabSnapshot(snapshotWrite, "rank", { rank: myRank.value, next: progress.next?.v ?? null, missing: progress.missing.length,
-        bars: progress.rows.filter(row => row.tier === progress.next?.v).map(row => ({ key: row.key, kind: row.kind, vLevel: row.vLevel ?? null, percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)) })) }, null);
+      saveTabSnapshot(snapshotWrite, "rank", { rank: myRank.value, next: progress.next?.v ?? null, missing: progress.unmetCount,
+        ...(progress.reviewPending ? { reviewPending: true } : {}),
+        bars: progress.rows.filter(row => row.tier === progress.next?.v).map(row => ({ key: row.key, kind: row.kind, vLevel: row.vLevel ?? null, percent: row.status === "unknown" ? null : Math.min(100, Math.round(row.current! / row.required * 100)) })) }, null);
     };
     let strictFailure = false, failureRecorded = false, pairGeneration = 0;
     const isLocalSessionPending = (cause: ReturnType<typeof asApiError>) => cause.kind === "auth"
@@ -401,7 +410,7 @@ export const useVRank = defineStore("vRank", () => {
 
   return {
     selfComputePoints, teamComputePoints,
-    myRank, directRefs, vDownlineCounts, ladder, prizeName,
+    myRank, directRefs, vDownlineCounts, ladder, prizeName, salary,
     capabilities,
     remoteReady, remoteError, remoteRateLimited, remoteTransientFailure,
     setMyRank, setProgress, bindAccount, refreshCanonicalVRank, ensureCanonicalVRank, invalidateReadOwner,
@@ -507,7 +516,7 @@ function rankConditionChecks(state: VRankData, c: VRankConditions) {
 
 export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRankGapInfo {
   const current = ladder[state.myRank] ?? EMPTY_V_RANK;
-  const next = ladder[state.myRank + 1];
+  const { next, rows, unmet, unmetCount } = teamRankProgress(state, ladder);
   if (!next) {
     return {
       next: null,
@@ -519,11 +528,19 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
     };
   }
 
-  const { gaps, progressPct, progressKnown } = rankConditionChecks(state, next.conditions);
-
-  const primaryGap = gaps.length
-    ? gaps.reduce((worst, g) => (g.progress < worst.progress ? g : worst))
-    : null;
+  const ratio = (row: typeof rows[number]) => row.status === "unknown" ? 0 : Math.min(1, row.current! / row.required);
+  const nextRows = rows.filter(row => row.tier === next.v);
+  const progressPct = nextRows.length ? nextRows.reduce((sum, row) => sum + ratio(row), 0) / nextRows.length : 1;
+  const progressKnown = !unmet.some(row => row.status === "unknown");
+  const hardest = unmet.reduce<typeof rows[number] | undefined>((worst, row) => !worst || ratio(row) < ratio(worst) ? row : worst, undefined);
+  const gap = hardest?.gap;
+  let primaryGap: PrimaryGap | null = null;
+  if (gap && hardest) {
+    const progress = ratio(hardest);
+    if (gap.kind === "vDownlines") primaryGap = { kind: gap.kind, vLevel: gap.vLevel, remaining: gap.n, progress };
+    else if (gap.kind === "directRefs") primaryGap = { kind: gap.kind, remaining: gap.n, progress };
+    else primaryGap = { kind: gap.kind, remaining: gap.amount, progress };
+  }
 
   const unlocks: PerkUnlock[] = [];
   if (current.peerBonus === 0 && next.peerBonus > 0) {
@@ -549,5 +566,5 @@ export function nextRankGap(state: VRankData, ladder: VRankDef[] = []): NextRank
     .sort((a, b) => PERK_WEIGHT[b.kind] - PERK_WEIGHT[a.kind])
     .slice(0, TOP_UNLOCKS_CAP);
 
-  return { next, progressPct, progressKnown, primaryGap, unmetCount: gaps.length, topUnlocks };
+  return { next, progressPct, progressKnown, primaryGap, unmetCount, topUnlocks };
 }

@@ -33,14 +33,16 @@
 
         <!-- My V-rank summary -->
         <!-- Badge, the gap to the next rank and one bar per next-rank condition. -->
-        <view class="nx-team-rank-link team-rank" role="link" tabindex="0" :aria-label="t.team.rankBenefits" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')">
-          <view class="team-rank__header"><text class="team-rank__title">{{ designCopy.myRank }}</text><view class="team-rank__chev" aria-hidden="true"><NxIcon name="chevron-right" /></view></view>
+        <view class="nx-team-rank-link team-rank" :class="{ 'team-rank--bare': !rankBars.length }" role="link" tabindex="0" :aria-label="t.team.rankBenefits" @click="go('/pages/team/rank')" @keydown.enter.prevent="go('/pages/team/rank')">
+          <view class="team-rank__header"><text class="team-rank__title">{{ t.myRank.g1Title }}</text><view class="team-rank__chev" aria-hidden="true"><NxIcon name="chevron-right" /></view></view>
+          <!-- G1: badge and level centred, the gap line under them, then one shared .nx-progress per next-rank condition. -->
           <view class="team-rank__identity">
-            <TeamRankEmblem v-if="!visibility.hidden && rankReadable" :rank="remoteApiEnabled ? selectedRank : myRank" :size="52" />
-            <view class="team-rank__copy"><text class="team-rank__level">{{ visibility.mask(myRankDisplay) }}</text><text class="team-rank__hint">{{ visibility.mask(rankGapText) }}</text></view>
+            <TeamRankEmblem v-if="!visibility.hidden && rankReadable" :rank="remoteApiEnabled ? selectedRank : myRank" :size="44" />
+            <text class="team-rank__level">{{ visibility.mask(myRankDisplay) }}</text>
           </view>
+          <text class="team-rank__hint">{{ visibility.mask(rankGapText) }}</text>
           <view v-if="rankBars.length" ref="rankBarsEl" class="team-rank__bars" aria-hidden="true">
-            <view v-for="(bar, index) in rankBars" :key="bar.key" class="team-rank__bar"><text>{{ bar.label }}</text><view class="team-rank__track"><view :style="{ width: rankBarsInView === false || visibility.hidden || bar.percent === null ? '0%' : `${bar.percent}%`, transition: rankBarsInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: rankBarsInView === false ? '0ms' : vizStagger(index) }" /></view></view>
+            <template v-for="(bar, index) in rankBars" :key="bar.key"><text class="team-rank__label">{{ bar.label }}</text><view class="nx-progress" :aria-valuenow="visibility.hidden || bar.percent === null ? undefined : rankBarsInView === false ? 0 : bar.percent"><view class="nx-progress__fill" :style="{ width: rankBarsInView === false || visibility.hidden || bar.percent === null ? '0%' : `${bar.percent}%`, transition: rankBarsInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: rankBarsInView === false ? '0ms' : vizStagger(index) }" /></view></template>
           </view>
         </view>
 
@@ -255,34 +257,31 @@ const rankProgress = computed(() => teamRankProgress({
 const rankGapText = computed(() => {
   if (!rankReadable.value) return designCopy.value.benefitsAndRewards;
   const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
-  if (snapshot) return snapshot.next === null ? t.value.home.rankTopTier
-    : `${fmt(auditCopy.value.toRank, { rank: `V${snapshot.next}` })}${locale.code === "zh" ? " " : " · "}${fmt(auditCopy.value.remainingConditions, { n: snapshot.missing })}`;
+  const underReview = (rank: number) => `${fmt(t.value.myRank.g2Toward, { r: `V${rank}` })} · ${t.value.myRank.reviewTag}`;
+  if (snapshot) return snapshot.next === null ? t.value.myRank.topRank
+    : snapshot.reviewPending ? underReview(snapshot.next)
+    : fmt(t.value.myRank.gapTag, { r: `V${snapshot.next}`, n: snapshot.missing });
   const next = rankProgress.value.next;
-  if (!next) return t.value.home.rankTopTier;
-  return `${fmt(auditCopy.value.toRank, { rank: `V${next.v}` })}${locale.code === "zh" ? " " : " · "}${fmt(auditCopy.value.remainingConditions, { n: rankProgress.value.missing.length })}`;
+  if (!next) return t.value.myRank.topRank;
+  return rankProgress.value.reviewPending ? underReview(next.v)
+    : fmt(t.value.myRank.gapTag, { r: `V${next.v}`, n: rankProgress.value.unmetCount });
 });
 // One short bar per condition of the next rank; unknown progress keeps an empty track.
 const rankBars = computed(() => {
   const next = rankProgress.value.next;
   if (!rankReadable.value) return [];
-  const short = ({
-    zh: { selfComputePoints: "自购", directRefs: "好友", teamComputePoints: "团队" },
-    en: { selfComputePoints: "Self", directRefs: "Friends", teamComputePoints: "Team" },
-    vi: { selfComputePoints: "Cá nhân", directRefs: "Bạn bè", teamComputePoints: "Nhóm" },
-    id: { selfComputePoints: "Beli sendiri", directRefs: "Teman", teamComputePoints: "Tim" },
-    ms: { selfComputePoints: "Sendiri", directRefs: "Rakan", teamComputePoints: "Pasukan" },
-    fil: { selfComputePoints: "Sarili", directRefs: "Kaibigan", teamComputePoints: "Team" },
-    ru: { selfComputePoints: "Свои покупки", directRefs: "Друзья", teamComputePoints: "Команда" },
-    kk: { selfComputePoints: "Жеке", directRefs: "Достар", teamComputePoints: "Команда" },
-    uz: { selfComputePoints: "Shaxsiy", directRefs: "Doʻstlar", teamComputePoints: "Jamoa" },
-  })[uiLocale(locale.code)];
+  const copy = t.value.myRank;
+  const short = { selfComputePoints: copy.g1Self, directRefs: copy.g1Buy, teamComputePoints: copy.g1Team };
+  const label = (kind: keyof typeof short | "vDownlines", vLevel?: number) => kind === "vDownlines" ? fmt(copy.g1Lead, { r: `V${vLevel}` }) : short[kind];
   const snapshot = !vrank.remoteReady ? readTabSnapshot("rank") : null;
-  if (snapshot) return snapshot.bars.map(row => ({ key: row.key, label: row.kind === "vDownlines" ? `V${row.vLevel}` : short[row.kind], percent: row.percent }));
+  // Board order (DESIGN G1): own compute, team compute, buyers, then the V{n}+ count.
+  const order = { selfComputePoints: 0, teamComputePoints: 1, directRefs: 2, vDownlines: 3 };
+  if (snapshot) return [...snapshot.bars].sort((a, b) => order[a.kind] - order[b.kind]).map(row => ({ key: row.key, label: label(row.kind, row.vLevel ?? undefined), percent: row.percent }));
   if (!next) return [];
-  return rankProgress.value.rows.filter(row => row.tier === next.v).map(row => ({
+  return rankProgress.value.rows.filter(row => row.tier === next.v).sort((a, b) => order[a.kind] - order[b.kind]).map(row => ({
     key: row.key,
-    label: row.kind === "vDownlines" ? `V${row.vLevel}` : short[row.kind],
-    percent: row.status === "unknown" ? null : row.required === 0 ? 100 : Math.min(100, Math.round(row.current! / row.required * 100)),
+    label: label(row.kind, row.vLevel),
+    percent: row.status === "unknown" ? null : Math.min(100, Math.round(row.current! / row.required * 100)),
   }));
 });
 const { elRef: rankBarsEl, inView: rankBarsInView } = useScrollGrowProgress();
@@ -314,7 +313,7 @@ const ledger = computed(() => {
     if (e.status === "unlocked") uU += e.amountUSDT;
     if (e.status === "cooling") cU += e.amountUSDT;
     tU += e.amountUSDT;
-    if (e.kind === "direct_purchase" || e.kind === "direct_device_earning" || (e.kind === "unilevel" && e.layer === 1)) dU += e.amountUSDT;
+    if (e.layer === 1 && (e.kind === "direct_purchase" || e.kind === "direct_device_earning" || e.kind === "unilevel")) dU += e.amountUSDT;
     else eU += e.amountUSDT;
   }
   if (remoteApiEnabled) {
@@ -638,18 +637,21 @@ useAutoRecovery({
 </script>
 
 <style scoped>
+/* G1 (DESIGN G1, 01 §1.3, 03 §3.6): solid card, card-title role, badge 44 + level in the metric role, centred gap line,
+   label column as wide as the longest label so every .nx-progress starts on one line. */
 .team-rank { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--v5-space-2); min-width: 0; min-height: 176px; box-sizing: border-box; padding: var(--ui-space-inset); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+:global([data-theme="light"]) .team-rank { box-shadow: inset 0 0 0 1px var(--v5-border), var(--v5-glass-shadow); }
 .team-rank__header { display: flex; align-items: center; justify-content: space-between; min-height: 24px; gap: 4px; }
-.team-rank__title { font: 600 14px/20px var(--font-v5); }
-.team-rank__chev { font-size: 18px; color: var(--v5-ink-4); }
-.team-rank__identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.team-rank__copy { display: flex; flex-direction: column; min-width: 0; }
-.team-rank__level { font: 700 22px/26px var(--font-metric); color: var(--v5-brand); }
-.team-rank__hint { font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
-.team-rank__bars { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
-.team-rank__bar { display: grid; grid-template-columns: minmax(28px, max-content) minmax(0, 1fr); align-items: center; gap: 6px; font: 400 10px/12px var(--font-v5); color: var(--v5-ink-3); }
-.team-rank__track { height: 4px; overflow: hidden; border-radius: 999px; background: var(--v5-surface-3); }
-.team-rank__track > view { height: 100%; border-radius: 999px; background: var(--v5-brand); }
+.team-rank__title { min-width: 0; font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color: var(--v5-ink); }
+.team-rank__chev { display: grid; flex: none; font-size: 18px; color: var(--v5-ink-4); }
+.team-rank__identity { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+/* 没有进度条时（V8，或条件全部未知）徽章和说明居中，下半不空（04.3 双卡平衡）。 */
+.team-rank--bare { justify-content: center; }
+.team-rank--bare .team-rank__header { position: absolute; left: var(--ui-space-inset); right: var(--ui-space-inset); top: var(--ui-space-inset); }
+.team-rank__level { font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); color: var(--v5-brand); font-variant-numeric: tabular-nums; }
+.team-rank__hint { margin-top: -4px; align-self: center; text-align: center; font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); overflow-wrap: break-word; }
+.team-rank__bars { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 6px 8px; margin-top: auto; }
+.team-rank__label { font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .team-overview-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--ui-space-inline); align-items: stretch; }
 .team-rank:focus-visible, .team-tool:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .team-rank__status { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; font: 400 12px/1.4 var(--font-v5); color: var(--v5-ink-3); }

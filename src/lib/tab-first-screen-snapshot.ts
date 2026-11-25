@@ -23,7 +23,7 @@ export interface TabSnapshotData {
   commission: { totalUSDT: number; contributorCount: number; directUSDT: number; extendedUSDT: number;
     monthUSDT: number; monthNEX: number; unlockedUSDT: number; coolingUSDT: number };
   network: { total: number; direct: number };
-  rank: { rank: number; next: number | null; missing: number; bars: Array<{ key: string;
+  rank: { rank: number; next: number | null; missing: number; reviewPending?: boolean; bars: Array<{ key: string;
     kind: "selfComputePoints" | "directRefs" | "teamComputePoints" | "vDownlines"; vLevel: number | null; percent: number | null }> };
   referral: { enabled: boolean; amount: number; invited: number };
   release: { pending: number; locked: number };
@@ -60,12 +60,16 @@ const range = nullable("estimateRange");
 const amount = nullable({ anyOf: [fields({ usd: n, nex: n }), fields({ usd: n, nex: n, usdRange: range, nexRange: range })] });
 const period = fields({ usdt: nullable(n), nex: nullable(n), jobCount: nullable(c) });
 const localized = fields({ zh: s, en: s, vi: s });
+const rankSnapshotFields = {
+  rank: { oneOf: [0, 1, 2, 3, 4, 5, 6, 7, 8] }, next: nullable({ oneOf: [1, 2, 3, 4, 5, 6, 7, 8] }), missing: c,
+  bars: list(fields({ key: s, kind: { oneOf: ["selfComputePoints", "directRefs", "teamComputePoints", "vDownlines"] }, vLevel: nullable(c), percent: nullable(pct) })),
+};
 const schemas: Record<TabSnapshotKey, Schema> = {
   home: fields({ earnings: fields({ today: period, week: period, month: period, all: period }), latest: nullable(fields({ id: s, client: s, model: s, rewardUsdt: n, completedAt: s, synthetic: b })) }),
   wallet: fields({ usdt: "signedNumber", nex: n, today: fields({ usdt: n, nex: n }) }),
   commission: fields({ totalUSDT: n, contributorCount: c, directUSDT: n, extendedUSDT: n, monthUSDT: n, monthNEX: n, unlockedUSDT: n, coolingUSDT: n }),
   network: fields({ total: c, direct: c }),
-  rank: fields({ rank: { oneOf: [0, 1, 2, 3, 4, 5, 6, 7, 8] }, next: nullable({ oneOf: [1, 2, 3, 4, 5, 6, 7, 8] }), missing: c, bars: list(fields({ key: s, kind: { oneOf: ["selfComputePoints", "directRefs", "teamComputePoints", "vDownlines"] }, vLevel: nullable(c), percent: nullable(pct) })) }),
+  rank: { anyOf: [fields(rankSnapshotFields), fields({ ...rankSnapshotFields, reviewPending: b })] },
   referral: fields({ enabled: b, amount: n, invited: c }),
   release: fields({ pending: n, locked: n }), market: fields({ price: n }),
   vouchers: list(fields({ id: s, startAt: n, endAt: n, claimableOnStore: b, type: { oneOf: ["fixed", "percent"] }, amountUSD: nullable(n), percent: nullable(n), maxDiscountUSD: nullable(n) })),

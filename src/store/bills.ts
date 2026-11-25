@@ -309,6 +309,7 @@ export const useBills = defineStore("bills", () => {
     newcomerReward: "newcomerReward",
     inviterReward: "inviterReward",
     referralReward: "referralReward",
+    vrankSalary: "vrankSalary",
     computeTaskReward: "computeTaskReward",
     dailyCheckIn: "dailyCheckIn",
     trialCharge: "trialCharge",

@@ -25,6 +25,7 @@ import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
 import { createPaymentPinFlowFixture } from './lib/payment-pin-flow-fixture.mjs';
 import { applyDemoOrderTopupScene, demoOrderTopupResponse, planDemoOrderTopupScene } from './lib/prototype-demo-order-topup.mjs';
 import { demoTradeinRecovery, tradeinRecoveryStates } from './lib/prototype-demo-tradein-recovery.mjs';
+import { demoRankSalaryCommand, isRankSalaryCommand } from './lib/prototype-demo-rank-salary.mjs';
 const root=path.resolve(process.env.DEMO_BUILD_ROOT||path.join(import.meta.dirname,'../dist/build/h5'));
 const port=Number(process.env.DEMO_PORT||5190);
 const state=structuredClone(demoDefaults),routes=[],init=[];
@@ -89,6 +90,7 @@ const seed=()=>'<script>'+init.map(script=>script()).join('\n')+"for(const [key,
 // trade-in and trial commands, event commands awaiting confirmation, recovery rows and caches. The payment PIN, profile, cart and preferences belong to the
 // account and stay.
 const scenarioStorageKeys=['nexgrid-orders-accounts-v1','nexgrid-order-action-accounts-v1','nexgrid-pending-checkout-accounts-v1','uvel-checkout-create-recovery-v1','nexgrid-checkout-server-order-recovery-v1','nexgrid-checkout-receipt-recovery-v1','nexgrid-remote-checkout-commands-v1','nexgrid-bundle-order-command-v1','nexgrid-bundle-receipt-recovery-v1','nexgrid-promotion-checkout-v1','nexgrid-promotion-commands-v1','uvel-purchase-payment-accounts-v1','uvel-purchase-payment-keys-accounts-v1','nexgrid-e3-capacity-payment-accounts-v1','nexgrid-e3-capacity-commands-accounts-v1','nexgrid-trial-accounts-v1','nexgrid-trial-convert-accounts-v1','uvel-event-pending-accounts-v1'];
+scenarioStorageKeys.push('nexgrid-rank-salary-command-v1');
 const serverRun=Date.now().toString(36);
 // The scenario a page or a reply belongs to: this server run and its scenario epoch.
 const scenarioId=()=>serverRun+':'+(state.scenarioEpoch??0);
@@ -257,7 +259,8 @@ const server=http.createServer(async(req,res)=>{
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(projected.trialQuoteState);
         const tradeinRecoverySelection=tradeinRecoveryStates.includes(update.tradeinRecoveryState)?update.tradeinRecoveryState:null;
         const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||projected.contentState!==wasContent||['fleetState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(projected.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
-        const scenarioFields=['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'];
+        const scenarioFields=['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview',
+          'rankSalaryClaims','rankSalaryCommands','rankSalaryTransitions','rankSalaryExpirations'];
         if(scenarioChange)for(const key of scenarioFields)delete projected[key];
         const topupSelection=demoOptions.orderTopupState.find(([value])=>value===update.orderTopupState);
         const scene=topupSelection?.[0]??projected.orderTopupState;
@@ -278,6 +281,7 @@ const server=http.createServer(async(req,res)=>{
         updatePreviewHomeDisplay(state,update,Date.now());
         // A live trial conversion policy change keeps existing quotes and payment intents.
         if(typeof update.trialConversionEnabled==='boolean')state.trialConversionEnabled=update.trialConversionEnabled;
+        if(['original','revised'].includes(update.rankGuideEdition))state.rankGuideEdition=update.rankGuideEdition;
         // API-only preview controls for live quota changes and pre-hold compatibility.
         if(Number.isSafeInteger(update.quotaMonthlyStock)&&update.quotaMonthlyStock>=0)state.quotaMonthlyStock=update.quotaMonthlyStock;
         if(update.quotaProductNo===null)delete state.quotaProductNo;
@@ -462,6 +466,17 @@ const server=http.createServer(async(req,res)=>{
         let raw='';for await(const chunk of req)raw+=chunk;
         const response=trialPin.handle(url,{method:()=>req.method,headers:()=>req.headers,postDataJSON:()=>raw?JSON.parse(raw):{}});
         return sendJson(res,{code:response.status===200?0:response.status,message:response.message,data:response.data},response.status);
+      }
+      if(isRankSalaryCommand(url.pathname,req.method)){
+        let request=null;
+        if(req.method==='POST'){
+          let raw='';for await(const chunk of req)raw+=chunk;
+          request=raw?JSON.parse(raw):null;
+          await new Promise(resolve=>setTimeout(resolve,350));
+          if(staleWrite())return refuseStale();
+        }
+        const response=demoRankSalaryCommand(state,url.pathname,req.method,previewAccountId(state,req.headers),req.headers['idempotency-key'],request);
+        return sendJson(res,response.body,response.status);
       }
       const withdrawalRequest = handlesWithdrawalRequest(url.pathname, req.method);
       const modeledBankWrite=/^\/api\/(withdrawals\/bank\/(beneficiary(?:\/otp)?|quotes(?:\/BQ-[a-f0-9]{32}\/abandon)?|orders)|payout-addresses(?:\/otp\/send)?)$/.test(url.pathname);

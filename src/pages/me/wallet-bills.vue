@@ -72,13 +72,13 @@
               </NxIconTile>
               <view class="bills-row__copy">
                 <view class="bills-row__title-row">
-                  <text class="bills-row__title">{{ typeLabel(b.type) }}</text>
+                  <text class="bills-row__title">{{ billTitle(b) }}</text>
                   <NxTag v-if="b.status !== 'posted'" :tone="b.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(b.status)" />
                 </view>
                 <!-- Memo and time flow together and wrap; a reference gets its own line, ellipsized in the middle. -->
                 <view :class="b.memoKey === 'learningReward' || b.type === 'clawback' ? '' : 'bills-row__sub--line'" class="bills-row__sub">
-                  <text class="bills-row__memo">{{ billMemo(b) }}</text>
-                  <text class="bills-row__dot"> · {{ fmtClock(b.ts) }}</text>
+                  <text v-if="!namedByMemo(b)" class="bills-row__memo">{{ billMemo(b) }}</text>
+                  <text class="bills-row__dot">{{ namedByMemo(b) ? '' : ' · ' }}{{ fmtClock(b.ts) }}</text>
                 </view>
                 <NxCodeValue v-if="b.ref && b.memoKey !== 'learningReward' && b.type !== 'refund'" class="bills-row__code" :value="b.ref" :label="t.bills.detailRef" :copyable="false" />
                 <view v-if="b.type === 'refund' && b.ref" class="flex items-center" @click.stop>
@@ -108,18 +108,18 @@
 
     <view v-if="detail" class="bills-sheet-root">
       <view class="bills-sheet-scrim nx-sheet-fade-in" @click="detail = null" />
-      <view class="nx-glass-sheet nx-sheet-slide-up bills-sheet" role="dialog" aria-modal="true" :aria-label="typeLabel(detail.type)" data-testid="bills-detail">
+      <view class="nx-glass-sheet nx-sheet-slide-up bills-sheet" role="dialog" aria-modal="true" :aria-label="billTitle(detail)" data-testid="bills-detail">
         <view class="bills-sheet__handle" aria-hidden="true" />
         <view class="bills-sheet__head">
           <NxIconTile class="bills-sheet__icon" :tone="BILL_TILE[detail.type]" size="l"><BillTypeIcon :type="detail.type" color="currentColor" /></NxIconTile>
-          <text class="bills-sheet__type">{{ typeLabel(detail.type) }}</text>
+          <text class="bills-sheet__type">{{ billTitle(detail) }}</text>
           <view class="bills-sheet__amount" :class="{ 'bills-sheet__amount--in': !isDebit(detail) }">
             <text class="nx-num-amount">{{ isDebit(detail) ? "−" : "+" }}{{ fmtAmount(detail) }}</text>
             <text class="bills-sheet__unit">{{ platformDisplayText(detail.symbol) }}</text>
           </view>
         </view>
         <view class="bills-sheet__facts">
-          <view class="bills-sheet__fact"><text>{{ t.bills.detailType }}</text><text class="bills-sheet__value">{{ typeLabel(detail.type) }}</text></view>
+          <view class="bills-sheet__fact"><text>{{ t.bills.detailType }}</text><text class="bills-sheet__value">{{ billTitle(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailTime }}</text><text class="bills-sheet__value tabular-nums">{{ fmtTime(detail.ts) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailSource }}</text><text class="bills-sheet__value">{{ billMemo(detail) }}</text></view>
           <view class="bills-sheet__fact"><text>{{ t.bills.detailStatus }}</text><NxTag :tone="detail.status === 'posted' ? 'success' : detail.status === 'pending' ? 'warning' : 'danger'" :label="statusLabel(detail.status, isDebit(detail))" /></view>
@@ -365,9 +365,14 @@ function fmtTime(ts: number): string {
 function fmtClock(ts: number): string {
   return walletBillClockLabel(ts);
 }
+// 等级月薪归在邀请奖励类里，按展示码单独叫名；名字已经是标题，下面一行不再重复。
+const namedByMemo = (b: Bill) => b.memoKey === "vrankSalary";
+function billTitle(b: Bill): string {
+  return namedByMemo(b) ? billMemo(b) : typeLabel(b.type);
+}
 function billAria(b: Bill): string {
   // 用 billMemo(渲染时翻译)而不是写入时冻结语言的 raw memo —— 切语言后读屏不再旧语直出
-  return [typeLabel(b.type), billMemo(b), b.ref].filter(Boolean).join(" ");
+  return [billTitle(b), namedByMemo(b) ? "" : billMemo(b), b.ref].filter(Boolean).join(" ");
 }
 function billClickable(b: Bill): boolean {
   if (b.type === "withdraw") return !!b.ref;
