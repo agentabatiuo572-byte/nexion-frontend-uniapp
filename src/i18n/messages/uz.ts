@@ -2188,7 +2188,7 @@ export const uz: Messages = {
     inventorySlotMeter: "{active}/{max} slot band",
     inventorySlotsLabel: "Quvvat slotlari",
     inventorySectionDevices: "Online",
-    inventorySectionInventory: "Mavjud qurilmalar",
+    inventorySectionInventory: "Yoqishni kutmoqda",
     inventorySectionActivationUnconfirmed: "Holat tasdiqlanmagan",
     inventoryActivationUnconfirmed: "Qurilmani faollashtirish yozuvi tasdiqlanmagan, hozircha faollashtirib boʻlmaydi. Yangilab, qayta urining yoki yordam xizmatiga murojaat qiling.",
     inventoryToastSlotsFull: "Slotlar toʻla: {max}/{max}. Avval bitta qurilmani oʻchiring.",

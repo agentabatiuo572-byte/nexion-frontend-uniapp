@@ -2188,7 +2188,7 @@ export const ms: Messages = {
     inventorySlotMeter: "{active}/{max} slot digunakan",
     inventorySlotsLabel: "Slot peranti",
     inventorySectionDevices: "Online",
-    inventorySectionInventory: "Peranti tersedia",
+    inventorySectionInventory: "Sedia diaktifkan",
     inventorySectionActivationUnconfirmed: "Status belum disahkan",
     inventoryActivationUnconfirmed: "Rekod pengaktifan peranti menunggu pengesahan dan belum boleh diaktifkan. Muat semula dan cuba lagi, atau hubungi khidmat pelanggan.",
     inventoryToastSlotsFull: "Slot penuh: {max}/{max}. Nyahaktifkan satu peranti dahulu.",

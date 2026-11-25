@@ -2188,7 +2188,7 @@ export const kk: Messages = {
     inventorySlotMeter: "Бос емес орын: {active}/{max}",
     inventorySlotsLabel: "Есептеу орындары",
     inventorySectionDevices: "Online",
-    inventorySectionInventory: "Қолжетімді құрылғылар",
+    inventorySectionInventory: "Белсендіруді күтуде",
     inventorySectionActivationUnconfirmed: "Күйі расталмады",
     inventoryActivationUnconfirmed: "Құрылғыны белсендіру жазбасы расталуда, сондықтан оны әзірге белсендіру мүмкін емес. Жаңартып, қайталаңыз немесе қолдауға жазыңыз.",
     inventoryToastSlotsFull: "Орындар толы: {max}/{max}. Алдымен бір құрылғының белсенділігін тоқтатыңыз.",
