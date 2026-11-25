@@ -49,9 +49,18 @@ const remoteSessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled, authenticated: auth.isAuthenticated, accountId: auth.accountId,
   appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null,
 }));
+// A web sign-in or the user stopped the bound phone; offer it back only while a slot is free to take it.
+const phoneStopped = computed(() => {
+  const phones = app.visibleDevices.filter(device => device.kind === 'phone');
+  return (app.remoteFleetStatus === 'ready' || (app.remoteFleetStatus === 'loading' && app.remoteFleetHasSnapshot)) && phones.length > 0 && phones.every(device => device.activatedAt === null && !device.activationUnconfirmed)
+    && app.remoteSlotsUsed !== null && app.remoteSlotsUsed < app.slotCap;
+});
 const rows = computed<HomeActionRow[]>(() => {
   const list: HomeActionRow[] = [];
-  if (remoteApiEnabled && hasNativePhoneRuntime() && app.accountKey !== 'default' && (app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey))) list.push({ key:'phone', title:copy.value.bind, subtitle:detailCopy.value.bindHint, action:copy.value.bindAction, href:'/pages/onboarding/connect?mode=recalibrate' });
+  if (remoteApiEnabled && hasNativePhoneRuntime() && app.accountKey !== 'default') {
+    if (app.remotePhoneBindingInvalid || !session.isCurrentDeviceCalibrated(app.accountKey)) list.push({ key:'phone', title:copy.value.bind, subtitle:detailCopy.value.bindHint, action:copy.value.bindAction, href:'/pages/onboarding/connect?mode=recalibrate' });
+    else if (phoneStopped.value) list.push({ key:'phone', title:detailCopy.value.reactivate, subtitle:detailCopy.value.reactivateHint, action:detailCopy.value.reactivateAction, href:'/pages/onboarding/connect?mode=recalibrate' });
+  }
   const task = quest.remoteStatus === 'ready' ? homeTaskSummary({ quests: quest.remoteQuests, dayOneRequiredTaskCount: quest.dayOneRequiredTaskCount, dayOneSnapshotStatus: quest.dayOneSnapshotStatus, dayOneRewardNex: quest.dayOneRewardNex }, now.value * 1000, config.isEnabled('stakingVisible')) : null;
   if (config.isEnabled('homeNewcomerTasksEnabled') && task) list.push({ key:'quest', title:copy.value.newcomer, href:'/pages/missions/missions', progress:{ done:task.done, total:task.total }, progressLabel:task.total ? fmt(copy.value.questProgress,{done:task.done!,total:task.total}) : detailCopy.value.viewTasks, subtitle:detailCopy.value.viewTasks, reward:task.reward ? formatAmount(task.reward).replace(/\.00$/, '') : undefined, rewardLabel:task.claimable ? detailCopy.value.claimReward : detailCopy.value.completeReward, remaining:task.remainingHours !== null ? fmt(detailCopy.value.hours,{n:task.remainingHours}) : task.remainingMinutes !== null ? fmt(detailCopy.value.minutes,{n:task.remainingMinutes}) : undefined });
   const unpaid = ordersReady.value ? orders.visibleOrders.filter(order => order.status === 'placed' || order.status === 'payment_failed') : [];

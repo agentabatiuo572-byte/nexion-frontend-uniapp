@@ -25,8 +25,8 @@
       <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
-      <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
-        <text class="lg-recovery-notice__t">{{ h5RefreshCookieEnabled ? t.login.serverSessionReloadNotice : t.login.nativeSessionReloadNotice }}</text>
+      <view v-if="sessionEndNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
+        <text class="lg-recovery-notice__t">{{ sessionEndNotice }}</text>
       </view>
       <!-- #ifdef H5 -->
       <view v-if="browserUnsupportedNotice" class="lg-recovery-notice" role="status" data-qa="secure-browser-unsupported-notice">
@@ -34,8 +34,7 @@
       </view>
       <!-- #endif -->
       <template v-if="!loginRecoveryPending">
-        <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
-        <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
+        <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>        <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
         <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
       </template>
 
@@ -337,7 +336,11 @@ const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
 const remoteTwoFactorChallenge = ref<string | null>(null);
-const serverSessionReloadNotice = ref(false);
+const notice = ref("");
+const sessionEndNotice = computed(() => notice.value === "session-replaced-by-web" ? t.value.login.sessionReplacedByWebNotice
+  : notice.value === "session-replaced" ? t.value.login.sessionReplacedNotice
+    : notice.value !== "server-session-reload" ? ""
+      : h5RefreshCookieEnabled ? t.value.login.serverSessionReloadNotice : t.value.login.nativeSessionReloadNotice);
 // #ifdef H5
 const browserUnsupportedNotice = ref(false);
 // #endif
@@ -354,7 +357,7 @@ onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   const forwarded = new URLSearchParams(takeNavigationQuery("/pages/login/login"));
   if (forwarded.get("return") || o.return) returnParam.value = forwarded.get("return") || o.return;
-  serverSessionReloadNotice.value = o.notice === "server-session-reload";
+  notice.value = o.notice || "";
   // #ifdef H5
   browserUnsupportedNotice.value = o.notice === "secure-browser-unsupported";
   // #endif
