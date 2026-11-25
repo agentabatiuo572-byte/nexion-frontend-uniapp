@@ -34,7 +34,8 @@
       </view>
       <!-- #endif -->
       <template v-if="!loginRecoveryPending">
-        <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>        <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
+        <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
+        <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
         <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
       </template>
 
@@ -153,6 +154,7 @@ import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 // #ifdef APP-PLUS
 // #endif
+import { sessionEndReason } from "@/auth/session-end";
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, nextTick, watch, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
@@ -328,7 +330,7 @@ async function recoverLoginResult() {
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
-    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : remoteLoginError(cause);
+    error.value = cause instanceof Error && ["APP_REPLACED", "H5_REPLACED"].includes(cause.message) ? t.value.login.sessionReplaced : remoteLoginError(cause);
   } finally { if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 const returnParam = ref<string | null>(null);
@@ -336,10 +338,10 @@ const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
 const remoteTwoFactorChallenge = ref<string | null>(null);
-const notice = ref("");
-const sessionEndNotice = computed(() => notice.value === "session-replaced-by-web" ? t.value.login.sessionReplacedByWebNotice
-  : notice.value === "session-replaced" ? t.value.login.sessionReplacedNotice
-    : notice.value !== "server-session-reload" ? ""
+const serverSessionReloadNotice = ref(false);
+const sessionEndNotice = computed(() => sessionEndReason.value === "H5_REPLACED" ? t.value.login.sessionReplacedByWebNotice
+  : sessionEndReason.value === "APP_REPLACED" ? t.value.login.sessionReplacedNotice
+    : !serverSessionReloadNotice.value ? ""
       : h5RefreshCookieEnabled ? t.value.login.serverSessionReloadNotice : t.value.login.nativeSessionReloadNotice);
 // #ifdef H5
 const browserUnsupportedNotice = ref(false);
@@ -357,7 +359,7 @@ onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   const forwarded = new URLSearchParams(takeNavigationQuery("/pages/login/login"));
   if (forwarded.get("return") || o.return) returnParam.value = forwarded.get("return") || o.return;
-  notice.value = o.notice || "";
+  serverSessionReloadNotice.value = o.notice === "server-session-reload";
   // #ifdef H5
   browserUnsupportedNotice.value = o.notice === "secure-browser-unsupported";
   // #endif

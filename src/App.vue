@@ -73,6 +73,7 @@ import {
 } from "@/api/runtime";
 import { refreshBusinessCalendar } from "@/lib/business-calendar-sync";
 import { completeSignIn } from "@/auth/complete-sign-in";
+import { sessionEndReason } from "@/auth/session-end";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route';
 import { prepareProductCatalog, productCatalogLanguageReadFailed, productCatalogRetryAt, refreshProductCatalog, refreshProductCatalogLanguage } from "@/store/product-catalog";
@@ -96,8 +97,6 @@ let devBusinessTimeoutRuns = 0;
 let pendingCanonicalRouteRepair = "";
 let pendingCanonicalRouteRepairAt = 0;
 let pendingServerSessionRecovery = false;
-/** Login explanation for the ended session; only another sign-in taking over has a specific one. */
-let sessionEndNotice = "server-session-reload";
 type ServerSessionRestoreState = "idle" | "restoring" | "ready" | "failed";
 let serverSessionRestoreState: ServerSessionRestoreState = serverSessionRestoreEnabled ? "idle" : "ready";
 let serverSessionRestoreInFlight: Promise<boolean> | null = null;
@@ -807,10 +806,7 @@ function checkAuthGuard(): boolean {
   if (isAuthWhitelisted(route)) {
     // Once login is visible, consume the recovery latch before any periodic
     // guard retry. Re-launching the same login route resets in-progress input.
-    if (route.startsWith("pages/login/")) {
-      pendingServerSessionRecovery = false;
-      sessionEndNotice = "server-session-reload";
-    }
+    if (route.startsWith("pages/login/")) pendingServerSessionRecovery = false;
     return false;
   }
   const auth = useAuth();
@@ -827,9 +823,8 @@ function checkAuthGuard(): boolean {
         && auth.accountId === `user:${serverSession.user.userId}`) {
       pendingServerSessionRecovery = false;
       serverAuthenticatedAccountTraceAtBoot = false;
-      sessionEndNotice = "server-session-reload";
     } else {
-      navReset({ url: `/pages/login/login?notice=${sessionEndNotice}` });
+      navReset({ url: "/pages/login/login?notice=server-session-reload" });
       return true;
     }
   }
@@ -845,7 +840,7 @@ function checkAuthGuard(): boolean {
     clearInvalidRemoteSessionState(auth);
     navReset({
       url: requiresServerSessionRecovery
-        ? `/pages/login/login?notice=${sessionEndNotice}`
+        ? "/pages/login/login?notice=server-session-reload"
         : "/pages/onboarding/intro",
     });
     return true;
@@ -1333,9 +1328,7 @@ onLaunch(() => {
   // #endif
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler((reason) => {
-      // A later generic rejection must not hide the takeover before Login shows it.
-      if (reason === "H5_REPLACED") sessionEndNotice = "session-replaced-by-web";
-      else if (reason === "APP_REPLACED") sessionEndNotice = "session-replaced";
+      if (reason === "APP_REPLACED" || reason === "H5_REPLACED") sessionEndReason.value = reason;
       // Preserve only the non-secret trace long enough to choose the login explanation.
       const requiresServerSessionRecovery = pendingServerSessionRecovery
         || (!sessionVault.read() && hasServerAuthenticatedAccountTrace(auth));
@@ -1346,7 +1339,7 @@ onLaunch(() => {
       if (route && !isAuthWhitelisted(route)) {
         navReset({
           url: requiresServerSessionRecovery
-            ? `/pages/login/login?notice=${sessionEndNotice}`
+            ? "/pages/login/login?notice=server-session-reload"
             : "/pages/onboarding/intro",
         });
       }

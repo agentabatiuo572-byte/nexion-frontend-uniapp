@@ -6,6 +6,7 @@ import { useApp } from "@/store/app";
 import { readAccountSessionRecords, useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
+import { sessionEndReason } from "@/auth/session-end";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { ensureEarningsReleaseStatus } from "@/store/earning-release";
 import { refreshRemoteFleetAfterCatalog } from "@/lib/e3-fleet-bootstrap";
@@ -174,6 +175,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   // reused the same completion key. This prevents an earlier browser profile
   // from surviving a cross-account or refreshed server identity.
   if (remoteApiEnabled && options.serverProfile) {
+    sessionEndReason.value = undefined;
     app.projectServerIdentity(options.serverProfile);
     useProfile().projectServerIdentity(options.serverProfile);
     hydrateCurrentProfileLocale(options.initialOAuthLocale);

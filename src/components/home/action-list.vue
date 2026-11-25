@@ -49,10 +49,11 @@ const remoteSessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled, authenticated: auth.isAuthenticated, accountId: auth.accountId,
   appAccountKey: app.accountKey, sessionUserId: sessionVault.read()?.user.userId ?? null,
 }));
-// A web sign-in or the user stopped the bound phone; offer it back only while a slot is free to take it.
+// A web sign-in or the user stopped the phone bound to this installation; offer it back only while a slot is free.
 const phoneStopped = computed(() => {
   const phones = app.visibleDevices.filter(device => device.kind === 'phone');
-  return (app.remoteFleetStatus === 'ready' || (app.remoteFleetStatus === 'loading' && app.remoteFleetHasSnapshot)) && phones.length > 0 && phones.every(device => device.activatedAt === null && !device.activationUnconfirmed)
+  return app.remoteFleetHasSnapshot && phones.some(device => device.id === app.nativeBoundPhoneId)
+    && phones.every(device => device.activatedAt === null && !device.activationUnconfirmed)
     && app.remoteSlotsUsed !== null && app.remoteSlotsUsed < app.slotCap;
 });
 const rows = computed<HomeActionRow[]>(() => {
