@@ -471,8 +471,6 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const suspended = [...suspendedIntents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
-      if (subject.kind==='TRIAL_CONVERT'&&source.quote.feePolicyVersion!==(state.trialPaymentFeePolicyVersion??3))
-        return refused(409,'PURCHASE_PAYMENT_FEE_POLICY_CHANGED');
       const rememberTrialRefusal = result => {
         if (subject.kind!=='TRIAL_CONVERT'||result.message!=='TRIAL_QUOTE_CHANGED'||!trialPurchaseOptionsEnabled(state)) return result;
         refusedTrialCreates.set(key,{quoteId,result});
@@ -504,6 +502,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         return rememberTrialRefusal({status:409,message:error.message,data:error.data});
       }
       if (trial && trial.claimNo !== subject.identity) return refused(409, 'TRIAL_NOT_CONVERTIBLE');
+      if (trial&&source.quote.feePolicyVersion!==(state.trialPaymentFeePolicyVersion??3))
+        return refused(409,'PURCHASE_PAYMENT_FEE_POLICY_CHANGED');
       if (source.replacementQuote)
         checkedReplacementPricing(url, request, subject, source.payload, source.replacementQuote);
       const amount = trial?.quote.amountUsdt ?? order?.amountUsdt;
