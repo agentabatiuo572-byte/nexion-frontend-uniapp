@@ -148,8 +148,8 @@ let rejectedsnapshotSource: NonNullable<typeof commission.binarySnapshot> | null
 watch(() => [commission.binaryStatus, commission.binarySnapshot, commission.binaryTransientFailure] as const, ([status, value, transient]) => {
   // A temporary read failure keeps the confirmed snapshot on screen while recovery reads again (03 §3.4).
   const retained = status === 'error' && transient && value !== null;
-  if (status === 'error' && !retained) { snapshotPresentation.value = null; rejectedsnapshotSource = value; }
-  else if ((status === 'ready' || retained) && auth.isAuthenticated && displayEnvironmentCurrent() && value && value !== rejectedsnapshotSource) snapshotPresentation.value = value;
+  if (!value || (status === 'error' && !retained)) { snapshotPresentation.value = null; rejectedsnapshotSource = value; }
+  else if ((status === 'ready' || retained) && auth.isAuthenticated && displayEnvironmentCurrent() && value !== rejectedsnapshotSource) snapshotPresentation.value = value;
 }, { immediate: true, flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => {
   rejectedsnapshotSource = commission.binarySnapshot; snapshotPresentation.value = null;

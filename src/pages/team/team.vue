@@ -216,10 +216,10 @@ watch(() => {
 }, () => { binaryPresentation.value = null; }, { flush: "sync" });
 watch([displayCatalogValid, () => commission.binaryStatus, () => commission.binarySnapshot, () => commission.binaryTransientFailure], () => {
   // A temporary read failure keeps the confirmed snapshot (03 §3.4); a refusal clears it.
-  const retained = commission.binaryStatus === "error" && commission.binaryTransientFailure;
-  if (commission.binaryStatus === "error" && !retained) { binaryPresentation.value = null; return; }
   const snapshot = commission.binarySnapshot;
-  if (!displayCatalogValid.value || (commission.binaryStatus !== "ready" && !retained) || !snapshot) return;
+  const retained = commission.binaryStatus === "error" && commission.binaryTransientFailure;
+  if (!snapshot || (commission.binaryStatus === "error" && !retained)) { binaryPresentation.value = null; return; }
+  if (!displayCatalogValid.value || (commission.binaryStatus !== "ready" && !retained)) return;
   const { estimatedAmountUsdt, trackA, trackB, blockedReason } = snapshot;
   binaryPresentation.value = { estimatedAmountUsdt, trackA, trackB, blockedReason };
 }, { immediate: true, flush: "sync" });
