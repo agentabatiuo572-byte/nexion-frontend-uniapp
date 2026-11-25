@@ -1,10 +1,9 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
 import { apiRuntimeClientOrigin, vRankApi } from "@/api/runtime";
-import { isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
+import { ApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
 import { readRankSalaryAttempt, type RankSalaryAttempt, type RankSalaryReceipt } from "@/api/v-rank-api";
-import { appReadForeground, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
-import { remoteAccountScope } from "@/lib/remote-account-epoch";
+import { foregroundReadAllowed } from "@/lib/foreground-read";
 import type { SalaryClaimPhase } from "@/lib/rank-salary-view";
 import { acquireAccountCommand, readAccountRow, releaseAccountCommandKey, type AccountCommandRow } from "@/store/account-scoped-storage";
 
@@ -36,9 +35,9 @@ export function useRankSalaryClaim(options: {
     clearTimer();
     working = attempt;
     phase.value = write ? "claiming" : "confirming";
-    const scope = remoteAccountScope.snapshot();
-    const current = () => pending.value === attempt && options.account() === account && remoteAccountScope.isCurrent(scope);
-    const isVisible = () => current() && shown.value && appReadForeground.value && documentReadVisible.value;
+    // Session restore publishes the user before rebinding stores. The command
+    // belongs to the account and attempt across that rebind.
+    const current = () => pending.value === attempt && options.account() === account;
     const { month, amountUsdt } = attempt.item;
     const nextRead = (delay: number) => {
       if (visible()) timer = setTimeout(() => {
@@ -62,9 +61,11 @@ export function useRankSalaryClaim(options: {
         }
       } catch (error) {
         if (!current()) return;
+        // The API client can discard a write response after the server processed it.
+        const sessionChanged = error instanceof ApiError && error.message === "SESSION_CHANGED_DURING_REQUEST";
         if (write && isApiRefusal(error, 409, "SALARY_NOT_CLAIMABLE", "IDEMPOTENCY_KEY_CONFLICT")) {
           receipt = { status: "REJECTED", month, rejectionCode: "SALARY_NOT_CLAIMABLE" };
-        } else if (write && !isApiRefusal(error, 503, "SALARY_RECEIPT_UNAVAILABLE") && !isAmbiguousOutcome(error)) {
+        } else if (write && !sessionChanged && !isApiRefusal(error, 503, "SALARY_RECEIPT_UNAVAILABLE") && !isAmbiguousOutcome(error)) {
           receipt = { status: "FAILED" };
         } else {
           phase.value = "confirming";
@@ -73,7 +74,7 @@ export function useRankSalaryClaim(options: {
         }
       }
       if (!current()) return;
-      if (!isVisible()) {
+      if (!visible()) {
         phase.value = "confirming";
         return;
       }
@@ -85,7 +86,7 @@ export function useRankSalaryClaim(options: {
       } else {
         releaseAccountCommandKey(STORAGE, account, INTENT, attempt.key);
         try {
-          await options.settled(receipt, attempt, isVisible);
+          await options.settled(receipt, attempt, () => current() && visible());
         } finally {
           if (current()) {
             pending.value = null;
