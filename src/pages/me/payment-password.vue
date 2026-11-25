@@ -108,12 +108,9 @@ function toConfirm() { if (canNext.value) step.value = "confirm"; }
 function restartNew() { passwords.new = ""; passwords.confirm = ""; step.value = "new"; }
 // Back from step 2 returns to step 1 with every input cleared (PRD §4.6.6); header back and system back both land here.
 function backToVerify() { if (ui.busy) return; passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
-// PLACEHOLDER(Codex): where a rejected change lands. Wrong or locked current PIN → step 1 (remaining attempts shown there);
-// a new PIN the server refuses → the new-PIN screen.
-watch(() => ui.changeError, key => {
-  if (key === "incorrect" || key === "locked") { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
-  else if (key === "samePassword" || key === "simple" || key === "mismatch") restartNew();
-});
+// PLACEHOLDER(Codex): where a rejected change lands. save() has already dropped the current PIN, so any rejection starts
+// again at step 1 with every input cleared; the message (remaining attempts, same PIN, …) shows there.
+watch(() => ui.changeError, key => { if (key) { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; } });
 function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
 async function load() {
   const generation = pageGeneration;
