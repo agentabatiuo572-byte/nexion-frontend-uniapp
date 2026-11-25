@@ -159,6 +159,8 @@ function onTap() {
 }
 .scb-cta { max-width:100%; box-sizing:border-box; min-height:48px; height:auto; padding-block:10px; text-align:center; }
 .scb-cta svg { flex:none; }
+/* No price slot (a note and one action, or one action alone): the action is the full-width L 48 (04 §4.0), as trial detail's. */
+.scb-bar:not(:has(.scb-info, .scb-quantity)) .scb-cta { flex:1 1 100%; }
 @media(max-width:350px) { .scb-cta { flex:1 1 100%; } }
 </style>
 

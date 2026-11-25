@@ -738,7 +738,8 @@ useAutoRecovery({
 .rank-dock__text:active { opacity:.6; }
 .rank-dock__text:focus-visible { outline:2px solid var(--v5-brand);outline-offset:-2px;border-radius:999px; }
 /* 领取中按钮、确认中胶囊：灰色玻璃由共享层给（03 §3.1），这里只排加载指示和文字。 */
-.rank-dock__status { display:flex;align-items:center;justify-content:center;gap:8px;flex:1;height:48px;border-radius:999px;color:var(--ui-tray-disabled-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
+/* Size, type and ink come from the shared .nx-tray-status capsule (tokens.css). */
+.rank-dock__status { flex:1; }
 .rank-dock__spin { flex:none;width:18px;height:18px;box-sizing:border-box;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:rank-dock-spin 800ms linear infinite; }
 @keyframes rank-dock-spin { to { transform:rotate(360deg); } }
 /* 减少动态、系统省电：加载指示静止（A10）。 */

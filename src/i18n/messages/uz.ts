@@ -2114,6 +2114,7 @@ export const uz: Messages = {
     sheetProp3Title: "Tejash: koʻpi bilan ${amount}",
     sheetDismissCta: "Keyinroq",
     claimUnknownInline: "Sinov faollashtirilishi tasdiqlanmoqda. Tasdiqlangach, oʻzi yangilanadi.",
+    claimNotStartedInline: "Sinov faollashtirilmadi. Qayta urinib koʻrishingiz mumkin.",
     claimOnboardingRequired: "Sinov boshlanmadi. Dastlabki sozlashni yakunlab, olish uchun qayting.",
     claimOnboardingCta: "Dastlabki sozlashni yakunlash",
     claimTermsRequired: "Sinov boshlanmadi. Xizmat shartlarini tasdiqlab, olish uchun qayting.",

@@ -119,8 +119,10 @@ const claimFromRetry = ref(false);
 const heldReasonText = ref("");
 const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+// A start found not to have run offers 重新领取, so its line says it did not start (a hint), not that it is confirming (03 §3.5.2).
+const startNotRun = computed(() => !!freeTrial.pendingStart && freeTrial.startRetryable);
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
-const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart);
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
@@ -138,7 +140,7 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
-const claimErrorText = computed(() => freeTrial.pendingStart ? t.value.trial.claimUnknownInline
+const claimErrorText = computed(() => freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
   : claimErrorReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : claimErrorReason.value === "terms-required" ? t.value.trial.claimTermsRequired
   : sheet.failureText(claimErrorReason.value));
@@ -169,7 +171,7 @@ async function onClaim() {
   const requestedSequence = ++claimSequence;
   claimFromRetry.value = claimRetryable.value;
   heldReasonText.value = claimErrorText.value;
-  heldStatusLine.value = !!freeTrial.pendingStart;
+  heldStatusLine.value = lineIsStatus.value;
   claiming.value = true;
   claimError.value = false;
   claimErrorReason.value = undefined;

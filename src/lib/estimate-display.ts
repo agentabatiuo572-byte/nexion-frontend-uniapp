@@ -40,6 +40,7 @@ export function estimateRangeParts(low: number, high: number, calculated = false
   return lowText === highText ? [lowText] : [lowText, highText];
 }
 
+/** A range as one string never breaks at its dash (03 §3.6.1): word joiners hold both sides. */
 export function formatEstimateRange(low: number, high: number, calculated = false): string {
-  return estimateRangeParts(low, high, calculated).join("–");
+  return estimateRangeParts(low, high, calculated).join("\u2060–\u2060");
 }

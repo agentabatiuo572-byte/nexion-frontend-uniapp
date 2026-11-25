@@ -2114,6 +2114,7 @@ export const ru: Messages = {
     sheetProp3Title: "Скидка до ${amount}",
     sheetDismissCta: "Позже",
     claimUnknownInline: "Подтверждаем запуск пробного периода. Обновится автоматически.",
+    claimNotStartedInline: "Пробный период не запущен. Можно попробовать ещё раз.",
     claimOnboardingRequired: "Пробный период не начат. Завершите начальную настройку и вернитесь.",
     claimOnboardingCta: "Завершить настройку",
     claimTermsRequired: "Пробный период не начат. Примите условия использования и вернитесь.",
