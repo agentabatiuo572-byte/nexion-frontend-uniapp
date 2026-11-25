@@ -1176,7 +1176,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(assignmentIncomplete)blockedReason='BINARY_LEG_ASSIGNMENT_INCOMPLETE';
     else if(belowThreshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
     else if(settlementNotDue)blockedReason='F3_SETTLEMENT_NOT_DUE';
-    const estimateBlocked=assignmentIncomplete||belowThreshold||(!preset&&settlementNotDue);
+    const estimateBlocked=assignmentIncomplete||belowThreshold||settlementNotDue;
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,
       trackATotalMembers:legs.A.length,trackBTotalMembers:legs.B.length,autoPlacedMembers:0,
       matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:estimateBlocked?0:Number(Math.min(periodCap,weakerVolume*matchRate).toFixed(6)),
