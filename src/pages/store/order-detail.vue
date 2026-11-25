@@ -1146,7 +1146,10 @@ async function handleWalletPayment(topupDeadline?: string, topupAmount?: string)
   paymentSheetOpen.value = false;
   let paymentConfirmed = false;
   try {
-      const receipt = await executeSelectedPurchase({amount:topupAmount ?? requestAmountUsdt,currency:'USDT',summary:liveOrder.value?.productName??t.value.store.coConfirmPurchase,precision:topupAmount === undefined ? undefined : 'full'},
+      const receipt = await executeSelectedPurchase({
+        amount:topupAmount ?? requestAmountUsdt,currency:'USDT',summary:originalOrder.productName??t.value.store.coConfirmPurchase,precision:topupAmount === undefined ? undefined : 'full',
+        details:originalOrder.lineItems?.map(item=>({name:item.name,quantity:item.quantity,amount:item.lineAmountUsdt})),
+      },
         async authorization=>{
           if (!paymentOrderCurrent()) {
             if (isCurrentDetailScope(scope)) { paymentNoticeReason.value = recoveryCopy.value.changed; paymentNotice.value = 'query'; }

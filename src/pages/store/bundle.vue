@@ -657,7 +657,10 @@ async function onCheckout() {
         const paymentCurrent=()=>scopeIsCurrent()&&bundleFingerprint(products.value)===bundleFingerprint(list)
           &&normalizeBundleExpectedAmountUsdt(total.value)===command.expectedAmountUsdt
           &&policy.value?.policyVersion===latestPolicy.policyVersion;
-        const paid = await executeSelectedPurchase({amount:command.expectedAmountUsdt,currency:'USDT',summary:list.map(product=>product.name).join(', ')},
+        const paid = await executeSelectedPurchase({
+          amount:command.expectedAmountUsdt,currency:'USDT',summary:list.map(product=>product.name).join(', '),
+          details:persisted.lineItems?.map(item=>({name:item.name,quantity:item.quantity,amount:item.lineAmountUsdt})),
+        },
           async authorization=>{
             if(!paymentCurrent())return null;
             const action=beginOrderAction(accountKey,'pay',created.orderNo,command.expectedAmountUsdt,'WALLET');paymentKey=action.key;
