@@ -763,17 +763,23 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
       const bundle = orderItems.length > 1;
       // Older receipts omit amounts. Read the confirmed order's lines, using the same subtotal as checkout.
       const needsOrderLines = bundle && orderItems.some(item => itemSubtotal(item) === undefined);
+      const readOrderLines = async () => (await orders.ensureRemoteOrder(orderNo))?.lineItems;
       const orderLines = needsOrderLines
-        ? orders.getById(orderNo)?.lineItems ?? (await orders.ensureRemoteOrder(orderNo).catch(() => undefined))?.lineItems
+        ? orders.getById(orderNo)?.lineItems ?? await readOrderLines().catch(() => undefined)
         : undefined;
       if (!paymentCurrent()) return;
-      const details = orderItems.map(item => ({
+      const lineAmounts = (rows: typeof orderLines) => orderItems.map(item =>
+        rows?.find(line => line.sku === item.productNo && line.quantity === item.quantity)?.lineAmountUsdt);
+      const amounts = lineAmounts(orderLines);
+      const details = orderItems.map((item, index) => ({
         name: item.productName,
         quantity: item.quantity,
-        amount: bundle ? itemSubtotal(item) ?? orderLines?.find(line => line.sku === item.productNo && line.quantity === item.quantity)?.lineAmountUsdt : undefined,
+        amount: bundle ? itemSubtotal(item) ?? amounts[index] : undefined,
       }));
+      const readDetailAmounts = bundle && details.some(item => item.amount === undefined)
+        ? async () => lineAmounts(await readOrderLines()) : undefined;
       await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,precision:topup?'full':undefined,
-        details},
+        details,readDetailAmounts},
         async authorization=>{
           try{
             updateClock();if(!paymentCurrent())return;

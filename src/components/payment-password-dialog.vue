@@ -21,7 +21,7 @@
           <view v-if="expanded" class="payment-pin-details">
             <!-- One unit for the list: shown once as the amount column head, read per row (03 §3.6.1); an unread amount shows — (03 §3.4). -->
             <text class="payment-pin-details__head" aria-hidden="true">{{ fmt(t.paymentPin.detailsAmount, { unit: ui.context.currency }) }}</text>
-            <view v-for="(item, index) in ui.context.details" :key="index" class="payment-pin-details__row"><text class="payment-pin-details__name">{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template></text><text class="payment-pin-details__amount"><template v-if="item.amount !== undefined">{{ detailAmount(item.amount) }}<text class="nx-sr-only">&nbsp;{{ ui.context.currency }}</text></template><template v-else>—</template></text></view>
+            <view v-for="(item, index) in ui.context.details" :key="index" class="payment-pin-details__row"><text class="payment-pin-details__name">{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template></text><text class="payment-pin-details__amount"><template v-if="item.amount !== undefined">{{ formatGroupedAmount(item.amount, ui.context.precision) }}<text class="nx-sr-only">&nbsp;{{ ui.context.currency }}</text></template><template v-else>—</template></text></view>
           </view>
         </view>
         <text v-if="ui.stage === 'loading'" class="payment-pin-note" role="status">{{ t.paymentPin.loading }}</text>
@@ -98,6 +98,11 @@ useAutoRecovery({
   retry: () => pin.load(false), repeatMs: 30_000,
 });
 useAutoRecovery({
+  active: () => open.value,
+  failed: () => !!ui.context?.readDetailAmounts && ui.context.details?.some(item => item.amount === undefined) === true,
+  retry: pin.recoverDetailAmounts, repeatMs: 30_000,
+});
+useAutoRecovery({
   failed: () => open.value && ui.stage === "pending" && !!ui.pendingOperation && !ui.busy && !ui.reading,
   retry: () => pin.query(() => active.value), repeatMs: 15_000,
 });
@@ -133,11 +138,6 @@ const errorMessage = computed(() => {
   if (!ui.error || (ui.error === "locked" && pin.locked())) return "";
   return ui.error === "incorrect" ? fmt(t.value.paymentPin.incorrect, { n: ui.state?.remainingAttempts ?? 0 }) : t.value.paymentPin[ui.error];
 });
-function detailAmount(value: number | string) {
-  const formatted = formatGroupedAmount(value, "full");
-  const fraction = typeof value === "string" ? /^\d+\.(\d+)$/.exec(value)?.[1] : undefined;
-  return fraction === undefined ? formatted : `${formatted.split(".")[0]}.${fraction}`;
-}
 watch(() => [ui.stage, ui.revision, ui.visible], () => { password.value = ""; code.value = ""; }, { flush: "sync" });
 watch(() => ui.visible, () => { expanded.value = false; });
 function complete(value: string) { if (ui.stage === "pay") { password.value = ""; uni.hideKeyboard(); pin.authorize(value); } }
