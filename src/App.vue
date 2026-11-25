@@ -524,9 +524,15 @@ if (remoteApiEnabled) {
     toast.info(useT().value.trial.toastCancelled);
     void useApp().refreshRemoteFleet();
   });
+  watch(() => trial.confirmedCancelDenial, reason => {
+    if (!reason) return;
+    const t = useT().value;
+    toast.warn(reason === "payment-in-progress" ? trialDetailCopy.value.cancelLocked
+      : reason === "not-cancellable" ? t.trial.endedTitle : t.security.opFailed);
+  });
   useAutoRecovery({
     failed: () => trial.lifecycleReadbackPending,
-    retry: () => trial.refreshRemote(),
+    retry: () => trial.recoverLifecycleCommand(),
     repeatMs: 30_000,
     quiet: true,
   });
@@ -539,9 +545,11 @@ if (remoteApiEnabled) {
   watch(() => trialResults.outsidePage, results => {
     const app = useApp(), epoch = app.accountBindingEpoch;
     for (const result of results) {
-      if (!trialResults.consume(trialResults.resultKey(result), result.status === "refused")) continue;
+      const key = trialResults.resultKey(result);
+      if (trialResults.wasDelivered(key)) continue;
       if (result.status === "settled") {
         toast.success(trialPurchaseCopy.value.resultTitle);
+        trialResults.announceOrder(result.orderNo);
         void useOrders().reconcileRemoteOrder(result.orderNo, () => app.accountBindingEpoch === epoch).catch(() => {});
       } else {
         const t = useT().value;
@@ -549,6 +557,7 @@ if (remoteApiEnabled) {
           : trialDeviceNeedsReselection(result.reason) ? trialDetailCopy.value.deviceGone
           : trialPurchaseReasonMessage(t, result.reason, useLocaleStore().code) ?? trialPurchaseCopy.value.coPurchaseUnavailable;
         toast.warn(reason);
+        trialResults.consume(key, true);
       }
     }
   }, { flush: "post" });

@@ -25,6 +25,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   const quotes = new Map(), intents = new Map();
   const refusedTrialCreates = new Map();
   const suspendedIntents = new Map();
+  const processingCreates = new Map();
   let sequence = 0;
   const paymentMode = () => demoPaymentScenario(state);
   // D1 switch closure leaves fee configuration intact (PurchasePaymentPolicyService.current).
@@ -141,6 +142,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     intents.clear();
     refusedTrialCreates.clear();
     suspendedIntents.clear();
+    processingCreates.clear();
   };
   const sameSubject = (row, subject) => row.kind === subject.kind
     && (row.kind === 'ORDER_PAY' ? !!subject.orderNo && row.orderNo === subject.orderNo
@@ -439,14 +441,16 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       requireDemoExternalPaymentQuota(state, products, items, now);
       if (order) requireDemoExternalOrderGate(state, products, items, now);
       const adjustment = Number(BigInt(subtotal) * 10000n - micros) / 1000000;
-      const channel = Math.round(subtotal * 0.0125) + 50, network = bank ? 0 : erc20 ? 380 : 25;
+      const feePolicyVersion = trial ? state.trialPaymentFeePolicyVersion ?? 3 : 3;
+      const channelFixed = feePolicyVersion === 4 ? 51 : 50;
+      const channel = Math.round(subtotal * 0.0125) + channelFixed, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
       const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: body.kind, paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
         businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: adjustment.toFixed(6), subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
-        networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion: 3, pricingAsOf: new Date(now).toISOString(), expiresAt: new Date(Math.min(now + QUOTE_TTL, deadline)).toISOString(),
+        networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion, pricingAsOf: new Date(now).toISOString(), expiresAt: new Date(Math.min(now + QUOTE_TTL, deadline)).toISOString(),
         deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(body.paymentMethod, deadline)).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null,
-        ...(trial&&{currency:bank?'VND':'USDT',channelFeeRatePct:'1.25',channelFeeFixed:'0.50',paymentFeesConfigured:true,
+        ...(trial&&{currency:bank?'VND':'USDT',channelFeeRatePct:'1.25',channelFeeFixed:money(channelFixed),paymentFeesConfigured:true,
           trialOffsetBasis:trialPurchaseOptionsEnabled(state)?'ACCRUED_B90':'ACCRUED',...(bank&&{fxVersion:1})})};
       const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
       quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote, trialDeviceSnapshot});
@@ -461,6 +465,9 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       if (!source) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
       const {subject, deadline} = source, known = [...intents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (known) return known.paymentQuoteId === quoteId ? {status: 200, message: 'OK', data: view(known)} : refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
+      const createKey = JSON.stringify([subject.kind, key]);
+      if (processingCreates.has(createKey))
+        return refused(409, processingCreates.get(createKey) === quoteId ? 'PURCHASE_PAYMENT_INTENT_PROCESSING' : 'IDEMPOTENCY_KEY_CONFLICT');
       const suspended = [...suspendedIntents.values()].find(row => row.kind === subject.kind && row.commandKey === key);
       if (suspended && suspended.paymentQuoteId !== quoteId) return refused(409, 'IDEMPOTENCY_KEY_CONFLICT');
       if ([...intents.values()].some(row => row.paymentQuoteId === quoteId)) return refused(409, 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED');
@@ -495,6 +502,8 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         return rememberTrialRefusal({status:409,message:error.message,data:error.data});
       }
       if (trial && trial.claimNo !== subject.identity) return refused(409, 'TRIAL_NOT_CONVERTIBLE');
+      if (trial&&source.quote.feePolicyVersion!==(state.trialPaymentFeePolicyVersion??3))
+        return refused(409,'PURCHASE_PAYMENT_FEE_POLICY_CHANGED');
       if (source.replacementQuote)
         checkedReplacementPricing(url, request, subject, source.payload, source.replacementQuote);
       const amount = trial?.quote.amountUsdt ?? order?.amountUsdt;
@@ -511,23 +520,41 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin,
         trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{claimNo:trial.claimNo,version:1,reconciliationStatus:'PENDING'})};
-      if (suspended) {
-        suspendedIntents.delete(intentNo);
-        addDemoPaymentQuotaHold(state, suspended.quotaHold);
-      } else {
-        intent.quotaHold = reserveDemoPaymentQuotaHold(state, now, quantity);
+      const commit = () => {
+        if (suspended) {
+          suspendedIntents.delete(intentNo);
+          addDemoPaymentQuotaHold(state, suspended.quotaHold);
+        } else {
+          intent.quotaHold = reserveDemoPaymentQuotaHold(state, now, quantity);
+        }
+        intents.set(intentNo, intent);
+        // The deadline task leaves an order with a payment intent to the payment's own outcome.
+        if (subject.orderNo) (state.intentOrders ??= {})[subject.orderNo] = true;
+      };
+      if (!historicalSeed && state.purchaseCreateReceiptState === 'processing') {
+        state.purchaseCreateReceiptState = 'normal';
+        processingCreates.set(createKey, quoteId);
+        // Preview only: a gateway loses the reply while the admitted create commits independently of GET.
+        setTimeout(() => {
+          sync();
+          if (processingCreates.get(createKey) !== quoteId) return;
+          commit();
+          processingCreates.delete(createKey);
+        }, 12000).unref();
+        return refused(503, 'PURCHASE_PAYMENT_CREATE_RESPONSE_UNAVAILABLE');
       }
-      intents.set(intentNo, intent);
-      // The deadline task leaves an order with a payment intent to the payment's own outcome.
-      if (subject.orderNo) (state.intentOrders ??= {})[subject.orderNo] = true;
+      commit();
       return {status: 200, message: 'OK', data: view(intent)};
     }
     if (path === `${base}-intents` && method === 'GET') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND');
-      const intent = [...intents.values()].find(row => row.kind === url.searchParams.get('kind') && row.commandKey === url.searchParams.get('commandKey'));
+      const kind = url.searchParams.get('kind'), key = url.searchParams.get('commandKey');
+      const intent = [...intents.values()].find(row => row.kind === kind && row.commandKey === key);
       if (intent) return readIntent(intent);
-      const denial=url.searchParams.get('kind')==='TRIAL_CONVERT'&&refusedTrialCreates.get(url.searchParams.get('commandKey'));
-      return denial?.result??readIntent(null);
+      const denial=kind==='TRIAL_CONVERT'&&refusedTrialCreates.get(key);
+      if (denial) return denial.result;
+      if (processingCreates.has(JSON.stringify([kind, key]))) return refused(409, 'PURCHASE_PAYMENT_INTENT_PROCESSING');
+      return readIntent(null);
     }
     const snapshot = path.match(/^\/api\/app\/purchase-payment-intents\/snapshots\/([^/]+)$/);
     if (snapshot && method === 'GET') {

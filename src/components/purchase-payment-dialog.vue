@@ -471,7 +471,7 @@ const trialCopy = useTrialPurchaseCopy();
 const trial = useFreeTrial();
 const trialTerminalIntent = computed(() => active.value && s.open && s.intent?.kind === 'TRIAL_CONVERT' && s.intent.trialPurchaseOutcome
   ? s.intent.intentNo : null);
-const terminalAuthority = ref<string | null>(null);
+const terminalAuthority = ref<string | null | undefined>(null);
 async function readTerminalAuthority(intentNo: string) {
   const binding = app.accountBindingEpoch;
   const ready = await trial.refreshRemote();
@@ -479,9 +479,9 @@ async function readTerminalAuthority(intentNo: string) {
     terminalAuthority.value = ready ? intentNo : null;
 }
 watch(trialTerminalIntent, id => {
-  terminalAuthority.value = null;
+  terminalAuthority.value = id ? undefined : null;
   if (id) void readTerminalAuthority(id);
-});
+}, { flush: 'sync' });
 const terminalTrialExit = computed(() => {
   if (!trialTerminalIntent.value || trialTerminalIntent.value !== terminalAuthority.value || trial.authorityStatus !== 'ready') return null;
   const state = trial.displayState, claimNo = s.intent?.claimNo;
@@ -492,7 +492,7 @@ const terminalTrialExit = computed(() => {
     return { label: original.status === 'AWAITING_PAYMENT' ? copy.value.continuePay : copy.value.viewProgress,
       href: originalTrialCheckoutHref(original) };
   }
-  return state.status === 'active' || state.status === 'grace'
+  return trial.conversionWindowOpen
     ? { label: trialCopy.value.coChangeDevice, href: '/pages/me/trial' } : null;
 });
 async function openTerminalTrialExit() {
@@ -593,7 +593,8 @@ function noticeFor(kind: PurchaseNotice): Notice | null {
     default: return null;
   }
 }
-const notice = computed(() => noticeFor(s.notice));
+const notice = computed(() => s.notice === 'timeout' && trialTerminalIntent.value && terminalAuthority.value === undefined
+  ? null : noticeFor(s.notice));
 const TOAST_NOTICES: PurchaseNotice[] = ['timeout', 'gone', 'changed', 'orderMissing', 'networkPaused', 'quoteChanged', 'rejectTradeinBusy', 'rejectTradeinWalletOnly', 'rejectTradeinOwner',
   'rejectQuotaPaused', 'rejectQuotaMonthFull', 'rejectQuotaSoldOut', 'rejectCapacitySourceChanged', 'rejectCapacityPurchaseRetired', 'trialConversionClosed', 'trialNotConvertible'];
 const acknowledgementOnly = computed(() => !!notice.value && !notice.value.secondary && TOAST_NOTICES.includes(s.notice));

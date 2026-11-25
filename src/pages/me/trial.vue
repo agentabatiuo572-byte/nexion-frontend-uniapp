@@ -68,7 +68,7 @@
         <view v-if="originalPurchase || showDevicePicker" class="trial-select trial-rise trial-rise--3">
           <TrialOriginalPurchaseCard v-if="originalPurchase" :purchase="originalPurchase"
             :is-trial-device="originalPurchase.device.productNo === trialProductId" :now="serverNow" />
-          <TrialDevicePicker v-if="showDevicePicker" :options="purchaseOptionsView.options"
+          <TrialDevicePicker v-if="showDevicePicker" :options="devicePickerOptions"
             :selected-product-no="selectedProductNo" :status="purchaseOptionsView.status" :locked="!!originalPurchase"
             :estimates="purchaseEstimates" :condition-links="purchaseConditionLinks"
             @select="selectDevice" @open-conditions="openPurchaseConditions" />
@@ -294,7 +294,7 @@ import { useTrialFleetCopy } from "@/i18n/trial-fleet";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { useTrialCheckout } from "@/store/trial-checkout";
-import { trialOrderResultKey, trialRefusalResultKey, useTrialPurchaseResult } from "@/store/trial-purchase-result";
+import { trialRefusalResultKey, useTrialPurchaseResult } from "@/store/trial-purchase-result";
 import { useLocaleStore } from "@/store/locale";
 import { trialOptionReadFailed, useTrialPurchaseOptions } from "@/store/trial-purchase-options";
 import { useTrialCreditOptionsRead, useTrialPurchaseConfirmation } from "@/composables/use-trial-credit-option";
@@ -390,7 +390,7 @@ const optionsRead = useTrialCreditOptionsRead(() => pageVisible.value, () => {
 const purchaseClaim = computed(() => isActiveCycle.value ? displayState.value?.claimNo ?? null : null);
 const originalPurchase = computed(() => purchaseClaim.value ? checkout.originalPurchase : null);
 const purchaseConfirmation = useTrialPurchaseConfirmation();
-const trialResultConfirming = computed(() => (freeTrial.authorityResultUnknown && !freeTrial.startRetryable)
+const trialResultConfirming = computed(() => (freeTrial.authorityResultUnknown && (!freeTrial.startRetryable || !displayState.value))
   || (purchaseConfirmation.value && !originalPurchase.value));
 provide(TRIAL_PAYMENT_CARD_KEY, () => {
   const original = originalPurchase.value;
@@ -398,6 +398,11 @@ provide(TRIAL_PAYMENT_CARD_KEY, () => {
 });
 const hasScopedOptions = computed(() => purchaseClaim.value !== null && purchaseClaim.value === trialOptions.claimNo);
 const purchaseOptionsView = computed(() => hasScopedOptions.value ? trialOptions.current : { status: "idle" as const, options: [] });
+const devicePickerOptions = computed(() => purchaseOptionsView.value.options.map(option => {
+  if (option.imageUrl || productCatalogState.status !== "ready") return option;
+  const imageUrl = getProduct(option.productNo)?.imageUrl;
+  return imageUrl ? { ...option, imageUrl } : option;
+}));
 const waitingForReselection = computed(() => hasScopedOptions.value && !!trialOptions.current.invalidatedProductNo);
 const selectedOption = computed(() => hasScopedOptions.value && !waitingForReselection.value && trialOptions.selectedOption?.canBuy
   ? trialOptions.selectedOption : null);
@@ -736,10 +741,10 @@ watch([pageVisible, originalPurchase, purchaseConfirmation], ([visible, original
 }, { flush: "post" });
 
 async function openTrialResult(orderNo: string) {
-  if (openingResult || !trialResults.consume(trialOrderResultKey(orderNo))) return;
+  if (openingResult) return;
   openingResult = true;
   try {
-    if (await navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`)) {
+    if (await trialResults.deliverOrder(orderNo, () => navReplace(`/pages/store/order-detail?id=${encodeURIComponent(orderNo)}&result=trial`))) {
       checkout.clearSettled(orderNo);
       freeTrial.clearLegacyConversionResult(orderNo);
     }

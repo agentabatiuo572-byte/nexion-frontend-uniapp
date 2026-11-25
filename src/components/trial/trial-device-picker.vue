@@ -91,7 +91,8 @@ const rows = computed(() => props.options.map(option => {
   const due = option.canBuy && option.quote ? amountParts(option.quote.amountUSD) : null;
   const was = option.priceUSD === null ? "" : `$${formatGroupedAmount(option.priceUSD, 2)}`;
   const claimPrice = option.isTrialProduct && option.marketPriceUSD !== undefined && option.marketPriceUSD !== option.priceUSD;
-  const link = option.reasonCode === "PURCHASE_GATE_NOT_MET" && (props.conditionLinks?.includes(option.productNo) ?? true);
+  const link = (option.reasonCode === "PURCHASE_GATE_NOT_MET" || option.reasonCode === "ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET")
+    && (props.conditionLinks?.includes(option.productNo) ?? true);
   const checked = !props.locked && option.canBuy && option.productNo === props.selectedProductNo;
   const aria = [option.productName, option.isTrialProduct ? copy.value.thisTrialTag : "", reason || (estimate ? estimate.label + estimate.value : ""),
     due ? `${copy.value.finalPrice} $${due.whole}${due.decimals}` : "", due ? `${claimPrice ? copy.value.claimPrice : copy.value.unitPrice} ${was}` : ""].filter(Boolean).join(", ");

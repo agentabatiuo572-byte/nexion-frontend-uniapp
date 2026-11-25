@@ -66,8 +66,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const redeemed=['converted','refunded'].includes(scenario);
     const activeAge=pricing==='cloud-share-half-cent'?2*day:day;
     const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day
+      :scenario==='grace-ending'?duration+grace-45000
       :ended?duration+grace+(scenario==='eligible-again'?cooldown:0)+day:activeAge);
-    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE'
+    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':['grace','grace-ending'].includes(scenario)?'GRACE'
       :ended?'CANCELLED':redeemed?'REDEEMED':'ELIGIBLE',startedAt,version:redeemed?1:0};
     if(ended){
       const finishedAt=startedAt+duration+grace;
@@ -156,6 +157,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const option={...device,inventoryMode:item?.inventoryMode??'FINITE',originalTrialProduct:isTrialProduct,
       paymentMethods:isTrialProduct?['WALLET','CREGIS_USDT_BSC','HDPAY_BANK']:['WALLET'],
       priceUsdt:fixed(units(priceUsdt)),...(isTrialProduct&&{storePriceUsdt:item?fixed(units(item.price)):null})};
+    if(state.trialPurchaseOptionState==='image-missing'&&device.productNo===trialPurchaseOptionSku(state))option.imageUrl=null;
     const simulatedFailure=state.trialPurchaseOptionState==='quote-error'&&device.productNo===trialPurchaseOptionSku(state);
     const missingTerms=cfg.shadowDailyUSD==null||cfg.shadowDailyNEX==null;
     if(simulatedFailure||missingTerms)return {...option,canPurchase:false,unavailableReason:'TRIAL_PRODUCT_QUOTE_UNAVAILABLE'};
@@ -218,7 +220,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       trialSettlement:{settlementPolicy:quote.settlementPolicy,promoDiscountUsdt:quote.promoDiscountUsdt,offsetUsdt:quote.offsetUsdt,earlyDiscountUsdt:quote.earlyDiscountUsdt,rewardUsdt:quote.remainderUsdt,rewardNex:quote.rewardNex}};
   }
   const key=request.headers?.()['idempotency-key']||request.headers?.()['Idempotency-Key'];
-  if(request.method()==='POST'&&key&&state.trialCommands?.[key])return structuredClone(state.trialCommands[key]);
+  if(url.pathname==='/api/trial/convert'&&request.method()==='POST'&&key&&state.trialCommands?.[key])return structuredClone(state.trialCommands[key]);
   const remember=value=>{if(key){state.trialCommands??={};state.trialCommands[key]=structuredClone(value);}return value;};
   if(url.pathname==='/api/trial/start'){
     const current=snapshot();
@@ -241,7 +243,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
     Object.assign(row,{state:'ACTIVE',claimNo:newClaimNo(),startedAt:now,finishedAt:null,endReason:null,cooldownUntil:null,
       claimConfig:structuredClone(cfg),version:current.claimNo?(row.version??0)+1:0});
-    return remember(snapshot());
+    return snapshot();
   }
   if(url.pathname==='/api/trial/cancel'){
     const purchase=originalPurchase();
@@ -249,7 +251,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if(purchase?.kind==='EXTERNAL')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS');
     if(purchase?.kind==='BALANCE')refuse('TRIAL_BALANCE_SUBMISSION_IN_PROGRESS',purchase);
     Object.assign(row,{state:'CANCELLED',endReason:'cancelled',finishedAt:now,cooldownUntil:now+cooldown,version:(row.version??0)+1});
-    return remember(snapshot());
+    return snapshot();
   }
   if(url.pathname==='/api/trial/purchase-options'){
     if(!usesOptions)refuse('RESOURCE_NOT_FOUND',null,404);
