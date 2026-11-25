@@ -25,8 +25,8 @@
       <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
         <text class="lg-mode-badge__t">{{ modeLabel }}</text>
       </view>
-      <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
-        <text class="lg-recovery-notice__t">{{ h5RefreshCookieEnabled ? t.login.serverSessionReloadNotice : t.login.nativeSessionReloadNotice }}</text>
+      <view v-if="sessionEndNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
+        <text class="lg-recovery-notice__t">{{ sessionEndNotice }}</text>
       </view>
       <!-- #ifdef H5 -->
       <view v-if="browserUnsupportedNotice" class="lg-recovery-notice" role="status" data-qa="secure-browser-unsupported-notice">
@@ -154,6 +154,7 @@ import ThirdPartyAuth from "@/components/third-party-auth.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 // #ifdef APP-PLUS
 // #endif
+import { sessionEndReason } from "@/auth/session-end";
 import { navReset, takeNavigationQuery } from "@/lib/route";
 import { ref, computed, nextTick, watch, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
@@ -305,7 +306,7 @@ async function retryOriginalLogin(captchaTicket?: string) {
   } catch (cause) { if (mounted && flowVersion === otpFlowVersion) {
     syncLoginRecovery();
     if (cause instanceof ApiError && cause.message === "USER_CAPTCHA_REQUIRED") { captchaPurpose.value = "replay"; showCaptcha.value = true; }
-    else error.value = remoteLoginError(cause);
+    else error.value = loginReceiptError(cause);
   } }
   finally { if (!showCaptcha.value || captchaPurpose.value !== "replay") { retryPassword.value = ""; retryCode.value = ""; } if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
@@ -329,7 +330,7 @@ async function recoverLoginResult() {
   } catch (cause) {
     if (!mounted || flowVersion !== otpFlowVersion) return;
     syncLoginRecovery(); replayAvailable.value = !!retryContext.value;
-    error.value = cause instanceof Error && cause.message === "APP_REPLACED" ? t.value.login.sessionReplaced : remoteLoginError(cause);
+    error.value = loginReceiptError(cause);
   } finally { if (mounted && flowVersion === otpFlowVersion) loading.value = false; }
 }
 const returnParam = ref<string | null>(null);
@@ -338,6 +339,10 @@ const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
 const remoteTwoFactorChallenge = ref<string | null>(null);
 const serverSessionReloadNotice = ref(false);
+const sessionEndNotice = computed(() => sessionEndReason.value === "H5_REPLACED" ? t.value.login.sessionReplacedByWebNotice
+  : sessionEndReason.value === "APP_REPLACED" ? t.value.login.sessionReplacedNotice
+    : !serverSessionReloadNotice.value ? ""
+      : h5RefreshCookieEnabled ? t.value.login.serverSessionReloadNotice : t.value.login.nativeSessionReloadNotice);
 // #ifdef H5
 const browserUnsupportedNotice = ref(false);
 // #endif
@@ -755,6 +760,16 @@ function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = invalidPhoneMessage.value; return; }
   void requestCode();
+}
+/**
+ * The original attempt's session was issued and has since ended. A takeover is explained by the notice at the
+ * top, like any other ended session; other endings ask for a new sign-in. Anything else keeps its own message.
+ */
+function loginReceiptError(cause: unknown): string | null {
+  const reason = cause instanceof ApiError && cause.kind === "auth" ? cause.message : "";
+  if (["APP_REPLACED", "H5_REPLACED"].includes(reason)) { sessionEndReason.value = reason; return null; }
+  if (["CURRENT_LOGOUT", "SECURITY_REVOKED", "SESSION_EXPIRED", "REAUTH_REQUIRED", "SESSION_REPLACED"].includes(reason)) return t.value.login.sessionReplaced;
+  return remoteLoginError(cause);
 }
 function remoteLoginError(error: unknown): string {
   syncLoginRecovery();

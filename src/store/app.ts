@@ -480,6 +480,8 @@ export const useApp = defineStore("app", () => {
   const remotePendingEarned = ref<import("@/api/task-assignment-api").PendingComputeEarning[] | null>(null);
   const remoteComputeProtocolVersion = ref<1 | 2 | 3>(1);
   let nativePhoneBinding: { accountKey: string; epoch: number; deviceId: number } | null = null;
+  /** The account's phone device when the server says this installation is bound to it; null until read or when another phone is bound. */
+  const nativeBoundPhoneId = ref<string | null>(null);
   let phoneRecovery: { sessionKey: string; retryAfter: number } | null = null;
   let lastConfirmedAssignments: { request: RemoteAccountRequest; state: CanonicalTaskAssignments; receivedMonotonicAt: number } | null = null;
   let remoteTaskSyncInFlightKey: string | null = null;
@@ -1052,8 +1054,13 @@ export const useApp = defineStore("app", () => {
                 || !remoteAccountEpoch.isCurrent(request)) return;
               if (`user:${binding.userId}` !== request.accountKey || binding.deviceId !== installationId)
                 throw new Error("PHONE_BINDING_IDENTITY_MISMATCH");
-              if (binding.activationStatus !== "ACTIVE" || binding.userDeviceId == null) return;
-              nativePhoneBinding = { ...request, deviceId: binding.userDeviceId };
+              const boundPhoneId = binding.activationStatus === "ACTIVE" ? binding.userDeviceId : null;
+              nativeBoundPhoneId.value = boundPhoneId == null ? null : String(boundPhoneId);
+              // Calibrated here before, but the server no longer binds this installation (replaced, or calibrated
+              // again without activating): offer binding again.
+              remotePhoneBindingInvalid.value = boundPhoneId == null;
+              if (boundPhoneId == null) return;
+              nativePhoneBinding = { ...request, deviceId: boundPhoneId };
             }
             const online = await taskAssignmentApi.confirmPhoneOnline(nativePhoneBinding.deviceId, getDeviceId());
             if (!remoteTaskForeground || foregroundEpoch !== remoteTaskForegroundEpoch
@@ -1373,6 +1380,7 @@ export const useApp = defineStore("app", () => {
       nativePhoneConfigWaitDeviceId.value = null;
       nativePhoneTaskRecoveryDeviceId.value = null;
       nativePhoneBinding = null;
+      nativeBoundPhoneId.value = null;
       remoteAssignmentError.value = "";
       remoteAssignmentHasSnapshot.value = false;
       remotePendingEarned.value = null;
@@ -2770,7 +2778,7 @@ export const useApp = defineStore("app", () => {
     accountKey, accountBindingEpoch, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, slotCap, remoteSlotUsage, remoteSlotsUsed, myTotalHashrateAt, earnings, global,
     homeTruth, homeTruthStatus, homeTruthError, homeTruthRateLimited, homeTruthTransientFailure,
-    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, activeJobsDisplay, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid, nativePhoneConfigWaitDeviceId, nativePhoneTaskRecoveryDeviceId,
+    remoteFleetStatus, remoteFleetError, remoteFleetHasSnapshot, remoteRealizedToday, activeJobsDisplay, remoteWithdrawalListStatus, remoteWithdrawalListHasSnapshot, remoteWalletReceiptHasSnapshot, remoteAssignmentStatus, remoteAssignmentError, remoteAssignmentHasSnapshot, remotePendingEarned, remoteComputeProtocolVersion, remotePhoneBindingInvalid, nativeBoundPhoneId, nativePhoneConfigWaitDeviceId, nativePhoneTaskRecoveryDeviceId,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, ensureHomeTruth, refreshHomeTruth, ensureRemoteFleet, refreshRemoteFleet, invalidateRemoteFleet, captureRemoteAccountRequest, adoptCommerceWallet, adoptDevelopmentCommerceWallet, adoptDevelopmentGenesisWallet, syncRemoteTaskAssignments, setRemoteTaskForeground, setTaskReadPageVisible, refreshVisibleTaskAssignments, invalidateRemoteTaskAssignments, pauseLocalPhoneRuntimeBeforeSignOut,
     tick, settle, setPhoneRuntime, interruptAllTasks, resumeMining, acceptPhoneActivation,
