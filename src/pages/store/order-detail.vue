@@ -124,7 +124,7 @@
           <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="discountMoney(order.promoDiscountUSD ?? 0)" />
           <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="discountMoney(order.trialOffsetUSD ?? 0)" />
           <DetailRow v-if="(order.earlyDiscountUSD ?? 0) > 0" :label="trialLifecycle.earlyDiscountLabel" :value="discountMoney(order.earlyDiscountUSD ?? 0)" />
-          <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="subCentTrialWalletPaid ? '<0.01 USDT' : summaryMoney(order.total, true)" />
+          <DetailRow v-if="summaryPaid" :label="paymentCopy.payable" :value="subCentTrialWalletPaid ? '<0.01\u00a0USDT' : summaryMoney(order.total, true)" />
           <DetailRow v-if="trialRewardText && order.status !== 'refunded'" :label="purchaseCopy.orderTrialReward" :value="trialRewardText" />
           <template v-if="order.status === 'refunded'">
             <DetailRow v-if="order.refundAmountUsdt != null" :label="t.orders.refundAmount" :value="usdt(order.refundAmountUsdt)" />
