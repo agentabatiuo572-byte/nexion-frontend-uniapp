@@ -117,8 +117,10 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       const sample=restartedAt&&hasSample?{...currentSample,taskNo:`DEMO-TASK-${device.id}-${restartedAt}`,
         startedAt:new Date(restartedAt).toISOString(),completableAt:new Date(restartedAt+currentSample.durationSec*1000).toISOString()}:currentSample;
       const running=hasSample&&device.activatedAt!==null;
+      // A waiting slot replacement finishes when this job ends: keep its end time fixed.
+      const replacementEnd=state.slotReplacements?.[device.id]?.taskEndsAt;
       return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
-        currentTask:running?task(sample,'RUNNING'):null,
+        currentTask:running?task(replacementEnd?{...sample,completableAt:new Date(replacementEnd).toISOString()}:sample,'RUNNING'):null,
         recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
         ...(v3&&{phoneValidUntil:null,simulationState:running?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
