@@ -14,6 +14,7 @@
 <template>
   <view v-if="cta" class="scb-outer" :style="outerStyle">
     <view class="scb-bar nx-glass-bar">
+      <view v-if="cta.status" class="nx-tray-status" role="status"><text>{{ cta.status }}</text></view>
       <text v-if="cta.note" class="scb-note nx-tray-note" role="status">{{ cta.note }}</text>
       <view v-if="cta.amount" class="scb-info nx-tray-copy">
         <!-- Eyebrow — explicitly labels the number as PRICE so it isn't

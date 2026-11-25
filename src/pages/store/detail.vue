@@ -740,7 +740,9 @@ function publishStickyCTA() {
         // Beside the lock note the catalog price would read as the amount of that payment, also when it is for another device.
         amount: ownTrialPaymentLocked.value ? undefined : `${priceText.value}`,
         // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
-        note: checkingBalance ? trialPurchaseCopy.value.coConfirming : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
+        // A balance result still being read has nothing to press: the bar is the lone status capsule, as on trial detail and checkout.
+        status: checkingBalance ? trialPurchaseCopy.value.coConfirming : undefined,
+        note: checkingBalance ? undefined : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
         buttonLabel: checkingBalance ? undefined : continuing ? t.value.orders.pendingContinue : t.value.store.cardBuyNow,
         disabled: !continuing,
         showTabBar: false,
