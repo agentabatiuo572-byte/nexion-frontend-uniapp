@@ -1693,7 +1693,7 @@ USDT 页绑定所选网络，显示应付总额、二维码、地址、复制操
 - **Pro / Pro v2**:`any-of`〔own ≥1 S1 / V-Rank ≥2 / 累计入金 ≥$1000 / trade-in〕
 - **Rack P1 / P2**:`any-of`〔own ≥1 上一档 / V-Rank ≥4 / 累计入金 ≥$5000 / trade-in〕
 
-**设备置换资格**(计算候选清单 `eligibleTradeInDevices(targetKind)`):实付价 > 0(赠送/免费设备排除,前端零痕迹)∧ kind ∈ `applyTo` 白名单 ∧ 目标目录价严格更高(`requireHigherPrice`,可配)。活跃与库存设备均可置换;激活中且任务在跑的设备也直接置换,不再阻断(2026-11-21 用户确认 §11.1 的 2026-10-30 补充规则,BUG-542):支付完成后旧设备当前未完成任务作废、不生成完成奖励,旧设备回收抵扣,新设备接替原算力槽并自动激活,确认卡事先披露。Compute V2 托管的设备不在此列,仍按原规则:任务在跑、尚未清空或上一结果未定时不能置换(钱包和银行卡／USDT 都拒绝),已清空的照常置换。在跑旧设备只能用钱包余额付款:选银行卡或 USDT 时,在出报价、建付款单前拒绝,不扣款、不发起付款,提示改用钱包余额支付(余额不足可先充值);空闲或仓库中的旧设备付款方式不变(2026-11-21,BUG-542)。候选按可抵额降序。
+**设备置换资格**(计算候选清单 `eligibleTradeInDevices(targetKind)`):实付价 > 0(赠送/免费设备排除,前端零痕迹)∧ 目标目录价严格更高(`requireHigherPrice`,可配)。活跃与库存设备均可置换;激活中且任务在跑的设备也直接置换,不再阻断(2026-11-21 用户确认 §11.1 的 2026-10-30 补充规则,BUG-542):支付完成后旧设备当前未完成任务作废、不生成完成奖励,旧设备回收抵扣,新设备接替原算力槽并自动激活,确认卡事先披露。Compute V2 托管的设备不在此列,仍按原规则:任务在跑、尚未清空或上一结果未定时不能置换(钱包和银行卡／USDT 都拒绝),已清空的照常置换。在跑旧设备只能用钱包余额付款:选银行卡或 USDT 时,在出报价、建付款单前拒绝,不扣款、不发起付款,提示改用钱包余额支付(余额不足可先充值);空闲或仓库中的旧设备付款方式不变(2026-11-21,BUG-542)。候选按可抵额降序。
 
 **置换目标合规**(三个目标面——retire 目标列表 / 设备行 strip / 商城横幅——统一判定 `isTradeInTargetAvailable`):目标 SKU **已正式上架(unlocksAtPhase 已达,与商城正门同源)∨ 处于抢先购窗口**(§7.1 `tradeInEarlyAccess` 开关,默认关);未上架且不在窗口的 SKU 不出现在任何置换目标面。
 
@@ -1701,7 +1701,7 @@ USDT 页绑定所选网络，显示应付总额、二维码、地址、复制操
 
 ```
 ratio  = cumulativeEarningsUsdt ÷ paidPriceUsdt        // 产出比(分子=该设备累计 USD 产出,分母=实付净额)
-credit = paidPriceUsdt × creditPct(band(ratio)) × promoMult,  clamp 到 [0, 目标价]
+credit = paidPriceUsdt × creditPct(band(ratio)),  clamp 到 [0, 目标价]
 ```
 
 | 档 | 产出比区间(左闭右开) | 抵扣比例(默认) |
@@ -1716,7 +1716,7 @@ credit = paidPriceUsdt × creditPct(band(ratio)) × promoMult,  clamp 到 [0, �
 
 - **实付基数**:`paidPriceUsdt` = 实付净额(订单 total,已扣券与置换抵扣;trial 转正 = 促销价 − 收益抵扣),非目录价 — 防券/试用低价买入套利。
 - **paidPrice = 0(赠送)⇒ 不可置换**(资格排除,非"∞ 产出比落档 5")。
-- **规则参数**(后台「升级置换阶梯」面板可配,详见后台 PRD E 域):阶梯 5 档界点与比例(区间连续、比例严格递减,结构由机器哨兵锁)/ `requireHigherPrice`(默认 true)/ `maxDevicesPerOrder`(默认 1)/ `promoMult`(默认 1.0;>≈1.47 时 clamp 可能绑定)/ `applyTo` SKU 白名单 / `enabled` 总开关(关闭 = 全部置换入口隐藏)。
+- **规则参数**(后台「升级置换阶梯」面板可配,详见后台 PRD E 域):阶梯 5 档界点与比例(区间连续、比例严格递减,结构由机器哨兵锁)/ `requireHigherPrice`(默认 true)/ `maxDevicesPerOrder`(默认 1)/ `enabled` 总开关(关闭 = 全部置换入口隐藏)。
 - 所有参数 server-canonical via `GET /api/config/tradein`,运营可热改无需 client redeploy。
 
 **铁律**:抵扣 **永不写余额** — 仅在结算中作为扣减项(`debitBalance(price − discount − credit)`),不可提现、不可累加;累计产出越多抵扣越低(合规口径向用户明示,引导尽早置换)。
@@ -1778,7 +1778,7 @@ flowchart TD
 **常驻置换条**(取代旧 `<TradeInPromoBanner>` 弹出式推送,入口从"节奏推送"升级为"行内常驻"):每台设备行底部按资格渲染:
 
 - 合规设备:「可抵 $X ›」chip(点开**阶梯规则说明弹层**「置换说明」:设备行(机图、名称、累计产出、可抵金额)；五列档位表(上行各档「抵实付价」比例,中间分段轨道标出当前档并以圆点标出该设备位置,下行「累计产出 ÷ 实付」区间,右下「已产出 x%」),当前档品牌色高亮,整张表有按数据拼出的读屏文本；表下一行脚注「仅抵本次购买，不可提现，以结算为准」。比例和区间取服务端阶梯配置,产出比和比例取该设备报价,未读到时显示「—」;累计产出、可抵和已产出跟随隐藏统计开关遮罩,档位规则照常显示)+「升级置换」CTA(→ §7.5.3 retire 流)
-- 免费设备(paidPrice=0)/ 不在 applyTo:**零痕迹**(不渲染置换条)
+- 免费设备(paidPrice=0):**零痕迹**(不渲染置换条)
 - 无更高价目标(已持最高档):显示禁用原因「当前已是最高算力档位」
 - 激活中且任务运行:与其他合规设备相同,显示「可抵 $X」和「升级置换」;确认卡披露支付完成后旧设备当前未完成任务作废(2026-11-21,BUG-542)
 
@@ -1815,7 +1815,7 @@ flowchart TD
 
 ### 7.6 升级置换横幅(TradeinWindowBanner)
 
-位置:`/store` 顶部,VsPhoneHero 之下、商品列表之上。**条件渲染** — 用户持有 ≥1 台可置换设备(§7.5.1 资格:实付>0 ∧ applyTo ∧ 存在合规目标 ∧ 抵扣>0 ∧ 总开关开)即显示;无合格设备整横幅隐藏,无 phase 窗口概念。
+位置:`/store` 顶部,VsPhoneHero 之下、商品列表之上。**条件渲染** — 用户持有 ≥1 台可置换设备(§7.5.1 资格:实付>0 ∧ 存在合规目标 ∧ 抵扣>0 ∧ 总开关开)即显示;无合格设备整横幅隐藏,无 phase 窗口概念。
 
 **目的**:把用户手上"最划算的一台置换机会"以动态报价固化在 `/store` 顶部,与 §6.8 车队产能 Banner(/earn 入口)、设备仓库置换条(§7.5.4)互补 — 三侧任一进入 §7.5 置换流程都有 1-tap 路径。CTA target 为 `/me/devices`。
 
@@ -3212,7 +3212,7 @@ Staking 开仓必须展示档位参考年奖励率、锁期、提前退出规则
 | Inviter reward(邀请人奖励 NEX)| `platform-config.rewards.inviterReward` | `GET /api/config/platform` | 后台调邀请人奖励额度(H8)|
 | Earnings milestones(5 档阈值 + NEX 奖励) | `lib/store/milestones.ts:28-34` | `GET /api/config/milestones` | 阶段调整 |
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x / 7d streak,作用于签到 NEX 发放)| `lib/v3/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier | A/B 实验值 |
-| 升级置换全配置(抵扣阶梯 5 档界点/比例 + `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult` / `applyTo` / `enabled` + `eligibility[kind].rules[]` + promo 预留组 + `inventory.softMax`)| `src/mock/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 抵扣定价 + 资格门槛;阶梯结构由哨兵锁(连续/递减) |
+| 升级置换全配置(抵扣阶梯 5 档界点/比例 + `requireHigherPrice` / `maxDevicesPerOrder` / `enabled` + `eligibility[kind].rules[]` + promo 预留组 + `inventory.softMax`)| `src/mock/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 抵扣定价 + 资格门槛;阶梯结构由哨兵锁(连续/递减) |
 | Tradein composer endpoints | `lib/store/index.ts:recycleDevice / replaceDevice / moveToInventory` | `POST /api/devices/recycle` / `POST /api/devices/replace` / `POST /api/devices/deactivate` (TBD; candidates) | 服务端原子 tx 替代 client composer |
 | Trade-in promo dismissal log | `app/components/tradein-promo-banner.tsx` localStorage | `GET/POST /api/users/me/promo-dismissals` (TBD; candidate) | 跨设备 cooldown 一致性 |
 | User cumulativeDepositUsdt | `recordDeposit` action | `GET /api/users/me.cumulativeDepositUsdt` (TBD; candidate) | trade-in 资格门槛源 |
@@ -5240,7 +5240,7 @@ progressPct = avg(checks);
 | 上架节奏门 | Pro v2 P3 / Rack P2 P5 | `Product.unlocksAtPhase` 字段,未 reached 时 /store 列表过滤 + 详情页 swap LockedProductCard + **置换目标面同拦**(详见 §7.1 / §7.2 / §7.5.1) |
 | 置换侧抢先购 | 关闭(leadDays 30) | `tradeInEarlyAccess{enabled, leadDays}`,上架参数配置项;开启后仅置换路径可在正式上架前 leadDays 天购买,目标行带「抢先升级」标;正门不受影响(§7.1) |
 | 置换抵扣阶梯 | 75% / 60% / 45% / 30% / 15% | 按产出比(累计产出÷实付)落档:<25% / <50% / <75% / <100% / ≥100%,左闭右开;仅结算抵减,永不入余额(§7.5.1) |
-| 置换阶梯规则 | 仅限更高价 · 单笔 1 台 · promoMult 1.0 | `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult`,连同 `applyTo` 白名单与总开关均后台可配 |
+| 置换阶梯规则 | 仅限更高价 · 单笔 1 台 | `requireHigherPrice` / `maxDevicesPerOrder`,连同总开关均后台可配 |
 | 任务锁定月度阈值 | P1-P2 $40 / P3-P4 $140 / P5-P6 $450 | `MONTHLY_LOCKED_TASK_USD` 常量,§6.7 TaskLockCumulativeBanner 主数字基准,日历月 partial accrual + 累计 |
 | Nova task-lock 推送节奏 | P1-P2 30 d / P3-P4 7 d / P5-P6 3.5 d | `monthly-task-lock` cooldownKey,30 min tick / phase-keyed cadence(§11.0A.2a),与 §6.7 banner 形成"屏内 + 召回"双层 funnel |
 | Nova tradein 推送节奏 | 60 min cooldown | `tradein-nudge` cooldownKey;触发条件 = 车队平均产能 < 65% 且持有可置换设备;文案钩子 = 产能/月损 + CTA 跳设备仓库置换入口(§11.0A.2a)|
