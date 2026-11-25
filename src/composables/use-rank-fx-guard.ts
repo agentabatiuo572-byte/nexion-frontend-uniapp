@@ -1,4 +1,5 @@
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
+import { appReadForeground, documentReadVisible } from "@/lib/foreground-read";
 import { useLoopsInView } from "./use-loops-in-view";
 
 /**
@@ -82,7 +83,7 @@ export function useRankFxGuard(selector: string) {
   readEnvironment();
   const { elRef, running } = useLoopsInView(selector);
   const still = computed(() => reducedMotion.value);
-  const looping = computed(() => running.value && !still.value && !lite.value);
+  const looping = computed(() => running.value && appReadForeground.value && documentReadVisible.value && !still.value && !lite.value);
   const stop = watch(looping, (on) => { if (on) monitorFrames(looping); }, { immediate: true });
   onUnmounted(stop);
   return {
