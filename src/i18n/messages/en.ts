@@ -4584,7 +4584,7 @@ timeHoursAgo: "{n}h ago",
     formula: "{rate}% of the smaller group's volume, paid {freq}",
     blocked: "Rewards paused",
     settlementPending: "Qualified, waiting for payout day",
-    settlesOnPayoutDay: "Settles on payout day",
+    settlesOnPayoutDay: "On payout day",
     settlementUnavailable: "Payout unavailable",
     blockedDetail:
       "Group {side} hasn't reached the required volume yet.",
