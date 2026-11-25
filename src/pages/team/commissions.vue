@@ -69,7 +69,7 @@
           </view>
         </view>
 
-        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">${{ visibility.mask(formatAmount(byKind[filter].usdt)) }} · {{ visibility.mask(formatAmount(byKind[filter].nex)) }} UVT</text></view>
+        <view v-if="filter !== 'all'" class="commission-filter-summary"><text>{{ t.commissions.kind[filter] }}</text><text class="commission-filter-summary__value">{{ visibility.mask(formatAmount(byKind[filter].usdt)) }}&nbsp;USDT · {{ visibility.mask(formatAmount(byKind[filter].nex)) }}&nbsp;UVT</text></view>
 
         <EmptyState v-if="filtered.length === 0 && !hasMoreEvents" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
         <view v-if="filtered.length > 0" class="commission-days">
@@ -87,17 +87,20 @@
               </view>
               <view class="flex-1 min-w-0">
                 <view class="flex items-center" style="gap: 6px">
-                  <text class="truncate" :style="{ fontSize: '14px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
+                  <text class="truncate" :style="{ fontSize: '14px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ eventTitle(e) }}</text>
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
-                <text class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
+                <template v-if="e.kind === 'vrank_salary'">
+                  <text v-if="e.salaryMonth && e.salaryRank" class="block" :style="eventMetaStyle">{{ salarySubtitle(e.salaryMonth, e.salaryRank) }}</text>
+                </template>
+                <text v-else class="block" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
                 <view v-for="code in eventCodes(e)" :key="code.label" class="commission-code"><text class="commission-code__label">{{ code.label }}</text><NxCodeValue class="commission-code__value" :value="code.value" :label="code.label" /></view>
               </view>
               <view class="text-right" style="max-width: 48%; overflow-wrap: break-word">
                 <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'usdt')">{{ commissionAmountLabel(e) }}</text>
                 <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="commissionAmountStyle(e, 'uvt')">{{ commissionNexLabel(e) }}</text>
-                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
-                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success-ink)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
+                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ t.myRank.cooling }}</text>
+                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success-ink)', marginTop: '2px' }">{{ t.myRank.credited }}</text>
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
                 <text v-else-if="e.status === 'frozen'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning-ink)', marginTop: '2px' }">{{ t.commissions.frozenTag }}</text>
                 <text v-else-if="e.status === 'reversed'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-danger)', marginTop: '2px' }">{{ t.commissions.reversedTag }}</text>
@@ -160,6 +163,7 @@ import { useDataVisibility } from '@/store/data-visibility';
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { formatTrialDate } from "@/lib/trial-date";
+import { salaryDates } from "@/lib/rank-salary-view";
 import { useCommission, type CommissionEvent, type CommissionKind } from "@/store/commission";
 import { apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
 import { uiLocale } from "@/i18n";
@@ -213,7 +217,8 @@ const KIND: Record<CommissionKind, KindSpec> = {
   cultivation: { color: "var(--v5-brand)", paths: ["M7 20h10", "M10 20c5.5-2.5.8-6.4 3-10", "M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z", "M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"] },
   leadership: { color: "var(--v5-nex)", paths: ["m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"] },
   promotion: { color: "var(--v5-brand-2)", paths: ["M12 3v18M5 10l7-7 7 7"] },
-  vrank_salary: GENERIC_REWARD_ICON,
+  // Monthly reward (DESIGN 第 9 节 glyph-salary): amber, the reward hue (01 §1.1.2).
+  vrank_salary: { color: "var(--v5-warning)", paths: ["M6.5 5h11a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z", "M3.5 10h17M8 3v4M16 3v4", "M12 13a2 2 0 1 0 0 4 2 2 0 1 0 0-4z"] },
   other: GENERIC_REWARD_ICON,
   genesis: { color: "var(--v5-warning)", paths: ["M6 3h12l4 6-10 13L2 9z", "M11 3 8 9l4 13 4-13-3-6", "M2 9h20"] },
 };
@@ -311,6 +316,14 @@ const noKindText = computed(() =>
   fmt(t.value.commissions.noKindEvents, { kind: t.value.commissions.kind[filter.value as CommissionKind] }),
 );
 
+// The monthly reward has no source user. Every other row leads with the person.
+function eventTitle(e: CommissionEvent): string {
+  return e.kind === "vrank_salary" ? t.value.commissions.kind.vrank_salary : e.sourceUserName;
+}
+function salarySubtitle(month: string, rank: string): string {
+  const dates = salaryDates(locale.code);
+  return visibility.mask(dates.sentence(fmt(t.value.myRank.monthRank, { m: dates.month(month), r: rank })));
+}
 function eventMeta(e: CommissionEvent): string {
   const kindLabel = t.value.commissions.kind[e.kind];
   const order = !e.sourceRef && e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${visibility.mask(formatGroupedAmount(e.orderAmountUSD))}` : "";
@@ -323,20 +336,17 @@ function eventCodes(e: CommissionEvent): { label: string; value: string }[] {
   if (e.sourceDeviceId) codes.push({ label: `${t.value.directReferral.device}:`, value: e.sourceDeviceId });
   return codes;
 }
-function coolingTag(e: CommissionEvent): string {
-  const days = Math.max(0, Math.ceil((e.unlockAt - Date.now()) / 86400000));
-  return fmt(t.value.commissions.coolingTag, { n: days });
-}
 
+// DESIGN 11.2-12: team reward rows write the currency as USDT, not $.
 function commissionAmountLabel(e: CommissionEvent): string {
-  const amount = `$${visibility.mask(formatAmount(e.amountUSDT))}`;
+  const amount = `${visibility.mask(formatGroupedAmount(e.amountUSDT, "full"))}\u00A0USDT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;
 }
 
 function commissionNexLabel(e: CommissionEvent): string {
-  const amount = `${visibility.mask(formatAmount(e.amountNEX))} UVT`;
+  const amount = `${visibility.mask(formatGroupedAmount(e.amountNEX, "full"))}\u00A0UVT`;
   if (e.status === "reversed") return `−${amount}`;
   if (e.status === "frozen" || e.status === "rejected" || e.status === "recovery_pending") return amount;
   return `+${amount}`;
@@ -401,7 +411,10 @@ const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3
 
 const filterOptions = computed(() => [
   { value: "all" as Filter, label: filterCopy.value.all, fullLabel: t.value.commissions.all, count: remoteApiEnabled ? ledger.value?.totalRows : commission.events.length },
+  // The old friend rank-up kind (cultivation) keeps its name on history rows but is offered as a filter only while it has rows.
   ...KIND_ORDER.filter(value => value !== 'vrank_salary' || (remoteApiEnabled ? ledger.value?.aggregate.byKind.vrank_salary !== undefined : byKind.value.vrank_salary.count > 0))
+    // 平级奖、激励池（规则默认关闭）和成员成长没有记录时不列（rank-rules）；有记录的照常可筛。
+    .filter(value => !(['peer', 'leadership', 'cultivation'] as CommissionKind[]).includes(value) || (byKind.value[value]?.count ?? 0) > 0)
     .map(value => ({ value, label: kindFilterLabel(value), fullLabel: t.value.commissions.kind[value], count: byKind.value[value].count })),
 ]);
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });

@@ -8,6 +8,7 @@ import { formatAmount } from "@/lib/amount-display";
 import { acceptNativeOAuthReturn } from "@/auth/oauth-browser-return";
 import { installNativePush, refreshNativePush, flushNativePushClick, showJPushPrivacyPrompt } from "@/services/native-push";
 // #ifdef APP-PLUS
+import { refreshNativeRankFxFlags } from "@/lib/native-rank-fx";
 import { checkUpdate, guardUpdate, installUpdateGuard } from "@/services/native-update";
 // #endif
 import { navReset } from "@/lib/route";
@@ -73,6 +74,7 @@ import {
 } from "@/api/runtime";
 import { refreshBusinessCalendar } from "@/lib/business-calendar-sync";
 import { completeSignIn } from "@/auth/complete-sign-in";
+import { sessionEndReason } from "@/auth/session-end";
 import { maintainRemoteSession } from "@/auth/remote-session-maintenance";
 import { preserveRouteDuringSessionRestore } from '@/auth/session-restore-route';
 import { prepareProductCatalog, productCatalogLanguageReadFailed, productCatalogRetryAt, refreshProductCatalog, refreshProductCatalogLanguage } from "@/store/product-catalog";
@@ -1326,7 +1328,8 @@ onLaunch(() => {
   });
   // #endif
   if (remoteApiEnabled) {
-    setRemoteUnauthorizedHandler(() => {
+    setRemoteUnauthorizedHandler((reason) => {
+      if (reason === "APP_REPLACED" || reason === "H5_REPLACED") sessionEndReason.value = reason;
       // Preserve only the non-secret trace long enough to choose the login explanation.
       const requiresServerSessionRecovery = pendingServerSessionRecovery
         || (!sessionVault.read() && hasServerAuthenticatedAccountTrace(auth));
@@ -1394,6 +1397,7 @@ onShow(() => {
   useLocaleStore().ensureSystemDetected();
   appReadForeground.value = true;
   // #ifdef APP-PLUS
+  refreshNativeRankFxFlags();
   useTheme().refreshSystemTheme();
   void checkUpdate();
   acceptNativeOAuthReturn(plus.runtime.arguments || "");

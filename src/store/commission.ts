@@ -41,6 +41,8 @@ export interface CommissionEvent {
   kind: CommissionKind;
   sourceUserId?: string;
   sourceUserName: string;
+  salaryMonth?: string;
+  salaryRank?: string;
   layer?: number;
   orderId?: string;
   orderAmountUSD?: number;

@@ -4,6 +4,7 @@ import { demoCommissionGroups, demoCommissionTotals, demoLifetimeEarningsUsdt, d
 
 import { demoBatchPage } from './prototype-demo-secondary.mjs';
 import { demoHasLongTasks } from './prototype-demo-long-content.mjs';
+import { rankDevicePolicies, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 
 const day=86400000;
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:''};
@@ -35,7 +36,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   // No published overrides in this demo: keep the App's bundled dictionary.
   if(p==='/api/content/i18n')return {namespace:'*',locale:{zh:'zh-CN',en:'en-US',vi:'vi-VN'}[lang],messages:{},serverCanonical:true};
   // Existing src/store/commission.ts mock rates; other fields mirror the public projection's shipped defaults.
-  if(p==='/api/config/commission/rates'&&url.searchParams.get('schemaVersion')==='2')return {...proof,source:'Local prototype demo: src/store/commission.ts',serverCanonical:true,runId:null,schemaVersion:2,unilevel:[10,5,3,2,1,.5,.5].map((usdtPct,i)=>({level:'L'+(i+1),usdtPct,nexReward:[50,20,10,5,2.5,1,1][i]})),unilevelPaused:Object.fromEntries([1,2,3,4,5,6,7].map(i=>['L'+i,false])),partnerTiersJson:{standard:0,verified:5000,premium:50000,diamond:500000},influenceClampMin:1,influenceClampMax:5,coolingDays:null,promoMultiplier:1};
+  if(p==='/api/config/commission/rates'&&url.searchParams.get('schemaVersion')==='2')return {...proof,serverCanonical:true,runId:null,schemaVersion:2,unilevel:[10,5,3,2,1,.5,.5].map((usdtPct,i)=>({level:'L'+(i+1),usdtPct,nexReward:[50,20,10,5,2.5,1,1][i]})),unilevelPaused:Object.fromEntries([1,2,3,4,5,6,7].map(i=>['L'+i,false])),partnerTiersJson:{standard:0,verified:5000,premium:50000,diamond:500000},influenceClampMin:1,influenceClampMax:5,coolingDays:null,promoMultiplier:1};
   const sample=text('原型演示资料，正式内容以发布版本为准。','Prototype sample. Refer to the published version for formal content.','Tài liệu nguyên mẫu. Nội dung chính thức theo phiên bản công bố.');
   if(p==='/api/app/proof') {
     const {createdAt:joinedAt}=read('/api/app/profile');
@@ -53,7 +54,21 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
       referralCode,referral:{invitedCount,lifetimeInviterNex},team:{totalMembers,activeMembers},
       availability:empty||!streak.lastCheckInDate?{status:'PARTIAL',...(!streak.lastCheckInDate&&{streak:'UNAVAILABLE'}),...(empty&&{percentile:'UNAVAILABLE'})}:{status:'READY'}};
   }
-  if(p==='/api/config/commission/direct-referral')return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:3,effectiveAt:empty?null:'2026-10-01T00:00:00Z',nexUsdtPrice:empty?null:.128,purchase:{enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays:7},deviceEarning:{enabled:!empty,totalRatePct:empty?0:5,usdtSharePct:70,coolingDays:0}};
+  if(p==='/api/config/commission/direct-referral'){
+    const coolingDays=state.rankCoolingState==='zero'?0:7;
+    const rankBased=usesRankPreset(state);
+    const purchase={enabled:!empty,totalRatePct:empty?0:10,usdtSharePct:60,coolingDays};
+    const {current}=rankDevicePolicies(state,state.previewFactsAt??now);
+    const {effectiveAt,policyVersion,...deviceEarning}=current;
+    const v2=url.searchParams.get('schemaVersion')==='2';
+    return {...proof,serverCanonical:true,configured:!empty,policyVersion:empty?0:policyVersion,
+      effectiveAt:empty?null:state.rankPreset==='follow'?'2026-10-01T00:00:00Z':new Date(effectiveAt).toISOString(),
+      nexUsdtPrice:empty?null:.128,purchase,deviceEarning,
+      ...(v2&&{schemaVersion:2,settlementMode:'SEVEN_V2',purchaseSplitConfigured:!empty,
+        purchaseSplit:{enabled:!empty,usdtSharePct:60},
+        sevenLayerReference:{revision:empty?0:3,baseRatePct:empty||rankBased?null:10,coolingDays:empty?null:coolingDays,legacyNexPerUsd:0,
+          ...(rankBased&&{purchaseBaseRateSource:'BENEFICIARY_RANK'})}})};
+  }
   if(p==='/api/app/team/insights/direct-referral') {
     const version=Number(url.searchParams.get('schemaVersion')??1);
     const filter=version===2?url.searchParams.get('kind')??'all':'all';
@@ -70,7 +85,7 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
     const kind=filter==='purchase'?'direct_purchase':'direct_device_earning';
     const selected=filter==='all'?all:all.filter(event=>event.kind===kind);
     const events=selected.slice((page-1)*pageSize,page*pageSize).map(event=>({...event,settlementNo:event.id,
-      sourceDeviceId:event.sourceDeviceId??null,basisUsdt:event.orderAmountUSD,policyVersion:3,nexUsdtPrice:.128,
+      sourceDeviceId:event.sourceDeviceId??null,basisUsdt:event.orderAmountUSD,policyVersion:event.policyVersion??3,nexUsdtPrice:.128,
       recoveryPendingUSDT:0,recoveryPendingNEX:0,cancelledUSDT:0,cancelledNEX:0,
       creditedUSDTAt:event.status==='unlocked'?new Date(event.unlockAt).toISOString():null,
       creditedNEXAt:event.status==='unlocked'?new Date(event.unlockAt).toISOString():null,

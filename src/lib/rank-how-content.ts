@@ -114,13 +114,19 @@ export function formatHowNumber(value: number | string, locale: string) {
     if (carry) rounded.unshift("1");
   }
   const fixed = rounded.join("");
-  const vietnamese = locale.split("-")[0] === "vi";
   const decimals = fixed.slice(-6).replace(/0+$/, "");
-  return (negative ? "-" : "") + fixed.slice(0, -6).replace(/\B(?=(\d{3})+(?!\d))/g, vietnamese ? "." : ",")
-    + (decimals ? `${vietnamese ? "," : "."}${decimals}` : "");
+  // Every language groups with a comma and keeps the point for decimals, like formatGroupedAmount (06 §6.2).
+  return (negative ? "-" : "") + fixed.slice(0, -6).replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    + (decimals ? `.${decimals}` : "");
 }
 
-export function buildRankHowContent(policy: RankHowPolicy | null, ranks: CanonicalVRankRow[], capabilities: CommissionCapabilities, locale: string, labels: RankHowConditionLabels) {
+export function formatRankPurchaseRate(rate: string | number | undefined, locale: string): string {
+  if (rate === undefined) return "—";
+  const [digits, exponent = "0"] = String(rate).split("e");
+  return `${formatHowNumber(`${digits}e${Number(exponent) + 2}`, locale)}%`;
+}
+
+export function buildRankHowContent(policy: RankHowPolicy | null, ranks: CanonicalVRankRow[], capabilities: CommissionCapabilities | null, locale: string, labels: RankHowConditionLabels) {
   const copy = rankHowCopy(locale);
   const ladder = ranks.filter(rank => rank.visible).sort((a, b) => a.v - b.v);
   const hasGate = (rank: CanonicalVRankRow) => [rank.selfComputePoints, rank.teamComputePoints, rank.directRefs].some(value => (value ?? 0) > 0)
@@ -140,11 +146,12 @@ export function buildRankHowContent(policy: RankHowPolicy | null, ranks: Canonic
       fromRank: `V${example.from.v}`, toRank: `V${example.to.v}`,
       selfComputePoints: target.selfComputePoints === undefined ? undefined : formatComputePoints(target.selfComputePoints, locale),
       teamComputePoints: target.teamComputePoints === undefined ? undefined : formatComputePoints(target.teamComputePoints, locale),
-      directRefs: (target.directRefs ?? 0) > 0 ? number(target.directRefs!) : copy.noThreshold,
-      rankLegs: (target.requiredDownlineRank ?? 0) > 0 && (target.requiredDownlineCount ?? 0) > 0
-        ? labels.vDownlines.replace("{n}", number(target.requiredDownlineCount!)).replace("{v}", String(target.requiredDownlineRank)) : copy.noThreshold,
+      directRefs: target.directRefs === undefined ? undefined : target.directRefs > 0 ? number(target.directRefs) : copy.noThreshold,
+      rankLegs: target.requiredDownlineCount === 0 || target.requiredDownlineRank === 0 ? copy.noThreshold
+        : target.requiredDownlineRank === undefined || target.requiredDownlineCount === undefined ? undefined
+          : labels.vDownlines.replace("{n}", number(target.requiredDownlineCount)).replace("{v}", String(target.requiredDownlineRank)),
       directRate: `${number(target.directBonus * 100)}%`,
-      peerRate: capabilities.peer ? `${number(target.peerBonus * 100)}%` : copy.peerUnavailable,
+      peerRate: capabilities ? (capabilities.peer ? `${number(target.peerBonus * 100)}%` : copy.peerUnavailable) : undefined,
       votes: number(target.leadershipVotes), cultivation: `${formatAmount(target.cultivationBonus)}\u00A0UVT`,
     });
   }
@@ -154,26 +161,30 @@ export function buildRankHowContent(policy: RankHowPolicy | null, ranks: Canonic
     if (policy.rules.qualifiedReferralSelfComputePoints !== null) tokens.referralThreshold = policy.rules.qualifiedReferralSelfComputePoints === 0
       ? copy.noReferralMinimum : formatComputePoints(policy.rules.qualifiedReferralSelfComputePoints, locale);
   }
-  const sections = new Map(policy?.sections.map(section => [section.id, section]));
-  function section(id: string, fallbackTitle = copy.unavailable) {
-    const published = sections.get(id);
-    let available = Boolean(published);
+  const sections = (policy?.sections ?? []).flatMap(published => {
+    let available = true;
     const interpolate = (text: string) => text.replace(/\{([^{}]+)\}/g, (_, key: string) => {
-      if (tokens[key] === undefined) { available = false; return ""; }
+      if (!Object.prototype.hasOwnProperty.call(tokens, key) || tokens[key] === undefined) { available = false; return ""; }
       return tokens[key]!;
     });
-    const title = published ? interpolate(published.title) : fallbackTitle;
+    const title = interpolate(published.title);
+    const body = interpolate(published.body);
+    if (!available) return [];
     // 平级奖励未派发时,规则页不得把配置比例写成已开放权益 —— 与等级页同一事实(#79)。
-    if (published && !capabilities.peer && (id === "unlock-peer" || id === "result-peer")) {
-      return { id, available, title: platformDisplayText(available ? title : fallbackTitle), body: available ? copy.peerUnavailable : copy.unavailable };
-    }
-    const body = published ? interpolate(published.body) : copy.unavailable;
-    return { id, available, title: platformDisplayText(available ? title : fallbackTitle), body: platformDisplayText(available ? body : copy.unavailable) };
-  }
-  return { ladder, example, section, copy };
+    const peerUnavailable = capabilities?.peer === false && (published.id === "unlock-peer" || published.id === "result-peer");
+    return [{ id: published.id, title: platformDisplayText(title), body: platformDisplayText(peerUnavailable ? copy.peerUnavailable : body) }];
+  });
+  return { ladder, sections, copy };
 }
 
-export interface RankHowResourceState { loading: boolean; error: boolean; policy: RankHowPolicy | null; ranks: CanonicalVRankRow[]; capabilities: CommissionCapabilities }
+export interface RankHowResourceState {
+  loading: boolean;
+  error: boolean;
+  policy: RankHowPolicy | null;
+  ranks: CanonicalVRankRow[];
+  capabilities: CommissionCapabilities | null;
+  ladderFailed: boolean;
+}
 export function createRankHowResource(deps: {
   published(locale: string): Promise<RankHowPolicy>;
   ladder(): Promise<{ ranks: CanonicalVRankRow[]; capabilities: CommissionCapabilities }>;
@@ -186,10 +197,16 @@ export function createRankHowResource(deps: {
     if (disposed) return Promise.resolve();
     if (pending?.locale === locale) return pending.promise;
     const request = ++epoch;
-    deps.apply({ loading: true, error: false, policy: null, ranks: [], capabilities: { peer: false, genesis: false } });
-    const promise = Promise.all([deps.published(locale), deps.ladder()])
-      .then(([policy, ladder]) => { if (!disposed && epoch === request) deps.apply({ loading: false, error: false, policy, ranks: ladder.ranks, capabilities: ladder.capabilities }); })
-      .catch(() => { if (!disposed && epoch === request) deps.apply({ loading: false, error: true, policy: null, ranks: [], capabilities: { peer: false, genesis: false } }); })
+    deps.apply({ loading: true, error: false, policy: null, ranks: [], capabilities: null, ladderFailed: false });
+    const promise = Promise.all([deps.published(locale), deps.ladder().catch(() => null)])
+      .then(([policy, ladder]) => {
+        if (disposed || epoch !== request) return;
+        deps.apply({
+          loading: false, error: false, policy, ranks: ladder?.ranks ?? [],
+          capabilities: ladder?.capabilities ?? null, ladderFailed: ladder === null,
+        });
+      })
+      .catch(() => { if (!disposed && epoch === request) deps.apply({ loading: false, error: true, policy: null, ranks: [], capabilities: null, ladderFailed: false }); })
       .finally(() => { if (epoch === request) pending = undefined; });
     pending = { locale, promise };
     return promise;

@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+<!-- Rank rail tap burst for V7 (platinum) / V8 (gold): six sparkles pre-composited into one layer; the whole image scales and fades as one element (no per-particle animation). Shown at 80 around a 40 badge. -->
+<g fill="#1E7BE8"><path d="M40 4.4Q41 8 44.6 9Q41 10 40 13.6Q39 10 35.4 9Q39 8 40 4.4Z"/><path d="M66.8 21.1Q67.6 23.8 70.2 24.5Q67.6 25.2 66.8 27.9Q66.1 25.2 63.4 24.5Q66.1 23.8 66.8 21.1Z"/><path d="M66.8 50.9Q67.9 54.5 71.4 55.5Q67.9 56.5 66.8 60.1Q65.8 56.5 62.2 55.5Q65.8 54.5 66.8 50.9Z"/><path d="M40 67.6Q40.7 70.3 43.4 71Q40.7 71.7 40 74.4Q39.3 71.7 36.6 71Q39.3 70.3 40 67.6Z"/><path d="M13.2 50.9Q14.2 54.5 17.8 55.5Q14.2 56.5 13.2 60.1Q12.1 56.5 8.6 55.5Q12.1 54.5 13.2 50.9Z"/><path d="M13.2 21.1Q13.9 23.8 16.6 24.5Q13.9 25.2 13.2 27.9Q12.4 25.2 9.8 24.5Q12.4 23.8 13.2 21.1Z"/></g>
+</svg>
