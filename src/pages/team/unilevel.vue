@@ -214,11 +214,7 @@ const totals = computed(() => {
 const remoteTotalUSDT = computed(() => totals.value.amountUSDT), remoteTotalNEX = computed(() => totals.value.amountNEX), remoteGroupCount = computed(() => totals.value.count);
 const currentRank = computed(() => vrank.remoteReady ? vrank.ladder[vrank.myRank] : undefined);
 const rankBasedPurchase = computed(() => policy.value?.sevenLayerReference?.purchaseBaseRateSource === "BENEFICIARY_RANK");
-const needsSharedRates = computed(() => {
-  const rank = currentRank.value;
-  return !!policy.value && filter.value !== 'device_earning'
-    && (!rankBasedPurchase.value || (rank && (rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined)));
-});
+const needsSharedRates = computed(() => !!policy.value && filter.value !== 'device_earning' && !rankBasedPurchase.value);
 watch(needsSharedRates, needed => {
   if (remoteApiEnabled && needed) void commission.ensureCanonicalConfig();
 }, { immediate: true });
@@ -242,7 +238,7 @@ const ruleDescription = computed(() => {
     if (p.settlementMode === "SEVEN_V2" && (p.purchaseSplitConfigured === false || !reference || reference.coolingDays === null
       || (!rankBasedPurchase.value && reference.baseRatePct === null))) return t.value.directReferral.purchaseUnconfigured;
     const current = rankBasedPurchase.value ? currentRank.value : undefined;
-    const shared = !rankBasedPurchase.value || current ? commission.config?.unilevelUsdt : undefined;
+    const shared = rankBasedPurchase.value ? undefined : commission.config?.unilevelUsdt;
     const a = formatRankPurchaseRate(current?.purchaseL1Rate ?? shared?.[1], dateLocale());
     const b = formatRankPurchaseRate(current?.purchaseL2Rate ?? shared?.[2], dateLocale());
     if (!rankBasedPurchase.value) return `${rankCopy.value.l1} ${a} · ${rankCopy.value.l2} ${b}`;

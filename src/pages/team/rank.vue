@@ -330,10 +330,11 @@ const countsHint = computed(() => prog.value.rows.some(row => row.tier === prog.
 const percentText = (rate: string | number | undefined) => formatRankPurchaseRate(rate, locale.code);
 // 没有公开购买字段时读有效七层配置的第 1、2 层，读不到为未知；有字段且为 0 不回退。
 const sharedRate = (layer: 1 | 2) => remoteApiEnabled ? commission.config?.unilevelUsdt[layer] : commission.unilevelRate(layer);
-const l1Rate = (rank: VRankDef) => rank.purchaseL1Rate ?? sharedRate(1);
-const l2Rate = (rank: VRankDef) => rank.purchaseL2Rate ?? sharedRate(2);
-const needsSharedRates = computed(() => remoteApiEnabled && rankAvailable.value
-  && rankDefs.value.some(rank => rank.purchaseL1Rate === undefined || rank.purchaseL2Rate === undefined));
+// 旧契约是所有等级都没有这两个字段，这时才用 F2 的全站比例；新契约里个别缺值按未知显示「—」。
+const legacyRates = computed(() => rankDefs.value.every(rank => rank.purchaseL1Rate === undefined && rank.purchaseL2Rate === undefined));
+const l1Rate = (rank: VRankDef) => rank.purchaseL1Rate ?? (legacyRates.value ? sharedRate(1) : undefined);
+const l2Rate = (rank: VRankDef) => rank.purchaseL2Rate ?? (legacyRates.value ? sharedRate(2) : undefined);
+const needsSharedRates = computed(() => remoteApiEnabled && rankAvailable.value && legacyRates.value);
 watch(needsSharedRates, missing => {
   if (missing) void commission.ensureCanonicalConfig();
 }, { immediate: true });
