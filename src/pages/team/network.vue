@@ -248,7 +248,7 @@ function sheetStatValStyle(color: string): CSSProperties {
 useDialogA11y(computed(() => selected.value !== null), ".nx-net-sheet-wrap", () => { selected.value = null; }, true);
 
 
-useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
+useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork(), retryNotBefore: network.retryNotBefore });
 </script>
 
 <style scoped>

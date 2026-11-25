@@ -51,7 +51,7 @@
               </view>
             </view>
 
-            <view v-if="wings.some(wing => wing.top) || pageState.memberDetails !== 'ready'" class="binary-leaders">
+            <view v-if="wings.some(wing => wing.top) || !memberDetailsReadable" class="binary-leaders">
               <text class="binary-section-title">{{ binaryCopy.leadingMembers }}</text>
               <view class="reward-wings">
                 <view v-for="wing in wings" :key="wing.key" class="reward-wing" :style="wingStyle(wing.isWeak)">
@@ -61,7 +61,7 @@
                         <text v-else class="reward-wing-member__rank">{{ visibility.mask('') }}</text>
                         <view class="reward-wing-member__body">
                         <text class="binary-label">{{ wing.name }}{{ binaryCopy.leads }}</text>
-                        <text class="reward-wing-member__name">{{ wing.top.name }}</text>
+                        <text class="reward-wing-member__name">{{ visibility.mask(wing.top.name) }}</text>
                         <text class="reward-wing-member__points nx-num-metric">{{ visibility.mask(formatComputePoints(wing.top.monthComputePoints, locale.code)) }}</text>
                         </view>
                       </view>
@@ -175,9 +175,10 @@ const pageState = computed(() => binaryPageState({
   binaryStatus: commission.binaryStatus === 'error' && snapshot.value !== null ? 'ready' : commission.binaryStatus,
   networkStatus: network.remoteStatus,
 }));
-// Member details show only from a healthy read: a retry after a failed read must not bring back cached members.
+// Member details read once stay through a temporary failure and its retries (03 §3.4); a rejected read or an account or
+// environment change clears the network snapshot, so nothing from before comes back.
 const memberDetailsReadable = computed(() => pageState.value.memberDetails === 'ready'
-  || (pageState.value.memberDetails === 'loading' && network.hasRemoteSnapshot && !network.remoteTransientFailure));
+  || (network.hasRemoteSnapshot && (pageState.value.memberDetails === 'loading' || network.remoteTransientFailure)));
 const remoteTrackA = computed(() => snapshot.value?.trackA ?? 0);
 const remoteTrackB = computed(() => snapshot.value?.trackB ?? 0);
 const settlePeriod = computed(() => remoteApiEnabled ? snapshot.value?.settlePeriod ?? "monthly" : BINARY_SETTLE_PERIOD);
@@ -394,7 +395,7 @@ function recentRowStyle(isLast: boolean): CSSProperties {
   return { padding: "14px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 useAutoRecovery({ failed: () => remoteSessionReady.value && commission.binaryStatus === "error", retry: () => remoteSessionReady.value ? commission.refreshCanonicalBinary() : Promise.resolve() });
-useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus === "error", retry: () => remoteSessionReady.value ? network.refreshCanonicalNetwork() : Promise.resolve(false) });
+useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus === "error", retry: () => remoteSessionReady.value ? network.refreshCanonicalNetwork() : Promise.resolve(false), retryNotBefore: network.retryNotBefore });
 </script>
 
 <style scoped>
