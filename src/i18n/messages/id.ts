@@ -4924,6 +4924,8 @@ export const id: Messages = {
     settlementPending: "Sudah memenuhi syarat, menunggu hari pembayaran",
     settlesOnPayoutDay: "Pada hari pembayaran",
     settlementUnavailable: "Pembayaran tidak tersedia",
+    thresholdNotMet: "Volume pesanan belum memenuhi syarat",
+    thresholdNotMetDetail: "Setelah volume pesanan tiap grup mencapai {amount}, hadiah dihitung pada hari pembayaran.",
     blockedDetail: "Volume pesanan Grup {side} belum memenuhi syarat.",
     blockReasons: {
       F3_BINARY_PAUSED: "Hadiah dijeda. Hubungi layanan pelanggan jika ada pertanyaan.",
@@ -4935,7 +4937,6 @@ export const id: Messages = {
       F3_SETTLEMENT_NOT_DUE: "Volume pesanan kedua grup sudah memenuhi syarat. Hadiah dihitung pada hari pembayaran, jumlahnya mengikuti pembayaran aktual.",
       UNKNOWN: "Hadiah dijeda. Hubungi layanan pelanggan jika ada pertanyaan.",
     },
-    blockedAction: "Undang teman agar lebih cepat tercapai.",
     inviteCta: "Undang teman",
     leftWing: "Grup A",
     rightWing: "Grup B",

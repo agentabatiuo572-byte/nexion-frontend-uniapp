@@ -192,6 +192,8 @@ export const useCommission = defineStore("commission", () => {
   const eventsLifetimeDisplayUSDT = ref<number | null>(null);
   const config = ref<CanonicalCommissionConfig | null>(null);
   const binarySnapshot = ref<CanonicalBinaryState | null>(null);
+  // The last binary read failed temporarily (network, 5xx, 429): the confirmed snapshot above stays for display.
+  const binaryTransientFailure = ref(false);
   const eventsStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const eventsRateLimited = ref(false);
   const eventsTransientFailure = ref(false);
@@ -218,6 +220,11 @@ export const useCommission = defineStore("commission", () => {
   let eventsInFlight: { scope: RequestScope; promise: Promise<void> } | null = null;
   let configInFlight: { scope: RequestScope; promise: Promise<void> } | null = null;
 
+  function clearBinarySnapshot(): void {
+    binarySnapshot.value = null;
+    binaryTransientFailure.value = false;
+  }
+
   const unsubscribeCommerceRun = subscribeRuntimeRevision((runtimeScope) => {
     if (!remoteApiEnabled) return;
     // A catalogue environment/RunID change invalidates every remote snapshot;
@@ -225,7 +232,7 @@ export const useCommission = defineStore("commission", () => {
     configRefreshGeneration += 1;
     binaryInFlight = null;
     config.value = null;
-    binarySnapshot.value = null;
+    clearBinarySnapshot();
     events.value = [];
     eventsEvidence.value = null;
     if (!isProductCatalogDisplayCurrent(runtimeScope)) {
@@ -267,7 +274,7 @@ export const useCommission = defineStore("commission", () => {
     events.value = []; eventsEvidence.value = null; eventsStatus.value = "idle";
     eventsLifetimeDisplayUSDT.value = null;
     eventsReadFailed.value = false;
-    config.value = null; binarySnapshot.value = null; configStatus.value = "idle"; binaryStatus.value = "idle";
+    config.value = null; clearBinarySnapshot(); configStatus.value = "idle"; binaryStatus.value = "idle";
   }, { flush: "sync" });
 
   function invalidateReadOwner(): void {
@@ -282,7 +289,7 @@ export const useCommission = defineStore("commission", () => {
     eventsReadFailed.value = false;
     eventsStatus.value = Date.now() < eventsRetryAt ? "error" : "idle";
     eventsLoadMoreStatus.value = "idle"; eventsPage.value = 0; eventsTotalRows.value = 0;
-    config.value = null; binarySnapshot.value = null; configStatus.value = "idle"; binaryStatus.value = "idle";
+    config.value = null; clearBinarySnapshot(); configStatus.value = "idle"; binaryStatus.value = "idle";
   }
 
   /** 账号切换重绑:装载该账号的佣金事件行(变更处处即时 persist,旧账号无需先落盘)。 */
@@ -294,7 +301,7 @@ export const useCommission = defineStore("commission", () => {
       configRefreshGeneration += 1;
       binaryInFlight = null;
       config.value = null;
-      binarySnapshot.value = null;
+      clearBinarySnapshot();
       events.value = [];
       eventsEvidence.value = null;
       eventsLifetimeDisplayUSDT.value = null;
@@ -363,13 +370,15 @@ export const useCommission = defineStore("commission", () => {
         const snapshot = await commissionConfigApi.binary();
         if (generation !== binaryRefreshGeneration || !isCurrentScope(scope)) return;
         binarySnapshot.value = snapshot;
+        binaryTransientFailure.value = false;
         binaryStatus.value = "ready";
-      } catch {
+      } catch (cause) {
         if (generation === binaryRefreshGeneration && isCurrentScope(scope)) {
-          // The team home consumes this same snapshot.  Clear it with the
-          // current-scope failure so no page can present an older estimate as
-          // current authority.
-          binarySnapshot.value = null;
+          // A temporary failure keeps this account's confirmed snapshot while
+          // pages recover in the background (03 §3.4). A refusal clears it so
+          // no page presents an estimate the server no longer stands behind.
+          if (isTransientReadFailure(cause)) binaryTransientFailure.value = true;
+          else clearBinarySnapshot();
           binaryStatus.value = "error";
         }
       }
@@ -556,7 +565,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, eventsEvidence, config, configStatus, binarySnapshot, eventsStatus, eventsLoadMoreStatus,
+    events, eventsEvidence, config, configStatus, binarySnapshot, binaryTransientFailure, eventsStatus, eventsLoadMoreStatus,
     eventsPage, eventsTotalRows, binaryStatus, eventsRateLimited, eventsTransientFailure, eventsReadFailed, eventsLifetimeDisplayUSDT, invalidateReadOwner, bindAccount,
     refreshCanonicalConfig, ensureCanonicalConfig, refreshCanonicalBinary, ensureCanonicalBinary, refreshCanonicalEvents, ensureCanonicalEvents, loadMoreCanonicalEvents, unilevelRate,
     addEvent, unlockMatured, withdraw,
