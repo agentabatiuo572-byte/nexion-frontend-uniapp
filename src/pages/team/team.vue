@@ -141,7 +141,7 @@ import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
 import { apiRuntimeConfig, remoteApiEnabled, teamInsightsApi, teamQuotaApi } from "@/api/runtime";
-import { productCatalogState, productCatalogDisplayProof, productCatalogPresentation, isProductCatalogDisplayCurrent } from "@/store/product-catalog";
+import { productCatalogState, productCatalogDisplayProof, productCatalogPresentation, isProductCatalogDisplayCurrent, refreshProductCatalog } from "@/store/product-catalog";
 import type { CanonicalBinaryState } from "@/api/commission-config-api";
 import type { TeamCommissionSnapshot, TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
@@ -631,6 +631,8 @@ const recoveryConfig = useConfig();
 useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.binaryStatus === "error", retry: () => commission.refreshCanonicalBinary() });
+// Every card here waits for a current catalogue proof; a cold failure must recover it, or recovered reads never show.
+useAutoRecovery({ failed: () => remoteApiEnabled && productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 useAutoRecovery({ failed: () => remoteApiEnabled && !!vrank.remoteError, retry: () => vrank.refreshCanonicalVRank() });
 const inviteRulesOpen = () => inviteCard.value?.rulesOpen === true;
 useAutoRecovery({
