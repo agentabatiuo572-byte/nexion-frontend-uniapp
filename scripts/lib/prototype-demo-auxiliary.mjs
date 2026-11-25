@@ -28,6 +28,18 @@ export function demoTaskAssignments(state, devices, assignment, cancelledTask) {
   return [...assignments.values()];
 }
 
+export function demoCurrentTaskSample(state, device, settlement, now) {
+  if(device.id!==settlement?.deviceId||device.activatedAt==null)return null;
+  const restartedAt=state.deviceActivations?.[device.id]?.activatedAt;
+  const taskNo=restartedAt?`DEMO-TASK-${device.id}-${restartedAt}`:'DEMO-TASK-4';
+  const retained=state.slotReplacementTasks?.[taskNo];
+  if(retained)return retained.completedAt==null?retained:null;
+  const durationSec=600,startedAt=restartedAt||now-300000;
+  return {...settlement,taskNo,durationSec,completedAt:null,postedAt:null,
+    startedAt:new Date(startedAt).toISOString(),completableAt:new Date(startedAt+durationSec*1000).toISOString(),
+    ...(settlement.simulation&&{amount:0.031874,simulation:{...settlement.simulation,rewardAmount:'0.031874'}})};
+}
+
 export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDevices,referralFacts) {
   if(request.method()!=='GET')return undefined;
   const p=url.pathname,now=Date.now(),iso=new Date(now).toISOString(),empty=state.dataState==='empty';
@@ -98,8 +110,8 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
   }
   // The simulated sample uses the v3 projection on the canonical assignment route.
   if(p==='/api/tasks/assignments'||p==='/api/tasks/v2/assignments') {
-    const v2=p.includes('/v2/'),settledTasks=demoSettledTasks(state,state.previewFactsAt??now),[settlement]=settledTasks;
     const devices=fleetDevices();
+    const v2=p.includes('/v2/'),settledTasks=demoSettledTasks(state,state.previewFactsAt??now),[settlement]=settledTasks;
     const v3=demoHasLongTasks(state);
     if(v2&&(v3||!devices.some(device=>device.activatedAt!==null)))
       throw Object.assign(new Error('COMPUTE_V2_NOT_AVAILABLE'),{status:404});
@@ -122,20 +134,15 @@ export function auxiliaryDemo(url,locale,state,request,read,walletBills,fleetDev
         receiptNo:completed?sample.receiptNo:null,proofNonce:null,proofExpiresAt:null};
     };
     const currentSample=settlement?{...settlement,taskNo:'DEMO-TASK-4',durationSec:600}:null;
-    if(currentSample?.simulation) {
-      currentSample.amount=0.031874;
-      currentSample.simulation={...currentSample.simulation,rewardAmount:'0.031874'};
-    }
     const assignment=device=>{
       const hasSample=device.id===currentSample?.deviceId;
-      const restartedAt=state.deviceActivations?.[device.id]?.activatedAt;
-      const sample=restartedAt&&hasSample?{...currentSample,taskNo:`DEMO-TASK-${device.id}-${restartedAt}`,
-        startedAt:new Date(restartedAt).toISOString(),completableAt:new Date(restartedAt+currentSample.durationSec*1000).toISOString()}:currentSample;
-      const running=hasSample&&device.activatedAt!==null;
+      const sample=demoCurrentTaskSample(state,device,settlement,now);
+      const completed=settledTasks.filter(job=>job.deviceId===device.id&&state.slotReplacementTasks?.[job.taskNo]);
+      const history=hasSample?(settlement.simulation?settledTasks:[...completed,settlement]):[];
       return {deviceId:device.id,instanceNo:device.instanceNo,deviceType:device.deviceType,lockUntil:null,
-        currentTask:running?task(sample,'RUNNING'):null,
-        recentTasks:hasSample?(settlement.simulation?settledTasks:[settlement]).map(sample=>task(sample,'COMPLETED')):[],
-        ...(v3&&{phoneValidUntil:null,simulationState:running?'CLOSING':'WAITING_CONFIG'}),
+        currentTask:sample?task(sample,'RUNNING'):null,
+        recentTasks:history.map(job=>task(job,'COMPLETED')),
+        ...(v3&&{phoneValidUntil:null,simulationState:sample?'CLOSING':'WAITING_CONFIG'}),
         ...(v2&&{recoveryPending:false,recoveryReason:null})};
     };
     // The v1 history contract accepts completed tasks only.

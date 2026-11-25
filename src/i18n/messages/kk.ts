@@ -2212,7 +2212,7 @@ export const kk: Messages = {
     inventoryConfirmDeactivateCancel: "Артқа",
     inventorySlotsFullWarning: "Орындар толы. Алдымен бір құрылғының белсенділігін тоқтатыңыз.",
     inventoryCtaGoStore: "Дүкенге өту",
-    inventoryPendingDeactivateChip: "Тапсырмадан кейін белсенділігі тоқтайды",
+    inventoryPendingDeactivateChip: "Жұмыстан кейін белсенділігі тоқтайды",
     inventoryRowActivate: "Белсендіру",
     inventoryRowDeactivate: "Тоқтату",
     inventoryMoreActions: "Басқа әрекеттер",

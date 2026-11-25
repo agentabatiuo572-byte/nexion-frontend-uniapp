@@ -1,6 +1,13 @@
 import type { CanonicalQuest } from "@/api/quest-api";
 import type { Product } from "@/mock/products";
-import type { DeviceKind } from "@/store/types";
+import type { Device, DeviceKind } from "@/store/types";
+import type { PendingDeviceReplacement } from "@/api/device-e3-api";
+
+/** The fleet retains phone slots, but Lite shows a replacement only when both devices are visible here. */
+export function isLiteDeviceReplacement(pair: PendingDeviceReplacement, devices: readonly Device[]): boolean {
+  return [pair.oldDeviceId, pair.newDeviceId].every(id =>
+    devices.some(device => device.id === String(id) && device.kind !== "phone"));
+}
 
 /** Native phone setup and legacy multi-platform review pages are not Lite routes. */
 export function isLiteNativeRoute(href: string): boolean {

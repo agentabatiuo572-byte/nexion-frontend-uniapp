@@ -278,7 +278,7 @@ export function secondaryDemo(url,state,request,walletBills){
     const items=tasks.map((task,i)=>({...proof,
       receiptNo:task.receiptNo,taskNo:task.taskNo,taskClass:task.taskClass,model:task.model,client:task.client,
       rewardUsdt:task.amount,rewardNex:task.nex,settledAt:task.postedAt,earningStatus:'SETTLED',completedAt:task.completedAt,
-      startedAt:task.completedAt-task.durationSec*1000,durationSec:task.durationSec,deviceId:task.deviceId,
+      startedAt:task.startedAt?Date.parse(task.startedAt):task.completedAt-task.durationSec*1000,durationSec:task.durationSec,deviceId:task.deviceId,
       deviceInstanceNo:'REVIEW-S1',deviceName:'UVELBox S1',deviceType:'BOX',deviceGpu:'RTX 4090',vramTotalGb:24,
       taskId:'demo-'+task.taskClass.toLowerCase(),taskName:task.taskName,...task.simulation,
       ...(task.simulation&&demoSimulatedReceiptFields(task)),
