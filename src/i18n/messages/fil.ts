@@ -75,6 +75,10 @@ export const fil: Messages = {
     confirmNewTitle: "Kumpirmahin ang bagong PIN",
     confirmReset: "Kumpirmahin ang reset",
     entered: "{n} sa 6 na digit ang nailagay",
+    verifyTitle: "I-verify ang kasalukuyang PIN",
+    verifyHint: "Awtomatikong ive-verify kapag nailagay na ang 6 na digit.",
+    verifying: "Vine-verify…",
+    reload: "I-reload",
   },
   coreReview: {
     fleetReadFailed: "Hindi ma-refresh ang mga device",

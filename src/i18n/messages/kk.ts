@@ -75,6 +75,10 @@ export const kk: Messages = {
     confirmNewTitle: "Жаңа PIN-кодты растау",
     confirmReset: "Қайта орнатуды растау",
     entered: "Енгізілді: {n} / 6",
+    verifyTitle: "Ағымдағы PIN-кодты растаңыз",
+    verifyHint: "6 цифр енгізілгенде автоматты түрде тексеріледі.",
+    verifying: "Тексерілуде…",
+    reload: "Қайта жүктеу",
   },
   coreReview: {
     fleetReadFailed: "Құрылғылар жаңартылмады",

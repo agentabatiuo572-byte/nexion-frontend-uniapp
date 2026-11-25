@@ -75,6 +75,10 @@ export const ms: Messages = {
     confirmNewTitle: "Sahkan PIN pembayaran baharu",
     confirmReset: "Sahkan set semula",
     entered: "{n} daripada 6 digit dimasukkan",
+    verifyTitle: "Sahkan PIN semasa",
+    verifyHint: "Disahkan secara automatik selepas 6 digit dimasukkan.",
+    verifying: "Mengesahkan…",
+    reload: "Muat semula",
   },
   coreReview: {
     fleetReadFailed: "Peranti gagal dimuat semula",

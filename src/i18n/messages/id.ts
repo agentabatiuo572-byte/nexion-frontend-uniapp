@@ -75,6 +75,10 @@ export const id: Messages = {
     confirmNewTitle: "Konfirmasi PIN baru",
     confirmReset: "Konfirmasi atur ulang",
     entered: "{n} dari 6 digit dimasukkan",
+    verifyTitle: "Verifikasi PIN saat ini",
+    verifyHint: "Diverifikasi otomatis setelah 6 digit dimasukkan.",
+    verifying: "Memverifikasi…",
+    reload: "Muat ulang",
   },
   coreReview: {
     fleetReadFailed: "Perangkat gagal dimuat ulang",

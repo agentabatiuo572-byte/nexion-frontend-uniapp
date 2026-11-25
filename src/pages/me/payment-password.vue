@@ -1,16 +1,17 @@
 <template>
   <AppChassis active="me">
-    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" />
+    <SubPageHeader back="/pages/me/me" :title="state?.configured ? t.paymentPin.change : t.paymentPin.title" :back-action="step === 'verify' ? undefined : backToVerify" />
     <view class="payment-pin-page">
-      <text v-if="!state || state.configured" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
-      <view v-if="loading" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
+      <text v-if="!state" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
+      <view v-if="loading && !state?.configured" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>
       <template v-else-if="ui.pendingOperation">
         <text class="payment-pin-page__note" role="status">{{ t.paymentPin.pending }}</text>
       </template>
-      <template v-else-if="!state">
-        <text class="payment-pin-page__error" role="alert">{{ t.paymentPin.readFailed }}</text>
-        <NxButton variant="primary" class="payment-pin-page__primary" @click="load">{{ t.paymentPin.retry }}</NxButton>
-      </template>
+      <!-- Nothing to show (03 §3.4, §3.5.2): one sentence in the middle of the page and the page's single reload. -->
+      <view v-else-if="!state" class="payment-pin-page__empty">
+        <text class="payment-pin-page__empty-text" role="alert">{{ t.paymentPin.readFailed }}</text>
+        <view class="nx-card-recovery-action" role="button" tabindex="0" @click="load">{{ t.paymentPin.reload }}</view>
+      </view>
       <template v-else-if="!state.configured">
         <view class="payment-vault-stage"><view class="payment-vault-aura payment-vault-aura--outer" aria-hidden="true" /><view class="payment-vault nx-tint">
           <view class="payment-vault-lock" aria-hidden="true"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14.5v2.5"/></svg></view>
@@ -18,22 +19,39 @@
           <text class="payment-vault-title">{{ t.paymentPin.title }}</text><text class="payment-vault-status">{{ t.paymentPin.notConfigured }}</text><text class="payment-vault-purpose">{{ t.paymentPin.purpose }}</text>
         </view></view>
       </template>
-      <template v-else>
-        <view v-for="field in fields" :key="field.key" class="payment-pin-page__field">
-          <text class="payment-pin-page__label">{{ field.label }}</text>
-          <PaymentPasswordInput v-model="passwords[field.key]" :label="field.label" :disabled="ui.busy || !!state.lockedUntil" />
+      <!-- Change in two steps (PRD §4.6.6): 1 verify the current PIN, 2 set the new one (enter, then enter again).
+           One input group per screen, high on the page, so it and the step's action stay above the keyboard (BUG-738). -->
+      <view v-else class="pin-change">
+        <view class="pin-change__progress">
+          <view class="pin-change__bars" aria-hidden="true"><view class="on" /><view :class="{ on: step !== 'verify' }" /></view>
+          <text>{{ step === 'verify' ? t.paymentPin.stepOne : t.paymentPin.stepTwo }}</text>
         </view>
-        <text class="payment-pin-page__note">{{ t.paymentPin.rule }}</text>
-        <text v-if="validation" class="payment-pin-page__error" role="alert">{{ validation }}</text>
-        <text v-else-if="error" class="payment-pin-page__error" role="alert">{{ error }}</text>
-        <text v-if="pin.locked()" class="payment-pin-page__error" role="alert">{{ lockMessage }}</text>
-        <text v-else-if="!complete" class="payment-pin-page__note">{{ t.paymentPin.incomplete }}</text>
-        <NxButton variant="primary" class="payment-pin-page__primary" :disabled="!canSave" @click="save">{{ ui.busy ? t.paymentPin.changing : t.paymentPin.save }}</NxButton>
-        <view v-if="state.lockedUntil && !pin.locked()" class="payment-pin-page__link" role="button" tabindex="0" @click="load">{{ t.paymentPin.retry }}</view>
-        <view class="payment-pin-page__link" role="button" tabindex="0" :aria-disabled="ui.busy" @click="recover">{{ t.paymentPin.forgot }}</view>
-      </template>
+        <text class="pin-change__heading" role="heading" aria-level="2">{{ heading }}</text>
+        <text class="pin-change__hint">{{ hint }}</text>
+        <PaymentPasswordInput :key="step" v-model="passwords[stepField]" class="pin-change__input" :label="heading" :adjust-position="false"
+          :auto-focus="!inputDisabled" :disabled="inputDisabled" @complete="completeStep" />
+        <!-- In-place result line under the digits: lock (with time) wins, then the error, then the busy status. -->
+        <text v-if="step === 'verify' && pin.locked()" class="pin-change__error" role="alert">{{ lockMessage }}</text>
+        <text v-else-if="stepError" class="pin-change__error" role="alert">{{ stepError }}</text>
+        <text v-else-if="stepStatus" class="pin-change__status" role="status">{{ stepStatus }}</text>
+        <view v-if="step === 'verify'" class="pin-change__links">
+          <view v-if="state.lockedUntil && !pin.locked()" class="pin-change__link" role="button" tabindex="0" @click="load">{{ t.paymentPin.retry }}</view>
+          <view class="pin-change__link" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="recover">{{ t.paymentPin.forgot }}</view>
+        </view>
+        <view v-else-if="step === 'confirm'" class="pin-change__links">
+          <view class="pin-change__link" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="!ui.busy && restartNew()">{{ t.paymentPin.startAgain }}</view>
+        </view>
+      </view>
     </view>
-    <template #pageFixed><view v-if="!loading && state && !state.configured && !ui.pendingOperation" class="payment-pin-page__dock nx-glass-bar"><NxButton variant="primary" @click="setup">{{ t.paymentPin.setup }}</NxButton></view></template>
+    <template #pageFixed>
+      <view v-if="!loading && state && !state.configured && !ui.pendingOperation" class="payment-pin-page__dock nx-glass-bar"><NxButton variant="primary" @click="setup">{{ t.paymentPin.setup }}</NxButton></view>
+      <!-- Step 2's action is the lone floating button (04 §4.0). Its box follows the visible viewport, so with the keyboard up
+           it rests above the keyboard instead of under it (BUG-738; same measure as the PIN layer, BUG-735). -->
+      <view v-if="dockOpen" class="pin-change-dock" :style="{ top: dockViewport.top, height: dockViewport.height }">
+        <NxButton variant="primary" class="nx-tray-float pin-change-dock__primary" :disabled="step === 'new' ? !canNext : !canSave" :busy="step === 'confirm' && ui.busy"
+          @click="step === 'new' ? toConfirm() : save()">{{ step === 'new' ? t.paymentPin.next : ui.busy ? t.paymentPin.changing : t.paymentPin.save }}</NxButton>
+      </view>
+    </template>
   </AppChassis>
 </template>
 <script setup lang="ts">
@@ -45,6 +63,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import PaymentPasswordInput from "@/components/payment-password-input.vue";
+import { usePaymentPinViewport } from "@/composables/use-payment-pin-viewport";
 import { usePaymentPassword, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -55,7 +74,6 @@ const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() =
 const passwords = reactive({ current: "", new: "", confirm: "" }); const loading = ref(true);
 const active = ref(true);
 let pageGeneration = 0;
-const fields = computed(() => ([{ key: "current" as const, label: t.value.paymentPin.current }, { key: "new" as const, label: t.value.paymentPin.new }, { key: "confirm" as const, label: t.value.paymentPin.confirmNew }]));
 const complete = computed(() => Object.values(passwords).every(validPaymentPassword));
 const validation = computed(() => {
   if (validPaymentPassword(passwords.new) && simplePaymentPassword(passwords.new)) return t.value.paymentPin.simple;
@@ -69,7 +87,34 @@ const lockMessage = computed(() => {
   return fmt(t.value.paymentPin.locked, { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` });
 });
 const canSave = computed(() => complete.value && !validation.value && !ui.busy && !state.value?.lockedUntil && !ui.pendingOperation);
-function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; }
+// Two-step change (PRD §4.6.6). PLACEHOLDER(Codex): `step` and its transitions are a local stand-in for the flow logic.
+// Until B95 (server check of the current PIN) ships, step 1 only keeps the digits in passwords.current and moves on; the
+// server checks it when step 2 submits (save), and a wrong or locked current PIN brings the user back to step 1 below.
+type Step = "verify" | "new" | "confirm";
+const step = ref<Step>("verify");
+const stepField = computed(() => step.value === "verify" ? "current" as const : step.value);
+const heading = computed(() => step.value === "verify" ? t.value.paymentPin.verifyTitle : step.value === "new" ? t.value.paymentPin.newTitle : t.value.paymentPin.confirmNewTitle);
+const hint = computed(() => step.value === "verify" ? t.value.paymentPin.verifyHint : step.value === "new" ? t.value.paymentPin.rule : t.value.paymentPin.repeatDigits);
+const inputDisabled = computed(() => loading.value || ui.busy || (step.value === "verify" && !!state.value?.lockedUntil));
+const stepError = computed(() => step.value === "verify" ? error.value : validation.value || error.value);
+// PLACEHOLDER(Codex): "verifying" is the busy line for B95's verify call; today step 1 sends nothing, so it shows only while ui.busy.
+const stepStatus = computed(() => loading.value ? t.value.paymentPin.loading : step.value === "verify" && ui.busy ? t.value.paymentPin.verifying : "");
+const canNext = computed(() => validPaymentPassword(passwords.new) && !validation.value && !ui.busy);
+const dockOpen = computed(() => active.value && !loading.value && !!state.value?.configured && !ui.pendingOperation && step.value !== "verify");
+const dockViewport = usePaymentPinViewport(dockOpen);
+// PLACEHOLDER(Codex): step 1 completes on the sixth digit (B95 verify call goes here).
+function completeStep() { if (step.value === "verify" && !inputDisabled.value) { ui.changeError = ""; step.value = "new"; } }
+function toConfirm() { if (canNext.value) step.value = "confirm"; }
+function restartNew() { passwords.new = ""; passwords.confirm = ""; step.value = "new"; }
+// Back from step 2 returns to step 1 with every input cleared (PRD §4.6.6); header back and system back both land here.
+function backToVerify() { if (ui.busy) return; passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
+// PLACEHOLDER(Codex): where a rejected change lands. Wrong or locked current PIN → step 1 (remaining attempts shown there);
+// a new PIN the server refuses → the new-PIN screen.
+watch(() => ui.changeError, key => {
+  if (key === "incorrect" || key === "locked") { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
+  else if (key === "samePassword" || key === "simple" || key === "mismatch") restartNew();
+});
+function clear() { passwords.current = ""; passwords.new = ""; passwords.confirm = ""; step.value = "verify"; }
 async function load() {
   const generation = pageGeneration;
   loading.value = true; ui.changeError = "";
@@ -115,12 +160,30 @@ onUnmounted(() => { clear(); unsubscribe?.(); if (typeof document !== "undefined
 <style scoped>
 .payment-pin-page { padding: var(--v5-space-4) var(--v5-space-5) calc(var(--v5-space-6) + var(--v5-space-1) + env(safe-area-inset-bottom)); max-width: 480px; margin: 0 auto; color: var(--v5-ink); }
 .payment-pin-page__note { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.65; margin-bottom: var(--v5-space-4); }
-.payment-pin-page__field { margin-top: var(--v5-space-6); }
-.payment-pin-page__label { display: block; font-size: var(--ui-type-list-title); font-weight: 600; line-height: 1.5; }
-.payment-pin-page__error { display: block; color: var(--v5-danger); font-size: var(--ui-type-list-subtitle); line-height: 1.6; margin: var(--ui-space-row-y) 0; }
-.payment-pin-page__primary { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font-size: var(--ui-type-button); font-weight: 600; text-align: center; margin-top: var(--v5-space-5); }
-.payment-pin-page__primary[aria-disabled="true"] { opacity: .45; }
-.payment-pin-page__link { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--v5-space-2); color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); text-align: center; }
+/* Whole page unreadable (03 §3.4): one centred sentence (empty-state line, 10 §10.1: 13/18, ink-3) and the one reload. */
+.payment-pin-page__empty { min-height: 50vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--v5-space-2); text-align: center; }
+.payment-pin-page__empty-text { font-size: 13px; line-height: 18px; color: var(--v5-ink-3); }
+/* Step screen: progress, heading (overview title role), one 4px-close hint, then the six digits. */
+.pin-change { display: flex; flex-direction: column; padding-top: var(--v5-space-1); }
+.pin-change__progress { display: flex; align-items: center; gap: 10px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.pin-change__bars { display: flex; width: 64px; gap: var(--v5-space-1); }
+.pin-change__bars > view { flex: 1; height: 4px; border-radius: 2px; background: var(--v5-surface-3); }
+.pin-change__bars > .on { background: var(--v5-brand); }
+.pin-change__heading { margin-top: var(--v5-space-5); color: var(--v5-ink); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.pin-change__hint { margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.pin-change__input { margin: var(--v5-space-6) 0 0; }
+/* Result line under the digits (10 §10.2 status/hint line size): error in danger, busy status in body ink. */
+.pin-change__error, .pin-change__status { margin-top: var(--v5-space-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.pin-change__error { color: var(--v5-danger); }
+.pin-change__status { color: var(--v5-ink-2); }
+/* Text buttons (03 §3.1: brand, no arrow; 10 §10.1 text link 13/18, 500), 44px target, centred under the digits. */
+.pin-change__links { display: flex; flex-wrap: wrap; justify-content: center; column-gap: var(--v5-space-4); margin-top: var(--v5-space-3); }
+.pin-change__link { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 var(--v5-space-2); color: var(--v5-brand); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); white-space: nowrap; }
+.pin-change__link[aria-disabled="true"] { opacity: .5; }
+/* The dock spans the visible viewport (keyboard excluded) and passes touches through; only the button takes them. */
+.pin-change-dock { position: fixed; z-index: 20; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none; }
+.pin-change-dock[style*="height"] { bottom: auto; }
+.pin-change-dock__primary { position: absolute; left: 12px; right: 12px; bottom: var(--nx-tray-bottom); pointer-events: auto; }
 </style>
 
 <style scoped>
@@ -145,6 +208,5 @@ onUnmounted(() => { clear(); unsubscribe?.(); if (typeof document !== "undefined
 .payment-vault-purpose { margin-top:var(--v5-space-3); font-size:13px; line-height:20px; color:var(--v5-ink-3); }
 .payment-pin-page__dock { position:fixed; display:flex; }
 .payment-pin-page__dock > .nx-button { flex:1; }
-.payment-pin-page__primary { width:100%; padding:0; background:none; }
 @media(prefers-reduced-motion:reduce) { .payment-vault-lock,.payment-vault-dots > view { animation:none; } }
 </style>

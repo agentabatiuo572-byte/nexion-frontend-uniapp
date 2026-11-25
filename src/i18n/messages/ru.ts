@@ -75,6 +75,10 @@ export const ru: Messages = {
     confirmNewTitle: "Подтвердите новый PIN",
     confirmReset: "Сбросить",
     entered: "Введено цифр: {n} из 6",
+    verifyTitle: "Подтвердите текущий PIN-код",
+    verifyHint: "Проверка начнётся после ввода 6 цифр.",
+    verifying: "Проверяем…",
+    reload: "Обновить",
   },
   coreReview: {
     fleetReadFailed: "Не удалось обновить устройства",

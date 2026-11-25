@@ -75,6 +75,10 @@ export const uz: Messages = {
     confirmNewTitle: "Yangi PIN-kodni tasdiqlash",
     confirmReset: "Tiklashni tasdiqlash",
     entered: "{n}/6 raqam kiritildi",
+    verifyTitle: "Joriy PIN-kodni tasdiqlang",
+    verifyHint: "6 ta raqam kiritilgach avtomatik tekshiriladi.",
+    verifying: "Tekshirilmoqda…",
+    reload: "Qayta yuklash",
   },
   coreReview: {
     fleetReadFailed: "Qurilmalarni yangilab boʻlmadi",
