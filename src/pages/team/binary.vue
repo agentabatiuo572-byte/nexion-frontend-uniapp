@@ -22,10 +22,13 @@
                   <view class="binary-group-heading"><text v-if="!visibility.hidden && leftMonthVol !== rightMonthVol" class="binary-group-badge" :class="{ 'binary-weak': wing.isWeak }">{{ wing.isWeak ? t.binary.weakBadge : t.binary.strongBadge }}</text></view>
                   <view class="binary-contribution-track" aria-hidden="true"><view v-if="contributionWidths && !visibility.hidden" class="binary-contribution-fill" :class="{ 'binary-contribution-fill--other': index === 1 }" :style="{ height: (comparisonInView === false ? 0 : contributionWidths[index]) + '%', transition: comparisonInView === false ? 'none' : VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: comparisonInView === false ? '0ms' : vizStagger(index, 120) }" /></view>
                   <text class="binary-group-name">{{ wing.name }}</text>
-                  <text class="binary-points tabular-nums" :class="volumeSizes[index]">{{ visibility.mask(formatFinanceAmount(wing.monthVol)) }}<text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text>
+                  <text class="binary-points tabular-nums" :class="[volumeSizes[index], { 'binary-points--probe': volumesStacked }]">{{ visibility.mask(formatFinanceAmount(wing.monthVol)) }}<text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text>
                   <text v-if="wing.count !== null" class="binary-note">{{ wingMembersText(wing.count) }}</text>
                 </view>
                 <view class="binary-rate"><text class="nx-num-metric">×{{ rateLabel }}%</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><text class="binary-note">{{ t.binary.weakBadge }}</text></view>
+              </view>
+              <view v-if="volumesStacked" class="binary-volume-rows">
+                <view v-for="wing in wings" :key="wing.key" class="binary-volume-row"><text class="binary-volume-name">{{ wing.name }}</text><text class="binary-volume-amount tabular-nums">{{ formatFinanceAmount(wing.monthVol) }}<text class="binary-unit">&nbsp;USDT</text></text></view>
               </view>
               <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text v-if="settlementNotDue" class="binary-estimate-status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else class="reward-amount nx-num-amount" :class="estimateSize">{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text><text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text></view>
             </view>
@@ -94,7 +97,8 @@ import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { useLocaleStore } from "@/store/locale";
-import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
+import { computed, getCurrentInstance, inject, nextTick, onMounted, ref, watch, type CSSProperties } from "vue";
+import { CHASSIS_QUERY_SCOPE } from "@/composables/use-loops-in-view";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -271,6 +275,23 @@ const volumeSizes = computed(() => wings.value.map((wing) => {
   const length = formatFinanceAmount(wing.monthVol).length;
   return length >= 12 ? "binary-points--longest" : length >= 10 ? "binary-points--long" : "";
 }));
+// An amount and its unit wider than its column, at its smallest step, moves both amounts to full-width rows under the bars
+// (10 §10.2). Measured on screen, so the real font and width decide, not a digit count. The column amount stays as an
+// invisible probe so the check also runs once the rows show. Hidden stats never switch: the layout must not reveal the
+// amount range (03 §3.10).
+const volumeQueryScope = inject(CHASSIS_QUERY_SCOPE, null) ?? getCurrentInstance()?.proxy ?? null;
+const volumesWide = ref(false);
+const volumesStacked = computed(() => !visibility.hidden && volumesWide.value);
+function measureVolumes() {
+  const query = volumeQueryScope ? uni.createSelectorQuery().in(volumeQueryScope) : uni.createSelectorQuery();
+  query.selectAll(".binary-contribution").boundingClientRect();
+  query.selectAll(".binary-points").boundingClientRect();
+  query.exec((res: UniApp.NodeInfo[][]) => {
+    const [columns, amounts] = res;
+    volumesWide.value = amounts.some((amount, index) => (amount.width ?? 0) > (columns[index]?.width ?? Infinity) + 0.5);
+  });
+}
+watch(() => [pageState.value.primary, leftMonthVol.value, rightMonthVol.value, visibility.hidden] as const, () => { void nextTick(measureVolumes); }, { immediate: true });
 
 // 结算周期文案 + 数字据后台同源配置派生(默认每月),消除「页面暗示日结」与「每月结算」矛盾,
 // 并让 hero 预计金额随结算周期联动(数字 periodMatch + 标签 {period} + 节奏 {freq} 三者一致)。
@@ -406,12 +427,18 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-group-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 2px var(--ui-space-row-y); border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .binary-weak { background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); color: var(--ui-device-ink); }
 .binary-group-name { color: var(--v5-ink-2); font-size: 13px; line-height: 18px; }
-.binary-points { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.binary-points { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Long volumes step down so the full number stays on one line with its unit (01 §1.2): from 100,000.00 the inline-figure
    role, from 1,000,000.00 the meta role, and the columns drop their side padding to give the number the room. */
 .binary-points--long { font-size: var(--ui-type-inline-figure); }
 .binary-points--longest { font-size: var(--ui-type-meta); }
 .binary-comparison--wide { padding-inline: 0; }
+.binary-points--probe { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; }
+/* Amounts too wide for the columns: one full-width row per group, name | amount (01 §1.1.1), amount and unit on one line. */
+.binary-volume-rows { display: flex; flex-direction: column; gap: var(--v5-space-2); margin-top: var(--v5-space-3); }
+.binary-volume-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: var(--v5-space-3); }
+.binary-volume-name { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.binary-volume-amount { margin-left: auto; white-space: nowrap; color: var(--v5-ink); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .binary-contribution-track { position: relative; width: 64px; height: 150px; margin: var(--v5-space-1) 0; border-radius: 18px; background: var(--v5-surface-3); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; }
 .binary-contribution-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px; background: linear-gradient(180deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 25%, transparent)); }
 .binary-contribution-fill--other { background: linear-gradient(180deg, var(--ui-device-ink), color-mix(in srgb, var(--ui-device-ink) 25%, transparent)); }
