@@ -4244,6 +4244,7 @@ FAQ accordion,分类:Account / Earnings / Hardware / Payment / Security。
 
 2. **6-cell Stats grid**:
    - Market Cap / 24h Volume / FDV
+   - UVT 的 24h 成交量读取 `GET /api/config/market/nex` 的 `volume24hUsdt`。后端按完成时间滚动汇总最近 24 小时的已成交 UVT/USDT 兑换，买入按支付的 USDT，卖出按成交的 UVT 数量乘以成交价，单位为 USDT。沙盒账户、已删除记录和未成交订单不计入。后端最多缓存 60 秒，市场页按现有读取时机更新，返回 0 或数据不可用时沿用「—」。
    - Circulating / Total Supply / Rank
    - 底部 ATH 行:`$0.184 (-X.X% from ATH)` 损失感
 
