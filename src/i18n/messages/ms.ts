@@ -4917,6 +4917,8 @@ export const ms: Messages = {
     settlementPending: "Sudah layak, menunggu hari bayaran",
     settlesOnPayoutDay: "Pada hari bayaran",
     settlementUnavailable: "Bayaran tidak tersedia",
+    thresholdNotMet: "Nilai pesanan belum mencapai syarat",
+    thresholdNotMetDetail: "Selepas nilai pesanan setiap kumpulan mencapai {amount}, ganjaran dikira pada hari bayaran.",
     blockedDetail: "Nilai pesanan Kumpulan {side} belum mencapai syarat minimum.",
     blockReasons: {
       F3_BINARY_PAUSED: "Ganjaran dijeda. Hubungi khidmat pelanggan jika ada soalan.",
@@ -4928,7 +4930,6 @@ export const ms: Messages = {
       F3_SETTLEMENT_NOT_DUE: "Nilai pesanan kedua-dua kumpulan sudah mencapai syarat minimum. Ganjaran dikira pada hari bayaran, jumlahnya mengikut bayaran sebenar.",
       UNKNOWN: "Ganjaran dijeda. Hubungi khidmat pelanggan jika ada soalan.",
     },
-    blockedAction: "Jemput rakan untuk capai lebih cepat.",
     inviteCta: "Jemput rakan",
     leftWing: "Kumpulan A",
     rightWing: "Kumpulan B",

@@ -192,6 +192,8 @@ export const useCommission = defineStore("commission", () => {
   const eventsLifetimeDisplayUSDT = ref<number | null>(null);
   const config = ref<CanonicalCommissionConfig | null>(null);
   const binarySnapshot = ref<CanonicalBinaryState | null>(null);
+  // The last binary read failed temporarily (network, 5xx, 429): the confirmed snapshot above stays for display.
+  const binaryTransientFailure = ref(false);
   const eventsStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const eventsRateLimited = ref(false);
   const eventsTransientFailure = ref(false);
@@ -363,13 +365,15 @@ export const useCommission = defineStore("commission", () => {
         const snapshot = await commissionConfigApi.binary();
         if (generation !== binaryRefreshGeneration || !isCurrentScope(scope)) return;
         binarySnapshot.value = snapshot;
+        binaryTransientFailure.value = false;
         binaryStatus.value = "ready";
-      } catch {
+      } catch (cause) {
         if (generation === binaryRefreshGeneration && isCurrentScope(scope)) {
-          // The team home consumes this same snapshot.  Clear it with the
-          // current-scope failure so no page can present an older estimate as
-          // current authority.
-          binarySnapshot.value = null;
+          // A temporary failure keeps this account's confirmed snapshot while
+          // pages recover in the background (03 §3.4). A refusal clears it so
+          // no page presents an estimate the server no longer stands behind.
+          binaryTransientFailure.value = isTransientReadFailure(cause);
+          if (!binaryTransientFailure.value) binarySnapshot.value = null;
           binaryStatus.value = "error";
         }
       }
@@ -556,7 +560,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, eventsEvidence, config, configStatus, binarySnapshot, eventsStatus, eventsLoadMoreStatus,
+    events, eventsEvidence, config, configStatus, binarySnapshot, binaryTransientFailure, eventsStatus, eventsLoadMoreStatus,
     eventsPage, eventsTotalRows, binaryStatus, eventsRateLimited, eventsTransientFailure, eventsReadFailed, eventsLifetimeDisplayUSDT, invalidateReadOwner, bindAccount,
     refreshCanonicalConfig, ensureCanonicalConfig, refreshCanonicalBinary, ensureCanonicalBinary, refreshCanonicalEvents, ensureCanonicalEvents, loadMoreCanonicalEvents, unilevelRate,
     addEvent, unlockMatured, withdraw,

@@ -4917,6 +4917,8 @@ export const kk: Messages = {
     settlementPending: "Шарт орындалды, төлем күні күтілуде",
     settlesOnPayoutDay: "Төлем күні",
     settlementUnavailable: "Төлем қолжетімсіз",
+    thresholdNotMet: "Тапсырыс көлемі әлі жеткіліксіз",
+    thresholdNotMetDetail: "Әр топтың тапсырыс көлемі кемінде {amount} болғанда, сыйақы төлем күні есептеледі.",
     blockedDetail: "{side} тобы әлі қажетті көлемге жеткен жоқ.",
     blockReasons: {
       F3_BINARY_PAUSED: "Сыйақы төлеу тоқтатылды. Сұрақ болса, қолдау қызметіне жазыңыз.",
@@ -4928,7 +4930,6 @@ export const kk: Messages = {
       F3_SETTLEMENT_NOT_DUE: "Екі топ та қажетті көлемге жетті. Сыйақы төлем күні есептеледі, сомасы нақты төлемге сай болады.",
       UNKNOWN: "Сыйақы төлеу тоқтатылды. Сұрақ болса, қолдау қызметіне жазыңыз.",
     },
-    blockedAction: "Тезірек жету үшін достарды шақырыңыз.",
     inviteCta: "Достарды шақыру",
     leftWing: "A тобы",
     rightWing: "B тобы",

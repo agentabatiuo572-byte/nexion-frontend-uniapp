@@ -4917,6 +4917,8 @@ export const uz: Messages = {
     settlementPending: "Shart bajarildi, toʻlov kuni kutilmoqda",
     settlesOnPayoutDay: "Toʻlov kunida",
     settlementUnavailable: "Hozircha toʻlab boʻlmaydi",
+    thresholdNotMet: "Buyurtmalar hajmi hali yetarli emas",
+    thresholdNotMetDetail: "Har bir guruhning buyurtmalar hajmi kamida {amount} boʻlgach, mukofot toʻlov kunida hisoblanadi.",
     blockedDetail: "{side} guruhining buyurtmalar hajmi hali yetarli emas.",
     blockReasons: {
       F3_BINARY_PAUSED: "Mukofotlar toʻxtatilgan. Savollar boʻlsa, yordam xizmatiga murojaat qiling.",
@@ -4928,7 +4930,6 @@ export const uz: Messages = {
       F3_SETTLEMENT_NOT_DUE: "Ikkala guruhning buyurtmalar hajmi yetarli. Mukofot toʻlov kunida hisoblanadi, summasi haqiqiy toʻlovga koʻra belgilanadi.",
       UNKNOWN: "Mukofotlar toʻxtatilgan. Savollar boʻlsa, yordam xizmatiga murojaat qiling.",
     },
-    blockedAction: "Tezroq erishish uchun doʻstlarni taklif qiling.",
     inviteCta: "Doʻst taklif qilish",
     leftWing: "A guruhi",
     rightWing: "B guruhi",

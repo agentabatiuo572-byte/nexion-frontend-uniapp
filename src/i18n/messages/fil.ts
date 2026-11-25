@@ -4917,6 +4917,8 @@ export const fil: Messages = {
     settlementPending: "Kwalipikado na, hinihintay ang araw ng payout",
     settlesOnPayoutDay: "Sa araw ng payout",
     settlementUnavailable: "Hindi available ang payout",
+    thresholdNotMet: "Hindi pa naaabot ang kailangang volume",
+    thresholdNotMetDetail: "Kapag umabot sa {amount} ang volume ng order ng bawat grupo, kukuwentahin ang reward sa araw ng payout.",
     blockedDetail: "Hindi pa naaabot ng Grupo {side} ang kailangang volume ng order.",
     blockReasons: {
       F3_BINARY_PAUSED: "Naka-pause ang reward. Makipag-ugnayan sa support kung may tanong ka.",
@@ -4928,7 +4930,6 @@ export const fil: Messages = {
       F3_SETTLEMENT_NOT_DUE: "Naabot na ng dalawang grupo ang kailangang volume. Kinukuwenta ang reward sa araw ng payout, at ang halaga ay batay sa aktuwal na payout.",
       UNKNOWN: "Naka-pause ang reward. Makipag-ugnayan sa support kung may tanong ka.",
     },
-    blockedAction: "Mag-imbita ng kaibigan para mas mabilis.",
     inviteCta: "Mag-imbita",
     leftWing: "Grupo A",
     rightWing: "Grupo B",
