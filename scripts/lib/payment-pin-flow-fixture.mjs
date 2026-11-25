@@ -7,6 +7,10 @@ export const paymentPinFixtureOtp = '012345';
 
 export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
   const orders = new Map(), quotes = new Map(), commands = new Map(), challenges = new Map(), proofs = new Map();
+  const changeAttempts = new Map(), changeProofs = new Map();
+  const changeProofTtlMs = Number(process.env.DEMO_PAYMENT_PIN_CHANGE_PROOF_TTL_MS ?? 600_000);
+  const attemptNoFormat = /^[A-Za-z0-9:_-]{8,128}$/;
+  const invalidChangeProof = 'PAYMENT_PASSWORD_CHANGE_PROOF_INVALID_OR_EXPIRED';
   const state = { loggedIn:false, password:null, version:0, balance:10000, attempts:5, lockedUntil:null, payWrites:0, setupWrites:0, dropNextPayment:false };
   let challengeSequence = 0, proofSequence = 0;
   const proof={serverCanonical:true,sourceEnvironment:'PRODUCTION',runId:''};
@@ -54,12 +58,39 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       dailyNex: active.reduce((sum, device) => sum + device.dailyNex, 0) };
   }
   function handle(url, request) {
-    const method=request.method(), body=request.postDataJSON?.()??{}, path=url.pathname, key=request.headers()['idempotency-key'];
+    const method=request.method(), body=request.postDataJSON?.()??{}, path=url.pathname;
+    const { 'idempotency-key': key, authorization: sessionId } = request.headers();
     if(path==='/auth/users/login'){state.loggedIn=true;return ok(session());}
     if(path==='/auth/users/refresh')return state.loggedIn?ok(session()):fail(401,'USER_REFRESH_TOKEN_REQUIRED');
     if(path==='/api/legal/terms/current')return ok({source:'server',sourceEnvironment:'PRODUCTION',runId:'',requestedLocale:url.searchParams.get('locale')||'zh-CN',resolvedLocale:'zh-CN',requestedJurisdiction:'GLOBAL',resolvedJurisdiction:'GLOBAL',provenance:'frontend-acceptance',version:'v1',effectiveAt:'2026-09-02T00:00:00Z',title:'Terms',summary:'Accepted',sections:[{key:'main',title:'Terms',body:'Accepted',sortOrder:0}],acknowledged:true,acknowledgedAt:'2026-09-02T00:00:00Z'});
     const pin='/api/app/security/payment-password';
     if(path===pin)return ok(pinState());
+    if(path===pin+'/change/verify'){
+      if(method!=='POST')return fail(405,'METHOD_NOT_ALLOWED');
+      const current=pinState();
+      if(typeof body.currentPassword!=='string'||!/^[0-9]{6}$/.test(body.currentPassword)||typeof body.attemptNo!=='string'||!attemptNoFormat.test(body.attemptNo))
+        return fail(422,'PAYMENT_PASSWORD_INVALID',current);
+      if(!current.configured)return fail(409,'PAYMENT_PASSWORD_NOT_CONFIGURED',current);
+      if(body.expectedCredentialVersion!==current.credentialVersion)return fail(409,'PAYMENT_PASSWORD_VERSION_CONFLICT',current);
+      const binding=JSON.stringify([sessionId,current.credentialVersion]);
+      const prior=changeAttempts.get(body.attemptNo);
+      if(prior){
+        if(prior.binding!==binding)return fail(409,'PAYMENT_PASSWORD_ATTEMPT_CONFLICT',current);
+        return prior.rejection??fail(409,'PAYMENT_PASSWORD_ATTEMPT_ALREADY_USED',current);
+      }
+      if(current.lockedUntil!==null)return fail(429,'PAYMENT_PASSWORD_LOCKED',current);
+      if(body.currentPassword!==state.password){
+        const message=wrongPassword();
+        const rejection=fail(state.lockedUntil===null?422:429,message,pinState());
+        changeAttempts.set(body.attemptNo,{binding,rejection});
+        return rejection;
+      }
+      state.attempts=5;
+      changeAttempts.set(body.attemptNo,{binding});
+      const changeProof='pin-fixture-change-proof-'+(++proofSequence), expiresAt=now()+changeProofTtlMs;
+      changeProofs.set(sessionId,{changeProof,expiresAt,version:current.credentialVersion});
+      return ok({changeProof,expiresAt:new Date(expiresAt).toISOString()});
+    }
     if([pin+'/setup',pin+'/change',pin+'/reset'].includes(path)){
       if(method!=='POST')return fail(405,'METHOD_NOT_ALLOWED');
       if(typeof key!=='string'||!key)return fail(422,'IDEMPOTENCY_KEY_REQUIRED');
@@ -72,18 +103,22 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
       };
       const operation=path.split('/').at(-1), current=pinState();
       if(operation==='setup'&&current.configured)return reject(409,'PAYMENT_PASSWORD_ALREADY_CONFIGURED');
-      if(operation!=='setup'&&!current.configured)return reject(409,'PAYMENT_PASSWORD_NOT_CONFIGURED');
-      if(operation!=='setup'&&body.expectedCredentialVersion!==state.version)return reject(409,'PAYMENT_PASSWORD_VERSION_CONFLICT');
-      if(operation==='change'){
-        if(current.lockedUntil!==null)return reject(423,'PAYMENT_PASSWORD_LOCKED');
-        if(body.currentPassword!==state.password)return reject(422,wrongPassword());
-      }
+      if(operation==='reset'&&!current.configured)return reject(409,'PAYMENT_PASSWORD_NOT_CONFIGURED');
+      if(operation==='reset'&&body.expectedCredentialVersion!==state.version)return reject(409,'PAYMENT_PASSWORD_VERSION_CONFLICT');
       const resetProof=operation==='reset'?proofs.get(body.resetProof):null;
       if(operation==='reset'&&(!resetProof||resetProof.expiresAt<=now()||resetProof.version!==state.version))return reject(422,'PAYMENT_PASSWORD_PROOF_EXPIRED');
       if(typeof body.newPassword!=='string'||!/^[0-9]{6}$/.test(body.newPassword)||body.newPassword!==body.confirmPassword)return reject(422,'PAYMENT_PASSWORD_CONFIRM_MISMATCH');
       if(/^(.)\1{5}$/.test(body.newPassword)||'0123456789012345'.includes(body.newPassword)||'9876543210987654'.includes(body.newPassword))return reject(422,'PAYMENT_PASSWORD_TOO_SIMPLE');
+      if(operation==='change'){
+        const issued=changeProofs.get(sessionId);
+        if(body.currentPassword!==undefined||!issued||issued.changeProof!==body.changeProof||issued.expiresAt<=now()
+          ||issued.version!==current.credentialVersion||body.expectedCredentialVersion!==current.credentialVersion)return reject(422,invalidChangeProof);
+        if(typeof body.attemptNo!=='string'||!attemptNoFormat.test(body.attemptNo))return reject(422,'PAYMENT_PASSWORD_INVALID');
+        if(current.lockedUntil!==null)return reject(429,'PAYMENT_PASSWORD_LOCKED');
+      }
       if(operation!=='setup'&&body.newPassword===state.password)return reject(422,'PAYMENT_PASSWORD_NEW_MUST_DIFFER');
       if(operation==='reset')proofs.delete(body.resetProof);
+      if(operation==='change')changeProofs.delete(sessionId);
       state.password=body.newPassword;state.version++;state.attempts=5;state.lockedUntil=null;
       if(operation==='setup')state.setupWrites++;
       const receipt={commandKey:key,status:'SUCCEEDED',state:pinState(),canResumeSameKey:false};commands.set('security:'+key,receipt);return ok(receipt);

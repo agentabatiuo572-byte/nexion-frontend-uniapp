@@ -35,8 +35,8 @@
         <text v-else-if="stepError" class="pin-change__error" role="alert">{{ stepError }}</text>
         <text v-else-if="stepStatus" class="pin-change__status" role="status">{{ stepStatus }}</text>
         <view v-if="step === 'verify'" class="pin-change__links">
-          <view v-if="state.lockedUntil && !pin.locked()" class="pin-change__link" role="button" tabindex="0" @click="load">{{ t.paymentPin.retry }}</view>
-          <view class="pin-change__link" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="recover">{{ t.paymentPin.forgot }}</view>
+          <view v-if="retryVerification || (state.lockedUntil && !pin.locked())" class="pin-change__link" role="button" tabindex="0" @click="retryVerification ? verifyCurrent() : load()">{{ t.paymentPin.retry }}</view>
+          <view class="pin-change__link" role="button" :tabindex="actionBusy ? -1 : 0" :aria-disabled="actionBusy" @click="recover">{{ t.paymentPin.forgot }}</view>
         </view>
         <view v-else-if="step === 'confirm'" class="pin-change__links">
           <view class="pin-change__link" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="!ui.busy && restartNew()">{{ t.paymentPin.startAgain }}</view>
@@ -57,28 +57,37 @@
 <script setup lang="ts">
 import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import { onBackPress, onHide, onShow, onUnload } from "@dcloudio/uni-app";
+import { sha256 } from "js-sha256";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { usePaymentPinViewport } from "@/composables/use-payment-pin-viewport";
-import { usePaymentPassword, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
+import { usePaymentPassword, paymentPasswordErrorKey, simplePaymentPassword, validPaymentPassword } from "@/store/payment-password";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { sessionVault } from "@/api/runtime";
+import { isAmbiguousOutcome } from "@/api/errors";
+import type { PaymentPasswordChangeProof, PaymentPasswordChangeVerification } from "@/api/payment-password-api";
+import { requireCryptoUuid } from "@/lib/secure-command-id";
 const pin = usePaymentPassword(); const ui = pin.ui; const state = computed(() => ui.state); const t = useT();
 const passwords = reactive({ current: "", new: "", confirm: "" }); const loading = ref(true);
 const active = ref(true);
+const verifying = ref(false);
+const verificationAttempt = shallowRef<PaymentPasswordChangeVerification>();
+const verifiedChange = shallowRef<PaymentPasswordChangeProof & { expectedCredentialVersion: number; currentPinDigest: string }>();
 let pageGeneration = 0;
-const complete = computed(() => Object.values(passwords).every(validPaymentPassword));
 const validation = computed(() => {
-  if (validPaymentPassword(passwords.new) && simplePaymentPassword(passwords.new)) return t.value.paymentPin.simple;
-  if (passwords.current && passwords.new === passwords.current) return t.value.paymentPin.samePassword;
+  if (validPaymentPassword(passwords.new)) {
+    if (simplePaymentPassword(passwords.new)) return t.value.paymentPin.simple;
+    const verified = verifiedChange.value;
+    if (verified && sha256(`${verified.changeProof}:${passwords.new}`) === verified.currentPinDigest) return t.value.paymentPin.samePassword;
+  }
   if (validPaymentPassword(passwords.confirm) && passwords.confirm !== passwords.new) return t.value.paymentPin.mismatch;
   return "";
 });
@@ -92,22 +101,64 @@ const step = ref<Step>("verify");
 const stepField = computed(() => step.value === "verify" ? "current" as const : step.value);
 const heading = computed(() => step.value === "verify" ? t.value.paymentPin.verifyTitle : step.value === "new" ? t.value.paymentPin.newTitle : t.value.paymentPin.confirmNewTitle);
 const hint = computed(() => step.value === "verify" ? t.value.paymentPin.verifyHint : step.value === "new" ? t.value.paymentPin.rule : t.value.paymentPin.repeatDigits);
-const inputDisabled = computed(() => loading.value || ui.busy || (step.value === "verify" && !!state.value?.lockedUntil));
-const stepError = computed(() => step.value === "verify" ? error.value : validation.value || error.value);
-const stepStatus = computed(() => loading.value ? t.value.paymentPin.loading : "");
+const actionBusy = computed(() => ui.busy || verifying.value);
+const retryVerification = computed(() => !!verificationAttempt.value && !verifying.value);
+const inputDisabled = computed(() => loading.value || actionBusy.value || (step.value === "verify" && (!!state.value?.lockedUntil || retryVerification.value)));
+const stepError = computed(() => {
+  if (step.value !== "verify") return validation.value || error.value;
+  return retryVerification.value ? t.value.paymentPin.failed : error.value;
+});
+const stepStatus = computed(() => loading.value ? t.value.paymentPin.loading : verifying.value ? t.value.paymentPin.verifying : "");
 const canNext = computed(() => step.value === "new" && !inputDisabled.value && validPaymentPassword(passwords.new) && !validation.value);
-const canSave = computed(() => step.value === "confirm" && !inputDisabled.value && complete.value && !validation.value && !state.value?.lockedUntil && !ui.pendingOperation);
+const canSave = computed(() => step.value === "confirm" && !!verifiedChange.value && !inputDisabled.value && validPaymentPassword(passwords.new) && validPaymentPassword(passwords.confirm) && !validation.value && !state.value?.lockedUntil && !ui.pendingOperation);
 const dockOpen = computed(() => active.value && !loading.value && !!state.value?.configured && !ui.pendingOperation && step.value !== "verify");
 const dockViewport = usePaymentPinViewport(dockOpen);
 function completeStep() {
-  if (step.value !== "verify" || inputDisabled.value || !validPaymentPassword(passwords.current)) return;
-  // B95 交付后第一步改为调用验证接口。过渡期间仅在页面内存暂存当前密码，由修改命令校验。
+  if (!active.value || step.value !== "verify" || inputDisabled.value || !state.value?.configured || !validPaymentPassword(passwords.current)) return;
+  try {
+    verificationAttempt.value = { currentPassword: passwords.current, expectedCredentialVersion: state.value.credentialVersion, attemptNo: requireCryptoUuid() };
+  } catch {
+    clear();
+    ui.changeError = "failed";
+    return;
+  }
+  void verifyCurrent();
+}
+async function verifyCurrent() {
+  const attempt = verificationAttempt.value;
+  if (!attempt || actionBusy.value) return;
+  const isCurrent = () => active.value && verificationAttempt.value === attempt;
+  verifying.value = true;
   ui.changeError = "";
-  step.value = "new";
+  try {
+    const result = await pin.changeVerify(attempt, isCurrent);
+    if (!isCurrent()) return;
+    if (!result || "error" in result) {
+      clear();
+      if (result) ui.changeError = result.error;
+      return;
+    }
+    // Keep only a proof-salted digest for the step-two equality check.
+    verifiedChange.value = { ...result, expectedCredentialVersion: attempt.expectedCredentialVersion,
+      currentPinDigest: sha256(`${result.changeProof}:${attempt.currentPassword}`) };
+    verificationAttempt.value = undefined;
+    passwords.current = "";
+    verifying.value = false;
+    step.value = "new";
+  } catch (error) {
+    if (!isCurrent() || isAmbiguousOutcome(error)) return;
+    clear();
+    ui.changeError = paymentPasswordErrorKey(error);
+  } finally {
+    if (isCurrent()) verifying.value = false;
+  }
 }
 function toConfirm() { if (canNext.value) step.value = "confirm"; }
 function restartNew() { passwords.new = ""; passwords.confirm = ""; step.value = "new"; }
 function clear() {
+  verifying.value = false;
+  verificationAttempt.value = undefined;
+  verifiedChange.value = undefined;
   passwords.current = "";
   passwords.new = "";
   passwords.confirm = "";
@@ -148,12 +199,14 @@ useAutoRecovery({
   }, repeatMs: 15_000,
 });
 async function setup() { await pin.waitForQuery(); if (!await pin.setup()) await load(); }
-async function recover() { await pin.waitForQuery(); if (ui.busy) return; clear(); if (!await pin.recover()) await load(); }
+async function recover() { await pin.waitForQuery(); if (actionBusy.value) return; clear(); if (!await pin.recover()) await load(); }
 async function save() {
   await pin.waitForQuery();
-  if (!canSave.value || !state.value) return;
-  const result = pin.change(passwords.current, passwords.new, passwords.confirm);
-  passwords.current = "";
+  const verified = verifiedChange.value;
+  if (!canSave.value || !verified) return;
+  const result = pin.change({ changeProof: verified.changeProof, expectedCredentialVersion: verified.expectedCredentialVersion,
+    newPassword: passwords.new, confirmPassword: passwords.confirm });
+  verifiedChange.value = undefined;
   await result;
   if (pin.locked() || ui.visible) clear();
 }

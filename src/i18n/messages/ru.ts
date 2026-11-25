@@ -71,6 +71,7 @@ export const ru: Messages = {
     support: "Поддержка",
     codeInvalid: "Не удалось проверить код. Проверьте его или запросите новый.",
     proofExpired: "Срок подтверждения личности истёк. Пройдите проверку ещё раз.",
+    changeProofExpired: "Подтверждение больше не действует. Введите текущий платёжный PIN ещё раз.",
     newTitle: "Новый платёжный PIN",
     confirmNewTitle: "Подтвердите новый PIN",
     confirmReset: "Сбросить",

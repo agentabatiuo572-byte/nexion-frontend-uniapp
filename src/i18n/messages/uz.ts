@@ -71,6 +71,7 @@ export const uz: Messages = {
     support: "Yordam xizmati",
     codeInvalid: "Bu kodni tasdiqlab boʻlmadi. Tekshiring yoki yangi kod soʻrang.",
     proofExpired: "Shaxs tasdigʻi muddati tugadi. Qayta tasdiqlang.",
+    changeProofExpired: "Tasdiq endi amal qilmaydi. Joriy toʻlov PIN-kodini qayta kiriting.",
     newTitle: "Yangi PIN-kod oʻrnatish",
     confirmNewTitle: "Yangi PIN-kodni tasdiqlash",
     confirmReset: "Tiklashni tasdiqlash",

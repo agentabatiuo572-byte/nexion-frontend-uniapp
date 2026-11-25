@@ -71,6 +71,7 @@ export const kk: Messages = {
     support: "Қолдауға жазу",
     codeInvalid: "Кодты растау мүмкін болмады. Тексеріңіз немесе жаңа код сұраңыз.",
     proofExpired: "Жеке басты растау мерзімі өтті. Қайта растаңыз.",
+    changeProofExpired: "Растау жарамсыз. Ағымдағы төлем PIN-кодын қайта енгізіңіз.",
     newTitle: "Жаңа PIN-код орнату",
     confirmNewTitle: "Жаңа PIN-кодты растау",
     confirmReset: "Қайта орнатуды растау",

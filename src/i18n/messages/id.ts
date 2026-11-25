@@ -71,6 +71,7 @@ export const id: Messages = {
     support: "Hubungi CS",
     codeInvalid: "Kode tidak dapat diverifikasi. Periksa lagi atau minta kode baru.",
     proofExpired: "Verifikasi identitas sudah kedaluwarsa. Verifikasi ulang.",
+    changeProofExpired: "Verifikasi sudah tidak berlaku. Masukkan kembali PIN pembayaran saat ini.",
     newTitle: "Atur PIN pembayaran baru",
     confirmNewTitle: "Konfirmasi PIN baru",
     confirmReset: "Konfirmasi atur ulang",

@@ -25,16 +25,39 @@ export interface PaymentPasswordChallenge {
   expiresAt: string;
 }
 export interface PaymentPasswordProof { resetProof: string; expiresAt: string }
+export interface PaymentPasswordChangeProof { changeProof: string; expiresAt: string }
+interface PaymentPasswordChangeAttempt { expectedCredentialVersion: number; attemptNo: string }
+export interface PaymentPasswordChangeVerification extends PaymentPasswordChangeAttempt { currentPassword: string }
+type PaymentPasswordChangeVerificationResult = PaymentPasswordChangeProof | {
+  reason: (typeof changeVerifyRefusals)[number]["message"];
+  state: PaymentPasswordState;
+};
 export interface PaymentPasswordApi {
   status(): Promise<PaymentPasswordState>;
   setup(input: { newPassword: string; confirmPassword: string; commandKey: string }): Promise<PaymentPasswordReceipt>;
-  change(input: { currentPassword: string; newPassword: string; confirmPassword: string; expectedCredentialVersion: number; attemptNo: string; commandKey: string }): Promise<PaymentPasswordReceipt>;
+  changeVerify(input: PaymentPasswordChangeVerification): Promise<PaymentPasswordChangeVerificationResult>;
+  change(input: PaymentPasswordChangeAttempt & { changeProof: string; newPassword: string; confirmPassword: string; commandKey: string }): Promise<PaymentPasswordReceipt>;
   receipt(commandKey: string): Promise<PaymentPasswordReceipt>;
   challenge(): Promise<PaymentPasswordChallenge>;
   verify(challengeNo: string, code: string): Promise<PaymentPasswordProof>;
   reset(input: { resetProof: string; newPassword: string; confirmPassword: string; expectedCredentialVersion: number; commandKey: string }): Promise<PaymentPasswordReceipt>;
 }
 
+const changeVerifyRefusals = [
+  { code: 422, message: "PAYMENT_PASSWORD_INCORRECT" },
+  { code: 429, message: "PAYMENT_PASSWORD_LOCKED" },
+  { code: 409, message: "PAYMENT_PASSWORD_VERSION_CONFLICT" },
+  { code: 409, message: "PAYMENT_PASSWORD_NOT_CONFIGURED" },
+  { code: 409, message: "PAYMENT_PASSWORD_ATTEMPT_ALREADY_USED" },
+] as const;
+
+export function validPaymentPassword(value: unknown): value is string { return typeof value === "string" && /^[0-9]{6}$/.test(value); }
+function validChangeProof(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 128; }
+function validateChangeAttempt({ expectedCredentialVersion, attemptNo }: PaymentPasswordChangeAttempt) {
+  if (!Number.isSafeInteger(expectedCredentialVersion) || expectedCredentialVersion < 1
+    || typeof attemptNo !== "string" || !/^[A-Za-z0-9:_-]{8,128}$/.test(attemptNo)) throw invalidInput();
+}
+function invalidInput(): ApiError { return new ApiError({ kind: "business", message: "PAYMENT_PASSWORD_INVALID" }); }
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid();
   return value as Record<string, unknown>;
@@ -70,7 +93,28 @@ export function createPaymentPasswordApi(client: ApiClient): PaymentPasswordApi 
   return {
     status: async () => parsePaymentPasswordState(await client.request({ path: base })),
     setup: input => mutate("setup", input),
-    change: input => mutate("change", input),
+    async changeVerify(input) {
+      validateChangeAttempt(input);
+      const { currentPassword, expectedCredentialVersion, attemptNo } = input;
+      if (!validPaymentPassword(currentPassword)) throw invalidInput();
+      return client.request<PaymentPasswordChangeVerificationResult>({
+        method: "POST", path: `${base}/change/verify`, body: { currentPassword, expectedCredentialVersion, attemptNo }, retryAfterAuth: false,
+        acceptedResponses: changeVerifyRefusals.flatMap(refusal => [200, refusal.code].map(status => ({ ...refusal, status }))),
+        parseResponseData(value, _, { code, message }) {
+          const refusal = changeVerifyRefusals.find(entry => entry.code === code && entry.message === message);
+          if (refusal) return { reason: refusal.message, state: parsePaymentPasswordState(value) };
+          const { changeProof, expiresAt } = object(value);
+          if (!validChangeProof(changeProof) || !date(expiresAt)) throw invalid();
+          return { changeProof, expiresAt };
+        },
+      });
+    },
+    async change(input) {
+      validateChangeAttempt(input);
+      const { changeProof, newPassword, confirmPassword, expectedCredentialVersion, attemptNo, commandKey } = input;
+      if (!validChangeProof(changeProof) || !validPaymentPassword(newPassword) || !validPaymentPassword(confirmPassword)) throw invalidInput();
+      return mutate("change", { changeProof, newPassword, confirmPassword, expectedCredentialVersion, attemptNo, commandKey });
+    },
     reset: input => mutate("reset", input),
     receipt: async key => receipt(await client.request({ path: `${base}/commands/${encodeURIComponent(key)}` }), key),
     challenge: async () => {

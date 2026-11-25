@@ -71,6 +71,7 @@ export const ms: Messages = {
     support: "Hubungi bantuan",
     codeInvalid: "Kod ini tidak dapat disahkan. Sila semak atau minta kod baharu.",
     proofExpired: "Pengesahan identiti telah tamat tempoh. Sila sahkan semula.",
+    changeProofExpired: "Pengesahan tidak lagi sah. Sila masukkan semula PIN pembayaran semasa.",
     newTitle: "Tetapkan PIN baharu",
     confirmNewTitle: "Sahkan PIN pembayaran baharu",
     confirmReset: "Sahkan set semula",
