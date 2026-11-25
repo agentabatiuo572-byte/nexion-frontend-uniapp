@@ -3,8 +3,9 @@
     <view class="payment-pin-sheet" :class="{ 'nx-glass-sheet': !standalone }" @click.stop>
       <view class="payment-pin-header">
         <text class="payment-pin-title" role="heading" aria-level="2" aria-live="polite">{{ title }}</text>
-        <view class="payment-pin-close" :class="{ 'nx-frosted-button': standalone }" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" :aria-label="t.paymentPin.close" @click="requestClose">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path :d="standalone ? 'm15 18-6-6 6-6' : 'm6 6 12 12M18 6 6 18'" /></svg>
+        <NxButton v-if="!standalone" class="payment-pin-close" :label="t.paymentPin.close" size="medium" :disabled="ui.busy" @click="requestClose"><NxIcon name="close" :size="18" /></NxButton>
+        <view v-else class="payment-pin-close nx-frosted-button" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" :aria-label="t.paymentPin.close" @click="requestClose">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
         </view>
       </view>
       <view class="payment-pin-body" @touchmove.stop>
@@ -15,7 +16,7 @@
         <text v-if="ui.notice" class="payment-pin-note" role="status">{{ t.paymentPin[ui.notice] }}</text>
         <view v-if="ui.context" class="payment-pin-summary">
           <text class="payment-pin-summary__name">{{ ui.context.summary }}</text>
-          <view class="payment-pin-summary__amount"><text class="payment-pin-summary__label">{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" :value="ui.context.amount" :currency="ui.context.currency" :precision="ui.context.precision" /><text v-else>{{ formatGroupedAmount(ui.context.amount) }} <text class="payment-pin-note">{{ ui.context.currency }}</text></text></view>
+          <view class="payment-pin-summary__amount"><text class="payment-pin-summary__label">{{ t.paymentPin.due }}</text><CheckoutAmount v-if="ui.context.currency === 'USD' || ui.context.currency === 'USDT'" class="payment-pin-summary__value" :value="ui.context.amount" :currency="ui.context.currency" :precision="ui.context.precision" /><text v-else class="payment-pin-summary__value payment-pin-summary__value--plain">{{ formatGroupedAmount(ui.context.amount) }}<text class="payment-pin-summary__unit">&nbsp;{{ ui.context.currency }}</text></text></view>
           <view v-if="ui.context.details?.length" class="payment-pin-link" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded">{{ expanded ? t.paymentPin.hideDetails : t.paymentPin.details }}</view>
           <view v-if="expanded" class="payment-pin-details"><view v-for="(item, index) in ui.context.details" :key="index"><text>{{ item.name }}<template v-if="item.quantity"> × {{ item.quantity }}</template><template v-if="item.amount !== undefined"> · {{ formatGroupedAmount(item.amount) }}</template></text></view></view>
         </view>
@@ -24,7 +25,7 @@
           <text class="payment-pin-note" role="status">{{ t.paymentPin.pending }}</text>
           <view class="payment-pin-link" role="button" tabindex="0" @click="support">{{ t.paymentPin.support }}</view>
         </template>
-        <view v-else-if="ui.stage === 'read-error'" class="payment-pin-primary" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load">{{ t.paymentPin.retry }}</view>
+        <template v-else-if="ui.stage === 'read-error'" />
         <template v-else-if="ui.stage === 'recovery'">
           <text class="payment-pin-note">{{ t.paymentPin.recoveryIntro }}</text>
           <template v-if="ui.challenge">
@@ -54,7 +55,8 @@
           </template>
         </template>
         <text v-if="errorMessage" class="payment-pin-error" role="alert">{{ errorMessage }}</text>
-        <view v-if="!standalone" class="payment-pin-link payment-pin-link--muted" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="requestClose">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
+        <view v-if="ui.stage === 'read-error'" class="nx-card-recovery-action" role="button" tabindex="0" :aria-disabled="ui.busy" @click="pin.load">{{ t.paymentPin.retry }}</view>
+        <view v-if="!standalone" class="payment-pin-link" role="button" :tabindex="ui.busy ? -1 : 0" :aria-disabled="ui.busy" @click="requestClose">{{ ui.context ? t.paymentPin.cancel : t.paymentPin.back }}</view>
       </view>
     </view>
   </view>
@@ -69,6 +71,7 @@ import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxIcon from "@/components/ui/nx-icon.vue";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import PaymentPasswordInput from "@/components/payment-password-input.vue";
 import CheckoutAmount from '@/components/checkout/CheckoutAmount.vue';
@@ -145,10 +148,12 @@ export default paymentPinViewportView;
    so content scrolls to the screen edge and the last action rests above the Home Indicator. */
 .payment-pin-mask { position: fixed; z-index: 1700; inset: 0; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; overflow: hidden; padding: var(--nx-overlay-top) 0 0; background: var(--v5-bg-color-mask); }
 .payment-pin-sheet { display: flex; flex-direction: column; width: 100%; max-width: 440px; max-height: 100%; min-height: 0; overflow: hidden; padding: var(--v5-space-5) var(--v5-space-5) 0; background: var(--nx-glass-fill); color: var(--v5-ink); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; box-shadow: var(--nx-glass-edge); }
-.payment-pin-header { flex: none; display: flex; align-items: flex-start; gap: var(--v5-space-3); margin-bottom: var(--v5-space-4); }
+.payment-pin-header { flex: none; display: flex; align-items: center; gap: var(--v5-space-3); margin-bottom: var(--v5-space-4); }
 /* Sheet title: overview title role (03 §3.9). */
 .payment-pin-title { flex: 1; min-width: 0; font-size: var(--ui-type-hero-title); font-weight: var(--ui-type-hero-title-weight); line-height: var(--ui-type-hero-title-lh); overflow-wrap: break-word; }
-.payment-pin-close { width: 44px; min-height: 44px; flex: 0 0 44px; margin-top: -10px; margin-right: -10px; display: flex; align-items: center; justify-content: center; color: var(--v5-ink-2); }
+/* Sheet close: the shared neutral-glass M control (NxButton, as in NxSheet), a 40px circle in a 44px target (03 §3.1). */
+.payment-pin-close { flex: none; width: 44px; }
+.payment-pin-close :deep(.nx-button__surface) { flex: none; width: 40px; min-height: 40px; padding: 0; }
 .payment-pin-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin-inline: calc(-1 * var(--v5-space-2)); padding-inline: var(--v5-space-2); padding-bottom: var(--nx-overlay-bottom); display: flex; flex-direction: column; gap: var(--v5-space-2); }
 .payment-pin-body > * { flex-shrink: 0; }
 .payment-pin-note { display: block; color: var(--v5-ink-2); font-size: var(--ui-type-list-subtitle); line-height: 1.65; }
@@ -160,13 +165,18 @@ export default paymentPinViewportView;
 .payment-pin-summary__amount { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--v5-space-2); margin-top:var(--v5-space-2); font-weight:500; font-size:var(--ui-type-card-title); }
 /* Field name and value (01 §1.1.1): the label is secondary ink at regular weight, the amount stays main ink. */
 .payment-pin-summary__label { color:var(--v5-ink-3); font-weight:400; }
+/* The due amount is the sheet's one payment total: sheet primary amount (10 §10.2), Montserrat 500 with symbol,
+   fraction and unit in secondary ink (CheckoutAmount); amount, precision and unit unchanged. */
+.payment-pin-summary__value { font-size: var(--ui-type-wallet-amount); line-height: var(--ui-type-wallet-amount-lh); letter-spacing: -.02em; }
+.payment-pin-summary__value--plain { font-family: var(--font-amount); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payment-pin-summary__unit { color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); letter-spacing: 0; }
 .payment-pin-details { font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
 .payment-pin-primary { display: flex; align-items: center; justify-content: center; min-height: 48px; margin-top: var(--ui-space-row-y); padding: var(--v5-space-3) var(--v5-space-4); border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); text-align: center; font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); }
 .payment-pin-primary.nx-button { padding:0; background:none; }
 .payment-pin-primary:not(.nx-button)[aria-disabled="true"] { opacity: .45; }
-/* Text buttons: 500 (01 §1.2); the quiet exit uses secondary ink, since body ink is for paragraphs only (01 §1.1.1). */
-.payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font-size: var(--ui-type-list-subtitle); font-weight: var(--ui-type-text-link-weight); text-align: center; }
-.payment-pin-link--muted { color: var(--v5-ink-3); }
+/* Text buttons, cancel and back included (03 §3.1 关闭／取消 = 文字): brand ink, 13/18 at 500 (10 §10.1), 44px target. */
+.payment-pin-link { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--v5-brand); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); text-align: center; }
+.payment-pin-body > .nx-card-recovery-action[aria-disabled="true"] { opacity: .5; }
 .payment-pin-link[aria-disabled="true"] { opacity: .5; }
 /* While the PIN is submitting the exits are held: say so to assistive tech and show it (03 §3.1 disabled 50%). */
 .payment-pin-close[aria-disabled="true"] { opacity: .5; }
@@ -185,7 +195,7 @@ export default paymentPinViewportView;
 .payment-pin-mask--standalone .payment-pin-sheet { max-width:none; padding:0; border-radius:0; background:var(--v5-bg); box-shadow:none; }
 .payment-pin-mask--standalone .payment-pin-header { position:relative; height:63px; align-items:center; justify-content:center; margin:0; padding:0 64px; }
 .payment-pin-mask--standalone .payment-pin-title { margin-top:-7px; flex:initial; font-size:15px; line-height:20px; text-align:center; }
-.payment-pin-mask--standalone .payment-pin-close { position:absolute; left:12px; top:6px; margin:0; border-radius:50%; background:color-mix(in srgb,var(--v5-ink) 6%,transparent); box-shadow:var(--ui-glass-edge-shadow); }
+.payment-pin-mask--standalone .payment-pin-close { position:absolute; left:12px; top:6px; width:44px; min-height:44px; margin:0; display:flex; align-items:center; justify-content:center; color:var(--v5-ink-2); border-radius:50%; background:color-mix(in srgb,var(--v5-ink) 6%,transparent); box-shadow:var(--ui-glass-edge-shadow); }
 .payment-pin-mask--standalone .payment-pin-body { margin:0; padding:0 0 110px; gap:0; }
 .payment-pin-mask--standalone .payment-pin-step { display:flex; align-items:center; gap:10px; margin:var(--v5-space-1) 20px 0; font-size:12px; line-height:16px; }
 .payment-pin-step-bars { display:flex; width:64px; gap:var(--v5-space-1); }
