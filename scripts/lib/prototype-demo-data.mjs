@@ -13,6 +13,7 @@ import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mj
 import { financeDemo } from './prototype-demo-finance.mjs';
 import { withdrawRecoveryOptions } from './prototype-demo-withdraw-recovery.mjs';
 import { demoV1SelfComputePoints, rankPolicyDemo } from './prototype-demo-rank-policy.mjs';
+import { rankCoolingOptions, rankDeviceLevel2Options, rankPresetDefaults, rankPresetOptions, rankPresetResponse, rankPriorOptions, rankReviewOptions, rankSalaryClaimOptions, rankSalaryOptions, usesRankPreset } from './prototype-demo-rank-presets.mjs';
 import { teamGuidesDemo } from './prototype-demo-team-guides.mjs';
 import { auxiliaryDemo, recordDemoTaskCancellation } from './prototype-demo-auxiliary.mjs';
 import { ambassadorDemo } from './prototype-demo-ambassador.mjs';
@@ -111,7 +112,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',trialQuoteState:'default',computeState:'app',checkoutState:'ordinary',powerUpState:'default',setupGateState:'open',withdrawLimitState:'open',topupChannels:'all',scopeState:'normal',promoState:'normal',promoEdgeState:'normal',downloadState:'unavailable',stakingOpenState:'readonly',...authDemoDefaults,paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',withdrawRecoveryState:'off',trialState:'follow',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',deviceTaskSampleState:'default',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,...rankPresetDefaults};
 Object.assign(demoDefaults,{
   trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
   trialPurchaseReadState:'normal',trialPurchasePriceState:'normal',trialOriginalPurchaseState:'none',trialPurchaseWindow:'follow',
@@ -170,6 +171,13 @@ export const demoOptions = {
   ambassadorState:[['none','尚未申请'],['draft','进行中 · 待提交材料（M0）'],['review','核验中 · 业务通过、费用待核（M3）'],['partial','核验中 · 已交但缺两项（M1）'],['more-finance','需补材料 · 费用退回、可下调（M6）'],['more-business','需补材料 · 业务退回（M5）'],['passed','两项通过 · 待批准（M7）'],['passed-short','两项通过 · 认可金额不足（M8）'],['passed-precise','两项通过 · 认可金额 2999.999999'],['future','两项通过 · 活动未到（M9）'],['bucket','历史待审缺类别（M10）'],['approved','最近一份已通过（M13）'],['rejected','最近一份未通过（M13）']],
   ambassadorIoState:[['normal','材料读写正常'],['upload-slow','上传慢（每次 4 秒）'],['upload-fail-once','下一次上传失败一次'],['save-reject-once','下一次提交被拒绝一次（422）'],['save-unknown-once','下一次提交结果未知一次（503）'],['save-lands-unknown-once','下一次提交已生效但回复丢失（503）'],['close-on-submit-once','下一次提交时申请已终结（409）'],['late-read-once','下一次材料读取迟到 4 秒（返回旧数据）'],['rereview-finance-once','下一次读取：同版本费用重新通过'],['history-fail-once','下一次申请记录读取失败一次']],
   ambassadorRank:[['follow','跟随“最高等级 V8”开关'],['v5','V5（刚满足资格）']],
+  rankPreset:rankPresetOptions,
+  rankSalaryState:rankSalaryOptions,
+  rankSalaryClaimState:rankSalaryClaimOptions,
+  rankReviewState:rankReviewOptions,
+  rankPriorState:rankPriorOptions,
+  rankCoolingState:rankCoolingOptions,
+  rankDeviceLevel2State:rankDeviceLevel2Options,
   repurchaseState:['follow','inside','boundary','outside'].map(value=>[value,value]),
   promotionBuyer:[['returning','购机活动 · 已购账号'],['sponsored-new','购机活动 · 受邀首购买家']],
   promotionEligibility:[['eligible','符合条件'],['sign-in','登录后确认资格'],['ineligible','不符合条件'],['unknown','资格待确认']],
@@ -982,8 +990,9 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(pathname==='/api/exchange')finance.wallet.nexAvailable=demoWalletNex(state,now);
     return finance;
   }
-  const rankPolicy=rankPolicyDemo(url,locale);if(rankPolicy!==undefined)return rankPolicy;
-  const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request));if(teamGuides!==undefined)return teamGuides;
+  const rankGuideEdition = state.rankGuideEdition ?? (usesRankPreset(state) ? 'revised' : 'original');
+  const rankPolicy=rankPolicyDemo(url,locale,rankGuideEdition,state.rankReviewState!=='off');if(rankPolicy!==undefined)return rankPolicy;
+  const teamGuides=teamGuidesDemo(url,locale,request,path=>demoFixture(new URL(path,url.origin),locale,state,request),rankGuideEdition);if(teamGuides!==undefined)return teamGuides;
   const ambassador=ambassadorDemo(url,state,request,locale);if(ambassador!==undefined)return ambassador;
   const read=path=>demoFixture(new URL(path,url.origin),locale,state,{method:()=>'GET',headers:()=>request.headers?.()??{},postDataJSON:()=>({})});
   const walletBills=()=>{
@@ -1009,6 +1018,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   const support=supportDemo(url,locale,state,request);if(support!==undefined)return support;
   const secondary=secondaryDemo(url,state,request,walletBills);
   if(secondary!==undefined)return secondary;
+  if(pathname==='/api/config/v-ranks'||pathname==='/api/team/rank'){
+    const preset=rankPresetResponse(pathname,structuredClone(base()),state,now);
+    if(preset!==undefined)return preset;
+  }
   if(pathname==='/api/config/v-ranks') {
     const data=structuredClone(base());
     const own=[0,demoV1SelfComputePoints,640,2000,4000,8000,16000,32000,64000],team=[0,1280,6400,20000,64000,160000,480000,1280000,3200000];
