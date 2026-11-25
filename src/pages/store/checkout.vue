@@ -64,8 +64,8 @@
         <CheckoutPaying v-if="originalExternalPaying && createdCheckoutOrder && (step === 'select-payment' || step === 'confirm')" class="checkout-paying-card" :order-no="createdCheckoutOrder.orderNo" @view="navTo('/pages/store/order-detail?id=' + encodeURIComponent(createdCheckoutOrder.orderNo))" />
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
-          <view class="checkout-product-copy"><text class="checkout-product-name">{{ trialOriginal?.device.productName ?? product?.name }}</text><text v-if="checkoutTagline && !trialOriginal" class="checkout-product-meta">{{ checkoutTagline }}</text><CheckoutAmount class="checkout-product-price" :value="shownPurchaseSubtotal" currency="USD" /></view>
-          <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><view class="checkout-quantity-controls">
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ trialOriginal?.device.productName ?? product?.name }}</text><text v-if="checkoutTagline && !trialOriginal" class="checkout-product-meta">{{ checkoutTagline }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--price" aria-hidden="true" /><CheckoutAmount v-else class="checkout-product-price" :value="shownPurchaseSubtotal" currency="USD" /><view v-if="multiTrialCheckout && !trialOriginalLocked" class="checkout-change-device" role="link" tabindex="0" @click="changeTrialDevice" @keydown.enter.prevent="changeTrialDevice"><text class="nx-after-chevron">{{ purchaseCopy.coChangeDevice }}</text></view></view>
+          <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><text v-if="multiTrialCheckout" class="checkout-quantity-value">{{ trialShare ? checkoutQuantityLabel : fmt(purchaseCopy.coQtyDevice, { n: 1 }) }}</text><view v-else class="checkout-quantity-controls">
             <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">{{ checkoutQuantityLabel }}</text>
             <view class="checkout-quantity-button" data-testid="checkout-quantity-increase" role="button" :tabindex="canIncreaseCheckoutQuantity() ? 0 : -1" :aria-disabled="!canIncreaseCheckoutQuantity()" :aria-label="t.uiChrome.increaseQty" @click.stop="increaseCheckoutQuantity" @keydown.enter.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)" @keydown.space.prevent.stop="onKeyboardActivate($event, increaseCheckoutQuantity)"><NxIcon name="plus" :size="20" /></view>
@@ -117,6 +117,16 @@
             </view>
           </view>
 
+          <!-- Trial checkout payment (04 试用结算): only the wallet can pay another device, and a zero due only needs the
+               payment password, so this is a statement row, not a choice. The trial device's own three methods stay in the pay sheet. -->
+          <view v-if="multiTrialCheckout && !trialOriginal && (trialWalletOnly || trialZeroDue || (trialQuotePending && productId !== trialDeviceNo))" class="checkout-section">
+            <view class="checkout-section-heading"><text>{{ t.store.coPaymentMethod }}</text></view>
+            <view class="checkout-group"><view class="checkout-option">
+              <NxIconTile tone="teal" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="WALLET_PATH" /><path :d="WALLET_PATH2" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg></NxIconTile>
+              <view class="checkout-option-copy"><text class="checkout-row-title">{{ t.me.walletBalance }}</text><text class="checkout-row-description">{{ trialWalletRowNote }}</text></view>
+            </view></view>
+          </view>
+
           <view v-if="!remoteApiEnabled" class="checkout-section">
             <view class="checkout-section-heading"><text>{{ t.store.coPaymentMethod }}</text></view>
             <view class="checkout-group" role="group" :aria-label="t.store.coPaymentMethod">
@@ -131,24 +141,30 @@
           <view class="checkout-section">
             <view class="checkout-section-heading"><text>{{ t.store.coReviewOrder }}</text></view>
             <view class="checkout-group checkout-fees">
+              <template v-if="trialQuotePending">
+                <view v-for="label in [t.store.coRowSubtotal, purchaseCopy.coPromoShort, t.store.coRowTrialOffset, trialDetailCopy.earlyRow]" :key="label" class="checkout-fee checkout-trial-fee"><text class="checkout-trial-fee__label">{{ label }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton" aria-hidden="true" /><text v-else class="checkout-trial-fee__unknown">—</text></view>
+              </template>
+              <template v-else>
               <CheckoutRow :label="t.store.coRowSubtotal" :value="reviewMoney(shownPurchaseSubtotal, false, true)" class="checkout-fee" />
               <CheckoutRow v-if="shownTrialDiscounts.promo > 0" :label="trialCheckoutShown ? trialPromoRowLabel : promoRowLabel" :value="reviewMoney(shownTrialDiscounts.promo, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="shownTrialDiscounts.offset > 0" :label="t.store.coRowTrialOffset" :value="reviewMoney(shownTrialDiscounts.offset, true)" class="checkout-fee checkout-fee--discount" />
-              <CheckoutRow v-if="shownTrialDiscounts.early > 0" :label="trialCopy.earlyDiscountLabel" :value="reviewMoney(shownTrialDiscounts.early, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="shownTrialDiscounts.early > 0" :label="trialCheckoutShown ? trialDetailCopy.earlyRow : trialCopy.earlyDiscountLabel" :value="reviewMoney(shownTrialDiscounts.early, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="reviewMoney(voucherDiscount, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="reviewMoney(tradeinCredit, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
               <CheckoutRow v-else-if="!remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" class="checkout-fee" />
               <CheckoutRow v-if="!remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" class="checkout-fee" />
+              </template>
               <!-- While the original order's external payment is under way, this is the order's amount, not what that payment
                    charges (its total, fees included, lives on the payment itself). -->
-              <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><CheckoutAmount :value="shownConfirmationTotal" currency="USD" /></view>
+              <view class="checkout-fee checkout-fee--total checkout-summary-total" :class="{ 'checkout-fee--noted': trialCheckoutShown }"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /><CheckoutAmount v-else :value="shownConfirmationTotal" currency="USD" /></view>
+              <text v-if="trialCheckoutShown" class="checkout-fees-note">{{ trialCopy.voucherUnavailable }}</text>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
               <text>{{ trialCopy.afterPurchaseLabel }}</text>
               <text class="checkout-trial-credit-value">{{ trialCreditText }}</text>
             </view>
-            <text v-if="trialZeroDue" class="checkout-note">{{ t.store.coTrialZeroNote }}</text>
+            <text v-if="trialZeroDue && !multiTrialCheckout" class="checkout-note">{{ t.store.coTrialZeroNote }}</text>
             <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
             <view v-if="checkoutCapacityBlocked && (checkoutOnboardingRequired || checkoutCapacityRefusal === 'purchase-conditions')" class="checkout-capacity-notice" data-testid="checkout-capacity-notice">
               <view class="checkout-capacity-actions">
@@ -279,8 +295,12 @@
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
       <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
-        <text v-if="trayNotice || (multiTrialCheckout && (trialTrayWarning || trialTrayNote))" class="nx-tray-note w-full" role="status">{{ multiTrialCheckout ? trialTrayWarning || trialTrayNote : trayNotice }}</text>
-        <view class="checkout-sticky-copy nx-tray-copy"><CheckoutAmount class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}</text></view>
+        <template v-if="multiTrialCheckout">
+          <view v-if="trialTrayWarning" class="nx-tray-note w-full checkout-tray-warning" role="status"><svg class="checkout-tray-warning__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg><text>{{ trialTrayWarning }}</text></view>
+          <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
+        </template>
+        <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
+        <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
         <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
@@ -1994,14 +2014,21 @@ function totalStillConfirmed(confirmed: number) {
 const trialCheckoutShown = computed(() => multiTrialCheckout.value || trialConversionMode.value);
 const trialQuotePending = computed(() => multiTrialCheckout.value && !trialOriginalLocked.value && !trialReviewQuote.value
   && (trialReviewStatus.value === "loading" || trialReviewStatus.value === "failed"));
+const trialQuoteLoading = computed(() => trialQuotePending.value && trialReviewStatus.value === "loading");
 const trialPromoRowLabel = computed(() => {
   const pct = formatTrialDiscountPercent(trialCfg.value.discountRate);
   const cap = trialCfg.value.discountCapUSD;
   if (cap === null) return fmt(trialDetailCopy.value.promoRowNoCap, { pct });
   return fmt(trialDetailCopy.value.promoRow, { pct, cap: Number.isInteger(cap) ? `$${cap}` : `$${formatAmount(cap)}` });
 });
+const trialWalletRowNote = computed(() => {
+  if (trialZeroDue.value) return purchaseCopy.value.coZeroPayNote;
+  const balance = checkoutWalletReadable.value ? fmt(purchaseCopy.value.coAvailable, { amount: formatAmount(app.user.usdtBalance) }) : walletBalanceHint.value;
+  return `${balance} · ${purchaseCopy.value.coBalanceOnly}`;
+});
 const trialPriceChanged = computed(() => !!trialQuoteChange.value && !trialOriginalLocked.value
   && formatAmount(trialQuoteChange.value.previousAmountUSD) !== formatAmount(trialQuoteChange.value.quote.amountUSD));
+const trialPreviousTotal = computed(() => trialPriceChanged.value && trialQuoteChange.value ? `$${formatAmount(trialQuoteChange.value.previousAmountUSD)}` : "");
 // Tray: one warning (what blocks or changed), then the consequence line (04 试用结算).
 const trialTrayWarning = computed(() => {
   const status = activeTrialOutcome.value?.status;
@@ -2025,6 +2052,12 @@ const trialTrayNote = computed(() => {
   if (status === "resumable") return purchaseCopy.value.coUnfinished;
   return purchaseCopy.value.coTrialNotice;
 });
+// 更换设备 goes back to the trial detail's selection, as an unavailable trial device does (leaveTrialReview), minus its toast.
+function changeTrialDevice() {
+  const pages = getCurrentPages();
+  if (pages[pages.length - 2]?.route === "pages/me/trial") navBack("/pages/me/trial");
+  else void navReplace("/pages/me/trial");
+}
 const cardFeeText = computed(() => formatAmount(cardFee.value));
 const paymentLabel = computed(() => ALL_PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const slotsFullText = computed(() => fmt(t.value.store.coSlotsFull, { max: app.slotCap }));
@@ -4628,10 +4661,30 @@ button.checkout-quantity-button::after {border:0;}
 .checkout-fee :deep(.tabular-nums) { text-align:right; flex-shrink:0; max-width:65%; overflow-wrap:break-word; }
 .checkout-fee--discount :deep(.tabular-nums) { color:var(--v5-brand) !important; }
 .checkout-fee--total { margin-top:var(--v5-space-1); padding-block:12px; min-height:55px; box-sizing:border-box; border-top:1px solid var(--v5-border); }
+/* Trial review: the note under the total carries the divider, so the total sits level between the rows and that line. */
+.checkout-fee--noted { min-height:0; border-top:0; }
+.checkout-fee--noted + .checkout-fees-note { margin-top:2px; }
 .checkout-fee--total > text,.checkout-fee--total > uni-text { font-weight:600; }
 .checkout-fee--total :deep(.tabular-nums) { font-size:18px !important; }
 .checkout-note { display:block; margin:var(--v5-space-3) 2px 0; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); }
 .checkout-trial-credit { display:flex; justify-content:space-between; align-items:baseline; gap:var(--v5-space-3); margin-top:var(--v5-space-3); padding:var(--v5-space-3) var(--v5-space-4); border-radius:var(--v5-radius-m); background:color-mix(in srgb, var(--v5-brand) 10%, transparent); font-size:var(--ui-type-list-subtitle); line-height:var(--ui-type-list-subtitle-lh); font-weight:600; color:var(--v5-ink-2); }
+/* Trial checkout (04 试用结算). Text link 03 §3.9: 13/18 500 ink-3 + chevron; 44px target without growing the copy. */
+.checkout-change-device { display:flex; align-items:center; width:fit-content; min-height:44px; margin:-6px 0 -10px; color:var(--v5-ink-3); font:var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); white-space:nowrap; cursor:pointer; }
+.checkout-change-device:focus-visible { outline:2px solid var(--v5-brand); outline-offset:2px; border-radius:4px; }
+.checkout-change-device:active { opacity:.6; }
+/* Static placeholders while the quote loads (03 §3.4 保持原结构尺寸); no shimmer. */
+.checkout-skeleton { flex:none; width:72px; height:16px; border-radius:8px; background:var(--v5-surface-3); }
+.checkout-skeleton--price { width:96px; height:16px; margin-top:var(--v5-space-2); }
+.checkout-skeleton--total { width:88px; height:18px; align-self:center; }
+.checkout-skeleton--tray { width:104px; height:24px; }
+.checkout-trial-fee { display:flex; align-items:center; justify-content:space-between; }
+.checkout-trial-fee__label { font-size:14px; line-height:20px; color:var(--v5-ink-2); }
+.checkout-trial-fee__unknown { color:var(--v5-ink-3); font:500 14px/20px var(--font-amount); }
+.checkout-fees-note { display:block; margin:var(--v5-space-2) 0 -6px; padding:var(--v5-space-3) 16px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+.checkout-sticky .checkout-tray-warning { display:flex; align-items:flex-start; justify-content:center; gap:4px; color:var(--v5-warning-ink); }
+.checkout-tray-warning__icon { flex:none; margin-top:0; }
+.checkout-sticky .checkout-tray-warning + .checkout-tray-consequence { padding-top:2px; }
+.checkout-total-was { margin-left:var(--v5-space-1); color:var(--v5-ink-3); text-decoration:line-through; font-variant-numeric:tabular-nums; }
 .checkout-trial-credit-value { color:var(--v5-brand); text-align:right; font-variant-numeric:tabular-nums; }
 .checkout-note--warning { padding:10px 12px; border-radius:12px; background:var(--v5-warning-soft); color:var(--v5-warning-ink); }
 /* Text buttons are their label line; the gaps keep each 44px target clear of its neighbour's. */
@@ -4655,6 +4708,8 @@ button.checkout-policy-link::after { border:0; }
 /* P4 card: the first block of the review column, with the product card's margins (16 sides, 20 to the next block). */
 .checkout-paying-card { margin:var(--v5-space-5) var(--v5-space-4) 0; }
 .checkout-sticky-copy { min-width:0; }
+/* A button pushed onto its own line stays on the right (03 §3.6.1). */
+.checkout-sticky-copy + :deep(.nx-button) { margin-left:auto; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
 .checkout-total { display:block; font:500 20px/24px var(--font-amount); font-variant-numeric:tabular-nums; color:var(--v5-ink); white-space:nowrap; }
 .checkout-sticky :deep(.nx-button) { flex:0 1 auto; min-width:150px; min-height:48px; font-size:var(--ui-type-button); }

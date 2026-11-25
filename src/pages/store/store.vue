@@ -86,6 +86,7 @@ import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
 // The voucher ticket is a LoopScope: its art bobs only while the ticket is on screen and the page is shown.
 import LoopScope from "@/components/loop-scope.vue";
 import ProductCard from "@/components/store/product-card.vue";
+import { useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
 import BundleEntryCard from "@/components/store/bundle-entry-card.vue";
 import { useCart } from "@/store/cart";
 import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
@@ -159,6 +160,9 @@ let storeObservationEpoch = 0;
 let storeViewReportedScope = "";
 let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<typeof createStoreViewEvent>; tries: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
 let releaseActiveRefresh = () => {};
+// Trial-credit list for the cards' 「可用试用抵扣金」 tag: one read per visit, shared with the detail page (PLAN §2.3).
+const trialCreditReadVisible = ref(false);
+const trialCreditRead = useTrialCreditOptionsRead(() => trialCreditReadVisible.value && !publicOnly.value);
 async function refreshVisibleStore() {
   if (!storePageVisible) return;
   if (publicOnly.value) return;
@@ -166,7 +170,7 @@ async function refreshVisibleStore() {
     voucher.revalidateRemote(), genesis.ensureSummary(), genesisCfg.ensure(),
     refreshServerProductPhase(true),
     revalidateProductCatalog(), phoneTierReadFailed() ? undefined : earnConfig.ensure(), app.ensureRemoteFleet(),
-    bundlePolicy.failed.value ? undefined : bundlePolicy.refresh(),
+    bundlePolicy.failed.value ? undefined : bundlePolicy.refresh(), trialCreditRead.refresh(),
   ]);
 }
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
@@ -176,6 +180,7 @@ onShow(() => {
   const pending=takeNavigationQuery('/pages/store/store');
   if(pending){const query=new URLSearchParams(pending),values:Record<string,string>={};query.forEach((value,key)=>{values[key]=value;});readPromotionQuery(values);}
   storePageVisible = true;
+  trialCreditReadVisible.value = true;
   releaseActiveRefresh();
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleStore);
   if(publicOnly.value)return;
@@ -193,6 +198,7 @@ onShow(() => {
 onHide(() => {
   releaseActiveRefresh();
   storePageVisible = false;
+  trialCreditReadVisible.value = false;
   storeObservationEpoch += 1;
   storeViewReportedScope = "";
   if (storeViewAttempt?.timer) clearTimeout(storeViewAttempt.timer);

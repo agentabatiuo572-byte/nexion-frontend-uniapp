@@ -7,7 +7,7 @@ export const trialDetailCopy = {
   zh: {
     countdownDays: "{days}天 {hours}:{minutes}",
     remaining: '剩余', keptLabel: '收益保留', keptUntil: '{time} 到期',
-    graceAmountLabel: '试用收益', withdrawAfterBuy: '购机后可提现', creditOnBuy: '购机时可抵扣', uvtAfterBuy: '购后到账',
+    graceAmountLabel: '试用收益', creditOnBuy: '购机时可抵扣', uvtAfterBuy: '购后到账',
     earlyTag: '试用期专享', earlyTitle: '留下这台 {device}，额外立减 {amount}', earlyTitleOther: '现在购买 {device}，额外立减 {amount}',
     earlySubtitle: '提前奖励试用期收益', earlyEstimate: '（预估收益）',
     graceTitle: '别让试用收益白白过期',
@@ -30,7 +30,7 @@ export const trialDetailCopy = {
   en: {
     countdownDays: "{days}d {hours}:{minutes}",
     remaining: 'Ends in', keptLabel: 'Earnings kept for', keptUntil: 'Expires {time}',
-    graceAmountLabel: 'Trial earnings', withdrawAfterBuy: 'Withdrawable once you buy', creditOnBuy: 'Counts toward your purchase', uvtAfterBuy: 'after purchase',
+    graceAmountLabel: 'Trial earnings', creditOnBuy: 'Counts toward your purchase', uvtAfterBuy: 'after purchase',
     earlyTag: 'Trial-only offer', earlyTitle: 'Keep this {device} and save an extra {amount}', earlyTitleOther: 'Buy {device} now and save an extra {amount}',
     earlySubtitle: 'Your full trial earnings, paid early', earlyEstimate: ' (estimated)',
     graceTitle: "Don't let your trial earnings expire",
@@ -53,7 +53,7 @@ export const trialDetailCopy = {
   vi: {
     countdownDays: "{days} ngày {hours}:{minutes}",
     remaining: 'Còn lại', keptLabel: 'Thu nhập được giữ thêm', keptUntil: 'Hết hạn {time}',
-    graceAmountLabel: 'Thu nhập dùng thử', withdrawAfterBuy: 'Có thể rút sau khi mua máy', creditOnBuy: 'Được trừ khi mua máy', uvtAfterBuy: 'nhận sau khi mua',
+    graceAmountLabel: 'Thu nhập dùng thử', creditOnBuy: 'Được trừ khi mua máy', uvtAfterBuy: 'nhận sau khi mua',
     earlyTag: 'Ưu đãi dùng thử', earlyTitle: 'Giữ lại {device} này, giảm thêm {amount}', earlyTitleOther: 'Mua {device} ngay, giảm thêm {amount}',
     earlySubtitle: 'Nhận trước thu nhập cả kỳ dùng thử', earlyEstimate: ' (ước tính)',
     graceTitle: 'Đừng để thu nhập dùng thử hết hạn',
@@ -76,7 +76,7 @@ export const trialDetailCopy = {
   id: {
     countdownDays: "{days} hr {hours}:{minutes}",
     remaining: 'Sisa waktu', keptLabel: 'Pendapatan disimpan selama', keptUntil: 'Kedaluwarsa {time}',
-    graceAmountLabel: 'Pendapatan uji coba', withdrawAfterBuy: 'Bisa ditarik setelah membeli', creditOnBuy: 'Dipotong dari harga saat membeli', uvtAfterBuy: 'masuk setelah membeli',
+    graceAmountLabel: 'Pendapatan uji coba', creditOnBuy: 'Dipotong dari harga saat membeli', uvtAfterBuy: 'masuk setelah membeli',
     earlyTag: 'Khusus masa uji coba', earlyTitle: 'Miliki {device} ini dan hemat ekstra {amount}', earlyTitleOther: 'Beli {device} sekarang dan hemat ekstra {amount}',
     earlySubtitle: 'Seluruh pendapatan uji coba, dibayar lebih awal', earlyEstimate: ' (perkiraan)',
     graceTitle: "Jangan biarkan pendapatan uji coba Anda hangus",
@@ -99,7 +99,7 @@ export const trialDetailCopy = {
   ms: {
     countdownDays: "{days} hari {hours}:{minutes}",
     remaining: 'Tamat dalam', keptLabel: 'Pendapatan disimpan selama', keptUntil: 'Luput {time}',
-    graceAmountLabel: 'Pendapatan percubaan', withdrawAfterBuy: 'Boleh dikeluarkan selepas beli', creditOnBuy: 'Ditolak daripada harga semasa membeli', uvtAfterBuy: 'masuk selepas membeli',
+    graceAmountLabel: 'Pendapatan percubaan', creditOnBuy: 'Ditolak daripada harga semasa membeli', uvtAfterBuy: 'masuk selepas membeli',
     earlyTag: 'Tawaran khas percubaan', earlyTitle: 'Simpan {device} ini dan jimat {amount} lagi', earlyTitleOther: 'Beli {device} sekarang dan jimat {amount} lagi',
     earlySubtitle: 'Pendapatan percubaan penuh, dibayar awal', earlyEstimate: ' (anggaran)',
     graceTitle: "Jangan biar pendapatan percubaan luput",
@@ -122,7 +122,7 @@ export const trialDetailCopy = {
   fil: {
     countdownDays: "{days}d {hours}:{minutes}",
     remaining: 'Matatapos sa', keptLabel: 'Nakatabi pa ang kita sa loob ng', keptUntil: 'Mag-e-expire {time}',
-    graceAmountLabel: 'Kita sa trial', withdrawAfterBuy: 'Mawi-withdraw kapag bumili ka', creditOnBuy: 'Ibabawas sa presyo kapag bumili ka', uvtAfterBuy: 'pagkatapos bumili',
+    graceAmountLabel: 'Kita sa trial', creditOnBuy: 'Ibabawas sa presyo kapag bumili ka', uvtAfterBuy: 'pagkatapos bumili',
     earlyTag: 'Para lang sa trial', earlyTitle: 'Panatilihin ang {device} na ito at makatipid pa ng {amount}', earlyTitleOther: 'Bilhin ang {device} ngayon at makatipid pa ng {amount}',
     earlySubtitle: 'Buong kita mo sa trial, maagang ibibigay', earlyEstimate: ' (tantiya)',
     graceTitle: "Huwag hayaang mag-expire ang kita mo sa trial",
@@ -145,7 +145,7 @@ export const trialDetailCopy = {
   ru: {
     countdownDays: "{days} дн. {hours}:{minutes}",
     remaining: 'Осталось', keptLabel: 'Доход сохранится', keptUntil: 'До {time}',
-    graceAmountLabel: 'Доход за пробный период', withdrawAfterBuy: 'Вывод после покупки', creditOnBuy: 'Зачтётся при покупке', uvtAfterBuy: 'после покупки',
+    graceAmountLabel: 'Доход за пробный период', creditOnBuy: 'Зачтётся при покупке', uvtAfterBuy: 'после покупки',
     earlyTag: 'Только в пробный период', earlyTitle: 'Оставьте {device} себе и сэкономьте ещё {amount}', earlyTitleOther: 'Купите {device} сейчас и сэкономьте ещё {amount}',
     earlySubtitle: 'Весь доход за пробный период — досрочно', earlyEstimate: ' (оценка)',
     graceTitle: "Не дайте доходу за пробный период сгореть",
@@ -168,7 +168,7 @@ export const trialDetailCopy = {
   kk: {
     countdownDays: "{days} күн {hours}:{minutes}",
     remaining: 'Аяқталуына', keptLabel: 'Табыс сақталады:', keptUntil: 'Аяқталуы: {time}',
-    graceAmountLabel: 'Сынақ табысы', withdrawAfterBuy: 'Сатып алғанда шығаруға болады', creditOnBuy: 'Сатып алғанда бағадан шегеріледі', uvtAfterBuy: 'сатып алғаннан кейін',
+    graceAmountLabel: 'Сынақ табысы', creditOnBuy: 'Сатып алғанда бағадан шегеріледі', uvtAfterBuy: 'сатып алғаннан кейін',
     earlyTag: 'Тек сынақ кезінде', earlyTitle: 'Осы {device} құрылғысын сатып алып, қосымша {amount} үнемдеңіз', earlyTitleOther: 'Қазір {device} сатып алып, қосымша {amount} үнемдеңіз',
     earlySubtitle: 'Сынақ табысы толық, ертерек төленеді', earlyEstimate: ' (болжамды)',
     graceTitle: "Сынақ табысының мерзімі өтіп кетпесін",
@@ -191,7 +191,7 @@ export const trialDetailCopy = {
   uz: {
     countdownDays: "{days} kun {hours}:{minutes}",
     remaining: 'Tugashiga', keptLabel: 'Daromad saqlanadi', keptUntil: 'Muddati: {time}',
-    graceAmountLabel: 'Sinov daromadi', withdrawAfterBuy: 'Xariddan keyin yechish mumkin', creditOnBuy: 'Xaridda narxdan chegiriladi', uvtAfterBuy: 'xariddan keyin',
+    graceAmountLabel: 'Sinov daromadi', creditOnBuy: 'Xaridda narxdan chegiriladi', uvtAfterBuy: 'xariddan keyin',
     earlyTag: 'Faqat sinovda', earlyTitle: '{device}ni qoldiring va qoʻshimcha {amount} tejang', earlyTitleOther: '{device}ni hozir oling va qoʻshimcha {amount} tejang',
     earlySubtitle: 'Sinovning toʻliq daromadi, oldinroq toʻlanadi', earlyEstimate: ' (taxminiy)',
     graceTitle: "Sinov daromadingiz muddati oʻtib ketmasin",

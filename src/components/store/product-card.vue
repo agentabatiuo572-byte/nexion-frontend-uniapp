@@ -88,6 +88,8 @@
         <text class="product-compact-estimate" :aria-label="compactEstimate.ariaLabel"><text class="product-compact-estimate__label">{{ compactEstimate.label + '\u00A0·\u00A0' }}</text><text class="product-compact-estimate__value">{{ compactEstimate.value }}</text></text>
       </view>
       <NxTag v-if="compactUnavailable" class="product-compact-status" tone="unavailable" wrap :label="gateLabel" />
+      <!-- Trial credit can buy this product now (PLAN §2.3): an attribute tag in the same status slot, brand tone, no amount. -->
+      <NxTag v-else-if="trialCredit" class="product-compact-status" tone="brand" wrap :label="t.store.trialCreditTag" />
     </view>
 
     <!-- ───── Footer: price + Buy CTA ───── -->
@@ -140,6 +142,7 @@ import { canPreviewPromotion,isPromotionActive,promotionCheckoutHref,promotionDe
 import { uiLocale } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import { useTrialCreditOption } from "@/composables/use-trial-credit-option";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean; compact?: boolean; promotion?:PublicPromotion|null; activityId?:string; promotionReady?:boolean; voucherContext?:VoucherEntryContext }>(), {
   featured: false,
@@ -268,9 +271,12 @@ const buyLabel = computed(() =>
 // reason, so a retained catalogue that is refreshing or failed to refresh never swaps it for a read status (03 §3.4).
 const compactUnavailable = computed(() => stockUnavailable.value
   || (remoteApiEnabled && eligibility.value.status === "ready" && !eligibility.value.eligible));
+// A voucher or activity entry buys at its own terms, and its detail page shows no trial-credit entry: no tag there either.
+const trialCreditOption = useTrialCreditOption(() => props.product.id);
+const trialCredit = computed(() => props.activityId || props.voucherContext?.voucherId ? null : trialCreditOption.value);
 const compactAriaLabel = computed(() => [copy.value.badge, props.product.name,
   `${t.value.store.cardPriceLabel} $${formatGroupedAmount(props.product.price)}`,
-  compactUnavailable.value ? gateLabel.value : ""].filter(Boolean).join(" · "));
+  compactUnavailable.value ? gateLabel.value : trialCredit.value ? t.value.store.trialCreditTag : ""].filter(Boolean).join(" · "));
 function onBuy() {
   if (buyUnavailable.value) return;
   if(promotionSignIn.value){navTo('/pages/login/login?return='+encodeURIComponent(promotionCheckoutHref([{productNo:props.product.id,quantity:1}],props.activityId)));return;}
@@ -538,8 +544,10 @@ const gateMetaStyle: CSSProperties = {
 .product-compact-name { font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); color:var(--v5-ink); overflow-wrap:break-word; }
 .product-compact-tagline { margin-top:2px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); }
 .product-compact-levels { display:block; margin-top:6px; font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color:var(--v5-ink-3); overflow-wrap:break-word; }
-/* Price bottom-left, estimate bottom-right; when both do not fit one row the estimate drops to the next line, still right-aligned. */
-.product-compact-bottom { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; column-gap:8px; row-gap:2px; margin-top:auto; padding-top:10px; font-variant-numeric:tabular-nums; }
+/* Price bottom-left, estimate bottom-right; when both do not fit one row the estimate drops to the next line, still right-aligned.
+   The price follows the tagline, not the card bottom, so cards in a row keep name, price and estimate level; a status tag
+   hangs under the price and a card without one leaves the space below empty (T17). */
+.product-compact-bottom { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; column-gap:8px; row-gap:2px; padding-top:10px; font-variant-numeric:tabular-nums; }
 /* The price is the card's main figure (10 §10.1 卡内主数值, Montserrat for amounts); the estimate is a right-side summary. */
 .product-compact-price { color:var(--v5-ink); font:var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric:tabular-nums; }
 .product-compact-estimate { margin-left:auto; text-align:right; font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color:var(--v5-brand); }
