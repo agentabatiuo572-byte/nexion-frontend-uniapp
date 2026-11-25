@@ -1131,7 +1131,7 @@ const trialShare = computed(() => multiTrialCheckout.value
 const checkoutQuantityLabel = computed(() => trialShare.value
   ? fmt(landingCopy(locale.code).qtyGift, { n: 1 }).replace(/^×\s*/, "") : "1");
 
-function leaveTrialReview(message: string | null = purchaseCopy.value.coDeviceRemoved) {
+function leaveTrialReview(message: string | null = trialDetailCopy.value.deviceGone) {
   if (trialReviewStatus.value === "unavailable") return;
   trialReviewStatus.value = "unavailable";
   clearTrialTopup(app.accountKey, trialTopupId.value);
@@ -1216,7 +1216,7 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
     if (!option?.canBuy || !option.quote) {
       const reason = option?.reasonCode;
       if (!reason || reason === "TRIAL_PRODUCT_REMOVED") trialOptions.invalidateSelection(scope.productNo);
-      leaveTrialReview(!reason || reason === "TRIAL_PRODUCT_REMOVED" ? purchaseCopy.value.coDeviceRemoved : trialRefusalCopy(reason));
+      leaveTrialReview(!reason || reason === "TRIAL_PRODUCT_REMOVED" ? trialDetailCopy.value.deviceGone : trialRefusalCopy(reason));
       return true;
     }
     trialReviewOption.value = option;
@@ -1236,6 +1236,7 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
 useAutoRecovery({ failed: () => remoteApiEnabled && !multiTrialCheckout.value && !useTrialClaimSheet().open && freeTrial.authorityStatus === "error", retry: () => freeTrial.refreshRemote() });
 const trialCopy = useTrialLifecycleCopy();
 const purchaseCopy = useTrialPurchaseCopy();
+const trialDetailCopy = useTrialDetailCopy();
 // 1s ticker — the credit keeps accruing during active (display freshness).
 const nowTick = ref(mockServerNow());
 let trialTicker: ReturnType<typeof setInterval> | undefined;
@@ -1987,7 +1988,6 @@ function totalStillConfirmed(confirmed: number) {
 }
 // ── Trial checkout presentation (display only) ────────────────────────────────
 // Reads the states the trial wiring exposes; never feeds a submit, quote or recovery decision.
-const trialDetailCopy = useTrialDetailCopy();
 // Every trial checkout (the multi-device list, the legacy trial-device path, the local mock) drops the 优惠 group and
 // lists the trial discounts once in 核对订单 under the ticket's names.
 const trialCheckoutShown = computed(() => multiTrialCheckout.value || trialConversionMode.value);

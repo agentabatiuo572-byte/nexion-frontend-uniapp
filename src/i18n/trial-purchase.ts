@@ -6,7 +6,6 @@ import { uiLocale } from '@/i18n';
 export const trialPurchaseCopy = {
   zh: {
     earlyTitle: '现在购买：完整试用权益照拿，再减 {discount}\u00A0USDT',
-    accruedTitle: '现在购买：按已累计试用收益结算',
     graceTitle: '购买后试用权益照常到账',
     earlyDeadline: '立减截止 {time}（试用期结束）',
     payGroup: '购机应付', unitPrice: '单价', amountDue: '应付', creditGroup: '购后到账',
@@ -25,7 +24,6 @@ export const trialPurchaseCopy = {
     resultPaid: '实付', resultSaved: '共节省', resultDevices: '查看我的设备', resultOrder: '查看订单',
     orderPaid: '实付', orderTrialReward: '试用奖励到账', orderRewardsReversed: '试用奖励已随退款收回',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "该设备已不可选，请重新选择",
     coPurchaseUnavailable: "暂时无法购买，请稍后再试",
     coLatePayment: "付款晚于截止时间，设备不会交付。款项将原路退回。",
     coChangeDevice: '更换设备',
@@ -46,7 +44,6 @@ export const trialPurchaseCopy = {
   },
   en: {
     earlyTitle: 'Buy now: keep your full trial benefits and get {discount}\u00A0USDT off',
-    accruedTitle: 'Buy now: settled on the trial earnings accrued so far',
     graceTitle: 'Your trial benefits are still credited when you buy',
     earlyDeadline: 'Discount ends {time} (end of trial)',
     payGroup: 'Amount due', unitPrice: 'Price', amountDue: 'Due', creditGroup: 'Credited after purchase',
@@ -65,7 +62,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Paid', resultSaved: 'You saved', resultDevices: 'View my devices', resultOrder: 'View order',
     orderPaid: 'Paid', orderTrialReward: 'Trial rewards credited', orderRewardsReversed: 'Trial rewards were taken back with the refund',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "This device is no longer available. Choose another device.",
     coPurchaseUnavailable: "This purchase is temporarily unavailable. Please try again later.",
     coLatePayment: "The payment was sent after the deadline. The device won’t be delivered. The funds will be returned to the original payment method.",
     coChangeDevice: 'Change device',
@@ -86,7 +82,6 @@ export const trialPurchaseCopy = {
   },
   vi: {
     earlyTitle: 'Mua ngay: giữ trọn quyền lợi dùng thử và giảm thêm {discount}\u00A0USDT',
-    accruedTitle: 'Mua ngay: khấu trừ theo thu nhập dùng thử đã tích lũy',
     graceTitle: 'Mua máy vẫn nhận đủ quyền lợi dùng thử',
     earlyDeadline: 'Giảm giá đến {time} (hết thời gian dùng thử)',
     payGroup: 'Số tiền phải trả', unitPrice: 'Đơn giá', amountDue: 'Phải trả', creditGroup: 'Nhận sau khi mua',
@@ -105,7 +100,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Đã trả', resultSaved: 'Tiết kiệm', resultDevices: 'Xem thiết bị', resultOrder: 'Xem đơn hàng',
     orderPaid: 'Đã trả', orderTrialReward: 'Thưởng dùng thử đã nhận', orderRewardsReversed: 'Thưởng dùng thử đã được thu hồi cùng khoản hoàn',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Thiết bị này không còn được chọn. Vui lòng chọn thiết bị khác.",
     coPurchaseUnavailable: "Hiện chưa thể mua. Vui lòng thử lại sau.",
     coLatePayment: "Bạn đã thanh toán sau thời hạn nên thiết bị sẽ không được giao. Tiền sẽ được hoàn qua phương thức thanh toán ban đầu.",
     coChangeDevice: 'Đổi thiết bị',
@@ -126,7 +120,6 @@ export const trialPurchaseCopy = {
   },
   id: {
     earlyTitle: 'Beli sekarang: tetap dapat seluruh manfaat uji coba plus potongan {discount}\u00A0USDT',
-    accruedTitle: 'Beli sekarang: dihitung dari pendapatan uji coba yang sudah terkumpul',
     graceTitle: 'Manfaat uji coba Anda tetap masuk saat membeli',
     earlyDeadline: 'Potongan berakhir {time} (akhir uji coba)',
     payGroup: 'Total bayar', unitPrice: 'Harga', amountDue: 'Bayar', creditGroup: 'Masuk setelah pembelian',
@@ -145,7 +138,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Dibayar', resultSaved: 'Anda hemat', resultDevices: 'Lihat perangkat saya', resultOrder: 'Lihat pesanan',
     orderPaid: 'Dibayar', orderTrialReward: 'Hadiah uji coba masuk', orderRewardsReversed: 'Hadiah uji coba ditarik kembali bersama pengembalian dana',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Perangkat ini tidak lagi bisa dipilih. Pilih perangkat lain.",
     coPurchaseUnavailable: "Pembelian belum bisa dilakukan. Coba lagi nanti.",
     coLatePayment: "Pembayaran dikirim setelah batas waktu. Perangkat tidak akan dikirim. Dana akan dikembalikan melalui metode pembayaran semula.",
     coChangeDevice: 'Ganti perangkat',
@@ -166,7 +158,6 @@ export const trialPurchaseCopy = {
   },
   ms: {
     earlyTitle: 'Beli sekarang: kekalkan manfaat percubaan penuh dan dapat diskaun {discount}\u00A0USDT',
-    accruedTitle: 'Beli sekarang: dikira berdasarkan pendapatan percubaan terkumpul setakat ini',
     graceTitle: 'Manfaat percubaan tetap dikreditkan apabila anda membeli',
     earlyDeadline: 'Diskaun tamat {time} (akhir percubaan)',
     payGroup: 'Jumlah bayaran', unitPrice: 'Harga', amountDue: 'Perlu bayar', creditGroup: 'Dikreditkan selepas beli',
@@ -185,7 +176,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Dibayar', resultSaved: 'Jimat', resultDevices: 'Lihat peranti saya', resultOrder: 'Lihat pesanan',
     orderPaid: 'Dibayar', orderTrialReward: 'Ganjaran percubaan diterima', orderRewardsReversed: 'Ganjaran percubaan ditarik balik bersama bayaran balik',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Peranti ini tidak lagi boleh dipilih. Sila pilih peranti lain.",
     coPurchaseUnavailable: "Pembelian tidak tersedia buat sementara waktu. Sila cuba lagi nanti.",
     coLatePayment: "Bayaran dibuat selepas tarikh akhir. Peranti tidak akan dihantar. Wang akan dipulangkan melalui kaedah bayaran asal.",
     coChangeDevice: 'Tukar peranti',
@@ -206,7 +196,6 @@ export const trialPurchaseCopy = {
   },
   fil: {
     earlyTitle: 'Bumili ngayon: buong benepisyo ng trial at {discount}\u00A0USDT na bawas',
-    accruedTitle: 'Bumili ngayon: batay sa naipong kita sa trial',
     graceTitle: 'Papasok pa rin ang benepisyo ng trial kapag bumili ka',
     earlyDeadline: 'Hanggang {time} ang discount (katapusan ng trial)',
     payGroup: 'Babayaran', unitPrice: 'Presyo', amountDue: 'Babayaran', creditGroup: 'Papasok pagkatapos bumili',
@@ -225,7 +214,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Bayad', resultSaved: 'Natipid mo', resultDevices: 'Tingnan ang device', resultOrder: 'Tingnan ang order',
     orderPaid: 'Bayad', orderTrialReward: 'Pumasok ang reward sa trial', orderRewardsReversed: 'Binawi ang reward sa trial kasama ng refund',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Hindi na mapipili ang device na ito. Pumili ng ibang device.",
     coPurchaseUnavailable: "Pansamantalang hindi makabili. Subukan ulit mamaya.",
     coLatePayment: "Naipadala ang bayad lagpas sa deadline. Hindi ihahatid ang device. Ibabalik ang bayad sa orihinal na paraan ng pagbabayad.",
     coChangeDevice: 'Palitan ang device',
@@ -246,7 +234,6 @@ export const trialPurchaseCopy = {
   },
   ru: {
     earlyTitle: 'Купите сейчас: все привилегии пробного периода сохранятся, плюс скидка {discount}\u00A0USDT',
-    accruedTitle: 'Купите сейчас: расчёт по доходу, накопленному за пробный период',
     graceTitle: 'Бонусы пробного периода по-прежнему зачисляются при покупке',
     earlyDeadline: 'Скидка до {time} (конец пробного периода)',
     payGroup: 'К оплате', unitPrice: 'Цена', amountDue: 'К оплате', creditGroup: 'После покупки',
@@ -265,7 +252,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Оплачено', resultSaved: 'Экономия', resultDevices: 'Мои устройства', resultOrder: 'Открыть заказ',
     orderPaid: 'Оплачено', orderTrialReward: 'Награды зачислены', orderRewardsReversed: 'Награды пробного периода отозваны с возвратом',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Это устройство больше недоступно. Выберите другое устройство.",
     coPurchaseUnavailable: "Покупка временно недоступна. Повторите попытку позже.",
     coLatePayment: "Платёж отправлен после окончания срока оплаты. Устройство не будет доставлено. Деньги вернутся тем же способом, которым вы платили.",
     coChangeDevice: 'Сменить устройство',
@@ -286,7 +272,6 @@ export const trialPurchaseCopy = {
   },
   kk: {
     earlyTitle: 'Қазір сатып алсаңыз: сынақ артықшылықтары толық сақталып, {discount}\u00A0USDT жеңілдік аласыз',
-    accruedTitle: 'Қазір сатып алыңыз: жиналған сынақ табысы бойынша есептеледі',
     graceTitle: 'Сатып алғаннан кейін сынақ сыйақылары әдеттегідей шотқа түседі',
     earlyDeadline: 'Жеңілдік аяқталады: {time} (сынақ соңы)',
     payGroup: 'Төленетін сома', unitPrice: 'Баға', amountDue: 'Төлеу', creditGroup: 'Сатып алғаннан кейін түседі',
@@ -305,7 +290,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Төленді', resultSaved: 'Үнемдедіңіз', resultDevices: 'Құрылғыларымды қарау', resultOrder: 'Тапсырысты қарау',
     orderPaid: 'Төленді', orderTrialReward: 'Сынақ сыйақылары түсті', orderRewardsReversed: 'Сынақ сыйақылары қайтарыммен бірге кері алынды',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Бұл құрылғы енді қолжетімсіз. Басқа құрылғыны таңдаңыз.",
     coPurchaseUnavailable: "Қазір сатып алу мүмкін емес. Кейінірек қайталап көріңіз.",
     coLatePayment: "Төлем мерзімі өткеннен кейін жіберілген. Құрылғы жеткізілмейді. Қаражат бастапқы төлем әдісімен қайтарылады.",
     coChangeDevice: 'Құрылғыны ауыстыру',
@@ -326,7 +310,6 @@ export const trialPurchaseCopy = {
   },
   uz: {
     earlyTitle: 'Hozir oling: sinovning barcha imtiyozlari saqlanadi va {discount}\u00A0USDT chegirma',
-    accruedTitle: 'Hozir oling: hozirgacha toʻplangan sinov daromadi hisobga olinadi',
     graceTitle: 'Xarid qilganingizda ham sinov imtiyozlari hisobga tushadi',
     earlyDeadline: 'Chegirma tugaydi: {time} (sinov oxiri)',
     payGroup: 'Toʻlanadigan summa', unitPrice: 'Narx', amountDue: 'Toʻlov', creditGroup: 'Xariddan keyin tushadi',
@@ -345,7 +328,6 @@ export const trialPurchaseCopy = {
     resultPaid: 'Toʻlandi', resultSaved: 'Tejaldi', resultDevices: 'Qurilmalarim', resultOrder: 'Buyurtma',
     orderPaid: 'Toʻlandi', orderTrialReward: 'Sinov mukofotlari tushdi', orderRewardsReversed: 'Pul qaytarilgani sababli sinov mukofotlari qaytarib olindi',
     // Trial checkout (checkout.vue, trial purchase only).
-    coDeviceRemoved: "Bu qurilmani endi tanlab boʻlmaydi. Boshqa qurilmani tanlang.",
     coPurchaseUnavailable: "Hozir xarid qilib boʻlmaydi. Keyinroq qayta urinib koʻring.",
     coLatePayment: "Toʻlov muddat tugagandan keyin yuborilgan. Qurilma yetkazilmaydi. Mablagʻ dastlabki toʻlov usuli orqali qaytariladi.",
     coChangeDevice: 'Qurilmani almashtirish',

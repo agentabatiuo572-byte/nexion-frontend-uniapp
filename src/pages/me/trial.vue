@@ -617,7 +617,7 @@ const barNote = computed(() => {
   if (usePurchaseOptions.value) {
     if (waitingForReselection.value) return "";
     if (purchaseOptionsFailed.value) return detail.value.listFailed;
-    if (noBuyableDevices.value) return detail.value.noneBuyable;
+    if (noBuyableDevices.value) return isGrace.value ? detail.value.noneBuyableGrace : detail.value.noneBuyable;
     return "";
   }
   if ((isActiveCycle.value || status.value === "ended") && trialProductUnavailable.value && productCatalogState.status === "ready") {

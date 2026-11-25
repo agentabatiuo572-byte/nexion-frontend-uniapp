@@ -24,7 +24,7 @@ export const trialDetailCopy = {
     lockNote: '这笔付款结束前，不能换设备', viewConditions: '查看购买条件', quoteFailed: '价格获取失败，正在重试', optionUnavailable: '暂时无法购买',
     payCardTitle: '进行中的付款', origConfirming: '结果确认中', origNotSent: '未完成', balancePay: '余额支付',
     cancelLocked: '付款中，不能取消试用',
-    chooseDevice: '请选择设备', listFailed: '设备信息加载失败，正在重试', noneBuyable: '暂无可购买的设备，试用照常进行',
+    chooseDevice: '请选择设备', listFailed: '设备信息加载失败，正在重试', noneBuyable: '暂无可购买的设备，试用照常进行', noneBuyableGrace: '暂无可购买的设备，试用收益仍保留',
     deviceGone: '该设备已不可选，请重新选择', viewProgress: '查看进度',
   },
   en: {
@@ -47,7 +47,7 @@ export const trialDetailCopy = {
     lockNote: 'You can\'t switch devices until this payment ends', viewConditions: 'Purchase requirements', quoteFailed: 'Couldn\'t load the price. Retrying', optionUnavailable: 'Not available right now',
     payCardTitle: 'Payment in progress', origConfirming: 'Confirming result', origNotSent: 'Not completed', balancePay: 'Wallet balance',
     cancelLocked: 'Payment in progress. Can\'t cancel the trial',
-    chooseDevice: 'Choose a device', listFailed: "Couldn't load devices. Retrying", noneBuyable: 'No devices to buy right now. Your trial continues',
+    chooseDevice: 'Choose a device', listFailed: "Couldn't load devices. Retrying", noneBuyable: 'No devices to buy right now. Your trial continues', noneBuyableGrace: 'No devices to buy right now. Your earnings are kept',
     deviceGone: 'Device unavailable. Pick again', viewProgress: 'View progress',
   },
   vi: {
@@ -70,7 +70,7 @@ export const trialDetailCopy = {
     lockNote: 'Chưa thể đổi thiết bị cho đến khi khoản thanh toán này kết thúc', viewConditions: 'Xem điều kiện mua', quoteFailed: 'Chưa tải được giá, đang thử lại', optionUnavailable: 'Tạm thời chưa thể mua',
     payCardTitle: 'Thanh toán đang xử lý', origConfirming: 'Đang xác nhận kết quả', origNotSent: 'Chưa hoàn tất', balancePay: 'Số dư ví',
     cancelLocked: 'Đang thanh toán, chưa thể hủy dùng thử',
-    chooseDevice: 'Chọn thiết bị', listFailed: 'Chưa tải được thiết bị, đang thử lại', noneBuyable: 'Chưa có thiết bị để mua, dùng thử vẫn tiếp tục',
+    chooseDevice: 'Chọn thiết bị', listFailed: 'Chưa tải được thiết bị, đang thử lại', noneBuyable: 'Chưa có thiết bị để mua, dùng thử vẫn tiếp tục', noneBuyableGrace: 'Chưa có thiết bị để mua, thu nhập vẫn được giữ lại',
     deviceGone: 'Thiết bị không còn, hãy chọn lại', viewProgress: 'Xem tiến độ',
   },
   id: {
@@ -93,7 +93,7 @@ export const trialDetailCopy = {
     lockNote: 'Perangkat tidak bisa diganti sampai pembayaran ini selesai', viewConditions: 'Lihat syarat pembelian', quoteFailed: 'Gagal memuat harga, mencoba lagi', optionUnavailable: 'Belum bisa dibeli saat ini',
     payCardTitle: 'Pembayaran berlangsung', origConfirming: 'Mengonfirmasi hasil', origNotSent: 'Belum selesai', balancePay: 'Saldo dompet',
     cancelLocked: 'Pembayaran berlangsung, uji coba tidak bisa dibatalkan',
-    chooseDevice: 'Pilih perangkat', listFailed: 'Gagal memuat perangkat, mencoba lagi', noneBuyable: 'Belum ada perangkat untuk dibeli, uji coba berlanjut',
+    chooseDevice: 'Pilih perangkat', listFailed: 'Gagal memuat perangkat, mencoba lagi', noneBuyable: 'Belum ada perangkat untuk dibeli, uji coba berlanjut', noneBuyableGrace: 'Belum ada perangkat untuk dibeli, pendapatan tetap disimpan',
     deviceGone: 'Perangkat tak tersedia, pilih lagi', viewProgress: 'Lihat progres',
   },
   ms: {
@@ -116,7 +116,7 @@ export const trialDetailCopy = {
     lockNote: 'Peranti tidak boleh ditukar sehingga pembayaran ini tamat', viewConditions: 'Lihat syarat pembelian', quoteFailed: 'Gagal memuatkan harga, mencuba semula', optionUnavailable: 'Tidak boleh dibeli buat masa ini',
     payCardTitle: 'Pembayaran sedang diproses', origConfirming: 'Mengesahkan keputusan', origNotSent: 'Belum selesai', balancePay: 'Baki dompet',
     cancelLocked: 'Pembayaran sedang diproses, percubaan tidak boleh dibatalkan',
-    chooseDevice: 'Pilih peranti', listFailed: 'Gagal memuatkan peranti, mencuba semula', noneBuyable: 'Tiada peranti untuk dibeli, percubaan diteruskan',
+    chooseDevice: 'Pilih peranti', listFailed: 'Gagal memuatkan peranti, mencuba semula', noneBuyable: 'Tiada peranti untuk dibeli, percubaan diteruskan', noneBuyableGrace: 'Tiada peranti untuk dibeli, pendapatan tetap disimpan',
     deviceGone: 'Peranti tiada lagi, pilih semula', viewProgress: 'Lihat kemajuan',
   },
   fil: {
@@ -139,7 +139,7 @@ export const trialDetailCopy = {
     lockNote: 'Hindi mapapalitan ang device hangga\'t hindi tapos ang bayad na ito', viewConditions: 'Tingnan ang requirements', quoteFailed: 'Hindi ma-load ang presyo, sinusubukan ulit', optionUnavailable: 'Hindi mabibili sa ngayon',
     payCardTitle: 'Kasalukuyang bayad', origConfirming: 'Kinukumpirma ang resulta', origNotSent: 'Hindi pa tapos', balancePay: 'Wallet balance',
     cancelLocked: 'May bayad na pinoproseso, hindi pa makakansela ang trial',
-    chooseDevice: 'Pumili ng device', listFailed: 'Hindi ma-load ang mga device, sinusubukan ulit', noneBuyable: 'Walang mabibiling device ngayon, tuloy ang trial',
+    chooseDevice: 'Pumili ng device', listFailed: 'Hindi ma-load ang mga device, sinusubukan ulit', noneBuyable: 'Walang mabibiling device ngayon, tuloy ang trial', noneBuyableGrace: 'Walang mabibiling device ngayon, nakatabi ang kita',
     deviceGone: 'Wala na ang device, pumili ulit', viewProgress: 'Tingnan ang progreso',
   },
   ru: {
@@ -162,7 +162,7 @@ export const trialDetailCopy = {
     lockNote: 'Сменить устройство можно после завершения этой оплаты', viewConditions: 'Условия покупки', quoteFailed: 'Цена не загрузилась, повторяем', optionUnavailable: 'Сейчас недоступно',
     payCardTitle: 'Текущая оплата', origConfirming: 'Подтверждаем результат', origNotSent: 'Не завершена', balancePay: 'С баланса',
     cancelLocked: 'Идёт оплата, отменить пробный период нельзя',
-    chooseDevice: 'Выберите устройство', listFailed: 'Устройства не загрузились, повторяем', noneBuyable: 'Нет устройств к покупке, пробный период идёт',
+    chooseDevice: 'Выберите устройство', listFailed: 'Устройства не загрузились, повторяем', noneBuyable: 'Нет устройств к покупке, пробный период идёт', noneBuyableGrace: 'Нет устройств к покупке, доход сохраняется',
     deviceGone: 'Устройство недоступно, выберите другое', viewProgress: 'Ход оплаты',
   },
   kk: {
@@ -185,7 +185,7 @@ export const trialDetailCopy = {
     lockNote: 'Бұл төлем аяқталғанша құрылғыны ауыстыруға болмайды', viewConditions: 'Сатып алу шарттары', quoteFailed: 'Баға жүктелмеді, қайталап жатырмыз', optionUnavailable: 'Қазір сатып алу мүмкін емес',
     payCardTitle: 'Ағымдағы төлем', origConfirming: 'Нәтиже расталуда', origNotSent: 'Аяқталмады', balancePay: 'Баланстан',
     cancelLocked: 'Төлем жүріп жатыр, сынақты тоқтатуға болмайды',
-    chooseDevice: 'Құрылғыны таңдаңыз', listFailed: 'Құрылғылар жүктелмеді, қайталап жатырмыз', noneBuyable: 'Сатып алатын құрылғы жоқ, сынақ жалғасуда',
+    chooseDevice: 'Құрылғыны таңдаңыз', listFailed: 'Құрылғылар жүктелмеді, қайталап жатырмыз', noneBuyable: 'Сатып алатын құрылғы жоқ, сынақ жалғасуда', noneBuyableGrace: 'Сатып алатын құрылғы жоқ, табыс сақталады',
     deviceGone: 'Құрылғы қолжетімсіз, басқасын таңдаңыз', viewProgress: 'Барысты қарау',
   },
   uz: {
@@ -208,7 +208,7 @@ export const trialDetailCopy = {
     lockNote: 'Bu toʻlov tugamaguncha qurilmani almashtirib boʻlmaydi', viewConditions: 'Xarid shartlari', quoteFailed: 'Narx yuklanmadi, qayta urinilmoqda', optionUnavailable: 'Hozircha xarid qilib boʻlmaydi',
     payCardTitle: 'Joriy toʻlov', origConfirming: 'Natija tasdiqlanmoqda', origNotSent: 'Yakunlanmagan', balancePay: 'Hamyon balansi',
     cancelLocked: 'Toʻlov jarayonda, sinovni bekor qilib boʻlmaydi',
-    chooseDevice: 'Qurilmani tanlang', listFailed: 'Qurilmalar yuklanmadi, qayta urinilmoqda', noneBuyable: 'Hozir xarid uchun qurilma yoʻq, sinov davom etadi',
+    chooseDevice: 'Qurilmani tanlang', listFailed: 'Qurilmalar yuklanmadi, qayta urinilmoqda', noneBuyable: 'Hozir xarid uchun qurilma yoʻq, sinov davom etadi', noneBuyableGrace: 'Hozir xarid uchun qurilma yoʻq, daromad saqlanadi',
     deviceGone: 'Qurilma yoʻq, boshqasini tanlang', viewProgress: 'Jarayonni koʻrish',
   },
 };
