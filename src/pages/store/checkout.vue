@@ -1870,13 +1870,15 @@ const checkoutBackHref = computed(() => promotionRoute.value
 const { imageSrc: checkoutImage, imageError: checkoutImageError } = useProductImage(
   () => trialOriginal.value ? trialOriginal.value.device.imageUrl ?? undefined : product.value?.imageUrl);
 const voucherDetailsOpen = ref(false);
-/** Arrow keys on the voucher choices: two choices, so any arrow selects the other one and moves focus with it (03 §3.5). */
-function moveVoucherChoice(automatic: boolean) {
+/** Arrow keys on the voucher choices: two choices, so any arrow selects the other one; focus follows the choice that ends up checked (03 §3.5). */
+async function moveVoucherChoice(automatic: boolean) {
   if (!canChangeVoucher()) return;
-  void selectAutomaticVoucher(!automatic);
   // uni-app hands handlers a normalized target: find the radio through the focused element's group.
   const group = (document.activeElement as HTMLElement | null)?.closest('[role="radiogroup"]');
-  group?.querySelector<HTMLElement>(`[role="radio"][data-automatic="${!automatic}"]`)?.focus();
+  await selectAutomaticVoucher(!automatic);
+  await nextTick();
+  // A failed selection leaves the old choice checked: focus stays with the one tab stop.
+  if (group?.isConnected) group.querySelector<HTMLElement>(`[role="radio"][data-automatic="${voucherAutomatic.value}"]`)?.focus();
 }
 
 const step = ref<Step>("select-payment");
