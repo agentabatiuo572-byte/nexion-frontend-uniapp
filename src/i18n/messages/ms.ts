@@ -75,6 +75,8 @@ export const ms: Messages = {
     verifyUnavailable: "Pengesahan tidak dapat diselesaikan buat masa ini.",
     verifyReenter: "Sila masukkan semula PIN pembayaran semasa.",
     resubmit: "Hantar semula",
+    changePending: "Mengesahkan hasil penukaran PIN.",
+    changeUnseen: "Permintaan penukaran tidak sampai. Anda boleh menghantarnya semula.",
     newTitle: "Tetapkan PIN baharu",
     confirmNewTitle: "Sahkan PIN pembayaran baharu",
     confirmReset: "Sahkan set semula",

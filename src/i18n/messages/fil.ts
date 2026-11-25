@@ -75,6 +75,8 @@ export const fil: Messages = {
     verifyUnavailable: "Hindi makumpleto ang pag-verify sa ngayon.",
     verifyReenter: "Ilagay ulit ang kasalukuyang PIN sa pagbabayad.",
     resubmit: "Isumite ulit",
+    changePending: "Kinukumpirma ang resulta ng pagpapalit ng PIN.",
+    changeUnseen: "Hindi naipadala ang kahilingang magpalit. Maaari mo itong ipadala ulit.",
     newTitle: "Mag-set ng bagong PIN",
     confirmNewTitle: "Kumpirmahin ang bagong PIN",
     confirmReset: "Kumpirmahin ang reset",

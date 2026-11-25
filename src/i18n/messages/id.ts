@@ -75,6 +75,8 @@ export const id: Messages = {
     verifyUnavailable: "Verifikasi belum dapat diselesaikan.",
     verifyReenter: "Masukkan kembali PIN pembayaran saat ini.",
     resubmit: "Kirim ulang",
+    changePending: "Memastikan hasil perubahan PIN.",
+    changeUnseen: "Permintaan perubahan tidak terkirim. Anda dapat mengirimkannya lagi.",
     newTitle: "Atur PIN pembayaran baru",
     confirmNewTitle: "Konfirmasi PIN baru",
     confirmReset: "Konfirmasi atur ulang",

@@ -4,7 +4,8 @@
     <view class="payment-pin-page">
       <text v-if="!state" class="payment-pin-page__note">{{ t.paymentPin.purpose }}</text>
       <template v-if="pendingVisible">
-        <text class="payment-pin-page__note" role="status">{{ t.paymentPin.pending }}</text>
+        <!-- Change-only wording (coordinator 2026-11-25): querying by the original key, or the request never arrived and may be resubmitted. -->
+        <text class="payment-pin-page__note" role="status">{{ canResubmit ? t.paymentPin.changeUnseen : t.paymentPin.changePending }}</text>
         <view v-if="canResubmit" class="pin-change__link" role="button" tabindex="0" @click="resubmit">{{ t.paymentPin.resubmit }}</view>
       </template>
       <view v-else-if="loading && !state?.configured" role="status"><text class="payment-pin-page__note">{{ t.paymentPin.loading }}</text></view>

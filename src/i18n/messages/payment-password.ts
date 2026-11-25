@@ -18,6 +18,7 @@ export const paymentPinEN = {
   verifyTitle: "Verify current payment PIN", verifyHint: "Checks automatically once all 6 digits are entered.", verifying: "Verifying…", reload: "Reload",
   changeProofExpired: "Verification expired. Enter your current payment PIN again.",
   verifyUnavailable: "Unable to complete verification right now.", verifyReenter: "Enter your current payment PIN again.", resubmit: "Resubmit",
+  changePending: "Confirming the PIN change.", changeUnseen: "The change request did not arrive. You can resubmit it.",
 };
 export const paymentPinZH: typeof paymentPinEN = {
   title: "支付密码", configured: "已设置", notConfigured: "未设置", unavailable: "暂时无法读取", loading: "正在读取支付密码状态…",
@@ -35,6 +36,7 @@ export const paymentPinZH: typeof paymentPinEN = {
   verifyTitle: "验证当前支付密码", verifyHint: "输入完成后自动验证", verifying: "正在验证…", reload: "重新加载",
   changeProofExpired: "验证已失效，请重新输入当前支付密码。",
   verifyUnavailable: "暂时无法完成验证。", verifyReenter: "请重新输入当前支付密码。", resubmit: "重新提交",
+  changePending: "正在确认修改结果", changeUnseen: "修改请求没有送达，可以重新提交。",
 };
 export const paymentPinVI: typeof paymentPinEN = {
   title: "Mã PIN thanh toán", configured: "Đã thiết lập", notConfigured: "Chưa thiết lập", unavailable: "Tạm thời không khả dụng", loading: "Đang đọc trạng thái mã PIN thanh toán…",
@@ -52,4 +54,5 @@ export const paymentPinVI: typeof paymentPinEN = {
   verifyTitle: "Xác minh mã PIN hiện tại", verifyHint: "Tự động xác minh khi nhập đủ 6 chữ số.", verifying: "Đang xác minh…", reload: "Tải lại",
   changeProofExpired: "Xác minh đã hết hiệu lực. Vui lòng nhập lại mã PIN thanh toán hiện tại.",
   verifyUnavailable: "Hiện chưa thể hoàn tất xác minh.", verifyReenter: "Vui lòng nhập lại mã PIN thanh toán hiện tại.", resubmit: "Gửi lại",
+  changePending: "Đang xác nhận kết quả đổi mã PIN.", changeUnseen: "Yêu cầu đổi mã PIN chưa được gửi đến. Bạn có thể gửi lại.",
 };

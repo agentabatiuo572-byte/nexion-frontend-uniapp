@@ -75,6 +75,8 @@ export const ru: Messages = {
     verifyUnavailable: "Сейчас не удалось завершить проверку.",
     verifyReenter: "Введите текущий платёжный PIN ещё раз.",
     resubmit: "Отправить повторно",
+    changePending: "Проверяем результат смены PIN-кода.",
+    changeUnseen: "Запрос на смену PIN-кода не дошёл. Его можно отправить снова.",
     newTitle: "Новый платёжный PIN",
     confirmNewTitle: "Подтвердите новый PIN",
     confirmReset: "Сбросить",

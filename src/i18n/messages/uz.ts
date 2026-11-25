@@ -75,6 +75,8 @@ export const uz: Messages = {
     verifyUnavailable: "Hozircha tekshiruvni yakunlab boʻlmadi.",
     verifyReenter: "Joriy toʻlov PIN-kodini qayta kiriting.",
     resubmit: "Qayta yuborish",
+    changePending: "PIN-kod oʻzgarishi natijasi tasdiqlanmoqda.",
+    changeUnseen: "Oʻzgartirish soʻrovi yetib bormadi. Uni qayta yuborishingiz mumkin.",
     newTitle: "Yangi PIN-kod oʻrnatish",
     confirmNewTitle: "Yangi PIN-kodni tasdiqlash",
     confirmReset: "Tiklashni tasdiqlash",

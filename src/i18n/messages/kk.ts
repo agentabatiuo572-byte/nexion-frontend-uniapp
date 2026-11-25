@@ -75,6 +75,8 @@ export const kk: Messages = {
     verifyUnavailable: "Растауды әзірге аяқтау мүмкін емес.",
     verifyReenter: "Ағымдағы төлем PIN-кодын қайта енгізіңіз.",
     resubmit: "Қайта жіберу",
+    changePending: "PIN-кодты өзгерту нәтижесі тексерілуде.",
+    changeUnseen: "Өзгерту сұрауы жетпеді. Оны қайта жіберуге болады.",
     newTitle: "Жаңа PIN-код орнату",
     confirmNewTitle: "Жаңа PIN-кодты растау",
     confirmReset: "Қайта орнатуды растау",
