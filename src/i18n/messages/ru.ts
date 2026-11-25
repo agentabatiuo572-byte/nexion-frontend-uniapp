@@ -2196,7 +2196,7 @@ export const ru: Messages = {
     inventorySlotMeter: "Занято слотов: {active}/{max}",
     inventorySlotsLabel: "Слоты мощности",
     inventorySectionDevices: "Online",
-    inventorySectionInventory: "Доступные",
+    inventorySectionInventory: "Ожидают включения",
     inventorySectionActivationUnconfirmed: "Не подтверждено",
     inventoryActivationUnconfirmed: "Запись об активации устройства ещё не подтверждена, активировать пока нельзя. Обновите страницу и повторите или напишите в поддержку.",
     inventoryToastSlotsFull: "Слоты заняты: {max}/{max}. Сначала отключите одно устройство.",

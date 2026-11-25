@@ -2196,7 +2196,7 @@ export const id: Messages = {
     inventorySlotMeter: "{active}/{max} slot terisi",
     inventorySlotsLabel: "Slot komputasi",
     inventorySectionDevices: "Online",
-    inventorySectionInventory: "Perangkat tersedia",
+    inventorySectionInventory: "Siap diaktifkan",
     inventorySectionActivationUnconfirmed: "Status belum terkonfirmasi",
     inventoryActivationUnconfirmed: "Catatan aktivasi perangkat masih menunggu konfirmasi sehingga belum bisa diaktifkan. Muat ulang dan coba lagi, atau hubungi layanan pelanggan.",
     inventoryToastSlotsFull: "Slot penuh: {max}/{max}. Nonaktifkan satu perangkat dulu.",

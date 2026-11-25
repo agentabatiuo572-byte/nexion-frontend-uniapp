@@ -2196,7 +2196,7 @@ export const fil: Messages = {
     inventorySlotMeter: "{active}/{max} slot ang gamit",
     inventorySlotsLabel: "Compute slot",
     inventorySectionDevices: "Online",
-    inventorySectionInventory: "Available na device",
+    inventorySectionInventory: "Handang i-activate",
     inventorySectionActivationUnconfirmed: "Hindi kumpirmado ang status",
     inventoryActivationUnconfirmed: "Hinihintay pang makumpirma ang activation record ng device kaya hindi pa ito ma-activate. Mag-refresh at subukan ulit, o makipag-ugnayan sa support.",
     inventoryToastSlotsFull: "Puno ang slot: {max}/{max}. Mag-deactivate muna ng isang device.",
