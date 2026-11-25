@@ -760,9 +760,8 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
       const pending = session.record.pending;
       const walletOnly = session.retryOriginal && pending?.operation === 'payOrder' && pending.paymentMethod !== 'EXTERNAL';
       const orderItems = expectedOrder.items ?? [];
-      const bundle = orderItems.length > 1;
       // Older receipts omit amounts. Read the confirmed order's lines, using the same subtotal as checkout.
-      const needsOrderLines = bundle && orderItems.some(item => itemSubtotal(item) === undefined);
+      const needsOrderLines = orderItems.some(item => itemSubtotal(item) === undefined);
       const readOrderLines = async () => (await orders.ensureRemoteOrder(orderNo))?.lineItems;
       const orderLines = needsOrderLines
         ? orders.getById(orderNo)?.lineItems ?? await readOrderLines().catch(() => undefined)
@@ -774,9 +773,9 @@ async function confirmPayment(topup?:OrderUsdtTopupRead){
       const details = orderItems.map((item, index) => ({
         name: item.productName,
         quantity: item.quantity,
-        amount: bundle ? itemSubtotal(item) ?? amounts[index] : undefined,
+        amount: itemSubtotal(item) ?? amounts[index],
       }));
-      const readDetailAmounts = bundle && details.some(item => item.amount === undefined)
+      const readDetailAmounts = details.some(item => item.amount === undefined)
         ? async () => lineAmounts(await readOrderLines()) : undefined;
       await executeSelectedPurchase({amount:topup?.amountDueUsdt??amountUsdt,currency:'USDT',summary:expectedOrder.items?.map(item=>item.productName).join(', ')||t.value.store.coConfirmPurchase,precision:topup?'full':undefined,
         details,readDetailAmounts},
