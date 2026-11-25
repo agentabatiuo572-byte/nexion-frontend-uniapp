@@ -101,7 +101,7 @@
             >
               <!-- Board S6: the waiting pair as a warning strip; name and instance number never split. -->
               <template v-if="d.replacement" #replacement-status>
-                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.oldWaiting, pairSides(d.replacement))" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
+                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><view class="device-replacement-note__text"><template v-for="(part, i) in slotCopyParts(replacementCopy.oldWaiting, pairSides(d.replacement))" :key="i"><view v-if="part.key" class="device-replacement-name"><text class="device-replacement-name__text">{{ part.text }}</text><NxCodeValue v-if="part.code" class="device-replacement-code" :value="part.code" :label="part.text" :copyable="false" /></view><text v-else>{{ part.text }}</text></template></view></view>
               </template>
             </DeviceInventoryRow>
           </view>
@@ -134,7 +134,7 @@
               @tradein="handleTradein(d)"
             >
               <template v-if="d.replacement" #replacement-status>
-                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><text class="device-replacement-note__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.newWaiting, pairSides(d.replacement))" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text></view>
+                <view class="device-replacement-note" role="status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><view class="device-replacement-note__text"><template v-for="(part, i) in slotCopyParts(replacementCopy.newWaiting, pairSides(d.replacement))" :key="i"><view v-if="part.key" class="device-replacement-name"><text class="device-replacement-name__text">{{ part.text }}</text><NxCodeValue v-if="part.code" class="device-replacement-code" :value="part.code" :label="part.text" :copyable="false" /></view><text v-else>{{ part.text }}</text></template></view></view>
               </template>
               <!-- Undoing is a reverse action (03 §3.1): plain ink-3 text, no container. With no candidate the entry stays,
                    greyed, and the reason with its way out sits on the line below (board S9). -->
@@ -208,7 +208,7 @@
       <view v-if="replacementDevice && !replacementStep" class="device-replacement-sheet">
         <view class="device-replacement-lead">
           <DeviceArt class="device-replacement-lead__art" :device="replacementDevice" />
-          <text class="device-replacement-lead__text"><text v-for="(part, i) in slotCopyParts(replacementCopy.lead, { new: deviceSide(replacementDevice) })" :key="i" :class="{ 'device-replacement-name': part.key }">{{ part.text }}<text v-if="part.code" class="device-replacement-code">{{ '\u00a0' + part.code }}</text></text></text>
+          <view class="device-replacement-lead__text"><template v-for="(part, i) in slotCopyParts(replacementCopy.lead, { new: deviceSide(replacementDevice) })" :key="i"><view v-if="part.key" class="device-replacement-name"><text class="device-replacement-name__text">{{ part.text }}</text><NxCodeValue v-if="part.code" class="device-replacement-code" :value="part.code" :label="part.text" :copyable="false" /></view><text v-else>{{ part.text }}</text></template></view>
         </view>
         <view v-if="hasUnknownReplacementTiming" class="device-replacement-job-note" role="status">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
@@ -220,7 +220,7 @@
             <DeviceArt class="device-replacement-target__art" :device="device" />
             <view class="device-replacement-target__meta" aria-hidden="true">
               <text class="device-replacement-target__name">{{ deviceName(t, device) }}</text>
-              <view class="device-replacement-target__line"><text v-if="device.instanceNo" class="device-replacement-code">{{ device.instanceNo }}</text><text class="device-replacement-target__today">{{ device.instanceNo ? '· ' : '' }}{{ fmt(replacementCopy.todayInline, { amount: visibility.mask(fmtMoney(device.todayEarnings)) }) }}</text></view>
+              <view class="device-replacement-target__line"><NxCodeValue v-if="device.instanceNo" class="device-replacement-code" :value="device.instanceNo" :label="deviceName(t, device)" :copyable="false" /><text class="device-replacement-target__today">{{ device.instanceNo ? '· ' : '' }}{{ fmt(replacementCopy.todayInline, { amount: visibility.mask(fmtMoney(device.todayEarnings)) }) }}</text></view>
               <text v-if="replacementTiming(device)" class="device-replacement-target__time">{{ replacementTiming(device) === 'busy' ? replacementCopy.rowBusy : replacementCopy.rowIdle }}</text>
             </view>
             <view class="device-replacement-target__chev" aria-hidden="true"><NxIcon name="chevron-right" :size="16" /></view>
@@ -232,13 +232,13 @@
         <view class="device-replacement-arrive">
           <view class="device-replacement-arrive__stage"><view class="device-replacement-arrive__floor" /><DeviceArt class="device-replacement-arrive__art" :device="replacementDevice" /></view>
           <text class="device-replacement-arrive__name">{{ deviceName(t, replacementDevice) }}</text>
-          <text v-if="replacementDevice.instanceNo" class="device-replacement-code">{{ replacementDevice.instanceNo }}</text>
+          <NxCodeValue v-if="replacementDevice.instanceNo" class="device-replacement-code" :value="replacementDevice.instanceNo" :label="deviceName(t, replacementDevice)" :copyable="false" />
         </view>
         <view class="device-replacement-yield">
           <DeviceArt class="device-replacement-yield__art" :device="replacementStep.oldDevice" />
           <view class="device-replacement-yield__meta">
             <text class="device-replacement-yield__name">{{ fmt(replacementCopy.confirmStop, { old: deviceName(t, replacementStep.oldDevice) }) }}</text>
-            <text v-if="replacementStep.oldDevice.instanceNo" class="device-replacement-code">{{ replacementStep.oldDevice.instanceNo }}</text>
+            <NxCodeValue v-if="replacementStep.oldDevice.instanceNo" class="device-replacement-code" :value="replacementStep.oldDevice.instanceNo" :label="deviceName(t, replacementStep.oldDevice)" :copyable="false" />
           </view>
           <view class="device-replacement-online"><view class="device-replacement-online__dot" aria-hidden="true" /><text>{{ t.earn.online }}</text></view>
         </view>
@@ -265,7 +265,7 @@
           <DeviceArt class="device-replacement-fate__art" :device="side.device" />
           <view class="device-replacement-fate__meta">
             <text class="device-replacement-fate__name">{{ deviceName(t, side.device) }}</text>
-            <view class="device-replacement-fate__sub"><text v-if="side.device.instanceNo" class="device-replacement-code">{{ side.device.instanceNo }}</text><text>{{ side.device.instanceNo ? '· ' : '' }}{{ side.fate }}</text></view>
+            <view class="device-replacement-fate__sub"><NxCodeValue v-if="side.device.instanceNo" class="device-replacement-code" :value="side.device.instanceNo" :label="deviceName(t, side.device)" :copyable="false" /><text class="device-replacement-fate__text">{{ side.device.instanceNo ? '· ' : '' }}{{ side.fate }}</text></view>
           </view>
         </view>
       </view>
@@ -295,6 +295,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import DeviceArt from "@/components/device-art.vue";
 import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
@@ -838,9 +839,13 @@ function goStore() {
 .device-replacement-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .device-replacement-note > svg { flex: none; margin-top: calc((var(--ui-type-description-lh) - 14px) / 2); }
 .device-replacement-note__text { min-width: 0; overflow-wrap: break-word; }
-.device-replacement-name { white-space: nowrap; }
-/* Instance numbers are codes: JetBrains Mono on one line (03 §3.6.1), in the auxiliary-figure size. */
-.device-replacement-code { white-space: nowrap; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); letter-spacing: 0; }
+/* A device in a sentence is one unit: the name stays whole and its instance number gives way in the middle (03 §3.6.1).
+   When the unit does not fit after the text before it, it moves whole to the next line. */
+.device-replacement-name { display: inline-flex; max-width: 100%; align-items: baseline; gap: 0 .3em; }
+.device-replacement-name__text { flex: none; white-space: nowrap; }
+/* Instance numbers are codes (NxCodeValue): JetBrains Mono on one line, the middle gives way when room runs out (03 §3.6.1),
+   in the auxiliary-figure size. */
+.device-replacement-code { max-width: 100%; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); letter-spacing: 0; }
 .device-replacement-note .device-replacement-code { color: inherit; line-height: inherit; }
 .device-replacement-undo { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; white-space: nowrap; cursor: pointer; }
 .device-replacement-undo[aria-disabled="true"] { opacity: .5; cursor: default; }
@@ -867,10 +872,11 @@ function goStore() {
 .device-replacement-target__art { flex: none; width: 64px; height: 64px; margin: -4px 0; }
 .device-replacement-target__meta { flex: 1 1 auto; min-width: 0; }
 .device-replacement-target__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
-.device-replacement-target__line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; margin-top: 2px; }
+/* The code gives way before the day's figure (03 §3.6.1): one line, the code shrinks to its prefix … tail. */
+.device-replacement-target__line { display: flex; align-items: baseline; column-gap: 6px; margin-top: 2px; }
 .device-replacement-target__line .device-replacement-code { line-height: var(--ui-type-list-subtitle-lh); }
 .device-replacement-target__today, .device-replacement-target__time { color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); font-variant-numeric: tabular-nums; }
-.device-replacement-target__today { white-space: nowrap; }
+.device-replacement-target__today { flex: none; white-space: nowrap; }
 .device-replacement-target__time { display: block; margin-top: 2px; overflow-wrap: break-word; }
 .device-replacement-target__chev { display: flex; flex: none; margin-left: -4px; color: var(--v5-ink-4); }
 .device-replacement-quiet { margin-block: 12px; }
@@ -898,8 +904,10 @@ function goStore() {
 .device-replacement-fate__art { flex: none; width: 48px; height: 48px; margin: -4px 0; }
 .device-replacement-fate__meta { flex: 1 1 auto; min-width: 0; }
 .device-replacement-fate__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
-.device-replacement-fate__sub { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.device-replacement-fate__sub { display: flex; align-items: baseline; column-gap: 6px; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
 .device-replacement-fate__sub .device-replacement-code { line-height: var(--ui-type-list-subtitle-lh); }
+/* Beside a code the fate keeps its full width and wraps only once the code is down to prefix … tail. */
+.device-replacement-code + .device-replacement-fate__text { flex: 0 0 auto; max-width: calc(100% - 11ch - 6px); overflow-wrap: break-word; }
 @media (max-width: 374px) {
   .device-replacement-target { gap: 10px; }
   .device-replacement-target__art { width: 52px; height: 52px; }
