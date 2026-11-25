@@ -28,6 +28,7 @@
     <view
       v-else-if="ctaLabel"
       class="nx-empty__cta nx-card-recovery-action active:opacity-90 transition-opacity"
+      :class="{ 'nx-empty__cta--busy': ctaBusy }"
       :style="ctaStyle"
       role="button"
       :tabindex="ctaDisabled || ctaBusy ? -1 : 0"
@@ -38,7 +39,8 @@
       @keydown.enter.prevent="activateCta($event)"
       @keydown.space.prevent="activateCta($event)"
     >
-      <text>{{ ctaLabel }}</text>
+      <text class="nx-empty__cta-label">{{ ctaLabel }}</text>
+      <view v-if="ctaBusy" class="nx-empty__spinner" aria-hidden="true" />
     </view>
   </view>
 </template>
@@ -94,7 +96,8 @@ const rootStyle = computed<CSSProperties>(() => ({
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-  opacity: props.ctaDisabled || props.ctaBusy ? 0.55 : 1,
+  // Busy is "working", not "unavailable": the button shows it with its spinner (03 §3.1 处理中), the page is not faded.
+  opacity: props.ctaDisabled ? 0.55 : 1,
   textAlign: "center",
   padding: props.compact ? "24px 24px" : "40px 24px",
 }));
@@ -129,3 +132,15 @@ const ctaStyle = computed<CSSProperties>(() => isReadRetry.value
   ? { margin: "12px auto 0", alignSelf: "center" }
   : { marginTop: "16px", alignSelf: props.ctaSize === "large" ? "stretch" : "center" });
 </script>
+
+<style scoped>
+/* 重新加载 while its read runs (03 §3.1 处理中): the label stays in place, transparent, so the width is locked; a spinner in
+   the button ink sits on it, the same ring as the shared NxButton at the compact size. Reduced motion keeps a still ring. */
+.nx-empty__cta--busy { cursor: default; }
+.nx-empty__cta--busy .nx-empty__cta-label { opacity: 0; }
+.nx-empty__spinner { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: nx-empty-spin 800ms linear infinite; }
+@keyframes nx-empty-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .nx-empty__spinner { animation: none; }
+}
+</style>

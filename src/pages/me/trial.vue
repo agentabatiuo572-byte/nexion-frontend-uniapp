@@ -217,7 +217,10 @@
           <view v-if="barNoteWarn" class="trial-bar__note trial-bar__note--warn nx-tray-note" role="status"><svg class="trial-bar__note-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg><text>{{ barNote }}</text></view>
           <text v-else-if="barNote" class="trial-bar__note nx-tray-note" role="status">{{ barNote }}</text>
           <view v-if="barRetry" class="trial-bar__retry"><NxButton variant="text" size="small" :label="t.store.catalogRetry" @click="retryCatalog" /></view>
-          <NxButton v-if="!originalConfirming" class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
+          <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the read runs on its own, the tray only says so,
+               as the one status capsule of the bar (04 §4.0 状态胶囊). -->
+          <view v-if="originalConfirming" class="nx-tray-status trial-bar__status" role="status"><text>{{ purchase.coConfirming }}</text></view>
+          <NxButton v-else class="trial-bar__main" variant="primary" :label="trialBuyCtaText" :disabled="trialBuyDisabled" :busy="trialBuyBusy && !listLoading" :aria-busy="trialBuyBusy" @click="goCheckout">
             <!-- Reading the list keeps the label beside the spinner (board S6a); a press in progress uses the shared busy state. -->
             <view v-if="listLoading" class="trial-bar__spinner" aria-hidden="true" />
             <svg v-else-if="isActiveCycle && !originalPurchase && !trialBuyDisabled" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
@@ -614,7 +617,6 @@ const barRetry = computed(() => (isActiveCycle.value || status.value === "ended"
   && !usePurchaseOptions.value && !originalPurchase.value && productCatalogState.status === "error");
 // The one line above the bottom button that says why it is disabled.
 const barNote = computed(() => {
-  if (originalConfirming.value) return purchase.value.coConfirming;
   if (freeTrial.startRetryable) return t.value.trial.claimUnknownInline;
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
@@ -1004,6 +1006,8 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 32px calc(70px + env(safe-area-inset-bottom)); }
 .trial-bar-space__retry { height:48px; }
 .trial-bar__main { display:flex;width:100%; }
+/* The lone status capsule takes the floating disabled primary's size and ink (04 §4.0, 03 §3.1); the glass comes from the shared bar. */
+.trial-bar__status { display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:4px 20px;box-sizing:border-box;border-radius:999px;color:var(--ui-tray-disabled-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);text-align:center; }
 .trial-bar__side { flex:1 1 0;min-width:fit-content; }
 .trial-bar__wide { flex:2 1 0;min-width:fit-content; }
 .trial-bar :deep(.nx-button__content) { white-space:nowrap;font-variant-numeric:tabular-nums; }

@@ -15,7 +15,15 @@
 -->
 <template>
   <view v-if="remoteApiEnabled" ref="proofRef" class="absolute social-proof" :style="rootStyle" :aria-label="remoteProof ? remoteProof.productName : w.unavailableLabel">
-    <view v-if="remoteProof" ref="trackRef" class="social-proof__track" :class="{ 'social-proof__track--running': trackRunning }" :style="{ animationDuration: `${remoteRows.length * 2}s` }">
+    <!-- Top-right (art shortened for the trial-credit entry): two still rows, both whole; the first leads, the second recedes. -->
+    <view v-if="remoteProof && placement === 'top-right'">
+      <view v-for="(r, i) in remoteRows.slice(0, 2)" :key="i" class="flex items-baseline" :style="rowStyle">
+        <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
+        <text class="shrink-0 tabular-nums" :style="numStyle(i === 0 ? r.color : 'var(--v5-ink-3)')">{{ r.exact ? r.n.toLocaleString() : storeHeatFigure(r.n, locale.code) }}</text>
+        <text class="truncate" :style="{ ...labelStyle, color: i === 0 ? 'var(--v5-ink-2)' : 'var(--v5-ink-3)' }">{{ r.label }}</text>
+      </view>
+    </view>
+    <view v-else-if="remoteProof" ref="trackRef" class="social-proof__track" :class="{ 'social-proof__track--running': trackRunning }" :style="{ animationDuration: `${remoteRows.length * 2}s` }">
       <view v-for="(r, i) in [...remoteRows, ...remoteRows]" :key="i" :aria-hidden="i >= remoteRows.length ? true : undefined" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
         <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.exact ? r.n.toLocaleString() : storeHeatFigure(r.n, locale.code) }}</text>
@@ -26,8 +34,8 @@
     <text v-else-if="remoteUnavailable" class="truncate" :style="unavailableStyle">{{ w.unavailableLabel }}</text>
   </view>
   <view v-else-if="!remoteApiEnabled" class="absolute" :style="rootStyle" :aria-label="`${w.label} · ${MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID}`">
-    <view :style="listStyle">
-      <view v-for="(r, i) in doubled" :key="i" class="flex items-baseline" :style="rowStyle">
+    <view :style="placement === 'top-right' ? undefined : listStyle">
+      <view v-for="(r, i) in (placement === 'top-right' ? flat.slice(0, 2) : doubled)" :key="i" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
         <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.exact ? r.n.toLocaleString() : storeHeatFigure(r.n, locale.code) }}</text>
         <text class="truncate" :style="labelStyle">{{ r.label }}</text>
@@ -56,7 +64,12 @@ import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
 
-const props = defineProps<{ product: Product }>();
+const props = withDefaults(defineProps<{
+  product: Product;
+  /** top-right: the detail art is shortened for the trial-credit entry, so the rows move to the free band above the machine
+   *  (two rows, right-aligned) instead of crossing its base (04 商城入口). */
+  placement?: "bottom-left" | "top-right";
+}>(), { placement: "bottom-left" });
 const t = useT();
 const locale = useLocaleStore();
 const app = useApp();
@@ -208,28 +221,29 @@ const flat = computed<FlatRow[]>(() => {
 const doubled = computed(() => [...flat.value, ...flat.value]);
 const duration = computed(() => flat.value.length * 2);
 
-const rootStyle: CSSProperties = {
+const rootStyle = computed<CSSProperties>(() => ({
   position: "absolute",
-  left: "4px",
-  bottom: "12px",
+  ...(props.placement === "top-right"
+    ? { top: "12px", right: "12px", height: "44px" } // 2 still rows × 22px, no fade: both read whole
+    : { left: "4px", bottom: "12px", height: "66px", // 3 scrolling rows × 22px, faded at the ends
+      maskImage: "linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%)",
+      WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%)" }),
   width: "156px",
-  height: "66px", // 3 rows × 22px
   overflow: "hidden",
-  maskImage: "linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%)",
-  WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%)",
   pointerEvents: "none",
   zIndex: 5,
-};
+}));
 const listStyle = computed<CSSProperties>(() => ({
   animation: mounted.value ? `dnk-scroll ${duration.value}s linear infinite` : "none",
 }));
-const rowStyle: CSSProperties = {
+const rowStyle = computed<CSSProperties>(() => ({
+  justifyContent: props.placement === "top-right" ? "flex-end" : undefined,
   gap: "5px",
   height: "22px",
   lineHeight: "22px",
   whiteSpace: "nowrap",
   overflow: "hidden",
-};
+}));
 const unavailableStyle: CSSProperties = { color: "var(--v5-ink-3)", fontSize: "12px" };
 function dotStyle(color: string): CSSProperties {
   return {
@@ -244,14 +258,15 @@ function dotStyle(color: string): CSSProperties {
 function numStyle(color: string): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontWeight: 600,
+    fontWeight: 500, // 14px and smaller stop at 500 (01 §1.2)
     fontSize: "13px",
     color,
     letterSpacing: "-0.005em",
   };
 }
+// Interface font: no monospace on marketing labels (06 §6.3).
 const labelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };

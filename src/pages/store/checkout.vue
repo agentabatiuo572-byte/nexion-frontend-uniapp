@@ -297,13 +297,17 @@
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
       <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+        <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the tray holds only its status capsule (04 §4.0). -->
+        <view v-if="trialProgressOnly" class="nx-tray-status checkout-tray-status" role="status"><text>{{ purchaseCopy.coConfirming }}</text></view>
+        <template v-else>
         <template v-if="multiTrialCheckout">
-          <view v-if="!trialProgressOnly && trialTrayWarning" class="nx-tray-note w-full checkout-tray-warning" role="status"><svg class="checkout-tray-warning__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg><text>{{ trialTrayWarning }}</text></view>
-          <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialProgressOnly || !trialTrayWarning ? 'status' : undefined">{{ trialTrayNote }}</text>
+          <view v-if="trialTrayWarning" class="nx-tray-note w-full checkout-tray-warning" role="status"><svg class="checkout-tray-warning__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg><text>{{ trialTrayWarning }}</text></view>
+          <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
         </template>
         <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
-        <view v-if="!trialProgressOnly" class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
-        <NxButton v-if="!trialProgressOnly" variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
+        <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
+        <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
+        </template>
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
            the quiet exit (back, Esc and H5 back all keep, the mask does not close it); cancelling is the explicit danger primary;
@@ -4863,6 +4867,8 @@ button.checkout-policy-link::after { border:0; }
 /* P4 card: the first block of the review column, with the product card's margins (16 sides, 20 to the next block). */
 .checkout-paying-card { margin:var(--v5-space-5) var(--v5-space-4) 0; }
 .checkout-sticky-copy { min-width:0; }
+/* The lone status capsule takes the floating disabled primary's size and ink (04 §4.0, 03 §3.1); the glass comes from the shared bar. */
+.checkout-tray-status { display:flex;align-items:center;justify-content:center;flex:1 1 100%;min-height:48px;padding:4px 20px;box-sizing:border-box;border-radius:999px;color:var(--ui-tray-disabled-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);text-align:center; }
 /* A button pushed onto its own line stays on the right (03 §3.6.1). */
 .checkout-sticky-copy + :deep(.nx-button) { margin-left:auto; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */

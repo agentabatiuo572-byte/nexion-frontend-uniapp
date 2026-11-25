@@ -264,7 +264,7 @@ export const trialPurchaseCopy = {
     coPriceUpdated: 'Цена изменилась: {amount}. Подтвердите оплату',
     coPolicyUpdated: 'Условия покупки обновились, подтвердите ещё раз',
     coQuoteFailed: 'Не удалось получить цену, повторяем',
-    coPromoShort: 'Скидка за пробный период',
+    coPromoShort: 'Пробная скидка',
     coConfirming: 'Проверяем результат оплаты, не оплачивайте повторно',
     coUnfinished: 'Платёж не завершён, его можно продолжить',
     coTopup: 'Пополнить',

@@ -34,8 +34,13 @@
         </view>
       </template>
 
-      <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary. -->
-      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" role="alert"><text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
+      <!-- Retrying the user's own claim is a text button beside the reason (03 §3.1, 3.5.2), not a second full-width primary.
+           The line itself is a sheet status or hint line (10 §10.2): a result still being confirmed is a status line (16px status
+           icon, body ink); a refusal is a hint line (16px warning icon, primary ink). -->
+      <view v-if="freeTrial.pendingStart || claimError || retryHeld" class="tcs-error" :class="lineIsStatus ? 'tcs-error--status' : 'tcs-error--hint'" role="alert">
+        <svg v-if="lineIsStatus" class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        <svg v-else class="tcs-error-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+        <text class="tcs-error-t">{{ retryHeld ? heldReasonText : claimErrorText }}</text><NxButton v-if="showRetry" class="tcs-retry" variant="text" size="small" :label="t.trial.claimRetryCta" :busy="claiming" :busy-label="copy.activating" :disabled="claimDisabled" @click="onClaim" /></view>
       <!-- A failed read recovers on its own (03 §3.5.2, 04.5): warning icon, the result and the retry line, no button. -->
       <view v-else-if="!activated && !claiming && stateReadFailed" class="tcs-read-state" role="status">
         <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
@@ -113,7 +118,10 @@ const claimDisabled = computed(() => claiming.value || claimDenied.value || (fre
 // so a retry does not swap to the full-width primary, and the reason it sat beside stays up until the claim settles.
 const claimFromRetry = ref(false);
 const heldReasonText = ref("");
+const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+// The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 useAutoRecovery({
   active: () => sheet.open && !claiming.value,
@@ -154,6 +162,7 @@ async function onClaim() {
   const requestedSequence = ++claimSequence;
   claimFromRetry.value = claimRetryable.value;
   heldReasonText.value = claimErrorText.value;
+  heldStatusLine.value = !!freeTrial.pendingStart;
   claiming.value = true;
   claimError.value = false;
   claimErrorReason.value = undefined;
@@ -233,8 +242,14 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-success-body { display:block;font:400 var(--ui-type-list-subtitle)/1.65 var(--font-v5);color:var(--v5-ink-2); }
 .tcs-success-time { display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-top:14px;font:400 12px/1.5 var(--font-v5);color:var(--v5-ink-3); }
 .tcs-success-time > text:last-child { font-size:22px;font-weight:500;color:var(--v5-brand); }
-.tcs-error { display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px 16px;margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--v5-warning) 10%,transparent); }
-.tcs-error-t { display:block;flex:1 1 12em;min-width:0;font:400 12px/1.65 var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+/* Sheet status / hint line (10 §10.2): description role 13/20, a 16px icon on the first line, no box. */
+.tcs-error { display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 8px;margin-top:16px;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.tcs-error-icon { flex:none;width:16px;height:16px;margin-top:calc((var(--ui-type-description-lh) - 16px) / 2); }
+.tcs-error-t { display:block;flex:1 1 12em;min-width:0;overflow-wrap:break-word; }
+.tcs-error--status { color:var(--v5-ink-2); }
+.tcs-error--status .tcs-error-icon { color:var(--v5-ink-3); }
+.tcs-error--hint { color:var(--v5-ink); }
+.tcs-error--hint .tcs-error-icon { color:var(--v5-warning-ink); }
 /* Read failure in the sheet: the receipt sheet's result block (03 §3.5.2, 04.5), centred, no button. */
 .tcs-read-state { display:flex;flex-direction:column;align-items:center;padding:20px 24px 0;text-align:center; }
 .tcs-read-state__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-warning-ink);background:var(--v5-warning-soft); }

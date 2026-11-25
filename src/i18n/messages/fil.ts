@@ -2543,7 +2543,7 @@ export const fil: Messages = {
     coBillVoucherPart: "voucher −${amount}",
     coBillTradeinPart: "trade-in {name} −${amount}",
     coBillCardFeePart: "kasama ang {rate} card fee ${amount}",
-    coRowTrialDiscount: "Diskwento sa trial ({pct}%, hanggang {cap})",
+    coRowTrialDiscount: "Diskwento sa trial ({pct}%,\u00a0hanggang\u00a0{cap})",
     coRowTrialDiscountNoCap: "Diskwento sa trial ({pct}%)",
     coRowTrialOffset: "Credit sa trial",
     coTrialZeroNote: "$0.00 ang babayaran — hindi ire-refund o ibibigay ang credit na lampas sa presyo.",
