@@ -2131,6 +2131,7 @@ export const id: Messages = {
     sheetProp3Title: "Hemat hingga ${amount}",
     sheetDismissCta: "Nanti saja",
     claimUnknownInline: "Aktivasi uji coba sedang dikonfirmasi. Diperbarui otomatis setelah dikonfirmasi.",
+    claimNotStartedInline: "Uji coba belum aktif. Anda bisa mencoba lagi.",
     claimOnboardingRequired: "Uji coba belum bisa diklaim saat ini. Hubungi layanan pelanggan.",
     claimOnboardingCta: "Hubungi CS",
     claimTermsRequired: "Uji coba belum dimulai. Setujui ketentuan layanan, lalu kembali untuk klaim.",

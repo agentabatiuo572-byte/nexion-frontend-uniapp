@@ -2131,6 +2131,7 @@ export const kk: Messages = {
     sheetProp3Title: "Ең көп үнем: ${amount}",
     sheetDismissCta: "Кейінірек",
     claimUnknownInline: "Сынақтың іске қосылуы расталуда. Расталған соң өзі жаңарады.",
+    claimNotStartedInline: "Сынақ іске қосылмады. Қайта көруге болады.",
     claimOnboardingRequired: "Сынақты қазір алу мүмкін емес. Қолдау қызметіне жазыңыз.",
     claimOnboardingCta: "Қолдауға жазу",
     claimTermsRequired: "Сынақ басталмады. Қызмет шарттарын растап, алуға оралыңыз.",

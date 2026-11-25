@@ -15,6 +15,8 @@ export interface StickyCTAPayload {
   amountSubtext?: string;
   /** A reason or status shown above the button (04 §4.0 .nx-tray-note), e.g. why the button is disabled. */
   note?: string;
+  /** A lone status with nothing to press (03 §3.5.2): the bar shows only it, as the shared .nx-tray-status capsule (04 §4.0). */
+  status?: string;
   quantity?: { value: number; min: number; max: number; decrease: () => void; increase: () => void };
   buttonLabel?: string;
   /** Disabled CTA remains visible but never navigates or vibrates. */

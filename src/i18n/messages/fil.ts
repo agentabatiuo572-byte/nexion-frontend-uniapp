@@ -2131,6 +2131,7 @@ export const fil: Messages = {
     sheetProp3Title: "Tipid hanggang ${amount}",
     sheetDismissCta: "Mamaya na",
     claimUnknownInline: "Kinukumpirma ang pag-activate ng trial. Kusang mag-a-update kapag nakumpirma.",
+    claimNotStartedInline: "Hindi na-activate ang trial. Puwede mong subukan ulit.",
     claimOnboardingRequired: "Hindi ma-claim ang trial sa ngayon. Makipag-ugnayan sa support.",
     claimOnboardingCta: "Kontakin ang support",
     claimTermsRequired: "Hindi pa nagsisimula ang trial. Kumpirmahin ang tuntunin ng serbisyo, saka bumalik para i-claim ito.",

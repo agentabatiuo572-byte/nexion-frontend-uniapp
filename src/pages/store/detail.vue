@@ -227,7 +227,7 @@ function formatAmount(value: Parameters<typeof formatPlainAmount>[0]): string {
 }
 import { formatAmount as formatPlainAmount, formatGroupedAmount } from "@/lib/amount-display";
 import { productDailyEstimateRange, productDailyUvtRange } from "@/lib/product-estimates";
-import { estimateRangeParts } from "@/lib/estimate-display";
+import { estimateRangeParts, formatEstimateRange } from "@/lib/estimate-display";
 import { navTo, takeNavigationParameters } from "@/lib/route";
 import { ref, computed, watch, onActivated, onDeactivated, onUnmounted, nextTick, type CSSProperties } from "vue";
 import { onLoad, onHide, onShow, onUnload } from "@dcloudio/uni-app";
@@ -580,8 +580,9 @@ const dailyUvtParts = computed(() => {
   const uvt = productDailyUvtRange(product.value);
   return rangeParts(uvt.low * qty.value, uvt.high * qty.value, qty.value !== 1);
 });
-const dailyEstimateLine = computed(() => dailyUsdtParts.value
-  ? fmt(t.value.store.detDailyEstimateLine, { n: dailyUsdtParts.value.join("") }) : undefined);
+// One string in the tray: the range keeps together and moves to the next line as a whole (03 §3.6.1).
+const dailyEstimateLine = computed(() => dailyEstimate.value ? fmt(t.value.store.detDailyEstimateLine, {
+  n: formatEstimateRange(dailyEstimate.value.low * qty.value, dailyEstimate.value.high * qty.value, qty.value !== 1) }) : undefined);
 const annualYieldText = computed(() => formatAmount(annualYield.value));
 const monthlyPctText = computed(() =>
   totalPrice.value > 0 ? ((monthlyYield.value / totalPrice.value) * 100).toFixed(1) : "0",
@@ -616,11 +617,15 @@ const ownTrialOriginal = computed(() => {
   const original = trialCheckout.originalPurchase;
   return original?.claimNo === ownTrialClaim.value && original.device.productNo === product.value?.id ? original : null;
 });
+// A payment for this trial is in progress, on this device or another one in the list.
+const ownTrialPaymentLocked = computed(() => {
+  const claim = ownTrialClaim.value;
+  return !!claim && (!!trialCheckout.originalPurchase || trialExternalPaymentActive(claim) || freeTrial.legacyConversionPending);
+});
 const ownTrialBlock = computed(() => {
   const claim = ownTrialClaim.value;
   if (!claim) return "";
-  if (trialCheckout.originalPurchase || trialExternalPaymentActive(claim) || freeTrial.legacyConversionPending)
-    return trialDetailCopy.value.lockNote;
+  if (ownTrialPaymentLocked.value) return trialDetailCopy.value.lockNote;
   if (freeTrial.authorityClaimNo !== claim || freeTrial.authorityStatus !== "ready"
       || trialOptions.claimNo !== claim || trialOptions.current.status !== "ready")
     return t.value.store.purchaseEligibilityLoading;
@@ -697,10 +702,12 @@ function publishStickyCTA() {
       const checkingBalance = original?.kind === "BALANCE" && original.status === "PROCESSING";
       sticky.show({
         href: continuing ? originalTrialCheckoutHref(continuing) : `/pages/store/detail?id=${product.value.id}`,
-        // The catalog price beside 继续支付 would read as the amount of the original payment.
-        amount: checkingBalance || continuing ? undefined : `${priceText.value}`,
+        // Beside the lock note the catalog price would read as the amount of that payment, also when it is for another device.
+        amount: ownTrialPaymentLocked.value ? undefined : `${priceText.value}`,
         // Loading and silent recovery read the same to the user: the reason sits above the disabled button (03 §3.1, 04 §4.0).
-        note: checkingBalance ? trialPurchaseCopy.value.coConfirming : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
+        // A balance result still being read has nothing to press: the bar is the lone status capsule, as on trial detail and checkout.
+        status: checkingBalance ? trialPurchaseCopy.value.coConfirming : undefined,
+        note: checkingBalance ? undefined : ownTrialBlock.value || t.value.store.purchaseEligibilityLoading,
         buttonLabel: checkingBalance ? undefined : continuing ? t.value.orders.pendingContinue : t.value.store.cardBuyNow,
         disabled: !continuing,
         showTabBar: false,
@@ -755,7 +762,7 @@ function publishStickyCTA() {
     }, stickyOwner);
 }
 watch(
-  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption,ownTrialClaim,ownTrialBlock,ownTrialOriginal],
+  [stickyPageVisible, catalogStatus, product, isShare, isLocked, purchaseUnavailable, stockUnavailable, priceText, dailyEarnText, dailyEstimateLine, purchaseGate, eligibility, purchaseEligibilityMessage,activityId,promotionStatus,promotionAvailable,activity,qty,maxQuantity,voucherContext,trialCreditEntry,trialConfirmationOption,ownTrialClaim,ownTrialBlock,ownTrialOriginal,ownTrialPaymentLocked],
   publishStickyCTA,
   { immediate: true },
 );

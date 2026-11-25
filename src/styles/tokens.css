@@ -1102,6 +1102,11 @@ body {
 /* Without backdrop-filter the translucent fill would show the content through it unblurred: use the solid surface. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .nx-float-panel { background: var(--v5-surface-2); } }
 @media (forced-colors: active) { .nx-float-panel { background: Canvas; box-shadow: none; outline: 1px solid CanvasText; outline-offset: -1px; backdrop-filter: none; -webkit-backdrop-filter: none; } }
+/* A lone status in the bar (.nx-tray-status, 04 §4.0 状态胶囊) is sized and set like the floating disabled primary: L 48, a pill,
+   button type, grey ink, centred, wrapping inside its padding. Low specificity, so a page's own status layout (daily's
+   check-in row, rank's spinner dock) keeps its own values; its material comes from the bar rules here. */
+:where(.nx-glass-bar) .nx-tray-status { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 20px; border-radius: 999px; color: var(--ui-tray-disabled-ink); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); }
+:where(.nx-glass-bar .nx-tray-status) > :only-child { text-align: center; }
 .nx-glass-bar .nx-tray-note { display: block; padding: 4px 12px 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); text-align: center; overflow-wrap: break-word; text-wrap: pretty; }
 .nx-glass-bar .nx-button--primary.nx-button--disabled, .nx-tray-float.nx-button--primary.nx-button--disabled { opacity: 1; }
 .nx-glass-bar:not(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-button--primary.nx-button--disabled > .nx-button__surface, .nx-glass-bar:not(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) [role="button"][aria-disabled="true"]:not(.nx-button, .nx-tray-text), .nx-glass-bar:not(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-tray-status, .nx-tray-float.nx-button--primary.nx-button--disabled > .nx-button__surface {
@@ -1111,7 +1116,7 @@ body {
   backdrop-filter: blur(24px) saturate(125%);
   -webkit-backdrop-filter: blur(24px) saturate(125%);
 }
-.nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-button--primary.nx-button--disabled > .nx-button__surface, .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) [role="button"][aria-disabled="true"]:not(.nx-button, .nx-tray-text) {
+.nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-button--primary.nx-button--disabled > .nx-button__surface, .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) [role="button"][aria-disabled="true"]:not(.nx-button, .nx-tray-text), .nx-glass-bar:is(:has(> :not(.nx-button, [role="button"], .nx-tray-status, .nx-tray-overlay)), :has(> :is(.nx-button, [role="button"], .nx-tray-status) ~ :is(.nx-button, [role="button"], .nx-tray-status))) .nx-tray-status {
   opacity: 1; color: var(--ui-tray-disabled-ink); background: var(--ui-tray-disabled-fill);
   box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
 }

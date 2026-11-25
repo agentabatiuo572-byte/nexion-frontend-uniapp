@@ -14,6 +14,7 @@
 <template>
   <view v-if="cta" class="scb-outer" :style="outerStyle">
     <view class="scb-bar nx-glass-bar">
+      <view v-if="cta.status" class="nx-tray-status" role="status"><text>{{ cta.status }}</text></view>
       <text v-if="cta.note" class="scb-note nx-tray-note" role="status">{{ cta.note }}</text>
       <view v-if="cta.amount" class="scb-info nx-tray-copy">
         <!-- Eyebrow — explicitly labels the number as PRICE so it isn't
@@ -159,6 +160,8 @@ function onTap() {
 }
 .scb-cta { max-width:100%; box-sizing:border-box; min-height:48px; height:auto; padding-block:10px; text-align:center; }
 .scb-cta svg { flex:none; }
+/* No price slot (a note and one action, or one action alone): the action is the full-width L 48 (04 §4.0), as trial detail's. */
+.scb-bar:not(:has(.scb-info, .scb-quantity)) .scb-cta { flex:1 1 100%; }
 @media(max-width:350px) { .scb-cta { flex:1 1 100%; } }
 </style>
 

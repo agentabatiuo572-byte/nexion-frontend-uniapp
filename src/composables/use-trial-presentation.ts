@@ -1,4 +1,4 @@
-import { computed, shallowRef, watchEffect } from "vue";
+import { computed, ref, shallowRef, watchEffect } from "vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { liveShadowNEX, liveShadowUSD, useFreeTrial } from "@/store/free-trial";
@@ -19,7 +19,10 @@ export function useTrialPresentation(displayActive?: () => boolean, options: {
     & { config: TrialConfig; offsetUSD: number | null };
   const retained = shallowRef<TrialPresentationRow | null>(null);
   let binding = `${app.accountKey}:${app.accountBindingEpoch}`;
-  const presentationReady = computed(() => !remoteApiEnabled || trial.authorityServerState !== null);
+  const authorityRead = computed(() => !remoteApiEnabled || trial.authorityServerState !== null);
+  // A cancel still being confirmed holds its row until it settles, also after a read already shows the trial cancelled.
+  const holding = ref(false);
+  const presentationReady = computed(() => authorityRead.value && !holding.value);
   const displayReady = computed(() => presentationReady.value
     || (options.retainOnReadFailure === true && trial.transientReadFailure && retained.value !== null));
   const readFailedWithoutData = computed(() => remoteApiEnabled && trial.lastReadFailed && !displayReady.value);
@@ -33,8 +36,16 @@ export function useTrialPresentation(displayActive?: () => boolean, options: {
       retained.value = null;
       binding = nextBinding;
     }
-    if (presentationReady.value) retained.value = {
-      ...trial.snapshot(),
+    // While held the row reads as an unknown result, as when the read fails (03 §3.5.2); it leaves with the one
+    // confirmation toast, as when the cancel receipt is read directly (04 §4.6 设备页试用行).
+    const held = retained.value;
+    const next = authorityRead.value ? trial.snapshot() : null;
+    const hold = !!options.retainWhileConfirming?.() && !!trial.pendingCancel && (held?.status === "active" || held?.status === "grace")
+      && next?.status !== "active" && next?.status !== "grace";
+    holding.value = hold;
+    if (hold) return;
+    if (next) retained.value = {
+      ...next,
       config: { ...trialConfig.config },
       offsetUSD: trial.authoritativeOffsetUSD,
     };

@@ -40,10 +40,25 @@
         <NxButton variant="text" size="small" :label="t.ui.reload" @click="refreshVisibleCheckout(true)" />
       </view>
 
-      <view v-else-if="trialQuoteScreenUnavailable" class="text-center" role="status" style="padding: var(--v5-space-6) var(--v5-space-4)">
-        <text class="block" style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3)">{{ freeTrial.authorityStatus === 'loading' ? t.trial.entryChecking : t.trial.entryUnavailable }}</text>
-        <NxButton variant="secondary" :label="t.trial.entryRetry" :busy="freeTrial.authorityStatus === 'loading'" @click="freeTrial.refreshRemote(true)" />
+      <!-- Waiting on the trial state (03 §3.4, §3.5.2): a trial start or cancel still being confirmed is a status with no button,
+           read on its own; a first read keeps the checkout's shape; only a failed read is the page result with its one 重新加载. -->
+      <view v-else-if="trialQuoteScreenUnavailable && trialWaitReason === 'confirming'" class="checkout-page-center" role="status">
+        <NxResultHead tone="warning" icon="clock" :title="trialCopy.resultConfirming" :description="trialCopy.resultConfirmingNote" />
       </view>
+      <view v-else-if="trialQuoteScreenUnavailable && trialWaitReason === 'loading'" class="checkout-trial-wait" aria-busy="true">
+        <view class="checkout-product checkout-group">
+          <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ product?.name }}</text><view class="checkout-skeleton checkout-skeleton--price" aria-hidden="true" /></view>
+        </view>
+        <view class="checkout-section">
+          <view class="checkout-section-heading"><text>{{ t.store.coReviewOrder }}</text></view>
+          <view class="checkout-group checkout-fees">
+            <view class="checkout-fee checkout-trial-fee"><text class="checkout-trial-fee__label">{{ t.store.coRowSubtotal }}</text><view class="checkout-skeleton" aria-hidden="true" /></view>
+            <view class="checkout-fee checkout-fee--total checkout-summary-total"><text>{{ flowCopy.paymentTotal }}</text><view class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /></view>
+          </view>
+        </view>
+      </view>
+      <EmptyState v-else-if="trialQuoteScreenUnavailable" kind="recoverable-error" page :title="purchaseCopy.coLoadFailed" :cta-label="t.ui.reload" :cta-busy="freeTrial.authorityStatus === 'loading'" @cta="freeTrial.refreshRemote(true)" />
 
       <!-- Product not found -->
       <view v-else-if="!product && !trialOriginal" class="text-center" style="padding: var(--v5-space-5)">
@@ -97,11 +112,19 @@
               <view v-if="voucherDetailsOpen && !multiTrialCheckout" class="checkout-voucher-details">
                 <text v-if="voucherMatch" class="checkout-row-description checkout-voucher-match">{{ voucherMatch.def.name }}</text>
                 <view class="checkout-voucher-choices" role="radiogroup" :aria-label="t.promotion.voucher">
-                  <view v-for="choice in [{ automatic: true, label: reviewCopy.automaticVoucher }, { automatic: false, label: t.promotion.noVoucher }]" :key="String(choice.automatic)" class="checkout-voucher-choice" role="radio" :data-automatic="String(choice.automatic)" :aria-checked="voucherAutomatic === choice.automatic" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === choice.automatic ? 0 : -1" @click="selectAutomaticVoucher(choice.automatic)"
-                    @keydown.space.stop.prevent="selectAutomaticVoucher(choice.automatic)" @keydown.enter.stop.prevent="selectAutomaticVoucher(choice.automatic)"
-                    @keydown.down.stop.prevent="moveVoucherChoice(choice.automatic)" @keydown.right.stop.prevent="moveVoucherChoice(choice.automatic)" @keydown.up.stop.prevent="moveVoucherChoice(choice.automatic)" @keydown.left.stop.prevent="moveVoucherChoice(choice.automatic)">
-                    <text class="checkout-voucher-choice__label">{{ choice.label }}</text>
-                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === choice.automatic }" aria-hidden="true" />
+                  <!-- Single-select rows (03 §3.5): the checked row is the one tab stop; arrows move to the other choice and select it; Space/Enter select.
+                       Written out (no v-for) so the radio-group keyboard gate sees both members. -->
+                  <view class="checkout-voucher-choice" role="radio" data-automatic="true" :aria-checked="voucherAutomatic === true" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === true ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(true)"
+                    @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(true)"
+                    @keydown.down.stop.prevent="moveVoucherChoice(true)" @keydown.right.stop.prevent="moveVoucherChoice(true)" @keydown.up.stop.prevent="moveVoucherChoice(true)" @keydown.left.stop.prevent="moveVoucherChoice(true)">
+                    <text class="checkout-voucher-choice__label">{{ reviewCopy.automaticVoucher }}</text>
+                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === true }" aria-hidden="true" />
+                  </view>
+                  <view class="checkout-voucher-choice" role="radio" data-automatic="false" :aria-checked="voucherAutomatic === false" :aria-disabled="!canChangeVoucher()" :tabindex="canChangeVoucher() && voucherAutomatic === false ? 0 : -1" @click="canChangeVoucher() && selectAutomaticVoucher(false)"
+                    @keydown.space.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)" @keydown.enter.stop.prevent="canChangeVoucher() && selectAutomaticVoucher(false)"
+                    @keydown.down.stop.prevent="moveVoucherChoice(false)" @keydown.right.stop.prevent="moveVoucherChoice(false)" @keydown.up.stop.prevent="moveVoucherChoice(false)" @keydown.left.stop.prevent="moveVoucherChoice(false)">
+                    <text class="checkout-voucher-choice__label">{{ t.promotion.noVoucher }}</text>
+                    <view class="checkout-voucher-radio" :class="{ 'checkout-voucher-radio--on': voucherAutomatic === false }" aria-hidden="true" />
                   </view>
                 </view>
                 <view class="checkout-voucher-link" role="link" tabindex="0" @click="navTo('/pages/me/rewards-list?cat=voucher')"><text>{{ auditCopy.vouchers }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></view>
@@ -296,7 +319,7 @@
       </view>
       <!-- No tray while the original order's external payment is under way: nothing to do here, and its USD total would read
            as the external payment's total (P4 card on the page instead). -->
-      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && !trialQuoteScreenUnavailable && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
+      <view v-if="!promotionRoute && !keepCheckoutTarget && !originalCheckoutClosed && !pendingCreateUnresolved && !pendingCreateTerms && !originalOrderNavigationFailed && !remoteTradeinRecoveryError && (product || trialOriginal) && (!trialQuoteScreenUnavailable || trialWaitLoading) && !receiptWriteFailure && !originalExternalPaying && (step === 'select-payment' || step === 'confirm')" class="checkout-sticky nx-glass-bar">
         <!-- A balance payment still confirming has nothing to press (03 §3.5.2): the tray holds only its status capsule (04 §4.0). -->
         <view v-if="trialProgressOnly" class="nx-tray-status checkout-tray-status" role="status"><text>{{ purchaseCopy.coConfirming }}</text></view>
         <template v-else>
@@ -305,8 +328,8 @@
           <text v-if="trialTrayNote" class="nx-tray-note w-full checkout-tray-consequence" :role="trialTrayWarning ? undefined : 'status'">{{ trialTrayNote }}</text>
         </template>
         <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
-        <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
-        <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
+        <view class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" currency="USD" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
+        <NxButton variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || trialWaitLoading || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
         </template>
       </view>
       <!-- D1 (contract P2): back on a checkout whose unpaid original order can still be cancelled stops here and asks. Keeping is
@@ -334,6 +357,7 @@ import { formatCheckoutReviewAmount } from '@/lib/checkout-review-amount';
 import { ref, reactive, shallowRef, nextTick, computed, watch, provide, onMounted, onUnmounted, getCurrentInstance, type CSSProperties } from "vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
+import EmptyState from "@/components/empty-state.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
@@ -350,7 +374,7 @@ import { useConversations } from '@/store/conversations';
 import type { CreatedOrder } from '@/api/order-api';
 import { useAuditUiCopy } from "@/i18n/audit-ui";
 import { onHide, onLoad, onShow, onUnload, onBackPress } from "@dcloudio/uni-app";
-import { documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
+import { appDeviceOffline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
 import PromotionCheckout from '@/components/promotion/promotion-checkout.vue';
 import { orderTopupNetwork, trialExternalRequote, type OrderTopupNetwork } from '@/api/purchase-payment-api';
 import { capacityPaymentKind, readCapacityPending } from '@/lib/capacity-command-recovery';
@@ -1437,6 +1461,16 @@ const trialQuoteScreenUnavailable = computed(() => !multiTrialCheckout.value && 
   && !(trialRoute.value && (pendingTrialPurchase.value || legacyTrialResume.value))
   && (trialReviewStatus.value !== "legacy" || trialQuoteIncomplete.value
     || (freeTrial.authorityStatus !== "ready" && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null))));
+// Why an ordinary checkout waits on the trial state, for the page and its tray only (what may be paid stays trialQuoteUnavailable):
+// a start or cancel still being confirmed, a read under way with no failure behind it (as trial.vue), else a failed read.
+const trialWaitReason = computed(() => freeTrial.authorityResultUnknown ? "confirming"
+  : (freeTrial.authorityStatus === "loading" ? !freeTrial.lastReadFailed && !freeTrial.authorityIncomplete
+    : freeTrial.authorityStatus === "unknown" && freeTrial.authorityError === null && !appDeviceOffline.value) ? "loading" : "failed");
+const trialWaitLoading = computed(() => !multiTrialCheckout.value && trialQuoteUnavailable.value && trialWaitReason.value === "loading");
+// An order already created keeps its page; its disabled tray says why (03 §3.1, §3.4).
+const trialWaitNote = computed(() => multiTrialCheckout.value || !hasOriginalCheckout.value || !trialQuoteUnavailable.value
+  || trialWaitReason.value === "loading" ? ""
+  : trialWaitReason.value === "confirming" ? trialCopy.value.resultConfirming : purchaseCopy.value.coLoadFailed);
 const trialConversionMode = computed(() => trialView.value.applied);
 const purchaseSubtotal = computed(() => createdCheckoutOrder.value?.subtotalUsdt ?? pendingCheckoutCreate.value?.subtotal
   ?? (multiTrialCheckout.value ? trialReviewQuote.value?.priceUSD ?? 0
@@ -2073,7 +2107,7 @@ const trialCheckoutNotice = computed(() => {
   return "";
 });
 const trayNotice = computed(() => legacyTrialResume.value ? purchaseCopy.value.coUnfinished
-  : multiTrialCheckout.value ? trialCheckoutNotice.value : checkoutTrayBlock.value);
+  : multiTrialCheckout.value ? trialCheckoutNotice.value : checkoutTrayBlock.value || trialWaitNote.value);
 const trayBusy = computed(() => multiTrialCheckout.value
   ? trialCheckoutWorking.value || (trialReviewStatus.value === "loading" && !trialOriginalLocked.value)
   : checkoutPurchaseChecking.value);
@@ -4808,7 +4842,7 @@ button.checkout-quantity-button::after {border:0;}
 /* Voucher choice is a single-select list aligned with the row copy, then a muted link to the voucher list. */
 .checkout-voucher-details { border-bottom:1px solid var(--v5-border); }
 .checkout-voucher-match { padding:var(--v5-space-2) var(--v5-space-4) 0 64px; }
-.checkout-voucher-choices { padding:var(--v5-space-1) var(--v5-space-4) var(--v5-space-1) 64px; }
+.checkout-voucher-choices { display:flex; flex-direction:column; gap:var(--v5-space-1); padding:var(--v5-space-1) var(--v5-space-1) var(--v5-space-2) 52px; }
 .checkout-tradein :deep(.nx-button) { flex:none; max-width:42%; }
 /* Long trade-in labels (ru, kk) would squeeze the title into 3 lines: the action drops below, right-aligned. */
 .checkout-tradein { flex-wrap:wrap; }
@@ -4870,8 +4904,6 @@ button.checkout-policy-link::after { border:0; }
 /* P4 card: the first block of the review column, with the product card's margins (16 sides, 20 to the next block). */
 .checkout-paying-card { margin:var(--v5-space-5) var(--v5-space-4) 0; }
 .checkout-sticky-copy { min-width:0; }
-/* The lone status capsule takes the floating disabled primary's size and ink (04 §4.0, 03 §3.1); the glass comes from the shared bar. */
-.checkout-tray-status { display:flex;align-items:center;justify-content:center;flex:1 1 100%;min-height:48px;padding:4px 20px;box-sizing:border-box;border-radius:999px;color:var(--ui-tray-disabled-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);text-align:center; }
 /* A button pushed onto its own line stays on the right (03 §3.6.1). */
 .checkout-sticky-copy + :deep(.nx-button) { margin-left:auto; }
 /* Text link (03 §3.9): 13/18, 500, muted, trailing chevron; one line; a 44px hit area that does not grow the note. */
@@ -4903,7 +4935,7 @@ button.checkout-policy-link::after { border:0; }
    under the header. The chassis scroller has a definite height, so each wrapper down to this state stretches to it. */
 :global(.nx-content > :has(.checkout-page-center)) { display:flex; flex-direction:column; min-height:100%; }
 :global(.nx-page-enter:has(.checkout-page-center)) { flex:1 0 auto; display:flex; flex-direction:column; }
-.checkout-content:has(.checkout-page-center) { flex:1 0 auto; display:flex; flex-direction:column; padding-bottom:0; }
+.checkout-content:has(.checkout-page-center), .checkout-content:has(.nx-empty--page) { flex:1 0 auto; display:flex; flex-direction:column; padding-bottom:0; }
 .checkout-page-center { flex:1 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:var(--v5-space-5); text-align:center; }
 /* With the floating 重新提交 button the group centres in the space above it (button 48 + offset 22 + gap 16). */
 .checkout-content:has(.checkout-original-open--action) { padding-bottom:calc(48px + var(--nx-tray-bottom, 22px) + 16px); }
@@ -4930,13 +4962,15 @@ button.checkout-policy-link::after { border:0; }
 </style>
 
 <style scoped>
-.checkout-voucher-choice { min-height:48px; display:flex; align-items:center; gap:var(--v5-space-3); border-bottom:1px solid var(--v5-border); cursor:pointer; }
-.checkout-voucher-choice:last-child { border-bottom:0; }
+/* Single-select rows (03 §3.5): the checked row is brand 10% with a 1.5px brand inner edge; the circle is a 1.5px ink-3 ring,
+   checked a 2px brand ring with a 12px brand dot; no movement on change. A group that cannot change is 50% throughout. */
+.checkout-voucher-choice { min-height:48px; display:flex; align-items:center; gap:var(--v5-space-3); padding:0 var(--v5-space-3); border-radius:12px; cursor:pointer; }
+.checkout-voucher-choice[aria-checked="true"] { background:color-mix(in srgb, var(--v5-brand) 10%, transparent); box-shadow:inset 0 0 0 1.5px var(--v5-brand); }
 .checkout-voucher-choice__label { flex:1; min-width:0; color:var(--v5-ink-2); font:400 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
 .checkout-voucher-choice[aria-checked="true"] .checkout-voucher-choice__label { color:var(--v5-ink); font-weight:var(--ui-type-subheading-weight); }
-.checkout-voucher-choice[aria-disabled="true"] { opacity:.45; pointer-events:none; }
+.checkout-voucher-choice[aria-disabled="true"] { opacity:.5; pointer-events:none; }
 /* Radio per design rules: hollow 1.5px ring; selected = 2px brand ring + 12px brand dot, no checkmark. */
-.checkout-voucher-radio { width:22px; height:22px; flex:none; box-sizing:border-box; display:grid; place-items:center; border-radius:999px; border:1.5px solid var(--v5-ink-4); }
+.checkout-voucher-radio { width:22px; height:22px; flex:none; box-sizing:border-box; display:grid; place-items:center; border-radius:999px; border:1.5px solid var(--v5-ink-3); }
 .checkout-voucher-radio--on { border:2px solid var(--v5-brand); }
 .checkout-voucher-radio--on::after { content:""; width:12px; height:12px; border-radius:999px; background:var(--v5-brand); }
 .checkout-voucher-link { min-height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 16px 0 64px; border-top:1px solid var(--v5-border); color:var(--v5-ink-3); font:500 var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); cursor:pointer; }

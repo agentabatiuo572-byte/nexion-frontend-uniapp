@@ -1006,8 +1006,6 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-bar-space { visibility:hidden;display:flex;flex-direction:column;padding:0 32px calc(70px + env(safe-area-inset-bottom)); }
 .trial-bar-space__retry { height:48px; }
 .trial-bar__main { display:flex;width:100%; }
-/* The lone status capsule takes the floating disabled primary's size and ink (04 §4.0, 03 §3.1); the glass comes from the shared bar. */
-.trial-bar__status { display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:4px 20px;box-sizing:border-box;border-radius:999px;color:var(--ui-tray-disabled-ink);font:var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);text-align:center; }
 .trial-bar__side { flex:1 1 0;min-width:fit-content; }
 .trial-bar__wide { flex:2 1 0;min-width:fit-content; }
 .trial-bar :deep(.nx-button__content) { white-space:nowrap;font-variant-numeric:tabular-nums; }
