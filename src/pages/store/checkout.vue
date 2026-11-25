@@ -944,12 +944,13 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
     if (!isCurrentCheckoutRoute(routeScope)) return;
 
     const read = refreshProductCatalog(true);
+    // Keep the shared trial read running, but a known unrelated SKU does not wait for it.
+    const trialRead = trialResumeNo || trialRefusalNo || trialPaymentNo
+      ? freeTrial.refreshRemote(true) : freeTrial.refreshVisible();
     await Promise.all([
       read,
       refreshServerProductPhase(true),
-      // Recovery links must observe a purchase that may have ended since the
-      // previous screen. A passive read can reuse that screen's active state.
-      trialResumeNo || trialRefusalNo || trialPaymentNo ? freeTrial.refreshRemote(true) : freeTrial.refreshVisible(),
+      confirmedOrdinaryProduct.value ? undefined : trialRead,
     ]);
     if (!isCurrentCheckoutRoute(routeScope)) return;
     // A retry may have replaced the failed read while phase and trial were still loading.
@@ -1123,6 +1124,13 @@ const legacyTrialResume = computed(() => freeTrial.legacyConversionResumable ? f
 const trialsCanConvert = (status: string) => status === "active" || status === "grace";
 const trialAuthorityCanConvert = computed(() => freeTrial.authorityServerState === "ACTIVE"
   || freeTrial.authorityServerState === "GRACE" || freeTrial.authorityServerState === "EXTENDED");
+const confirmedOrdinaryProduct = computed(() => {
+  const snapshot = freeTrial.displayState;
+  if (!snapshot || trialCheckoutSource.value || hasLegacyTrialBalance() || !productId.value
+      || (freeTrial.lastReadFailed && !freeTrial.transientReadFailure)) return false;
+  const claimedProduct = resolveTrialCheckoutProductId(snapshot.config.trialProductId);
+  return snapshot.claimNo === null || (claimedProduct !== null && productId.value !== claimedProduct);
+});
 const trialRoute = computed(() => !hasOriginalCheckout.value && (trialCheckoutSource.value || hasLegacyTrialBalance()
   || (productId.value === trialDeviceNo.value && (remoteApiEnabled ? trialAuthorityCanConvert.value
     : trialsCanConvert(resolveTrialAt(freeTrial.snapshot(), mockServerNow(), trialCfg.value).status)))
@@ -1372,11 +1380,13 @@ const trialQuoteIncomplete = computed(() => trialEarlyQuoteLapsed.value
     && (freeTrial.authoritativeOffsetUSD === null || freeTrial.authoritativeRemainderUSD === null
       || freeTrial.authoritativePriceUSD === null)));
 const trialQuoteUnavailable = computed(() => multiTrialCheckout.value ? !trialReviewQuote.value
-  : remoteApiEnabled && !hasOriginalCheckout.value && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
+  : remoteApiEnabled && !hasOriginalCheckout.value && !confirmedOrdinaryProduct.value
+    && (freeTrial.authorityStatus !== "ready" || trialQuoteIncomplete.value));
 // While trial authority is loading, keep the last confirmed quote on
 // screen meanwhile instead of swapping the page out (which also threw the scroll back to the top);
 // every action still waits on trialQuoteUnavailable.
 const trialQuoteScreenUnavailable = computed(() => !multiTrialCheckout.value && remoteApiEnabled && !hasOriginalCheckout.value
+  && !confirmedOrdinaryProduct.value
   && !(trialRoute.value && (pendingTrialPurchase.value || legacyTrialResume.value)) && ((freeTrial.authorityStatus !== "ready"
   && !(freeTrial.authorityStatus === "loading" && freeTrial.authorityServerState !== null)) || trialQuoteIncomplete.value));
 const trialConversionMode = computed(() => trialView.value.applied);
