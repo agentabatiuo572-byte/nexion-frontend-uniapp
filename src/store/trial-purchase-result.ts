@@ -17,6 +17,7 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
   const app = useApp();
   const pending = shallowRef<TrialPurchaseResult[]>([]);
   const delivered = new Set<string>();
+  const outsideRefusals = new Set<string>();
   const presenters = new Set<(claimNo: string) => boolean>();
   const visibilityRevision = ref(0);
   const outsidePage = computed(() => {
@@ -26,6 +27,7 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
   watch(() => app.accountBindingEpoch, () => {
     pending.value = [];
     delivered.clear();
+    outsideRefusals.clear();
   }, { flush: "sync" });
 
   function publish(result: TrialPurchaseResult) {
@@ -34,11 +36,17 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
       pending.value = [...pending.value, result];
   }
 
-  function consume(key: string) {
+  function consume(key: string, outsideRefusal = false) {
     if (delivered.has(key)) return false;
     delivered.add(key);
+    if (outsideRefusal) outsideRefusals.add(key);
     pending.value = pending.value.filter(item => resultKey(item) !== key);
     return true;
+  }
+
+  // The next matching selection invalidation can use the refusal already shown by App.
+  function takeOutsideRefusal(key: string) {
+    return outsideRefusals.delete(key);
   }
 
   function registerPresenter(presents: (claimNo: string) => boolean) {
@@ -50,5 +58,5 @@ export const useTrialPurchaseResult = defineStore("trial-purchase-result", () =>
     };
   }
 
-  return { outsidePage, publish, consume, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
+  return { outsidePage, publish, consume, takeOutsideRefusal, registerPresenter, resultKey, wasDelivered: (key: string) => delivered.has(key) };
 });

@@ -33,8 +33,10 @@ import {
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialCheckout } from "@/store/trial-checkout";
 import { useTrialPurchaseResult } from "@/store/trial-purchase-result";
+import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useTrialPurchaseCopy } from "@/i18n/trial-purchase";
-import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
+import { trialExternalRequote } from "@/api/purchase-payment-api";
+import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 import { useBills } from "@/store/bills";
 import { postMoneyBill, postMoneyBillsOnce, postReceiptForAccount, type ReceiptDraft } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
@@ -513,6 +515,7 @@ if (remoteApiEnabled) {
   const trial = useFreeTrial();
   const trialCheckout = useTrialCheckout();
   const trialResults = useTrialPurchaseResult();
+  const trialDetailCopy = useTrialDetailCopy();
   const trialPurchaseCopy = useTrialPurchaseCopy();
   watch(() => trial.displayState, state => { if (state) trialCheckout.adoptAuthority(state); });
   watch(() => trial.confirmedCancelClaimNo, claimNo => {
@@ -535,13 +538,16 @@ if (remoteApiEnabled) {
   watch(() => trialResults.outsidePage, results => {
     const app = useApp(), epoch = app.accountBindingEpoch;
     for (const result of results) {
-      if (!trialResults.consume(trialResults.resultKey(result))) continue;
+      if (!trialResults.consume(trialResults.resultKey(result), result.status === "refused")) continue;
       if (result.status === "settled") {
         toast.success(trialPurchaseCopy.value.resultTitle);
         void useOrders().reconcileRemoteOrder(result.orderNo, () => app.accountBindingEpoch === epoch).catch(() => {});
       } else {
-        const reason = trialPurchaseReasonMessage(useT().value, result.reason, useLocaleStore().code);
-        if (reason) toast.warn(reason);
+        const t = useT().value;
+        const reason = trialExternalRequote(result.reason) ? t.store.coTrialQuoteChanged
+          : trialDeviceNeedsReselection(result.reason) ? trialDetailCopy.value.deviceGone
+          : trialPurchaseReasonMessage(t, result.reason, useLocaleStore().code) ?? trialPurchaseCopy.value.coPurchaseUnavailable;
+        toast.warn(reason);
       }
     }
   }, { flush: "post" });

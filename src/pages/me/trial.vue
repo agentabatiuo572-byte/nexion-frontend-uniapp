@@ -721,7 +721,15 @@ watch([() => app.accountBindingEpoch, () => displayState.value?.claimNo], () => 
   openingPurchase.value = false;
 }, { flush: "sync" });
 watch(() => hasScopedOptions.value ? trialOptions.current.invalidatedProductNo : null, (invalidated) => {
-  if (invalidated && pageVisible.value && !originalPurchase.value) toast.warn(detail.value.deviceGone);
+  if (!invalidated || !pageVisible.value || originalPurchase.value) return;
+  const outcome = checkout.outcome;
+  if (outcome.status === "refused" && outcome.claimNo === purchaseClaim.value && outcome.productNo === invalidated) {
+    const reason = outcome.refusal.reasonCode;
+    const optionReason = trialOptions.current.options.find(option => option.productNo === invalidated)?.reasonCode;
+    if ((reason === optionReason || reason === "TRIAL_PRODUCT_NOT_AVAILABLE" || trialDeviceNeedsReselection(reason))
+        && trialResults.takeOutsideRefusal(trialRefusalResultKey(outcome.claimNo, outcome.submissionNo))) return;
+  }
+  toast.warn(detail.value.deviceGone);
 }, { flush: "post" });
 watch([pageVisible, originalPurchase, purchaseConfirmation], ([visible, original, confirming]) => {
   if (visible && (original || confirming)) observedOriginalClaim = original?.claimNo ?? displayState.value?.claimNo ?? null;
