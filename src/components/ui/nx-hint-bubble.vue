@@ -145,6 +145,10 @@ onBeforeUnmount(() => {
 .nx-hint__arrow { position: absolute; top: 100%; width: 12px; height: 6px; margin-left: -6px; background: var(--v5-toast-bg); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 /* Layer order: captcha-slider.vue 秩序表 (785 catcher, 786 bubble, both below the business half sheets). */
 .nx-hint__catcher { position: fixed; inset: 0; z-index: 785; }
+/* #ifndef H5 */
+/* The App's catcher is above the page; the bubble sits one layer over it so a tap on the bubble stays on the bubble. */
+.nx-hint__bubble { z-index: 786; }
+/* #endif */
 @media (prefers-reduced-motion: reduce) { .nx-hint__bubble--placed { transition: none; } }
 /* Reduced transparency or more contrast: the shared surfaces' fallback (glass-surfaces.css), an opaque face and no blur.
    The theme's toast colour is laid over black, so the face stays the toast's dark in both themes. */
