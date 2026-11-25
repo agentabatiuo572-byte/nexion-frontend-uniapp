@@ -296,8 +296,10 @@ const server=http.createServer(async(req,res)=>{
           state.trialOriginalPurchaseState='none';
         }
         if(scenarioChange)for(const key of ['rankSalaryClaims','rankSalaryCommands','rankSalaryTransitions','rankSalaryExpirations'])delete state[key];
-        if(Number.isInteger(update.trialLifecycleAdvanceDays)&&update.trialLifecycleAdvanceDays>=0&&update.trialLifecycleAdvanceDays<=90)
+        if(Number.isInteger(update.trialLifecycleAdvanceDays)&&update.trialLifecycleAdvanceDays>=0&&update.trialLifecycleAdvanceDays<=90) {
           state.trialLifecycleAdvanceDays=update.trialLifecycleAdvanceDays;
+          checkoutFlow?.observePayments();
+        }
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
         if(update.topupState)delete state.bankTopupDemo;
@@ -569,8 +571,12 @@ const server=http.createServer(async(req,res)=>{
         const result=trialLifecycle.submit(url,trialLifecyclePath[1],req.headers,JSON.parse(body||'{}'));
         return sendJson(res,result.body,result.status);
       }
-      if(/^\/api\/trial\/(state|eligibility|purchase-options|convert)$/.test(url.pathname))
-        return sendJson(res,{code:0,message:'success',data:fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers})});
+      if(/^\/api\/trial\/(state|eligibility|purchase-options|convert)$/.test(url.pathname)) {
+        const data=fixtureFor(url,{method:()=>req.method,postDataJSON:()=>JSON.parse(body||'{}'),headers:()=>req.headers});
+        if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='slow')
+          await new Promise(resolve=>setTimeout(resolve,2800));
+        return sendJson(res,{code:0,message:'success',data});
+      }
       if(url.pathname==='/api/legal/terms/current')return sendJson(res,{code:0,message:'OK',data:demoFixture(url,locale,state,{method:()=>req.method,postDataJSON:()=>({}),headers:()=>req.headers})});
       for(const route of [...routes].reverse()) {
         if(route.matcher!=='**/*'&&!route.matcher(url))continue;
