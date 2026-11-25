@@ -73,7 +73,7 @@
             <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <ProductBadge v-if="copy.badge" :label="copy.badge" :kind="copy.badgeKind" detail />
             <!-- Live activity danmaku -->
-            <LiveSocialProof :product="product" :placement="trialCreditEntry ? 'top-right' : 'bottom-left'" />
+            <LiveSocialProof v-if="product.liveActivityVisible !== false" :product="product" :placement="trialCreditEntry ? 'top-right' : 'bottom-left'" />
           </view>
 
           <view class="detail-summary relative">
