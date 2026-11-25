@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref } from "vue";
+import { computed, onScopeDispose, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
 import { supportApi } from "@/api/runtime";
 import { apiClient,apiRuntimeConfig,sessionVault } from "@/api/runtime";
@@ -9,6 +9,7 @@ import { conversationPeerKey, groupConversationThreads, type ConversationThread 
 import type { ConversationUserClear } from '@/api/conversation-management';
 import { remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError } from "@/api/errors";
+import { isReadAuthorizationDenial, isTransientReadFailure } from "@/lib/remote-read-failure";
 import { awaitMessageOutcome, isConversationDeliveryAmbiguous, isConversationPeerChanged, isConversationUserClearRejected, MESSAGE_ACK_TIMEOUT_MS, MESSAGE_READBACK_TIMEOUT_MS, SupportReplyRejected } from '@/lib/conversation-delivery-policy';
 import { isSupportAttachmentNotReady, type ConversationDismissal, type CurrentAdvisor, type SupportCommandResult } from "@/api/support-api";
 import type { Conversation, ConversationCategoryAvailability, ConversationType } from "@/domain/support";
@@ -177,6 +178,9 @@ export const useConversations = defineStore("conversations", () => {
   const realtimeReady = ref(false);
   const realtimeFallback = ref(false);
   const scopeInvalidated = ref(0);
+  const unreadAvailable = ref(!remoteApiEnabled);
+  const unreadConversationIds = shallowRef<ReadonlySet<string> | null>(null);
+  const managementUnavailable = ref(false);
   const peerChangedReadbacks = ref<Record<string, Promise<void>>>({});
   const advisor = ref<CurrentAdvisor | null>(null);
   const advisorLoading = ref(false);
@@ -431,6 +435,7 @@ export const useConversations = defineStore("conversations", () => {
   function suspendForReauthentication() {
     // Stop old page watchers writing while the account is being unbound.
     humanWritesBlocked = true;
+    unreadAvailable.value = false;
   }
   function discardHumanOutbox() {
     suspendForReauthentication();
@@ -526,6 +531,7 @@ export const useConversations = defineStore("conversations", () => {
         // Assignment changes invalidate live presence, not the outcome of a sent command.
         // Keep the account's pending keys and payloads for authoritative readback.
         stopRealtime();
+        unreadAvailable.value = false;
         scopeInvalidated.value += 1;
         startRealtime();
         if (watched) watchRealtime(watched);
@@ -846,6 +852,46 @@ export const useConversations = defineStore("conversations", () => {
   /** A delayed page may add an absent row, but cannot erase or regress a newer live snapshot. */
   function mergeConversations(items: Conversation[]) { for (const conversation of items) replace(conversation); }
 
+  function inboxReadAuthority() {
+    return JSON.stringify([scopeInvalidated.value, passiveTabReadScope(false, false), captureRuntimeRevision().epoch]);
+  }
+
+  async function readInbox(current: () => boolean, currentAuthority: () => boolean) {
+    function track<T>(request: Promise<T> | T) {
+      return Promise.resolve(request).catch(cause => {
+        // A failed sibling request must not hide a later loss of read authority.
+        if (isReadAuthorizationDenial(cause) ? currentAuthority() : current() && !isTransientReadFailure(cause)) {
+          unreadAvailable.value = false;
+        }
+        throw cause;
+      });
+    }
+    const management = supportApi.conversationManagement?.().catch((cause: unknown) => {
+      if (isReadAuthorizationDenial(cause) || (!isTransientReadFailure(cause)
+        && !(cause instanceof ApiError && cause.kind === "protocol"))) throw cause;
+      // The cursor list already enforces server-side history visibility.
+      return null;
+    });
+    const reads = [
+      track(supportApi.conversations()),
+      track(supportApi.conversationDismissals()),
+      track(management),
+    ] as const;
+    // Keep realtime reconciliation active until both visibility and list reads have settled.
+    await Promise.allSettled(reads);
+    return Promise.all(reads);
+  }
+
+  function applyInbox([page, dismissals, capability]: Awaited<ReturnType<typeof readInbox>>) {
+    for (const marker of capability?.clearedPeers ?? []) applyUserClear(marker);
+    mergeConversations(page.items); mergeDismissals(dismissals);
+    deletionAvailable.value = capability?.clearUserHistory === true;
+    // Rows kept for open threads may be absent from the authoritative cursor list.
+    unreadConversationIds.value = new Set(page.items.map(row => row.id));
+    managementUnavailable.value = capability === null;
+    unreadAvailable.value = !humanWritesBlocked;
+  }
+
   function refresh(active:()=>boolean=()=>true, fresh = false): Promise<void> {
     const owner = JSON.stringify([accountKeyValue, accountEpoch, scopeInvalidated.value, passiveTabReadScope(), captureRuntimeRevision().epoch]);
     const previous = listPending?.owner === owner ? listPending : null;
@@ -873,14 +919,14 @@ export const useConversations = defineStore("conversations", () => {
         if (!snapshotIsCurrent(scope) || requestGeneration !== listRequestGeneration || !current()) return;
         deletionAvailable.value = false;
         pending.dispatched = true;
-        const [page, dismissals, capability] = await Promise.all([supportApi.conversations(), supportApi.conversationDismissals(), supportApi.conversationManagement?.()]);
-        if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration && current()) {
-          for (const marker of capability?.clearedPeers ?? []) applyUserClear(marker);
-          mergeConversations(page.items); mergeDismissals(dismissals);
-          deletionAvailable.value = capability?.clearUserHistory === true;
-        }
+        const authority = inboxReadAuthority();
+        const latest = () => snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration;
+        const canApply = () => latest() && current();
+        const inbox = await readInbox(canApply, () => latest() && authority === inboxReadAuthority());
+        if (canApply()) applyInbox(inbox);
       } catch (cause) {
         if (epoch === accountEpoch && requestGeneration === listRequestGeneration && current()) {
+          if (!isTransientReadFailure(cause)) unreadAvailable.value = false;
           error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
         }
         throw cause;
@@ -930,6 +976,12 @@ export const useConversations = defineStore("conversations", () => {
 
   function byType(type: ConversationType): Conversation[] {
     return conversations.value.filter((row) => row.type === type && visibleInInbox(row)).sort((a, b) => b.lastTs - a.lastTs);
+  }
+  function unreadByType(type: ConversationType): number {
+    const included = unreadConversationIds.value;
+    return conversations.value.reduce((sum, row) =>
+      row.type === type && visibleInInbox(row) && (included === null || included.has(row.id))
+        ? sum + row.unread : sum, 0);
   }
   function categoryReadable(type: ConversationType): boolean {
     return categoryEnabled(type) || (type !== "ai" && conversations.value.some(row => row.type === type));
@@ -1010,20 +1062,27 @@ export const useConversations = defineStore("conversations", () => {
 
   async function reconcileAll(account: AccountScope): Promise<void> {
     if (!accountScopeIsCurrent(account)) return;
+    const visibility = scopeInvalidated.value;
+    const readScope = passiveTabReadScope();
+    const current = () => accountScopeIsCurrent(account) && visibility === scopeInvalidated.value
+      && readScope === passiveTabReadScope();
     let requestGeneration: number | undefined;
     try {
       await preparePendingRun();
-      if (!accountScopeIsCurrent(account)) return;
+      if (!current()) return;
       const scope = snapshotScope();
       requestGeneration = ++listRequestGeneration;
       loading.value = true;
       error.value = null;
-      const [page, dismissals] = await Promise.all([supportApi.conversations(), supportApi.conversationDismissals()]);
-      if (snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration) {
-        mergeConversations(page.items); mergeDismissals(dismissals);
-      }
+      deletionAvailable.value = false;
+      const authority = inboxReadAuthority();
+      const latest = () => snapshotIsCurrent(scope) && requestGeneration === listRequestGeneration;
+      const canApply = () => latest() && current();
+      const inbox = await readInbox(canApply, () => latest() && authority === inboxReadAuthority());
+      if (canApply()) applyInbox(inbox);
     } catch (cause) {
-      if (accountScopeIsCurrent(account) && requestGeneration === listRequestGeneration) {
+      if (current() && requestGeneration === listRequestGeneration) {
+        if (!isTransientReadFailure(cause)) unreadAvailable.value = false;
         error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
       }
       // The original command failure remains authoritative for its caller.
@@ -1166,6 +1225,9 @@ export const useConversations = defineStore("conversations", () => {
   function reset() {
     stopRealtime();watchedId=null;
     advisorRequestGeneration += 1;
+    unreadAvailable.value = !remoteApiEnabled;
+    unreadConversationIds.value = null;
+    managementUnavailable.value = false;
     accountEpoch += 1; conversations.value = []; error.value = null; loading.value = false; typingIds.value = {};
     advisor.value = null; advisorLoading.value = false; advisorError.value = false;
     peerChangedReadbacks.value = {};
@@ -1197,5 +1259,5 @@ export const useConversations = defineStore("conversations", () => {
     }).catch(() => undefined);
   }
 
-  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,settleHumanComposer,resumeRetainedSend,recordHumanDispatch,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,hasIndexedHumanSend,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
+  return { conversations, humanThreads, getThread, openThread, loadEarlierThread, deleteConversation, deletionAvailable, deletingIds, dismissConversation, dismissingIds, dismissalAvailable, typingIds, onlineIds,realtimeReady,realtimeFallback,scopeInvalidated,peerChangedReadbacks,advisor,advisorLoading,advisorError,humanComposers,clearedComposerThrough,composer,saveComposer,settleHumanComposer,resumeRetainedSend,recordHumanDispatch,clearComposer,continueRejectedReply,suspendForReauthentication,discardHumanOutbox,pendingHumanSendKey,hasIndexedHumanSend,checkHumanReply,hasPendingHumanCreate,refreshAdvisor,startRealtime,stopRealtime,watchRealtime,setTyping, categoryAvailability, categoryAvailabilityStatus, categoryLoading, totalUnread, unreadAvailable, unreadByType, managementUnavailable, loading, mutating, error, refresh, refreshCategories, categoryEnabled, categoryReadable, byType, get, open, loadEarlier, startConversation, startSupportSession, sendUser, reset, bindAccount };
 });

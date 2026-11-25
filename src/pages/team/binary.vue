@@ -6,7 +6,7 @@
         <view class="binary-content">
           <view ref="comparisonRef">
           <EmptyState v-if="remoteApiEnabled && pageState.primary === 'error'" kind="recoverable-error"
-            :title="t.network.projectionErrorTitle" :desc="t.network.projectionErrorDesc" :cta-label="t.ui.reload"
+            :title="t.network.projectionErrorTitle" :cta-label="t.ui.reload"
             page @cta="retryCanonicalData" />
           <view v-else-if="remoteApiEnabled && pageState.primary === 'loading' && !snapshot" class="binary-loading"
             role="status" aria-live="polite" aria-busy="true" />
@@ -17,17 +17,20 @@
                 <view class="binary-rule-link nx-card-link" role="link" tabindex="0" :aria-label="t.binary.howItWorksEntry"
                   @click="go('/pages/team/binary-how')" @keydown.enter.prevent="go('/pages/team/binary-how')" @keydown.space.prevent="go('/pages/team/binary-how')"><text class="nx-after-chevron">{{ binaryCopy.rules }}</text></view>
               </view>
-              <view class="binary-comparison">
+              <view class="binary-comparison" :class="{ 'binary-comparison--wide': volumeSizes.includes('binary-points--longest') }">
                 <view v-for="(wing, index) in wings" :key="wing.key" class="binary-contribution">
                   <view class="binary-group-heading"><text v-if="!visibility.hidden && leftMonthVol !== rightMonthVol" class="binary-group-badge" :class="{ 'binary-weak': wing.isWeak }">{{ wing.isWeak ? t.binary.weakBadge : t.binary.strongBadge }}</text></view>
                   <view class="binary-contribution-track" aria-hidden="true"><view v-if="contributionWidths && !visibility.hidden" class="binary-contribution-fill" :class="{ 'binary-contribution-fill--other': index === 1 }" :style="{ height: (comparisonInView === false ? 0 : contributionWidths[index]) + '%', transition: comparisonInView === false ? 'none' : VIZ_GROW_HEIGHT_TRANSITION, transitionDelay: comparisonInView === false ? '0ms' : vizStagger(index, 120) }" /></view>
                   <text class="binary-group-name">{{ wing.name }}</text>
-                  <text class="binary-points tabular-nums">{{ visibility.mask('$' + formatFinanceAmount(wing.monthVol)) }}</text>
+                  <text class="binary-points tabular-nums" :class="[volumeSizes[index], { 'binary-points--probe': volumesStacked }]">{{ visibility.mask(formatFinanceAmount(wing.monthVol)) }}<text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text>
                   <text v-if="wing.count !== null" class="binary-note">{{ wingMembersText(wing.count) }}</text>
                 </view>
                 <view class="binary-rate"><text class="nx-num-metric">×{{ rateLabel }}%</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg><text class="binary-note">{{ t.binary.weakBadge }}</text></view>
               </view>
-              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text class="reward-amount nx-num-amount"><text class="binary-dollar">$</text>{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text></text></view>
+              <view v-if="volumesStacked" class="binary-volume-rows">
+                <view v-for="wing in wings" :key="wing.key" class="binary-volume-row"><text class="binary-volume-name">{{ wing.name }}</text><text class="binary-volume-amount tabular-nums">{{ formatFinanceAmount(wing.monthVol) }}<text class="binary-unit">&nbsp;USDT</text></text></view>
+              </view>
+              <view class="binary-estimate"><text class="binary-label">{{ estimateText }}</text><text v-if="settlementNotDue" class="binary-estimate-status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else class="reward-amount nx-num-amount" :class="estimateSize">{{ estimateAmountParts[0] }}<text v-if="estimateAmountParts[1]" class="binary-decimals">.{{ estimateAmountParts[1] }}</text><text v-if="!visibility.hidden" class="binary-unit">&nbsp;USDT</text></text></view>
             </view>
               <view class="reward-binary-basis">
                 <text class="binary-note">{{ formulaText }}</text>
@@ -38,12 +41,13 @@
 
           <template v-if="pageState.primary === 'ready' || (pageState.primary === 'loading' && snapshot !== null)">
             <view v-if="blocked" class="binary-notice" :style="blockedStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4m0 4h.01"/></svg>
+              <svg v-if="settlementNotDue" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4m0 4h.01"/></svg>
               <view class="binary-notice-copy">
                 <text class="binary-notice-title">{{ blockedTitleText }}</text>
-                <text class="binary-note">{{ blockedRecoveryText }}</text>
-                <view v-if="showGrowthRecoveryCta" class="binary-text-action" role="button" tabindex="0"
-                  @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')"><text>{{ t.binary.inviteCta }}</text><NxIcon name="arrow-right" /></view>
+                <text class="binary-note">{{ blockedDetailText }}</text>
+                <view v-if="showGrowthRecoveryCta" class="binary-invite-link nx-card-link" role="link" tabindex="0"
+                  @click="go('/pages/team/team')" @keydown.enter.prevent="go('/pages/team/team')" @keydown.space.prevent="go('/pages/team/team')"><text class="nx-after-arrow">{{ t.binary.inviteCta }}</text></view>
               </view>
             </view>
 
@@ -69,11 +73,13 @@
 
             <view v-if="recentBinaries.length > 0" class="binary-recent" :style="recentBlockStyle">
               <text class="binary-section-title" :style="recentCapStyle">{{ t.binary.recentMatches }}</text>
+              <view v-if="recentStale" class="binary-recent-stale" role="status"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5" /><path d="M12 16.5v.01" /></svg><text>{{ t.exchange.staleSnapshot }}</text></view>
               <view class="binary-recent-card" :style="recentGroupStyle">
+                <view v-if="!visibility.hidden" class="binary-recent-unit" aria-hidden="true"><text>USDT</text></view>
                 <view v-for="(e, i) in recentBinaries" :key="e.id" class="binary-recent-row" :style="recentRowStyle(i === recentBinaries.length - 1)">
                   <view class="binary-record-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></view>
                   <view class="binary-recent-source"><text class="binary-record-name">{{ e.sourceUserName }}</text><text class="binary-note">{{ formatTrialDate(e.ts, dateLocale()) }}<template v-if="binaryStatusLabel(e.status)">{{ ' · ' + binaryStatusLabel(e.status) }}</template></text></view>
-                  <view class="reward-match-amount"><text class="binary-record-value nx-num-metric" :style="{ color: binaryAmountColor(e.status) }">{{ visibility.mask(binaryAmountLabel(e)) }}</text><text v-if="'amountNEX' in e" class="binary-record-uvt">{{ visibility.mask(formatFinanceAmount(e.amountNEX)) }} UVT</text></view>
+                  <view class="reward-match-amount"><text class="binary-record-value nx-num-metric" :style="{ color: binaryAmountColor(e.status) }">{{ visibility.mask(binaryAmountLabel(e)) }}<text v-if="!visibility.hidden" class="nx-sr-only"> USDT</text></text><text v-if="'amountNEX' in e" class="binary-record-uvt">{{ visibility.mask(formatFinanceAmount(e.amountNEX)) }} UVT</text></view>
                 </view>
               </view>
             </view>
@@ -84,14 +90,15 @@
   </AppChassis>
 </template>
 <script setup lang="ts">
-import NxIcon from "@/components/ui/nx-icon.vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, VIZ_GROW_HEIGHT_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
+import { formatGroupedAmount } from "@/lib/amount-display";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { useLocaleStore } from "@/store/locale";
-import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
+import { computed, getCurrentInstance, inject, nextTick, onMounted, ref, watch, type CSSProperties } from "vue";
+import { CHASSIS_QUERY_SCOPE } from "@/composables/use-loops-in-view";
 import AppChassis from "@/components/app-chassis.vue";
 import RewardPageSurface from "@/components/team/reward-page-surface.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -144,15 +151,17 @@ watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, (
 const displayEnvironmentCurrent = () => !environmentInvalidated && displayEnvironment[0] === apiRuntimeConfig.environment && displayEnvironment[1] === apiRuntimeConfig.baseUrl;
 const snapshotPresentation = ref<NonNullable<typeof commission.binarySnapshot> | null>(null);
 let rejectedsnapshotSource: NonNullable<typeof commission.binarySnapshot> | null = null;
-watch(() => [commission.binaryStatus, commission.binarySnapshot] as const, ([status, value]) => {
-  if (status === 'error') { snapshotPresentation.value = null; rejectedsnapshotSource = value; }
-  else if (status === 'ready' && auth.isAuthenticated && displayEnvironmentCurrent() && value && value !== rejectedsnapshotSource) snapshotPresentation.value = value;
+watch(() => [commission.binaryStatus, commission.binarySnapshot, commission.binaryTransientFailure] as const, ([status, value, transient]) => {
+  // A temporary read failure keeps the confirmed snapshot on screen while recovery reads again (03 §3.4).
+  const retained = status === 'error' && transient && value !== null;
+  if (!value || (status === 'error' && !retained)) { snapshotPresentation.value = null; rejectedsnapshotSource = value; }
+  else if ((status === 'ready' || retained) && auth.isAuthenticated && displayEnvironmentCurrent() && value !== rejectedsnapshotSource) snapshotPresentation.value = value;
 }, { immediate: true, flush: 'sync' });
 watch(() => [app.accountKey, app.accountBindingEpoch, auth.isAuthenticated, locale.code, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl] as const, () => {
   rejectedsnapshotSource = commission.binarySnapshot; snapshotPresentation.value = null;
   if (auth.isAuthenticated && displayEnvironmentCurrent()) void retryCanonicalData();
 }, { flush: 'sync' });
-const snapshot = computed(() => commission.binaryStatus === 'error' ? null : snapshotPresentation.value);
+const snapshot = computed(() => commission.binaryStatus === 'error' && !commission.binaryTransientFailure ? null : snapshotPresentation.value);
 const remoteSessionReady = computed(() => binarySessionReady({
   remote: remoteApiEnabled,
   authenticated: auth.isAuthenticated,
@@ -162,7 +171,8 @@ const remoteSessionReady = computed(() => binarySessionReady({
 }));
 const pageState = computed(() => binaryPageState({
   remote: remoteApiEnabled,
-  binaryStatus: commission.binaryStatus,
+  // A retained snapshot shows as content; only a page with nothing to show gets the single reload.
+  binaryStatus: commission.binaryStatus === 'error' && snapshot.value !== null ? 'ready' : commission.binaryStatus,
   networkStatus: network.remoteStatus,
 }));
 // Member details show only from a healthy read: a retry after a failed read must not bring back cached members.
@@ -194,7 +204,16 @@ const periodMatch = computed(() => {
   const factor = settleDays.value / 30;
   return Math.min(weakVol.value * factor * MATCH_RATE.value, DAILY_CAP.value * settleDays.value);
 });
-const estimateAmountParts = computed(() => visibility.mask(formatFinanceAmount(periodMatch.value)).split('.'));
+// A non-zero estimate under 0.01 reads "<0.01", never 0.00; a true zero stays 0.00.
+const estimateAmountParts = computed(() => visibility.mask(periodMatch.value > 0 && periodMatch.value < 0.01 ? "<0.01" : formatFinanceAmount(periodMatch.value)).split('.'));
+// Long estimates step down so the full amount and its unit stay on one line (01 §1.2); a masked value keeps the base size (03 §3.10).
+const estimateSize = computed(() => {
+  if (visibility.hidden) return "";
+  const length = estimateAmountParts.value.join(".").length;
+  return length >= 12 ? "reward-amount--longest" : length >= 10 ? "reward-amount--long" : "";
+});
+// Both groups qualified, payout day not reached: the server gives no estimate, so the amount slot shows a status line.
+const settlementNotDue = computed(() => remoteApiEnabled && snapshot.value?.blockedReason === "F3_SETTLEMENT_NOT_DUE");
 const blocked = computed(() => remoteApiEnabled
   ? Boolean(snapshot.value?.blockedReason)
   : leftMonthVol.value < MIN_THRESHOLD.value || rightMonthVol.value < MIN_THRESHOLD.value);
@@ -206,6 +225,8 @@ const recentBinaries = computed(() =>
     }))
     : commission.events.filter((e) => e.kind === "binary").slice(0, 5),
 );
+// Recorded rewards are fund amounts: a snapshot kept through a temporary failure says so in one line, without a button (03 §3.4).
+const recentStale = computed(() => commission.binaryTransientFailure && snapshot.value !== null);
 const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPlacedMembers ?? 0 : network.members.filter((m) => m.isSpillover).length);
 
 // Older backends omit the snapshot totals. A network group reaching layer 7 may have deeper members.
@@ -247,6 +268,31 @@ const wings = computed<Wing[]>(() => [
   },
 ]);
 
+// Long volumes step down so the full number stays on one line with its unit (01 §1.2). Masked values keep one size,
+// so the dots do not reveal the amount range (03 §3.10).
+const volumeSizes = computed(() => wings.value.map((wing) => {
+  if (visibility.hidden) return "";
+  const length = formatFinanceAmount(wing.monthVol).length;
+  return length >= 12 ? "binary-points--longest" : length >= 10 ? "binary-points--long" : "";
+}));
+// An amount and its unit wider than its column, at its smallest step, moves both amounts to full-width rows under the bars
+// (10 §10.2). Measured on screen, so the real font and width decide, not a digit count. The column amount stays as an
+// invisible probe so the check also runs once the rows show. Hidden stats never switch: the layout must not reveal the
+// amount range (03 §3.10).
+const volumeQueryScope = inject(CHASSIS_QUERY_SCOPE, null) ?? getCurrentInstance()?.proxy ?? null;
+const volumesWide = ref(false);
+const volumesStacked = computed(() => !visibility.hidden && volumesWide.value);
+function measureVolumes() {
+  const query = volumeQueryScope ? uni.createSelectorQuery().in(volumeQueryScope) : uni.createSelectorQuery();
+  query.selectAll(".binary-contribution").boundingClientRect();
+  query.selectAll(".binary-points").boundingClientRect();
+  query.exec((res: UniApp.NodeInfo[][]) => {
+    const [columns, amounts] = res;
+    volumesWide.value = amounts.some((amount, index) => (amount.width ?? 0) > (columns[index]?.width ?? Infinity) + 0.5);
+  });
+}
+watch(() => [pageState.value.primary, leftMonthVol.value, rightMonthVol.value, visibility.hidden] as const, () => { void nextTick(measureVolumes); }, { immediate: true });
+
 // 结算周期文案 + 数字据后台同源配置派生(默认每月),消除「页面暗示日结」与「每月结算」矛盾,
 // 并让 hero 预计金额随结算周期联动(数字 periodMatch + 标签 {period} + 节奏 {freq} 三者一致)。
 const periodFreqLabel = computed(() => t.value.binary.settlePeriodLabel[settlePeriod.value]);
@@ -261,17 +307,6 @@ const formulaText = computed(() =>
     freq: periodFreqLabel.value,
   }),
 );
-const blockedDetailText = computed(() => {
-  const blockedReason = snapshot.value?.blockedReason;
-  if (remoteApiEnabled && blockedReason) {
-    return t.value.binary.blockReasons[blockedReason as keyof typeof t.value.binary.blockReasons]
-      ?? t.value.binary.blockReasons.UNKNOWN;
-  }
-  return fmt(t.value.binary.blockedDetail, {
-    side: weakSide.value === "left" ? t.value.binary.left : t.value.binary.right,
-    vol: visibility.mask(formatFinanceAmount(weakVol.value)),
-  });
-});
 const blockedGuidance = computed(() => binaryBlockedGuidance({
   remote: remoteApiEnabled,
   blocked: blocked.value,
@@ -279,9 +314,11 @@ const blockedGuidance = computed(() => binaryBlockedGuidance({
 }));
 const blockedTitleText = computed(() => t.value.binary[blockedGuidance.value.titleKey]);
 const showGrowthRecoveryCta = computed(() => blockedGuidance.value.showInviteOptions);
-const blockedRecoveryText = computed(() => showGrowthRecoveryCta.value
-  ? `${blockedDetailText.value} ${t.value.binary.blockedAction}`
-  : blockedDetailText.value,
+// Below threshold the description names the threshold (a public rule, shown under hidden stats too); the entry below is the next step.
+const blockedDetailText = computed(() => showGrowthRecoveryCta.value
+  ? fmt(t.value.binary.thresholdNotMetDetail, { amount: `${formatFinanceAmount(MIN_THRESHOLD.value)}\u00A0USDT` })
+  : t.value.binary.blockReasons[snapshot.value?.blockedReason as keyof typeof t.value.binary.blockReasons]
+    ?? t.value.binary.blockReasons.UNKNOWN,
 );
 const spilloverTitleText = computed(() =>
   fmt(t.value.binary.spilloverTitle, { n: spilloverCount.value }),
@@ -295,10 +332,11 @@ function go(url: string) {
 }
 
 function binaryAmountLabel(event: { amountUSDT: number; status?: string }): string {
-  const amount = formatFinanceAmount(event.amountUSDT);
-  if (event.status === "reversed") return `−$${amount}`;
-  if (event.status === "frozen" || event.status === "rejected") return `$${amount}`;
-  return `+$${amount}`;
+  // Recorded rewards keep the ledger's precision without trailing zeros, like the commission list.
+  const amount = formatGroupedAmount(event.amountUSDT, "full");
+  if (event.status === "reversed") return `−${amount}`;
+  if (event.status === "frozen" || event.status === "rejected") return amount;
+  return `+${amount}`;
 }
 
 function binaryStatusLabel(status?: string): string {
@@ -370,22 +408,37 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .binary-estimate { display: flex; align-items: center; justify-content: space-between; gap: var(--v5-space-3); margin-top: var(--v5-space-4); padding: 14px var(--v5-space-4); border-radius: 18px; background: color-mix(in srgb, var(--ui-device-ink) 10%, var(--v5-surface-2)); }
 .binary-estimate .binary-label { flex: 1; min-width: 0; color: var(--v5-ink-3); }
 .binary-hero .reward-amount { margin: 0; max-width: 68%; font-size: 30px; line-height: 38px; font-weight: 500; letter-spacing: -.03em; overflow-wrap: break-word; }
-.binary-dollar { margin-right: 2px; font-size: 18px; color: var(--v5-ink-3); }
+/* From 100,000.00 the page-title role, from 1,000,000.00 the overview-title role, so the unit never wraps under the number. */
+.binary-hero .reward-amount.reward-amount--long { font-size: var(--ui-type-page-title); }
+.binary-hero .reward-amount.reward-amount--longest { font-size: var(--ui-type-hero-title); }
+.binary-estimate-status { flex: 0 1 auto; max-width: 60%; text-align: right; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); overflow-wrap: break-word; }
+.binary-unit { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .binary-decimals { color: var(--v5-ink-3); }
 .binary-section-title { display: block; font-size: var(--ui-type-section); line-height: var(--ui-type-section-lh); font-weight: 600; color: var(--v5-ink); }
-.binary-note { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; overflow-wrap: break-word; }
+.binary-note { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-description); line-height: var(--ui-type-description-lh); overflow-wrap: break-word; }
 .binary-notice { display: flex; align-items: flex-start; border-bottom: 1px solid var(--v5-border); margin-top: -12px; }
 .binary-notice > svg { flex: 0 0 18px; color: var(--v5-warning); margin-top: 2px; }
 .binary-notice-copy { min-width: 0; flex: 1; }
 .binary-notice-title { display: block; font-weight: 500; font-size: var(--ui-type-list-title); line-height: var(--ui-type-list-title-lh); margin-bottom: 6px; }
-.binary-text-action { display: inline-flex; align-items: center; gap: var(--ui-space-row-y); min-height: 44px; min-width: 44px; color: var(--v5-ink-2); font-size: var(--ui-type-button); line-height: var(--ui-type-button-lh); }
+.binary-invite-link { margin-top: var(--v5-space-2); color: var(--v5-brand); font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); }
 .binary-comparison { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; margin-top: 6px; padding: 0 var(--v5-space-3); }
 .binary-contribution { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
 .binary-group-heading { display: flex; align-items: center; justify-content: center; min-height: 24px; color: var(--v5-ink-2); }
 .binary-group-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 2px var(--ui-space-row-y); border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
 .binary-weak { background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); color: var(--ui-device-ink); }
 .binary-group-name { color: var(--v5-ink-2); font-size: 13px; line-height: 18px; }
-.binary-points { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.binary-points { display: block; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Long volumes step down so the full number stays on one line with its unit (01 §1.2): from 100,000.00 the inline-figure
+   role, from 1,000,000.00 the meta role, and the columns drop their side padding to give the number the room. */
+.binary-points--long { font-size: var(--ui-type-inline-figure); }
+.binary-points--longest { font-size: var(--ui-type-meta); }
+.binary-comparison--wide { padding-inline: 0; }
+.binary-points--probe { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; }
+/* Amounts too wide for the columns: one full-width row per group, name | amount (01 §1.1.1), amount and unit on one line. */
+.binary-volume-rows { display: flex; flex-direction: column; gap: var(--v5-space-2); margin-top: var(--v5-space-3); }
+.binary-volume-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: var(--v5-space-3); }
+.binary-volume-name { color: var(--v5-ink-3); font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.binary-volume-amount { margin-left: auto; white-space: nowrap; color: var(--v5-ink); font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .binary-contribution-track { position: relative; width: 64px; height: 150px; margin: var(--v5-space-1) 0; border-radius: 18px; background: var(--v5-surface-3); box-shadow: inset 0 0 0 1px var(--v5-border); overflow: hidden; }
 .binary-contribution-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px; background: linear-gradient(180deg, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 25%, transparent)); }
 .binary-contribution-fill--other { background: linear-gradient(180deg, var(--ui-device-ink), color-mix(in srgb, var(--ui-device-ink) 25%, transparent)); }
@@ -404,7 +457,11 @@ useAutoRecovery({ failed: () => remoteSessionReady.value && network.remoteStatus
 .reward-wing-member__rank { flex: none; }
 .reward-wing-member__rank :deep(.nx-vbadge__level) { display: none; }
 .reward-wing-member__points { display: block; max-width: 100%; overflow-wrap: break-word; color: var(--v5-ink-3); font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); }
+/* Stale-data line: warning colour with an icon, auxiliary description role; 4px under the title, 12px above the list. */
+.binary-recent-stale { display: flex; align-items: flex-start; gap: var(--v5-space-1); margin: -8px 0 var(--v5-space-3); color: var(--v5-warning-ink); font: 400 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.binary-recent-stale > svg, .binary-recent-stale > .nx-native-svg { flex: 0 0 16px; margin-top: calc((var(--ui-type-description-lh) - 16px) / 2); }
 .binary-recent-card { padding: 0 var(--v5-space-4); border-radius: 24px; background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); }
+.binary-recent-unit { display: flex; justify-content: flex-end; padding-top: var(--v5-space-3); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: .04em; color: var(--v5-ink-3); }
 .binary-recent-row { display: flex; align-items: center; min-height: 64px; }
 .binary-recent-row .binary-note { font-size: 12px; line-height: 16px; }
 .binary-record-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 12px; color: var(--ui-device-ink); background: color-mix(in srgb, var(--ui-device-ink) 16%, transparent); }

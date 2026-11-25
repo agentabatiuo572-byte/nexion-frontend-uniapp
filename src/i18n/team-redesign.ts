@@ -169,7 +169,7 @@ const COPY = {
     rewardsSection: 'Thưởng của tôi',
     memberCountLabel: 'Thành viên nhóm',
     invitationRewards: 'Thưởng mời bạn',
-    twoGroupRewards: 'Thưởng cân bằng nhóm',
+    twoGroupRewards: 'Thưởng cân bằng',
     memberRelationships: 'Danh sách thành viên',
     teamIncentivePool: 'Quỹ thưởng nhóm',
     memberGrowthReward: 'Thưởng khi bạn bè lên hạng',

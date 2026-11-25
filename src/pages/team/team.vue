@@ -76,8 +76,8 @@
               <view class="team-bento__head"><NxIconTile tone="device" size="m"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg></NxIconTile><svg class="team-bento__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
               <view v-if="binary && !visibility.hidden" class="team-bento__split" aria-hidden="true"><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.left}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION }" /><view :style="{ width: bentoInView === false ? '0%' : `${binarySplit.right}%`, transition: bentoInView === false ? 'none' : PROGRESS_GROW_TRANSITION, transitionDelay: bentoInView === false ? '0ms' : vizStagger(1) }" /></view>
               <view class="team-bento__foot">
-                <text v-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount"><text class="team-bento__currency">{{ binaryAmountParts.prefix }}</text>{{ binaryAmountParts.integer }}<text class="team-bento__fraction">.{{ binaryAmountParts.fraction }}</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
-                <text class="team-bento__caption">{{ designCopy.twoGroupRewards }} · <text class="team-bento__muted">{{ designCopy.estimated }}</text></text>
+                <text v-if="binarySettlementNotDue" class="team-bento__status">{{ t.binary.settlesOnPayoutDay }}</text><text v-else-if="binaryAmountParts && !visibility.hidden" class="team-bento__value team-bento__amount nx-num-amount" :class="binaryAmountSize">{{ binaryAmountParts[0] }}<text v-if="binaryAmountParts[1]" class="team-bento__fraction">.{{ binaryAmountParts[1] }}</text><text class="team-bento__amount-unit">&nbsp;USDT</text></text><text v-else class="team-bento__value team-bento__amount nx-num-amount">{{ visibility.mask(binaryMatchText) }}</text>
+                <text class="team-bento__caption">{{ designCopy.twoGroupRewards }}<template v-if="!binarySettlementNotDue"> ·&nbsp;<text class="team-bento__muted">{{ designCopy.estimated }}</text></template></text>
               </view>
             </view>
             <view class="nx-team-leadership-pool-link team-bento__card team-bento__card--wide team-bento__card--violet" role="link" tabindex="0" @click="go('/pages/team/leadership-pool')" @keydown.enter.prevent="go('/pages/team/leadership-pool')">
@@ -116,6 +116,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION, VIZ_GROW_HEIGHT_TRANSITION, VIZ_RING_TRANSITION, vizStagger } from "@/composables/use-scroll-grow-progress";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { formatUsd, formatUsdOverviewParts } from "@/lib/usd-display";
+import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { formatComputePoints, sumComputePoints } from "@/i18n/compute-points";
 import ReferralProgress from '@/components/promotion/referral-progress.vue';
 import { navTo } from "@/lib/route";
@@ -140,7 +141,7 @@ import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
 import { apiRuntimeConfig, remoteApiEnabled, teamInsightsApi, teamQuotaApi } from "@/api/runtime";
-import { productCatalogState, productCatalogDisplayProof, productCatalogPresentation, isProductCatalogDisplayCurrent } from "@/store/product-catalog";
+import { productCatalogState, productCatalogDisplayProof, productCatalogPresentation, isProductCatalogDisplayCurrent, refreshProductCatalog } from "@/store/product-catalog";
 import type { CanonicalBinaryState } from "@/api/commission-config-api";
 import type { TeamCommissionSnapshot, TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { leadershipPoolFailureState } from "@/lib/leadership-pool-state";
@@ -168,7 +169,7 @@ const rankPresentation = ref<number | null>(null);
 const displayLedger = computed(() => ledgerPresentation.value ?? readTabSnapshot("commission"));
 const networkDisplaySnapshot = computed(() => networkReadable.value ? null : readTabSnapshot("network"));
 const selectedRank = computed(() => rankPresentation.value ?? readTabSnapshot("rank")?.rank ?? null);
-const binaryPresentation = ref<Pick<CanonicalBinaryState, "estimatedAmountUsdt" | "trackA" | "trackB"> | null>(null);
+const binaryPresentation = ref<Pick<CanonicalBinaryState, "estimatedAmountUsdt" | "trackA" | "trackB" | "blockedReason"> | null>(null);
 const displayEnvironmentInvalidated = ref(false);
 watch(() => [apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl], () => { displayEnvironmentInvalidated.value = true; }, { flush: "sync" });
 const displayCatalogValid = computed(() => !displayEnvironmentInvalidated.value && productCatalogDisplayProof.value !== null
@@ -213,12 +214,14 @@ watch(() => {
   const snapshot = productCatalogPresentation.value;
   return snapshot && JSON.stringify([snapshot.source, snapshot.serverCanonical, snapshot.sourceEnvironment, snapshot.runId, snapshot.products.map(({ imageUrl: _imageUrl, ...product }) => product)]);
 }, () => { binaryPresentation.value = null; }, { flush: "sync" });
-watch([displayCatalogValid, () => commission.binaryStatus, () => commission.binarySnapshot], () => {
-  if (commission.binaryStatus === "error") { binaryPresentation.value = null; return; }
+watch([displayCatalogValid, () => commission.binaryStatus, () => commission.binarySnapshot, () => commission.binaryTransientFailure], () => {
+  // A temporary read failure keeps the confirmed snapshot (03 §3.4); a refusal clears it.
   const snapshot = commission.binarySnapshot;
-  if (!displayCatalogValid.value || commission.binaryStatus !== "ready" || !snapshot) return;
-  const { estimatedAmountUsdt, trackA, trackB } = snapshot;
-  binaryPresentation.value = { estimatedAmountUsdt, trackA, trackB };
+  const retained = commission.binaryStatus === "error" && commission.binaryTransientFailure;
+  if (!snapshot || (commission.binaryStatus === "error" && !retained)) { binaryPresentation.value = null; return; }
+  if (!displayCatalogValid.value || (commission.binaryStatus !== "ready" && !retained)) return;
+  const { estimatedAmountUsdt, trackA, trackB, blockedReason } = snapshot;
+  binaryPresentation.value = { estimatedAmountUsdt, trackA, trackB, blockedReason };
 }, { immediate: true, flush: "sync" });
 watch([displayCatalogValid, () => commission.eventsStatus, () => commission.eventsEvidence, () => network.remoteStatus, () => network.remoteTransientFailure, () => commission.eventsTransientFailure], () => {
   if (ledgerStrictFailure.value) { ledgerPresentation.value = null; return; }
@@ -351,8 +354,16 @@ const binary = computed(() => {
   const match = Math.min(Math.min(L / 30, R / 30) * 0.1, 5000);
   return { binaryMatch: match, leftVol: L, rightVol: R };
 });
+const binarySettlementNotDue = computed(() => binaryPresentation.value?.blockedReason === "F3_SETTLEMENT_NOT_DUE");
 const binaryMatchText = computed(() => binary.value === null ? "—" : formatUsd(binary.value.binaryMatch));
-const binaryAmountParts = computed(() => binary.value === null ? null : formatUsdOverviewParts(binary.value.binaryMatch));
+// A non-zero estimate under 0.01 reads "<0.01", never 0.00; a true zero stays 0.00.
+const binaryAmountParts = computed(() => binary.value === null ? null
+  : (binary.value.binaryMatch > 0 && binary.value.binaryMatch < 0.01 ? "<0.01" : formatFinanceAmount(binary.value.binaryMatch)).split("."));
+// Long amounts step down so the full amount and its unit stay on one line in the half-width card at 360 (01 §1.2).
+const binaryAmountSize = computed(() => {
+  const length = binaryAmountParts.value?.join(".").length ?? 0;
+  return length >= 12 ? "team-bento__amount--longest" : length >= 10 ? "team-bento__amount--longer" : length >= 8 ? "team-bento__amount--long" : "";
+});
 
 const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vrank.myRank));
 const leadershipUnlockRank = computed(() => remoteApiEnabled ? remotePool.value?.unlockRank ?? 3 : 3);
@@ -413,7 +424,7 @@ let releaseActiveRefresh = () => {};
 async function refreshVisibleTeam() {
   if (!remotePoolVisible || !remoteApiEnabled) return;
   await Promise.allSettled([
-    vrank.remoteError ? undefined : vrank.ensureCanonicalVRank(), commission.ensureCanonicalBinary(),
+    vrank.remoteError ? undefined : vrank.ensureCanonicalVRank(), commission.binaryStatus === "error" ? undefined : commission.ensureCanonicalBinary(),
     commission.eventsStatus === "error" ? undefined : commission.ensureCanonicalEvents(),
     network.remoteStatus === "error" ? undefined : network.ensureCanonicalNetwork(),
     referralRewards.error ? undefined : referralRewards.ensure(), refreshRemotePool(), refreshQuotaEntry(),
@@ -619,6 +630,9 @@ const teamSummaryStatus = computed(() => remoteApiEnabled ? network.remoteStatus
 const recoveryConfig = useConfig();
 useAutoRecovery({ failed: () => remoteApiEnabled && network.remoteStatus === "error", retry: () => network.refreshCanonicalNetwork() });
 useAutoRecovery({ failed: () => remoteApiEnabled && commission.eventsStatus === "error", retry: () => commission.refreshCanonicalEvents() });
+useAutoRecovery({ failed: () => remoteApiEnabled && commission.binaryStatus === "error", retry: () => commission.refreshCanonicalBinary() });
+// Every card here waits for a current catalogue proof; a cold failure must recover it, or recovered reads never show.
+useAutoRecovery({ failed: () => remoteApiEnabled && productCatalogState.status === "error", retry: () => refreshProductCatalog(true) });
 useAutoRecovery({ failed: () => remoteApiEnabled && !!vrank.remoteError, retry: () => vrank.refreshCanonicalVRank() });
 const inviteRulesOpen = () => inviteCard.value?.rulesOpen === true;
 useAutoRecovery({
@@ -681,7 +695,14 @@ useAutoRecovery({
 .team-bento__amount { font-family: var(--font-amount); }
 .team-bento__value--count { font-size: 28px; line-height: 34px; }
 .team-bento__unit { margin-left: 6px; font: 400 13px/1 var(--font-v5); color: var(--v5-ink-3); }
+.team-bento__status { font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .team-bento__currency { font-size: 14px; }
+/* Long amounts step down so the number and its unit stay on one line in a half-width card at 360 (01 §1.2):
+   from 1,000.00 the card-figure role, from 100,000.00 the inline-figure role, from 1,000,000.00 the meta role. */
+.team-bento__amount--long { font-size: var(--ui-type-card-figure); }
+.team-bento__amount--longer { font-size: var(--ui-type-inline-figure); }
+.team-bento__amount--longest { font-size: var(--ui-type-meta); }
+.team-bento__amount-unit { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .team-bento__fraction { color: var(--v5-ink-3); }
 /* The caption names the figure above it: auxiliary description role, 400, muted (10 §10.1; 01 §1.1.1 pairing 1). */
 .team-bento__caption { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }

@@ -74,8 +74,10 @@ function pathCursor(beforeMessageId?: number): string {
 function parseConversationHeader(value: unknown): Conversation {
   const v = row(value); const id = text(v?.conversationNo); const type = enumValue(v?.conversationType, ["advisor", "support"] as const);
   const status = enumValue(v?.status, ["open", "transferred", "resolved", "closed"] as const); const version = integer(v?.version);
-  const lastTs = time(v?.lastMessageAt) ?? time(v?.updatedAt); const unread = integer(v?.unreadCount); const agentName = text(v?.ownerAgentName, true);
-  const lastMessage = text(v?.lastMessage, true);
+  const lastTs = time(v?.lastMessageAt) ?? time(v?.updatedAt);
+  const unread = typeof v?.unreadCount === "number" ? integer(v.unreadCount) : null;
+  const agentName = text(v?.ownerAgentName ?? "", true);
+  const lastMessage = text(v?.lastMessage ?? "", true);
   const lastPublicMessageId = v?.lastPublicMessageId == null ? 0 : integer(v.lastPublicMessageId);
   const lastMessageKind = v?.lastMessageKind === "IDLE_TIMEOUT_CLOSE" ? "IDLE_TIMEOUT_CLOSE" : null;
   if (!v || !id || !type || !status || version === null || lastTs === null || unread === null || agentName === null || lastMessage === null) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID");

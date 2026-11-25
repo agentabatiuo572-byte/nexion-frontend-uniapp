@@ -1212,13 +1212,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const direct=members.filter(member=>member.layer===1);
     const trackAMembers=direct.filter(member=>member.leg==='A').length;
     const trackBMembers=direct.filter(member=>member.leg==='B').length;
-    const asOfDate=preset?new Date(now).toISOString().slice(0,10):demoTeamBusinessDate(now);
+    const asOfDate=demoTeamBusinessDate(now);
     const month=asOfDate.slice(0,7);
     const monthEnd=new Date(Date.UTC(Number(asOfDate.slice(0,4)),Number(asOfDate.slice(5,7)),0)).getUTCDate();
     const matches=demoCommissionGroups(state,state.previewFactsAt).filter(event=>event.kind==='binary');
     const consumed=matches.reduce((total,match)=>total+match.orderAmountUSD,0);
     const volume=leg=>Math.max(0,legs[leg].flatMap(member=>member.paidOrders)
-      .filter(order=>order.paidAt<=now&&(!preset||new Date(order.paidAt).toISOString().startsWith(month)))
+      .filter(order=>order.paidAt<=now&&(!preset||demoTeamBusinessDate(order.paidAt).slice(0,7)===month))
       .reduce((sum,order)=>sum+order.amountUsdt,0)-consumed);
     const trackA=volume('A'),trackB=volume('B'),threshold=1000,matchRate=.1,dailyCap=5000;
     const periodCap=dailyCap*monthEnd;
@@ -1230,7 +1230,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(assignmentIncomplete)blockedReason='BINARY_LEG_ASSIGNMENT_INCOMPLETE';
     else if(belowThreshold)blockedReason='BINARY_THRESHOLD_NOT_MET';
     else if(settlementNotDue)blockedReason='F3_SETTLEMENT_NOT_DUE';
-    const estimateBlocked=assignmentIncomplete||belowThreshold||(!preset&&settlementNotDue);
+    const estimateBlocked=assignmentIncomplete||belowThreshold||settlementNotDue;
     return {...authority,source:'server',runId:null,asOfDate,trackA,trackB,trackAMembers,trackBMembers,
       trackATotalMembers:legs.A.length,trackBTotalMembers:legs.B.length,autoPlacedMembers:0,
       matchRate,threshold,dailyCap,periodCap,estimatedAmountUsdt:estimateBlocked?0:Number(Math.min(periodCap,weakerVolume*matchRate).toFixed(6)),
