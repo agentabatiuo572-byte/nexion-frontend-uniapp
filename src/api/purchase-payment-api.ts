@@ -245,11 +245,18 @@ export function createPurchasePaymentApi(client: ApiClient) {
       // Only the server's own not-found proves there is no intent; any other 404 keeps the original command.
       catch (error) { if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null; throw error; }
     },
-    async findTrial(commandKey: string) {
+    async findTrial(commandKey: string, structuredRefusals: boolean): Promise<{
+      result: PurchasePaymentIntent | TrialExternalRefusal | null; notFoundAt?: number;
+    }> {
+      const request = { path: `${base}-intents?kind=TRIAL_CONVERT&commandKey=${encodeURIComponent(commandKey)}` };
       try {
-        return await trialRequest({ path: `${base}-intents?kind=TRIAL_CONVERT&commandKey=${encodeURIComponent(commandKey)}` }, parsePurchaseIntent);
+        const result = structuredRefusals ? await trialRequest(request, parsePurchaseIntent)
+          : parsePurchaseIntent(await client.request(request));
+        return { result };
       } catch (error) {
-        if (isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) return null;
+        if (error instanceof ApiError && isApiRefusal(error, 404, 'PURCHASE_PAYMENT_INTENT_NOT_FOUND')) {
+          return { result: null, notFoundAt: error.responseDateMs };
+        }
         throw error;
       }
     },

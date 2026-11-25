@@ -378,6 +378,7 @@ export function parseTrialPurchaseConvertResult(value: unknown, code: number, re
 function isStructuredBalanceRefusal(cause: unknown): cause is ApiError {
   return cause instanceof ApiError && cause.kind === "http" && cause.code === cause.status
     && cause.message !== "PAYMENT_COMMAND_INPUT_CHANGED"
+    && !/^(?:IDEMPOTENCY_|PAYMENT_COMMAND_)|(?:_UNKNOWN|_PROCESSING)$/.test(cause.message)
     && !AUTHORIZATION_REFUSALS.test(cause.message)
     && ((cause.code === 503 && BALANCE_SERVICE_REFUSALS.some(message => message === cause.message))
       || (cause.code !== undefined && cause.code >= 400 && cause.code < 500 && ![408, 425, 429].includes(cause.code)));
@@ -583,6 +584,7 @@ export function createTrialApi(client: ApiClient): TrialApi {
       path: "/api/trial/start",
       body: { deviceName },
       idempotencyKey,
+      retryAfterAuth: false,
     }),
     convert: async (...args) => parseTrialConvertReceipt(await client.request(convertRequest(...args))),
     async convertPurchase(...args) {
@@ -603,6 +605,7 @@ export function createTrialApi(client: ApiClient): TrialApi {
       path: "/api/trial/cancel",
       body: { reason },
       idempotencyKey,
+      retryAfterAuth: false,
       acceptedResponses: BALANCE_ORIGINAL_CODES.map(message => ({ status: 409, code: 409, message })),
       parseResponseData: (data, _, { code, message }): TrialCancelResult => code === 0
         ? { status: "cancelled", state: parseTrialAuthorityState(data) }

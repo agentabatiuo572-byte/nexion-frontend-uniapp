@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, shallowRef, watch } from "vue";
 import { apiClient, trialApi } from "@/api/runtime";
-import { asApiError, isAmbiguousOutcome, isApiRefusal } from "@/api/errors";
+import { asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { readPaymentCommand, type PaymentCommandReceipt } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
 import {
@@ -12,6 +12,7 @@ import { requireCryptoUuid } from "@/lib/secure-command-id";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { useApp } from "./app";
 import { useFreeTrial } from "./free-trial";
+import { useTrialPurchaseResult } from "./trial-purchase-result";
 
 type TrialBalancePurchase = Extract<TrialOriginalPurchase, { kind: "BALANCE" }>;
 type TrialRefusal = Extract<TrialPurchaseConvertResult, { status: "refused" }>;
@@ -82,6 +83,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
   }
 
   function adoptOriginal(purchase: TrialOriginalPurchase) {
+    if (authority.value?.claimNo && authority.value.claimNo !== purchase.claimNo) return;
     const current = outcome.value;
     if (purchase.kind === "BALANCE" && current.status === "resumable" && current.accepted && sameSubmission(current.submission, purchase)
         && (purchase.quoteVersion === null || current.submission.quoteVersion === purchase.quoteVersion)
@@ -103,12 +105,11 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
       return;
     }
     const current = outcome.value, original = next.originalPurchase;
-    if (!original && next.status !== "active" && next.status !== "grace") {
-      outcome.value = { status: !local.value || release(local.value) ? "idle" : "storage-error" };
-      return;
-    }
     if (current.status === "submitting" || current.status === "settled") return;
-    if (original) {
+    if (original?.kind === "BALANCE" && useFreeTrial().pendingConversion(original.device.productNo)?.key === original.submissionNo) {
+      // The legacy store reads this key. Publish its lock without giving checkout a second reader.
+      outcome.value = { status: "original", originalPurchase: original };
+    } else if (original) {
       if (original.kind === "BALANCE" && current.status === "refused" && current.submissionNo === original.submissionNo) return;
       adoptOriginal(original);
     } else if (local.value && (current.status !== "resumable" || current.accepted || !sameSubmission(current.submission, local.value))) {
@@ -133,6 +134,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
         throw new Error("TRIAL_SUBMISSION_MISMATCH");
       release(submission);
       outcome.value = { status: "settled", claimNo: submission.claimNo, receipt: result.receipt };
+      useTrialPurchaseResult().publish({ status: "settled", claimNo: submission.claimNo, orderNo: result.receipt.orderNo });
       return;
     }
     if ((result.originalPurchase && result.originalPurchase.claimNo !== submission.claimNo)
@@ -147,6 +149,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
         status: "refused", claimNo: submission.claimNo, submissionNo: submission.submissionNo, productNo: submission.device.productNo,
         confirmedAmountUSD: submission.confirmedAmountUSD, refusal: result,
       };
+      useTrialPurchaseResult().publish({ status: "refused", claimNo: submission.claimNo, key: submission.submissionNo, reason: result.reasonCode });
     }
   }
 
@@ -165,8 +168,14 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
         && snapshot.submissionNo === current.submissionNo) return null;
     if ("submission" in current && current.submission.claimNo === claimNo)
       return { ...current.submission, status: current.status === "resumable" ? "RESUMABLE" : "PROCESSING" };
-    if (current.status === "original" && current.originalPurchase.claimNo === claimNo) return current.originalPurchase;
-    if (snapshot?.claimNo === claimNo) return snapshot;
+    const original = current.status === "original" && current.originalPurchase.claimNo === claimNo
+      ? current.originalPurchase : snapshot;
+    if (original?.claimNo === claimNo) {
+      if (original.kind === "BALANCE" && trial.legacyConversionResumable
+          && trial.pendingConversion(original.device.productNo)?.key === original.submissionNo)
+        return { ...original, status: "RESUMABLE" };
+      return original;
+    }
     try {
       const saved = readLocal(claimNo);
       return saved ? { ...saved, status: "PROCESSING" } : null;
@@ -217,7 +226,9 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
         else outcome.value = { status: "storage-error" };
         throw cause;
       }
-      if (isAmbiguousOutcome(cause)) outcome.value = { status: "processing", submission };
+      const failure = asApiError(cause);
+      if (isAmbiguousEnvelopeOutcome(cause) || /^(?:IDEMPOTENCY_|PAYMENT_COMMAND_)|(?:_UNKNOWN|_PROCESSING)$/.test(failure.message))
+        outcome.value = { status: "processing", submission };
       else finish(submission, { status: "refused", reasonCode: asApiError(cause).message });
     }
   }
@@ -280,11 +291,15 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
   }
 
   function settleExternal(claimNo: string, receipt: TrialConvertReceipt) {
+    if (receipt.claimNo && receipt.claimNo !== claimNo) return;
+    useTrialPurchaseResult().publish({ status: "settled", claimNo, orderNo: receipt.orderNo });
     if (authority.value?.claimNo !== claimNo) return;
     outcome.value = { status: "settled", claimNo, receipt };
   }
 
   function rememberExternalRefusal(claimNo: string, productNo: string, commandKey: string, amount: number, refusal: TrialRefusal) {
+    useTrialPurchaseResult().publish({ status: "refused", claimNo, key: commandKey, reason: refusal.reasonCode });
+    if (authority.value?.claimNo !== claimNo) return;
     outcome.value = { status: "refused", claimNo, productNo, submissionNo: commandKey, confirmedAmountUSD: amount,
       refusal };
   }

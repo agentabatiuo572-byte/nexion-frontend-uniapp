@@ -456,7 +456,7 @@ const waitTitle = computed(() => {
   const c = copy.value;
   if (appDeviceOffline.value && !retryMessage.value) return c.offline;
   if (s.originalRecovery) return c.checkingOriginalPayment;
-  if (s.canResubmit) return c.originalPaymentNotFoundRetry;
+  if (s.canResubmit) return s.kind === 'TRIAL_CONVERT' ? c.checkingOriginalPayment : c.originalPaymentNotFoundRetry;
   if (s.busy && !s.intent) return c.creating;
   if (retryMessage.value) return retryMessage.value;
   if (trialReviewPending.value) return trialDetail.value.origConfirming;

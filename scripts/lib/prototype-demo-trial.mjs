@@ -1,6 +1,6 @@
 import { demoWalletUsdt, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 // Loopback-only lifecycle fixture. Never imported by src or an App build.
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { fixture, previewDefaultTrialName, previewDefaultTrialSku, previewTrialProductConfig } from './design-review-fixture.mjs';
 // Match BigDecimal DOWN at the boundary; quote arithmetic stays in millionths.
 const units=(value,scale=6)=>{
@@ -16,6 +16,7 @@ const min=(a,b)=>a<b?a:b,max=(a,b)=>a>b?a:b;
 const capped=(amount,cap)=>String(cap??'').trim()===''?amount:min(amount,units(cap));
 const liveStates=['ACTIVE','GRACE','EXTENDED'];
 const day=86400000,proof={sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
+const newClaimNo=()=>`TRIAL-${randomUUID().replaceAll('-','').toUpperCase()}`;
 const refuse=(message,data,status=409)=>{throw Object.assign(new Error(message),{status,data});};
 const optionSku=['stellarrack-p1','cloud-share','stellarbox-pro','stellarbox-pro-v2','stellarbox-s1','stellarrack-p2'];
 export const trialPurchaseOptionSku=state=>state.trialPurchaseOptionTarget==='trial-device'
@@ -29,7 +30,7 @@ export const wireTrialQuote=({trialOffsetCapUSD: _,...quote})=>Object.fromEntrie
 
 export function trialDemo(url,locale,state,request,capacityFull,products,requirePurchase){
   if(!url.pathname.startsWith('/api/trial/'))return undefined;
-  const now=Date.now(),mode=state.trialState||'follow';
+  const now=Date.now()+(state.trialLifecycleAdvanceDays??0)*day,mode=state.trialState||'follow';
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
   const switched=state.catalogState==='trial-h2-switched';
   const originalProduct=products.find(product=>product.id===previewDefaultTrialSku);
@@ -46,6 +47,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   unclaimedConfig.earlyPurchaseDiscountUSD??=String(state.trialEarlyDiscount??'10');
   // P-59 / backend B13-B14: the trial discount caps at $50; an empty offset cap is JSON null in App responses.
   unclaimedConfig.discountCapUSD='50';unclaimedConfig.trialOffsetCapUSD=null;
+  const cooldown=Number(unclaimedConfig.cooldownDays??30)*day;
   const pricing=state.trialQuoteState||'default';
   // BUG-081 samples keep their labelled early prices through a zero offset cap;
   // settled earnings are paid out after purchase and use the same catalog rate as a default claim.
@@ -60,12 +62,17 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     // The H2 switch can open on an account that claimed S1 before its catalog rename.
     if(switched&&originalProduct)Object.assign(claimConfig,previewTrialProductConfig({...originalProduct,name:previewDefaultTrialName}));
     const duration=Number(claimConfig.trialDays)*day,grace=Number(claimConfig.graceDays)*day;
-    const cooldown=scenario==='eligible-again'?30*day:0;
     const ended=['ended','eligible-again'].includes(scenario);
+    const redeemed=['converted','refunded'].includes(scenario);
     const activeAge=pricing==='cloud-share-half-cent'?2*day:day;
-    const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day:ended?duration+grace+cooldown+day:activeAge);
-    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE':ended?'FAILED':['converted','refunded'].includes(scenario)?'REDEEMED':'ELIGIBLE',startedAt};
-    if(cooldown)state.trialRow.cooldownUntil=startedAt+duration+grace+cooldown;
+    const startedAt=now-(scenario==='final-day'?duration-day/2:scenario==='grace'?duration+day
+      :ended?duration+grace+(scenario==='eligible-again'?cooldown:0)+day:activeAge);
+    state.trialRow={state:['active','final-day'].includes(scenario)?'ACTIVE':scenario==='grace'?'GRACE'
+      :ended?'CANCELLED':redeemed?'REDEEMED':'ELIGIBLE',startedAt,version:redeemed?1:0};
+    if(ended){
+      const finishedAt=startedAt+duration+grace;
+      Object.assign(state.trialRow,{endReason:'expired',finishedAt,cooldownUntil:finishedAt+cooldown,version:1});
+    }
     // B13: this preset was claimed under the former 50 USDT cap; new claims use today's null cap.
     if(state.trialRow.state!=='ELIGIBLE'){
       if(pricing==='historical-cap'&&['ACTIVE','GRACE','REDEEMED'].includes(state.trialRow.state))claimConfig.trialOffsetCapUSD='50';
@@ -73,6 +80,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     }
   }
   const row=state.trialRow;
+  // Saved preview rows predate per-claim identities.
+  if(row.state!=='ELIGIBLE')row.claimNo??=newClaimNo();
   // Historical terms still determine accrual and lifecycle dates. Only the live promo cap can be repriced.
   let cfg={...unclaimedConfig,...row.claimConfig,discountCapUSD:unclaimedConfig.discountCapUSD};
   let duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
@@ -80,7 +89,10 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const trialProduct=()=>products.find(item=>item.id===cfg.trialProductId);
   const atTrialClock=at=>at+(state.trialPurchaseWindow==='grace'&&liveStates.includes(row.state)
     ? row.startedAt+duration+day-now : 0);
-  const originalPurchase=()=>request.originalTrialPurchase?.()??state.trialBalancePurchase;
+  const originalPurchase=()=>{
+    const purchase=request.originalTrialPurchase?.()??state.trialBalancePurchase;
+    return purchase?.claimNo===row.claimNo?purchase:null;
+  };
   const trialDevice=()=>trialPurchaseDevice(trialProduct()??{
     id:cfg.trialProductId,productType:'DEVICE',imageUrl:null,
   },cfg.trialProductName);
@@ -91,13 +103,16 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   }
   const snapshot=()=>{
     if(row.state==='ACTIVE'&&now>=row.startedAt+duration)row.state='GRACE';
-    if(row.state==='GRACE'&&now>=row.startedAt+duration+grace)row.state='FAILED';
+    if(row.state==='GRACE'&&now>=row.startedAt+duration+grace){
+      const finishedAt=row.startedAt+duration+grace;
+      Object.assign(row,{state:'CANCELLED',endReason:'expired',finishedAt,cooldownUntil:finishedAt+cooldown,version:(row.version??0)+1});
+    }
     const trialNow=atTrialClock(now);
     const reportedState=liveStates.includes(row.state)&&trialNow>=row.startedAt+duration?'GRACE':row.state;
     const claimed=row.state!=='ELIGIBLE',live=liveStates.includes(row.state);
     const conversion=row.state==='REDEEMED'?conversionFacts():null;
-    const {shadow,nex}=claimed?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
-    const eligible=!claimed||(row.state==='FAILED'&&row.cooldownUntil!=null&&row.cooldownUntil<=now);
+    const {shadow,nex}=claimed&&row.state!=='CANCELLED'?accruedAt(row.state==='REDEEMED'?row.settlementAt??row.finishedAt:trialNow):{shadow:0n,nex:0n};
+    const eligible=!claimed||(['FAILED','CANCELLED'].includes(row.state)&&row.cooldownUntil!=null&&row.cooldownUntil<=now);
     // capacity-full comes from the fleet facts alone; the capacity-full preset seeds a genuinely full fleet.
     const canStart=eligible&&available&&!capacityFull;
     const quote=live?quoteFor(shadow,nex,reportedState==='ACTIVE'):undefined;
@@ -105,8 +120,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const purchaseSnapshot=purchase?.kind==='EXTERNAL'
       ? {...purchase,deadlineAt:new Date(atTrialClock(Date.parse(purchase.deadlineAt))).toISOString()} : purchase;
     return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
-      claimNo:claimed?'DEMO-TRIAL':null,version:row.version||1,serverNowEpochMs:trialNow,
-      claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,graceEndsAtEpochMs:claimed?row.startedAt+duration+grace:null,
+      claimNo:claimed?row.claimNo:null,version:row.version??0,serverNowEpochMs:trialNow,endReason:row.endReason??null,
+      claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,
+      graceEndsAtEpochMs:live?row.startedAt+duration+grace:null,
       finishedAtEpochMs:['FAILED','CANCELLED','REDEEMED'].includes(row.state)?row.finishedAt||row.startedAt+duration+grace:null,
       cooldownUntilEpochMs:row.cooldownUntil??null,
       shadowUsdt:number(shadow),shadowNex:number(nex),
@@ -125,8 +141,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       const base=max(0n,price-baseDiscount),earlyDiscount=early?min(discount,base):0n,amount=base-earlyDiscount;
       const settlementPolicy=early?'FULL_TERM_ON_CONVERSION':'ACCRUED_ON_CONVERSION';
       const terms=usesOptions
-        ? [row.startedAt,sku,fixed(price),cfg.discountRate,cfg.discountCapUSD,cfg.earlyPurchaseDiscountUSD,cfg.trialOffsetCapUSD]
-        : early?['ACCRUED_OFFSET','DEMO-TRIAL',...[settled,reward,promo].map(fixed),fixed(discount).slice(0,-4),cfg.trialOffsetCapUSD==null?'null':fixed(units(cfg.trialOffsetCapUSD))]:null;
+        ? [row.claimNo,sku,fixed(price),cfg.discountRate,cfg.discountCapUSD,cfg.earlyPurchaseDiscountUSD,cfg.trialOffsetCapUSD]
+        : early?['ACCRUED_OFFSET',row.claimNo,...[settled,reward,promo].map(fixed),fixed(discount).slice(0,-4),cfg.trialOffsetCapUSD==null?'null':fixed(units(cfg.trialOffsetCapUSD))]:null;
       const quoteVersion=terms?settlementPolicy+':'+createHash('sha256').update(usesOptions?JSON.stringify(terms):terms.join('|')).digest('hex').slice(0,usesOptions?24:16):settlementPolicy;
       return {settlementPolicy,quoteVersion,earlyPurchase:early,priceUsdt:number(price),accruedUsdt:number(shadow),accruedNex:number(nex),
         settledUsdt:number(settled),rewardNex:number(reward),earlyRewardUsdt:number(settled-shadow),earlyRewardNex:number(reward-nex),
@@ -205,7 +221,6 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(request.method()==='POST'&&key&&state.trialCommands?.[key])return structuredClone(state.trialCommands[key]);
   const remember=value=>{if(key){state.trialCommands??={};state.trialCommands[key]=structuredClone(value);}return value;};
   if(url.pathname==='/api/trial/start'){
-    if(mode==='claim-error'&&!state.trialStartFailed){state.trialStartFailed=true;refuse('TRIAL_SERVICE_UNAVAILABLE');}
     const current=snapshot();
     if(!current.canStart){
       if(current.eligibilityReason==='product-unavailable'){
@@ -218,9 +233,14 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       if(current.eligibilityReason==='converted')refuse('TRIAL_ALREADY_REDEEMED');
       refuse('TRIAL_COOLDOWN_ACTIVE');
     }
+    if(mode==='claim-error'&&!state.trialStartFailed){
+      state.trialStartFailed=true;
+      refuse('TRIAL_QUOTA_STATE_UNAVAILABLE',null,503);
+    }
     cfg={...unclaimedConfig};
     duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
-    Object.assign(row,{state:'ACTIVE',startedAt:now,cooldownUntil:null,claimConfig:structuredClone(cfg),version:(row.version||1)+1});
+    Object.assign(row,{state:'ACTIVE',claimNo:newClaimNo(),startedAt:now,finishedAt:null,endReason:null,cooldownUntil:null,
+      claimConfig:structuredClone(cfg),version:current.claimNo?(row.version??0)+1:0});
     return remember(snapshot());
   }
   if(url.pathname==='/api/trial/cancel'){
@@ -228,7 +248,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if(row.state!=='ACTIVE')refuse('TRIAL_NOT_CANCELLABLE');
     if(purchase?.kind==='EXTERNAL')refuse('TRIAL_EXTERNAL_PAYMENT_IN_PROGRESS');
     if(purchase?.kind==='BALANCE')refuse('TRIAL_BALANCE_SUBMISSION_IN_PROGRESS',purchase);
-    Object.assign(row,{state:'CANCELLED',finishedAt:now,version:(row.version||1)+1});return remember(snapshot());
+    Object.assign(row,{state:'CANCELLED',endReason:'cancelled',finishedAt:now,cooldownUntil:now+cooldown,version:(row.version??0)+1});
+    return remember(snapshot());
   }
   if(url.pathname==='/api/trial/purchase-options'){
     if(!usesOptions)refuse('RESOURCE_NOT_FOUND',null,404);
@@ -292,7 +313,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const order={...conversionOrder(orderNo,now,quote,device),inventoryUsedAt:now,hardwareQuotaUsedAt};
     if(paid)Object.assign(order,{paymentMethod:paid.paymentMethod,paymentNo:paid.intentNo,paidTotalUsdt:paid.totalUsdt,paidAt:paid.paidAt});
     state.createdOrders??=[];state.createdOrders.unshift(order);state.trialOrderNo=orderNo;
-    Object.assign(row,{state:'REDEEMED',finishedAt:now,settlementAt:atTrialClock(now),version:(row.version||1)+1});
+    Object.assign(row,{state:'REDEEMED',finishedAt:now,settlementAt:atTrialClock(now),version:(row.version??0)+1});
     delete state.trialBalancePurchase;
     delete state.trialBalanceCanResume;
     state.trialOriginalPurchaseState='none';

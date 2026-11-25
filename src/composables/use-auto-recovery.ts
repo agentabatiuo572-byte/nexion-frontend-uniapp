@@ -15,7 +15,7 @@ export function useAutoRecovery(options: {
   repeatMs?: number;
   repeatWhile?: () => boolean;
   retryNotBefore?: () => number;
-  quiet?: boolean;
+  quiet?: boolean | (() => boolean);
 }) {
   const app = useApp();
   const shown = ref(false);
@@ -109,7 +109,8 @@ export function useAutoRecovery(options: {
     release = registerPageRecovery({
       failed: options.failed, pending: () => inFlight !== null, retry,
       // Conditional repeats also serve ordinary failed reads when pull is available.
-      quiet: options.quiet ?? (options.repeatMs !== undefined && options.repeatWhile === undefined),
+      quiet: () => typeof options.quiet === "function" ? options.quiet()
+        : options.quiet ?? (options.repeatMs !== undefined && options.repeatWhile === undefined),
     });
     attempts = 0;
     schedule(delay);

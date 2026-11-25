@@ -317,7 +317,7 @@ function demoE1PurchaseRule(state,product,now,checkLiveQuota=true,skipPurchaseGa
   const required=!skipPurchaseGate&&product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
   const current=required?demoH4Account(state,now).rank:0;
   const gap=Math.max(0,required-current);
-  const soldOut=checkLiveQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
+  const soldOut=!skipPurchaseGate&&checkLiveQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
   const decisionCode=!product.available?'PRODUCT_NOT_RELEASED':soldOut?'PURCHASE_GATE_SOLD_OUT':
     gap>0?'PURCHASE_GATE_NOT_MET':'ELIGIBLE';
   const conditions=required?[{kind:'rank',required,current,gap,met:gap===0}]:[];
