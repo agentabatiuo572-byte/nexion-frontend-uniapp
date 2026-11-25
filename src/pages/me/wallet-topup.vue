@@ -179,7 +179,10 @@ function refreshTrialFunding(): Promise<boolean> {
   if (!target || !scope || !topupVisible.value || !foregroundReadAllowed()) return Promise.resolve(false);
   if (trialFundingRead) return trialFundingRead;
   const current = () => topupVisible.value && scope === trialFundingScope.value && !!readTrialTopup(target.accountKey, target.id);
-  const read = Promise.all([checkTrialTopup(target), app.refreshRemoteFleet(app.captureRemoteAccountRequest())])
+  const read = Promise.all([
+    checkTrialTopup(target),
+    app.refreshRemoteFleet(app.captureRemoteAccountRequest(), { coalesce: true }),
+  ])
     .then(async ([review, walletReady]) => {
       if (!current()) return false;
       if (review.status === "redirect") {
@@ -291,7 +294,8 @@ const sessionReady = computed(() => {
 watch([trialFundingScope, topupVisible, foregroundReadAllowed], ([scope, visible, allowed]) => {
   if (scope && visible && allowed) void refreshTrialFunding();
 }, { immediate: true, flush: "post" });
-useVisibleInterval(() => { void refreshTrialFunding(); }, 10_000, () => !!trialFundingScope.value);
+// The interval ticks synchronously when the target becomes available during account binding.
+useVisibleInterval(() => { void nextTick(refreshTrialFunding); }, 10_000, () => !!trialFundingScope.value);
 watch(() => dep.records.filter(record => record.status === "credited").map(record => record.depositId).join("|"),
   () => { void refreshTrialFunding(); });
 // The page reads the bank channel config itself, so a channel turned back on (or another account) shows again.
