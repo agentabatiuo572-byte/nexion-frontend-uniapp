@@ -3,7 +3,7 @@ import type { Device } from "@/store/types";
 
 /** What the 当前作业 line says for a remote phone without a current task (PRD 6.11, BUG-526), most urgent first.
  * Shared by the earn stage, the device card and the device warehouse row; a running or paused task keeps its own row. */
-export type PhoneIdleState = "restoring" | "notReady" | "expired" | "unavailable" | "loading" | "idle";
+export type PhoneIdleState = "restoring" | "notReady" | "expired" | "unknown" | "idle";
 
 type PhoneIdleFacts = {
   nativePhoneTaskRecoveryDeviceId: string | null;
@@ -19,20 +19,20 @@ export function phoneIdleState(device: Device, app: PhoneIdleFacts, monotonicNow
   if (device.simulationState === "EXPIRED" || (device.phoneValidUntil != null && device.taskServerNow != null
     && device.taskServerNowReceivedAt != null
     && projectServerNow(device.taskServerNow, device.taskServerNowReceivedAt, monotonicNow) >= device.phoneValidUntil)) return "expired";
-  if (app.remoteAssignmentStatus === "error") return "unavailable";
-  if (!app.remoteAssignmentHasSnapshot && (app.remoteAssignmentStatus === "idle" || app.remoteAssignmentStatus === "loading")) return "loading";
+  // A failed task read says nothing of its own (03 §3.5.2): like other devices the line reads 状态待确认 until a read succeeds.
+  if (app.remoteAssignmentStatus === "error"
+    || (!app.remoteAssignmentHasSnapshot && (app.remoteAssignmentStatus === "idle" || app.remoteAssignmentStatus === "loading"))) return "unknown";
   return "idle";
 }
 
 export function phoneIdleText(state: PhoneIdleState,
-  phone: { restoring: string; notReady: string; expired: string; unavailable: string },
+  phone: { restoring: string; notReady: string; expired: string },
   earn: { runtimeUnknown: string; noCurrentTask: string }): string {
   switch (state) {
     case "restoring": return phone.restoring;
     case "notReady": return phone.notReady;
     case "expired": return phone.expired;
-    case "unavailable": return phone.unavailable;
-    case "loading": return earn.runtimeUnknown;
+    case "unknown": return earn.runtimeUnknown;
     default: return earn.noCurrentTask;
   }
 }
