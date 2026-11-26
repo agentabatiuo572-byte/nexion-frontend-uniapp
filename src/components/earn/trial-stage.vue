@@ -8,11 +8,11 @@
     <JobGauge :progress="gaugeProgress" :live="online && gaugeProgress != null" tone="amber" :label="copy.availableCredit"><DeviceArt :src="art" /></JobGauge>
     <view class="trial-stage__credit">
       <text class="trial-stage__credit-label">{{ copy.availableCredit }}</text>
-      <text class="trial-stage__credit-value">{{ money(presentation.offsetUSD.value) }}<text class="trial-stage__credit-estimate">/ {{ fmt(t.earn.trialEstimateShort, { amount: money(presentation.estimatedOffsetUSD.value) }) }}</text></text>
+      <text class="trial-stage__credit-value">{{ money(presentation.offsetUSD.value) }}<text v-if="presentation.offsetUSD.value !== null" class="trial-stage__unit">&nbsp;USDT</text><text class="trial-stage__credit-estimate">/ {{ fmt(t.earn.trialEstimateShort, { amount: moneyText(presentation.estimatedOffsetUSD.value) }) }}</text></text>
     </view>
     <view class="trial-stage__stats">
       <view class="trial-stage__stat"><text class="trial-stage__label">{{ presentation.status.value === 'grace' ? copy.creditRemaining : copy.remaining }}</text><text class="trial-stage__value">{{ remaining }}</text></view>
-      <view class="trial-stage__stat"><text class="trial-stage__label">{{ copy.estimate }}</text><text class="trial-stage__value">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
+      <view class="trial-stage__stat"><text class="trial-stage__label">{{ copy.estimate }}</text><text class="trial-stage__value">{{ money(presentation.estimatedOffsetUSD.value) }}<text v-if="presentation.estimatedOffsetUSD.value !== null" class="trial-stage__unit">&nbsp;USDT</text></text></view>
     </view>
     <text v-if="presentation.status.value === 'grace'" class="trial-stage__note">{{ copy.grace }}</text>
     <text class="trial-stage__note">{{ copy.creditNote }}</text>
@@ -60,8 +60,12 @@ const statusText = computed(() => !presentation.displayReady.value ? copy.value.
   : online.value ? t.value.earn.online : copy.value.grace);
 const remaining = computed(() => presentation.remainingMs.value === null ? "—" : formatTrialCountdown(presentation.remainingMs.value));
 const gaugeProgress = computed(() => visibility.hidden || presentation.offsetProgress.value === null ? null : Math.round(presentation.offsetProgress.value * 100));
+// Amounts carry their unit USDT (01 §1.2, 03 §3.6.1): the template sets it after the figure; in a sentence it is joined by U+00A0.
 function money(value: number | null) {
-  return visibility.mask(value === null ? "—" : `$${formatAmount(value)}`);
+  return value === null ? "—" : visibility.mask(formatAmount(value));
+}
+function moneyText(value: number | null) {
+  return value === null ? "—" : `${money(value)}\u00A0USDT`;
 }
 const buyText = computed(() => copy.value.buy);
 // A failed trial read shows no strip (03 §3.4); the dimmed buy pill still tells screen readers why.
@@ -84,6 +88,8 @@ function goBuy() { if (presentation.actionsReady.value) goDetails(); }
 .trial-stage__credit { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 10px; text-align: center; }
 .trial-stage__credit-label { font: 400 13px/18px var(--font-v5); color: var(--v5-ink-2); }
 .trial-stage__credit-value { font: 500 30px/34px var(--font-metric); color: var(--v5-ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+/* Unit after a figure (01 §1.2): max(12px, .4em) (12px for the 30px credit and the 17px stats), 500, auxiliary. */
+.trial-stage__unit { font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .trial-stage__credit-estimate { margin-left: 6px; font: 500 14px/20px var(--font-v5); color: var(--v5-ink-3); letter-spacing: 0; }
 .trial-stage__stats { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
 .trial-stage__stat { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 0 4px; text-align: center; }

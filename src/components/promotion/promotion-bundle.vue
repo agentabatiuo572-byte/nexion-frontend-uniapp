@@ -350,7 +350,7 @@ const footerNote = computed(() => {
 // An unpaid original for this selection stays reachable here even when the activity or quote no longer allows a new purchase.
 const originalRead=ref(0);
 const originalCheckout=computed(()=>{void originalRead.value;return signedIn.value&&selection.value.length>0&&resumesOriginalCheckout();});
-const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
+const footer=computed(()=>!originalCheckout.value&&(singleActivityProduct.value||(scopeId.value&&!activity.value))?null:{
   note:originalCheckout.value?'':footerNote.value,
   signedIn:signedIn.value,canContinue:originalCheckout.value||canOpenDevices.value||canContinue.value,
   continueLabel:originalCheckout.value?t.value.promotion.resume:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
@@ -361,7 +361,7 @@ const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity
   continue:continueCheckout,signIn,
 });
 // The single-model action for the page's bottom bar (same handler as before).
-const single=computed(()=>singleActivityProduct.value?{label:commerceCopy(locale.code).singlePurchase,open:openSingleProduct}:null);
+const single=computed(()=>singleActivityProduct.value&&!originalCheckout.value?{label:commerceCopy(locale.code).singlePurchase,open:openSingleProduct}:null);
 defineExpose({footer,single});
 function freshQuote(){return !!quote.value&&isEntryQuoteFresh(quote.value.expiresAt,quote.value.serverTime,clockNow()-quoteReceivedAt);}
 function expireQuote(){

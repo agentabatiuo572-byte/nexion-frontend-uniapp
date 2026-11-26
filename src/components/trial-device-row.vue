@@ -12,9 +12,9 @@
     </view>
     <view v-if="variant !== 'home' && isExpanded" :id="`trial-device-details-${variant}`" class="trial-device-row__body">
       <text v-if="presentation.status.value === 'grace'" class="trial-device-row__state">{{ copy.grace }}</text>
-      <view class="trial-device-row__credit-block"><view class="trial-device-row__credit"><text>{{ copy.availableCredit }}</text><text v-if="variant === 'inventory'" class="trial-device-row__amount font-mono-tabular">{{ offsetParts[0] }}<text class="trial-device-row__dec">{{ offsetParts[1] }}</text></text><text v-else class="trial-device-row__amount font-mono-tabular">{{ money(presentation.offsetUSD.value) }}</text></view>
+      <view class="trial-device-row__credit-block"><view class="trial-device-row__credit"><text>{{ copy.availableCredit }}</text><text v-if="variant === 'inventory'" class="trial-device-row__amount font-mono-tabular">{{ offsetParts[0] }}<text class="trial-device-row__dec">{{ offsetParts[1] }}</text><text v-if="presentation.offsetUSD.value !== null" class="trial-device-row__unit">&nbsp;USDT</text></text><text v-else class="trial-device-row__amount font-mono-tabular">{{ money(presentation.offsetUSD.value) }}<text v-if="presentation.offsetUSD.value !== null" class="trial-device-row__unit">&nbsp;USDT</text></text></view>
       <view v-if="!hidePersonalData" class="trial-device-row__progress nx-progress" role="progressbar" :aria-label="copy.availableCredit" :aria-valuenow="presentation.offsetProgress.value === null ? undefined : Math.round(presentation.offsetProgress.value * 100)" aria-valuemin="0" aria-valuemax="100"><view v-viz-inview class="nx-progress__fill" :style="{ width: `${(presentation.offsetProgress.value ?? 0) * 100}%` }" /></view>
-      <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}</text></view>
+      <view class="trial-device-row__estimate"><text>{{ copy.estimate }}</text><text class="font-mono-tabular">{{ money(presentation.estimatedOffsetUSD.value) }}<text v-if="presentation.estimatedOffsetUSD.value !== null" class="trial-device-row__unit">&nbsp;USDT</text></text></view>
       <text class="trial-device-row__note">{{ copy.creditNote }}</text></view>
       <view class="trial-device-row__actions">
         <view v-if="variant === 'inventory' && showCancel && cancelLocked && presentation.status.value === 'active'" class="trial-device-row__cancel trial-device-row__cancel--inline nx-reverse-action"><text>{{ detailCopy.cancelLocked }}</text></view>
@@ -76,7 +76,7 @@ const statusText = computed(() => lifecycleConfirming.value ? lifecycleCopy.valu
 const offsetParts = computed(() => { const text = money(presentation.offsetUSD.value); const at = /\.\d+$/.exec(text)?.index ?? text.length; return [text.slice(0, at), text.slice(at)]; });
 const remainingText = computed(() => presentation.remainingMs.value === null ? "—" : formatTrialRemaining(presentation.remainingMs.value, copy.value.longRemaining));
 function money(value: number | null) {
-  const formatted = value === null ? "—" : `$${formatAmount(value)}`;
+  const formatted = value === null ? "—" : formatAmount(value);
   return props.variant === "inventory" ? formatted : visibility.mask(formatted);
 }
 function goDetails() { navTo("/pages/me/trial"); }
@@ -115,6 +115,8 @@ function requestCancel() { if (presentation.actionsReady.value && !props.cancelB
 .trial-device-row__amount { color:var(--v5-brand); font-size:20px; line-height:26px; font-weight:600; }
 .trial-device-row__progress { margin-top:8px; }
 .trial-device-row__estimate { margin-top:6px; }
+/* The amount's unit (01 §1.2: under 30px, 12/16, 500, auxiliary), joined by U+00A0 (03 §3.6.1). */
+.trial-device-row__unit { font:500 12px/16px var(--font-v5); letter-spacing:0; color:var(--v5-ink-3); }
 .trial-device-row__note { display:block; margin-top:8px; font:400 var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color:var(--v5-ink-3); }
 .trial-device-row__actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 8px; margin-top:8px; }
 /* Keep the mobile hit area while the visible pill remains a compact 32px. */

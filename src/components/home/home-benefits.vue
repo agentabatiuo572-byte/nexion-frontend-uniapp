@@ -20,7 +20,7 @@
         <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled || showCapacityManagement ? 0 : -1" :aria-disabled="trialOfferEnabled || showCapacityManagement ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art hb-half__art--device" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
-            <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
+            <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount">{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text><text v-if="estimateParts.known" class="hb-amount__unit">&nbsp;USDT</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
             <view class="hb-rule" aria-hidden="true" />
             <view class="hb-half__foot">
               <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
@@ -34,7 +34,7 @@
               <NxTag class="hb-wt__tag" tone="brand" :label="fmt(copy.benefitTrialFree, { n: trialDays })" />
             </view>
             <view class="hb-wt__txt">
-              <text class="hb-amount hb-wt__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text>
+              <text class="hb-amount hb-wt__amount nx-num-amount">{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text><text v-if="estimateParts.known" class="hb-amount__unit">&nbsp;USDT</text></text>
               <text class="hb-sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text>
               <view class="hb-wt__row">
                 <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
@@ -55,7 +55,7 @@
         <view v-if="trialPending" class="hb-card hb-pend" :class="{ 'hb-pend--wide': pendingCount === 1, 'hb-pop': popTrial }" :style="{ '--hb-i': offerCount + (voucherPending ? 1 : 0) }" :data-trial-state="status" role="button" tabindex="0" :aria-label="trialPendingAria" @click="openTrialDetails" @keydown.enter.prevent="openTrialDetails" @keydown.space.prevent="openTrialDetails">
           <view class="hb-icon" :class="{ 'hb-icon--dim': status === 'ended' }" aria-hidden="true"><image class="hb-icon__img" :src="trialArt" mode="aspectFit" /><view v-if="online" class="hb-online home-benefits__online" /></view>
           <view v-if="pendingCount === 2" class="hb-pend__text">
-            <text class="hb-pend__title">{{ status === 'active' ? copy.benefitTrialActive : status === 'grace' ? `${lifecycleCopy.cardGraceTitle} ${visibility.mask(creditText.replace(/\.00$/, ''))}` : lifecycleCopy.endedTitle }}</text>
+            <text class="hb-pend__title">{{ status === 'active' ? copy.benefitTrialActive : status === 'grace' ? `${lifecycleCopy.cardGraceTitle} ${creditValue === null ? '—' : `${visibility.mask(creditValue.replace(/\.00$/, ''))}\u00A0USDT`}` : lifecycleCopy.endedTitle }}</text>
             <text v-if="status !== 'ended'" class="hb-pend__sub"><text class="hb-mono font-mono-tabular">{{ countdownText }}</text></text>
           </view>
           <view v-else class="hb-pend__text">
@@ -64,7 +64,7 @@
           </view>
           <text v-if="pendingCount === 1 && status === 'ended'" class="hb-act nx-after-arrow">{{ lifecycleCopy.buyDevice }}</text>
           <template v-else>
-            <view v-if="pendingCount === 1" class="hb-val"><text>{{ copy.benefitCredit }}</text><text class="hb-val__amount">{{ visibility.mask(creditText) }}</text></view>
+            <view v-if="pendingCount === 1" class="hb-val"><text>{{ copy.benefitCredit }}</text><text class="hb-val__amount">{{ creditValue === null ? '—' : visibility.mask(creditValue) }}<text v-if="creditValue !== null" class="hb-val__unit">&nbsp;USDT</text></text></view>
             <view class="hb-chev" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></view>
           </template>
         </view>
@@ -132,13 +132,15 @@ const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.d
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
 const trialArt = computed(() => confirmedOffer.value ? confirmedOffer.value.imageUrl : trialView.imageUrl.value);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
-// Same capped estimate the trial page and checkout quote (BUG 78).
+// Same capped estimate the trial page and checkout quote (BUG 78), written with its unit USDT (03 §3.6); unknown is a bare 「—」.
 const estimateText = computed(() => {
   const estimate = confirmedOffer.value ? confirmedOffer.value.estimatedOffsetUSD : trialView.estimatedOffsetUSD.value;
-  return estimate === null ? '—' : `$${formatAmount(estimate)}`;
+  return estimate === null ? '—' : formatAmount(estimate);
 });
-const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
-const creditText = computed(() => trialView.offsetUSD.value === null ? '—' : `$${formatAmount(trialView.offsetUSD.value)}`);
+const estimateParts = computed(() => { const match = /^(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { whole: match[1], cents: match[2] ?? '', known: estimateText.value !== '—' }; });
+// The credit the trial gives toward a purchase: the figure and its unit USDT (01 §1.2, 03 §3.6.1); unknown is a bare 「—」.
+const creditValue = computed(() => trialView.offsetUSD.value === null ? null : formatAmount(trialView.offsetUSD.value));
+const creditText = computed(() => creditValue.value === null ? '—' : `${visibility.mask(creditValue.value)}\u00A0USDT`);
 const countdownText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialCountdown(trialView.remainingMs.value));
 // Keep the last confirmed label during a background read (BUG 14). [half pill, wide pill, screen-reader wording]
 const offerState = computed(() => trial.lastReadFailed ? 'error' : trial.confirmedOfferState());
@@ -172,7 +174,7 @@ const trialOfferAria = computed(() => trialRechecking.value || (showCapacityFull
 const trialPendingAria = computed(() => {
   if (status.value === 'ended') return `${trialName.value} · ${lifecycleCopy.value.endedTitle} · ${lifecycleCopy.value.buyDevice}`;
   const remaining = trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, lifecycleCopy.value.longRemaining);
-  return `${trialName.value} · ${status.value === 'active' ? lifecycleCopy.value.activeTitle : lifecycleCopy.value.graceTitle} · ${status.value === 'active' ? lifecycleCopy.value.remainingLabel : lifecycleCopy.value.creditUntilLabel} ${remaining} · ${copy.value.benefitCredit} ${visibility.mask(creditText.value)} · ${lifecycleCopy.value.viewTrial}`;
+  return `${trialName.value} · ${status.value === 'active' ? lifecycleCopy.value.activeTitle : lifecycleCopy.value.graceTitle} · ${status.value === 'active' ? lifecycleCopy.value.remainingLabel : lifecycleCopy.value.creditUntilLabel} ${remaining} · ${copy.value.benefitCredit} ${creditText.value} · ${lifecycleCopy.value.viewTrial}`;
 });
 
 const offerCount = computed(() => Number(voucherOffer.value) + Number(trialOffer.value));
@@ -247,6 +249,8 @@ const trialReadFailed = computed(() => trial.lastReadFailed || trial.authoritySt
 
 .hb-amount { display:block;font-weight:500;letter-spacing:-.02em;color:var(--v5-brand);white-space:nowrap; }
 .hb-amount__minor { font-size:max(12px,.55em);color:var(--v5-ink-3); }
+/* Unit after the trial estimate (01 §1.2): max(12px, .4em), 500, auxiliary; U+00A0 keeps it on the figure's line (03 §3.6.1). */
+.hb-amount__unit { font:500 max(12px,.4em)/1 var(--font-v5);letter-spacing:0;color:var(--v5-ink-3); }
 .hb-amount__dec { color:var(--v5-ink-3); }
 .hb-label { min-width:0;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .hb-sub { font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
@@ -323,6 +327,7 @@ const trialReadFailed = computed(() => trial.lastReadFailed || trial.authoritySt
 .hb-act { flex:none;font:500 13px/18px var(--font-v5);color:var(--v5-brand);white-space:nowrap; }
 .hb-val { flex:none;text-align:right;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);white-space:nowrap; }
 .hb-val__amount { display:block;margin-top:2px;font:500 15px/20px var(--font-v5);color:var(--v5-ink); }
+.hb-val__unit { font:500 12px/16px var(--font-v5);color:var(--v5-ink-3); }
 .hb-chev { flex:none;width:16px;height:16px;color:var(--v5-ink-4); }
 .hb-chev :deep(svg) { display:block; }
 

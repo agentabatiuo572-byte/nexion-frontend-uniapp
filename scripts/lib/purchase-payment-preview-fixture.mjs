@@ -204,6 +204,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const cutoff=Math.min(intent.deadline,intent.expirationTime?Date.parse(intent.expirationTime):Infinity);
     return {claimNo:intent.claimNo,kind:'EXTERNAL',intentNo:intent.intentNo,productNo,name,imageUrl,
       paymentMethod:intent.paymentMethod,expectedAmountUsdt:String(intent.payload.expectedAmountUsdt),
+      amountUsdt:intent.businessAmountUsdt,
       deadlineAt:new Date(cutoff).toISOString(),status:intent.status};
   }
   function originalTrialPurchase() {
@@ -341,7 +342,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
   }
   // Payment details follow the current network gate without changing the stored address (PurchasePaymentService.view).
   const view = intent => {
-    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialClockDaysAtCreate, trialSample, unpaidTerminalSample, ...row} = intent, open = Date.now() < deadline;
+    const {createdAt, orderNo, deadline, origin, payload, identity, targetProductNo, sourceDeviceId, pricingAt, paidAt, confirmedAt, replacementQuote, quotaHold, topupSample, snapshotUnavailable, trialDeviceSnapshot, trialQuote, trialClockDaysAtCreate, trialSample, unpaidTerminalSample, ...row} = intent, open = Date.now() < deadline;
     if (row.kind === 'TRIAL_CONVERT' && !trialPurchaseOptionsEnabled(state)) {
       delete row.claimNo;
       delete row.trialPurchaseOutcome;
@@ -450,16 +451,27 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const channelFixed = feePolicyVersion === 4 ? 51 : 50;
       const channel = Math.round(subtotal * 0.0125) + channelFixed, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
+      const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
+      const trialQuote=trial&&wireTrialQuote(trial.quote);
+      const trialPurchaseBreakdown=trial&&trialPurchaseOptionsEnabled(state)?{
+        productNo:trialDeviceSnapshot.productNo,productName:trialDeviceSnapshot.name,
+        ...(quoteProducts[0].tagline&&{productSubtitle:quoteProducts[0].tagline}),
+        ...Object.fromEntries(['priceUsdt','promoDiscountUsdt','offsetUsdt','earlyDiscountUsdt','amountUsdt'].map(key=>[key,trialQuote[key]])),
+      }:undefined;
       const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: body.kind, paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
         businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: adjustment.toFixed(6), subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
         networkConfirmFeeUsdt: money(network), totalUsdt: money(subtotal + channel + network), feePolicyVersion, pricingAsOf: new Date(now).toISOString(), expiresAt: new Date(Math.min(now + QUOTE_TTL, deadline)).toISOString(),
         deadlineAt: new Date(deadline).toISOString(), confirmationGraceEndsAt: new Date(graceEnd(body.paymentMethod, deadline)).toISOString(),
         fxRateVndPerUsdt: bank ? '25000.000000' : null, amountVnd: bank ? String((subtotal + channel) * 250) : null,
         ...(trial&&{currency:bank?'VND':'USDT',channelFeeRatePct:'1.25',channelFeeFixed:money(channelFixed),paymentFeesConfigured:true,
-          trialOffsetBasis:trialPurchaseOptionsEnabled(state)?'ACCRUED_B90':'ACCRUED',...(bank&&{fxVersion:1})})};
-      const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
+          trialOffsetBasis:trialPurchaseOptionsEnabled(state)?'ACCRUED_B90':'ACCRUED',...(bank&&{fxVersion:1})}),
+        ...(trialPurchaseBreakdown&&{trialPurchaseBreakdown})};
       quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote, trialDeviceSnapshot});
-      return {status: 200, message: 'OK', data: quote};
+      // The external-quote response exposes terms that the stored payment snapshot omits.
+      const data = trialPurchaseBreakdown ? {...quote, trialPurchaseBreakdown: {...trialPurchaseBreakdown,
+        discountRate: trialQuote.discountRate, discountCapUsdt: trialQuote.discountCapUsdt,
+        earlyDiscountConfiguredUsdt: trialQuote.earlyDiscountConfiguredUsdt}} : quote;
+      return {status: 200, message: 'OK', data};
     }
     if (path === `${base}-intents` && method === 'POST') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');
@@ -524,7 +536,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
         paymentUrl: source.quote.paymentMethod === 'HDPAY_BANK' ? new URL(intentNo, previewPurchaseCashier).href : null,
         address: source.quote.paymentMethod === 'HDPAY_BANK' ? null : '0x' + (source.quote.paymentMethod === 'CREGIS_USDT_ERC20' ? '7d3a' : '4b1f') + String(sequence).padStart(36, '0'),
         createdAt: Date.now(), ...subject, payload: source.payload, replacementQuote: source.replacementQuote, pricingAt: source.pricingAt, deadline, origin: url.origin,
-        trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{claimNo:trial.claimNo,version:1,reconciliationStatus:'PENDING',
+        trialDeviceSnapshot:source.trialDeviceSnapshot,...(trial&&{trialQuote:trial.quote,claimNo:trial.claimNo,version:1,reconciliationStatus:'PENDING',
           trialClockDaysAtCreate:state.trialLifecycleAdvanceDays??0})};
       const commit = () => {
         if (suspended) {

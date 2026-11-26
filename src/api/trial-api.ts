@@ -23,7 +23,7 @@ export interface TrialConversionOutcome {
 export interface TrialConversionQuote {
   settlementPolicy: TrialSettlementPolicy;
   quoteVersion: string;
-  /** True only inside the original term with the early-purchase policy on. */
+  /** True when an in-term purchase qualifies for full-term settlement. */
   earlyPurchase: boolean;
   priceUSD: number;
   /** Real accrual so far — never replaced by the settled totals. */
@@ -37,6 +37,9 @@ export interface TrialConversionQuote {
   offsetUSD: number;
   remainderUSD: number;
   promoDiscountUSD: number;
+  /** Fraction for display, normalized from the quote's wire percentage. */
+  discountRate?: number;
+  discountCapUSD?: number;
   /** The configured fixed discount (rules copy); this order may apply less. */
   earlyDiscountConfiguredUSD: number;
   earlyDiscountUSD: number;
@@ -81,6 +84,8 @@ export type TrialOriginalPurchase = TrialPurchaseSnapshot & (
       kind: "EXTERNAL";
       paymentNo: string;
       paymentMethod: TrialExternalMethod;
+      /** Frozen business principal, separate from the user's confirmation limit. */
+      amountUSD?: number;
       expiresAt: number;
       status: "CREATING" | "SUBMIT_UNKNOWN" | "AWAITING_PAYMENT" | "FUNDS_CONFIRMED" | "MANUAL_REVIEW" | "EXPIRED";
     }
@@ -289,17 +294,30 @@ export function parseTrialOriginalPurchase(value: unknown): TrialOriginalPurchas
   }
   const paymentNo = text(row.intentNo);
   const expiresAt = timestamp(row.deadlineAt);
+  const amountUSD = finiteNumber(row.amountUsdt);
   if (row.kind !== "EXTERNAL" || !paymentNo || expiresAt === null || !text(row.name)
+      || (row.amountUsdt != null && amountUSD === null)
       || !EXTERNAL_METHODS.has(row.paymentMethod as string)
       || !EXTERNAL_PURCHASE_STATES.has(row.status as string)) return invalid();
   type ExternalPurchase = Extract<TrialOriginalPurchase, { kind: "EXTERNAL" }>;
   return { kind: row.kind, claimNo, paymentNo, expiresAt, confirmedAmountUSD,
+    ...(amountUSD !== null ? { amountUSD } : {}),
     device: { ...purchaseDevice(row, productNo), productType: "DEVICE" },
     paymentMethod: row.paymentMethod as TrialExternalMethod,
     status: row.status as ExternalPurchase["status"] };
 }
 
 const SETTLEMENT_POLICIES = new Set(["FULL_TERM_ON_CONVERSION", "ACCRUED_ON_CONVERSION"]);
+
+export function parseTrialDiscountTerms(row: Record<string, unknown>) {
+  const rawRate = row.discountRate;
+  const pct = typeof rawRate === "string" && /^\d+(?:\.\d+)?$/.test(rawRate) ? finiteNumber(rawRate) : null;
+  const cap = finiteNumber(row.discountCapUsdt);
+  return {
+    ...(pct !== null && pct <= 100 ? { discountRate: Number(`${rawRate}e-2`) } : {}),
+    ...(cap !== null ? { discountCapUSD: cap } : {}),
+  };
+}
 
 export function parseTrialConversionQuote(value: unknown): TrialConversionQuote {
   const row = record(value);
@@ -321,7 +339,8 @@ export function parseTrialConversionQuote(value: unknown): TrialConversionQuote 
       || (row.earlyPurchase && earlyEndsAt === null)
       || Object.values(amounts).some(amount => amount === null)) return invalid();
   return { settlementPolicy: policy as TrialSettlementPolicy, quoteVersion: version,
-    earlyPurchase: row.earlyPurchase, ...amounts as { [K in keyof typeof amounts]: number }, earlyEndsAt };
+    earlyPurchase: row.earlyPurchase, ...amounts as { [K in keyof typeof amounts]: number }, earlyEndsAt,
+    ...parseTrialDiscountTerms(row) };
 }
 
 const QUOTE_UNAVAILABLE = "TRIAL_PRODUCT_QUOTE_UNAVAILABLE";

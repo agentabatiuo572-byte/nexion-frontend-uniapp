@@ -1,5 +1,5 @@
 <template>
-  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="activated ? copy.activationSuccessTitle : copy.activateTitle">
+  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="openedActivated ? copy.activationSuccessTitle : copy.activateTitle">
     <view class="tcs-backdrop" @click="hide" />
     <view class="nx-glass-sheet tcs-panel" @click.stop>
       <!-- The shared sheet close (as NxSheet): neutral glass M, round (03 §3.1 圆形关闭, 全站玻璃控件边缘). The wrapper only places it. -->
@@ -7,6 +7,11 @@
 
       <!-- Content scrolls under a pinned footer when it outgrows the screen, so the actions never leave it (03 §3.5 长内容). -->
       <view class="tcs-body" :class="{ 'tcs-body--alone': readFailView }">
+        <!-- Result head (03 §3.6.1, shared NxResultHead in its sheet size): 56px success circle, the overview-role title as a
+             heading, one body line. Said once, by one path: this status region stays mounted while the sheet is open and the
+             head is added to it when the claim is confirmed here. A sheet opened on an active trial is named by its title on
+             open instead, so the region then carries no live role. -->
+        <view class="tcs-result" :class="{ 'tcs-result--shown': activated }" :role="openedActivated ? undefined : 'status'"><NxResultHead v-if="activated" tone="success" size="sheet" :live="false" :title="copy.activationSuccessTitle" :description="copy.activationSuccessBody" /></view>
         <!-- Nothing to show at all: the result alone, recovering on its own (03 §3.5.2, 04.5); only the close stays. -->
         <view v-if="readFailView" class="tcs-read-state" role="status">
           <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
@@ -14,9 +19,6 @@
           <text class="tcs-read-state__hint">{{ copy.autoRetrying }}</text>
         </view>
         <template v-else>
-          <!-- Result head (03 §3.6.1, shared NxResultHead in its sheet size): 56px success circle, the overview-role title as a
-               heading, one body line. No toast speaks while the sheet is open, so the head announces its appearance once. -->
-          <view v-if="activated" class="tcs-result"><NxResultHead tone="success" size="sheet" announce :title="copy.activationSuccessTitle" :description="copy.activationSuccessBody" /></view>
           <!-- What is claimed: field name, device name, trial length (01 §1.1.1 字段名; 03 §3.8 NxTag). The same block stays after activation. -->
           <view class="tcs-head" :class="{ 'tcs-head--sub': activated }">
             <text class="tcs-eyebrow">{{ copy.productLabel }}</text>
@@ -37,7 +39,7 @@
               </template>
               <template v-else>
                 <text class="tcs-plinth__label">{{ copy.estimateLabel }}</text>
-                <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount"><text class="tcs-amount__cur">$</text>{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
+                <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount">{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text><text class="tcs-amount__unit">&nbsp;USDT</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
                 <text id="tcs-basis" class="tcs-estimate-note"><text v-for="(part, i) in estimateNoteParts" :key="i" :class="{ 'tcs-estimate-note__num': part.value }">{{ part.text }}</text></text>
               </template>
             </view>
@@ -78,7 +80,7 @@ import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
@@ -106,7 +108,7 @@ const loadingView = computed(() => trialView.config.value === null && !stateRead
 // The machine's placeholder disc shows until the catalog image is in (04 §4.1 中性占位).
 const imageReady = ref(false);
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
-// Sheet main amount (10 §10.2): the whole part stays, the $ and the decimals take the auxiliary ink; unknown is a whole 「—」.
+// Sheet main amount (10 §10.2): the whole part stays, the decimals and the USDT unit take the auxiliary ink; unknown is a whole 「—」.
 const estimateParts = computed(() => {
   if (trialView.estimatedOffsetUSD.value === null) return null;
   const [int, dec] = formatAmount(trialView.estimatedOffsetUSD.value).split('.');
@@ -115,15 +117,15 @@ const estimateParts = computed(() => {
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
 // The estimate card holds catalog information only (03 §3.4); a failed refresh is said on the status line by the button.
 // The basis line under the amount sets its figures in 500 (10 §10.2), so the sentence is split around its placeholders;
-// a "$" written right before a placeholder belongs to the figure.
+// each figure's unit follows it in the copy after a U+00A0 (03 §3.6.1).
 const estimateNoteParts = computed<{ text: string; value: boolean }[]>(() => {
   const config = trialView.config.value;
   if (!config) return stateReadFailed.value ? [] : [{ text: copy.value.loading, value: false }];
   if (config.shadowDailyUSD === null) return [];
   const values: Record<string, string> = { rate: formatAmount(config.shadowDailyUSD), days: String(config.trialDays), cap: formatAmount(config.trialOffsetCapUSD) };
-  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\$?\{\w+\})/).filter(Boolean).map((part) => {
-    const match = /^(\$?)\{(\w+)\}$/.exec(part);
-    return match && match[2] in values ? { text: match[1] + values[match[2]], value: true } : { text: part, value: false };
+  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\{\w+\})/).filter(Boolean).map((part) => {
+    const match = /^\{(\w+)\}$/.exec(part);
+    return match && match[1] in values ? { text: values[match[1]], value: true } : { text: part, value: false };
   });
 });
 const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
@@ -133,6 +135,9 @@ const remainingText = computed(() => trialView.remainingMs.value === null ? '—
 // error with retry (spec ⑤: failure is never silent).
 const claiming = ref(false);
 const { activated } = storeToRefs(sheet);
+// Whether the sheet opened on an already active trial: then the dialog is named by the result and the head is not
+// announced again; otherwise the name stays as opened, so a claim confirmed here is said once, by the result region.
+const openedActivated = ref(sheet.open && activated.value);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
 // View state only: the service's settled answer while the claim cannot go ahead. A refusal that a re-read did not lift, and the
@@ -152,9 +157,9 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
 const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
 const termsChanged = computed(() => shownReason.value === "terms-changed");
 // An explicitly unreceived start has a saved retry but no pending receipt to poll.
-const startNotRun = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
-  : freeTrial.startNotSeen && !shownReason.value);
-const claimRetryable = computed(() => !termsChanged.value && (startNotRun.value || (!freeTrial.pendingStart
+const startNotSeen = computed(() => !freeTrial.pendingStart && freeTrial.startNotSeen && !shownReason.value);
+const startRetryAvailable = computed(() => startNotSeen.value || freeTrial.startRetryable);
+const claimRetryable = computed(() => !termsChanged.value && (startRetryAvailable.value || (!freeTrial.pendingStart
   && claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value)));
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
   ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
@@ -164,8 +169,12 @@ const claimFromRetry = ref(false);
 const heldReasonText = ref("");
 const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+const checkingEligibility = computed(() => !activated.value && !claiming.value && !claimError.value && !startRetryAvailable.value
+  && freeTrial.authorityStatus === "loading" && freeTrial.canOpenClaim());
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
-const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value);
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value
+  : (!!freeTrial.pendingStart && (!freeTrial.startRetryable || !termsChanged.value))
+    || staleRead.value || checkingEligibility.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 // A refresh that failed over the shown data holds the claim: that is why 「免费激活」 is off, said as a status line beside it
 // while recovery reads again on its own (03 §3.1 禁用要有原因, §3.5.2).
@@ -175,8 +184,8 @@ const staleRead = computed(() => freeTrial.transientReadFailure && trialView.dis
 // unknown-eligibility hint stands above the off primary, so it is never grey without a reason (03 §3.4 无权限／不可用).
 const eligibilityUnknown = computed(() => !activated.value && !claiming.value && !freeTrial.pendingStart && !claimError.value && !staleRead.value
   && freeTrial.authorityStatus === "ready" && !freeTrial.canStart() && freeTrial.eligibility().reason === "unknown");
-const reasonLine = computed(() => !!freeTrial.pendingStart || startNotRun.value || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
-  || eligibilityUnknown.value);
+const reasonLine = computed(() => !!freeTrial.pendingStart || startNotSeen.value || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
+  || checkingEligibility.value || eligibilityUnknown.value);
 // Only a failed read with nothing to show leaves the result block alone; a reason or status line keeps its state (A09 order).
 const readFailView = computed(() => !reasonLine.value && !activated.value && !claiming.value && stateReadFailed.value);
 // Nothing left to decide once the claim is refused for now: the exit closes the sheet instead of 「我再想想」.
@@ -199,14 +208,16 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : copy.value.activateCta);
 // View state only: the one primary is the retry when the claim can be sent again (A06), busy while it is sent and while a
 // start the service took is still being confirmed (A07), so no greyed 「免费激活」 stands beside the status line.
-const confirmingStart = computed(() => !!freeTrial.pendingStart && !startNotRun.value);
+const confirmingStart = computed(() => !!freeTrial.pendingStart && !freeTrial.startRetryable);
 const primaryBusy = computed(() => claiming.value || confirmingStart.value);
 const primaryLabel = computed(() => showRetry.value ? t.value.trial.claimRetryCta : claimCtaLabel.value);
 const primaryLeaves = computed(() => !showRetry.value && claimOpensAnotherPage.value);
 const claimErrorText = computed(() => termsChanged.value && !confirmingStart.value ? sheet.failureText("terms-changed")
-  : startNotRun.value ? t.value.trial.claimNotStartedInline
+  : startNotSeen.value ? t.value.trial.claimNotStartedInline
+  : freeTrial.startRetryable ? t.value.trial.claimUnconfirmedRetryInline
   : freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : staleRead.value ? t.value.exchange.staleSnapshot
+  : checkingEligibility.value ? t.value.trial.entryChecking
   : eligibilityUnknown.value ? t.value.trial.eligReasonUnknown
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsRequired
@@ -290,6 +301,15 @@ watch(() => sheet.open, open => {
   claimError.value = false;
   claimErrorReason.value = undefined;
   activated.value = !claiming.value && !freeTrial.pendingStart && trialView.displayReady.value && trialView.active.value;
+  openedActivated.value = activated.value;
+});
+// A claim confirmed here swaps the primary for 「查看设备」: focus moves onto it once it is drawn, never back to the sheet
+// root (03 §3.5 焦点); the result itself is said only by the status region above.
+watch(activated, (now, was) => {
+  if (!now || was || !sheet.open || openedActivated.value) return;
+  // The App logic layer has no DOM (same guard as useDialogA11y).
+  if (typeof document === "undefined") return;
+  void nextTick(() => document.querySelector<HTMLElement>(".tcs-root .tcs-ctas .nx-button")?.focus());
 });
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
@@ -312,8 +332,8 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-body--alone { padding-bottom:var(--nx-overlay-bottom); }
 .tcs-foot { flex:none;padding:0 16px var(--nx-overlay-bottom); }
 
-/* Places the result head after activation: 4px under the sheet top, clear of the close (44px each side). */
-.tcs-result { padding:4px 44px 0; }
+/* Places the result head after activation: 4px under the sheet top, clear of the close (44px each side); empty, it takes no room. */
+.tcs-result--shown { padding:4px 44px 0; }
 
 /* What is claimed, centred, clear of the close (52px each side). */
 .tcs-head { padding:0 52px;text-align:center; }
@@ -328,7 +348,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-skel { display:inline-block;vertical-align:middle;border-radius:8px;background:color-mix(in srgb,var(--v5-ink) 9%,transparent); }
 .tcs-skel--name { width:148px;height:20px; }
 .tcs-skel--tag { width:104px;height:24px;border-radius:999px; }
-.tcs-skel--amount { width:104px;height:32px; }
+.tcs-skel--amount { width:136px;height:32px; }
 
 /* Stage: the machine stands on the plinth's upper edge. */
 .tcs-stage { position:relative;--tcs-mach:248px;margin-top:-34px; }
@@ -354,10 +374,11 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-plinth__label { display:block;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 /* One amount-sized line: the skeleton sits on its middle like the figure would (board .amt). */
 .tcs-amount-row { display:block;height:var(--ui-type-wallet-amount-lh);margin-top:4px;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); }
-/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, $ and decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
+/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
 .tcs-amount { display:block;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount);letter-spacing:-.02em;color:var(--v5-brand);font-variant-numeric:tabular-nums;white-space:nowrap; }
-/* line-height 1: the smaller symbol sits inside the figure's line instead of growing it. */
-.tcs-amount__cur { color:var(--v5-ink-3);font-size:max(12px,.55em);line-height:1; }
+/* Unit (01 §1.2): USDT after the figure at max(12px, .4em), 500, auxiliary; line-height 1 keeps it inside the figure's line,
+   and the U+00A0 before it keeps it on that line (03 §3.6.1). */
+.tcs-amount__unit { font:500 max(12px,.4em)/1 var(--font-v5);letter-spacing:0;color:var(--v5-ink-3); }
 .tcs-amount__dec { color:var(--v5-ink-3); }
 .tcs-amount--unknown { color:var(--v5-ink-3); }
 /* Basis line under the amount: auxiliary figure 12/16, its figures 500 (10 §10.2). */

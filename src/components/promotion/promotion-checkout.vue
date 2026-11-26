@@ -195,7 +195,7 @@ import { useOrders } from '@/store/orders';
 import { computeVoucherDiscount,isVoucherValid,voucherAppliesToSku,type VoucherDef } from '@/mock/vouchers';
 import { ApiError,asApiError,isApiRefusal } from '@/api/errors';
 import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,settleProductCatalogRefresh,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
-import { navTo,navBack,navReplace,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
+import { navTo,navBack,navReplace,navReset } from '@/lib/route';import { confirm,toast,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
 import { confirmInventoryPlacement,type InventoryPlacement } from '@/lib/inventory-placement-confirm';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord,PROMOTION_CHECKOUT_TABLE } from '@/lib/promotion-checkout-session';
@@ -665,7 +665,12 @@ async function createOrder(){
   if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;
   // Devices going to inventory (the notice above) need the user's confirmation before the order is created (PRD §7.3).
   const placement=inventoryPlacement.value;
-  if(placement?.purchased&&(!await confirmInventoryPlacement(t.value,placement,'order',paymentDialogOwner)||!current()||!visible.value||leaving.value||!canCreate.value))return;
+  if(placement?.purchased){
+    // The quote refreshes while the dialog is open: a new amount goes back to the page for review instead of into the order.
+    const reviewed=displayQuote.value?.amountUsdt;
+    if(!await confirmInventoryPlacement(t.value,placement,'order',paymentDialogOwner)||!current()||!visible.value||leaving.value||!canCreate.value)return;
+    if(displayQuote.value?.amountUsdt!==reviewed){toast.warn(t.value.store.coTotalQuoteChanged);return;}
+  }
   let orderRequested=false;
   await run(async()=>{
     createBlock.value=await session.create();

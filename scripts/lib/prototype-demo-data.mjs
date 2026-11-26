@@ -116,6 +116,7 @@ export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all'
 Object.assign(demoDefaults,{
   trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
   trialPurchaseReadState:'normal',trialPurchasePriceState:'normal',trialOriginalPurchaseState:'none',trialPurchaseWindow:'follow',
+  trialDefaultDiscountState:'initial',trialDeviceDiscountState:'initial',
   trialStartReceiptState:'normal',trialCancelReceiptState:'normal',purchaseCreateReceiptState:'normal',
 });
 export const demoOptions = {
@@ -123,14 +124,16 @@ export const demoOptions = {
   accountDeletionState:[['follow','跟随原场景'],['usdt','注销·USDT 余额'],['nex','注销·UVT 余额'],['locked','注销·锁定金额'],['withdrawal','注销·提现处理中'],['clear','注销·零余额无历史'],['history','注销·有历史（CONFIRMED 提现／CREDITED 充值，完成注销目前被 BUG-409 拦下）'],['blocked-funds','注销受阻·资金或订单未结清'],['blocked-unavailable','注销受阻·当时无法核实财务状态'],['blocked-unknown','注销受阻·未知原因'],['blocked-operator','注销受阻·运营拒绝'],['read-error','注销·余额读取失败'],['withdrawal-error','注销·提现读取失败']],
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
   powerUpState:[['default','默认连签增益'],['staking','含质押活动入口（/wallet/staking）']],
-  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['sub-half-cent','试用设备 · 抵后应付 0.004000（配合试用中）'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12']],
+  trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['sub-half-cent','试用设备 · 抵后应付 0.004000（配合试用中）'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['capped','领取层依据行 · 抵扣上限 20']],
   trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['grace-ending','抵扣期剩余 45 秒'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
   trialNameState:[['default','默认名称'],['long','超长设备名']],
   trialReadState:[['normal','正常读取'],['slow','试用状态 · 延迟返回原快照'],['error','试用读取失败'],['user-not-found','试用读取 · 用户不存在']],
   trialStartReceiptState:[...trialReceiptOptions,['rejected-unknown','通用拒绝（未知原因）＋资格重读']],
   trialCancelReceiptState:trialReceiptOptions,
   purchaseCreateReceiptState:[['normal','正常建单'],['processing','原建单请求处理中（稍后出单）']],
-  trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share']],
+  trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share'],['device-discounts','5 款 · 按设备优惠（S1、Cloud Share 售价 200）']],
+  trialDefaultDiscountState:[['initial','15% · 上限 50 · 立减 10'],['repriced','17.5% · 上限 50 · 立减 5']],
+  trialDeviceDiscountState:[['initial','折扣 20% · 上限 400 · 立减 30'],['repriced','折扣改为 5% · 上限 400 · 立减 30'],['discount-follows','折扣跟随默认 · 立减 30'],['early-follows','折扣 20% · 上限 400 · 立减跟随默认']],
   trialPurchaseOptionTarget:[['rack-p1','UVELRack P1'],['trial-device','本人试用设备']],
   trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['quota-requirements','硬件名额条件不足'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架'],['image-missing','清单未返回图片']],
   trialPurchaseReadState:[['normal','正常读取'],['loading','清单慢速读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
@@ -240,7 +243,8 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const optionTarget=trialPurchaseOptionSku(state);
   return skuDefinitions.map(([id,name,tier,listPrice,monthlyTarget,dailyEarnNEX,gpu,vram,watts],index)=>{
     const monthlyEstimateUsdt=id===previewDefaultTrialSku&&state.catalogState==='trial-h2-yield-updated'?225:monthlyTarget;
-    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, precision:402.123456,
+    const discountSamplePrice=state.trialPurchaseListState==='device-discounts'&&['stellarbox-s1','cloud-share'].includes(id);
+    const basePrice=discountSamplePrice?200:index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const priceChange=state.trialPurchasePriceState==='extra-up'&&id==='stellarrack-p1'?100:
       id===trialSku?({ 'trial-up':100,'trial-down':-100 })[state.trialPurchasePriceState]??0:0;
