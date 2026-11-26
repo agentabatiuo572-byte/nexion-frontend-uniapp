@@ -153,10 +153,11 @@ async function collectCalibrationSignals() {
   // #endif
   return collectDeviceSignals();
 }
-import { requireCryptoUuid } from "@/lib/secure-command-id";
+import { beginPhoneCommand, createPhoneWriteReadback, finishPhoneCommand, readPhoneCommand, type PhoneCommand } from "@/lib/phone-onboarding-commands";
+import { readCurrentPhoneActive, readReplacementSourceDevice } from "@/lib/phone-onboarding-authority";
 import { apiRuntimeConfig, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
-import { phoneRecoveryCredential, type PhoneRecoveryCredential } from "@/lib/phone-recovery-credential";
-import type { OnboardingCalibration, PhoneActivationVersions } from "@/api/onboarding-calibration-api";
+import { phoneRecoveryCredential } from "@/lib/phone-recovery-credential";
+import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
 import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -184,7 +185,7 @@ const failedAction = ref<FailedAction>("calibration");
 const failureCode = ref("");
 const activationOutcome = ref<"idle" | "preflight-unconfirmed" | "unconfirmed" | "active">("idle");
 const canDefer = computed(() => activationOutcome.value !== "unconfirmed" && activationOutcome.value !== "active"
-  && deferOutcome.value !== "unknown" && !deferSyncPending.value && canonical.value?.activationStatus !== "ACTIVE");
+  && deferOutcome.value !== "unknown" && !deferSyncPending.value && !currentPhoneActive.value && canonical.value?.activationStatus !== "ACTIVE");
 
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
@@ -223,6 +224,11 @@ watch(authenticatedAccountKey, (next, previous) => {
   requestGeneration += 1;
   useUI().clearConfirmsBy(confirmOwner);
   calibrationFlow.reset();
+  calibrationReadback.reset();
+  deferReadback.reset();
+  deferIntent = null;
+  replacementSource.value = null;
+  currentPhoneActive.value = false;
   activationIntent = null;
   activationOutcome.value = "idle"; activationCompleted = false;
   receiptNotFound.value = false;
@@ -246,17 +252,17 @@ const supportRequired = computed(() => activationOutcome.value === "idle" && fai
 // Initial onboarding reuses the estimator's canonical result. Only an explicit
 // warehouse remeasurement/resume can replace an existing calibration.
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
-  collect: collectCalibrationSignals, key: () => `onboarding:${requireCryptoUuid()}` });
+  collect: collectCalibrationSignals });
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const iosPhone = nativePhonePlatform() === "ios";
-type ActivationIntent = {
-  deviceId: string;
-  revision: number;
-  idempotencyKey: string;
-  versions: PhoneActivationVersions;
-  credential: PhoneRecoveryCredential | null;
-};
+type ActivationIntent = PhoneCommand<"activate">;
 let activationIntent: ActivationIntent | null = null;
+let deferIntent: PhoneCommand<"defer"> | null = null;
+const currentPhoneActive = ref(false);
+const calibrationReadback = createPhoneWriteReadback();
+const deferReadback = createPhoneWriteReadback();
+const replacementSource = ref<Awaited<ReturnType<typeof readReplacementSourceDevice>>>(null);
+const replacementSourceDevice = computed(() => replacementSource.value);
 const activationBusy = ref(false);
 let activationCompleted = false;
 
@@ -264,7 +270,10 @@ function calibrationOptions(scope = currentScope()) {
   return { deviceId: getDeviceId(), accountKey: accountKey(), isCurrent: () => scopeIsCurrent(scope) };
 }
 
-function acceptCalibration(result: OnboardingCalibration) {
+async function acceptCalibration(result: OnboardingCalibration, options: ReturnType<typeof calibrationOptions>, knownActive?: boolean) {
+  const active = knownActive ?? await readCurrentPhoneActive(result);
+  if (!options.isCurrent()) return;
+  currentPhoneActive.value = active;
   canonical.value = result;
   if (result.activationStatus === "DEFERRED") {
     resumeDeferred.value = true;
@@ -280,19 +289,43 @@ function acceptCalibration(result: OnboardingCalibration) {
   phase.value = "result";
 }
 
-async function startCalibration() {
+function restorePhoneWrite(options: ReturnType<typeof calibrationOptions>) {
+  activationIntent = readPhoneCommand(options, "activate");
+  if (activationIntent) {
+    activationOutcome.value = "unconfirmed";
+    failActivation(null);
+    void recoverActivation();
+    return true;
+  }
+  deferIntent = readPhoneCommand(options, "defer");
+  if (deferIntent) {
+    leaveAfterDeferral = true;
+    deferOutcome.value = "unknown";
+    phase.value = "error";
+    void deferRecovery.retry();
+    return true;
+  }
+  if (!calibrationFlow.restore(options)) return false;
+  readOnlyWait.value = true;
+  calibrationWritePending.value = true;
+  phase.value = "calibrating";
+  void resultRecovery.retry();
+  return true;
+}
+
+async function startCalibration(resend = false) {
   if (!nativePhoneAvailable || activationOutcome.value === "unconfirmed" || activationOutcome.value === "active") return;
   activationOutcome.value = "idle";
   failureCode.value = "";
   canonical.value = null;
   activationIntent = null;
   resultReadRecovering.value = false;
-  calibrationWritePending.value = false;
   readOnlyWait.value = !loginCheckNeeded.value;
   const requestScope = { ...currentScope(), generation: ++requestGeneration };
   const options = calibrationOptions(requestScope);
   try {
-    if (loginCheckNeeded.value) {
+    if (!resend && restorePhoneWrite(options)) return;
+    if (loginCheckNeeded.value && !resend) {
       const status = await onboardingCalibrationApi.phoneLogin(options.deviceId);
       if (!options.isCurrent()) return;
       if (status === "BOUND") {
@@ -308,20 +341,30 @@ async function startCalibration() {
     let current: OnboardingCalibration | null;
     try {
       current = await calibrationFlow.read(options);
+      const active = current && await readCurrentPhoneActive(current);
+      if (!options.isCurrent()) return;
+      if (resend) {
+        const reconciled = calibrationFlow.reconcile(current);
+        if (reconciled) {
+          calibrationWritePending.value = false;
+          await acceptCalibration(reconciled, options, active ?? undefined);
+          return;
+        }
+      } else if (current && (active || (!isRecal.value && !resumeDeferred.value))) {
+        await acceptCalibration(current, options, active ?? undefined);
+        return;
+      }
     } catch {
-      if (options.isCurrent()) resultReadRecovering.value = true;
-      return;
-    }
-    if (!options.isCurrent()) return;
-    const reuse = current && (current.activationStatus === "ACTIVE" || (!isRecal.value && !resumeDeferred.value));
-    const existing = calibrationFlow.reconcile(current) ?? (reuse ? current : null);
-    if (existing) {
-      acceptCalibration(existing);
+      calibrationReadback.reset();
+      if (options.isCurrent() && !resend) resultReadRecovering.value = true;
       return;
     }
     readOnlyWait.value = false;
-    const result = await calibrationFlow.write(options, current);
-    if (options.isCurrent()) acceptCalibration(result);
+    const result = await calibrationFlow.write(options, current, resend);
+    if (options.isCurrent()) {
+      calibrationWritePending.value = false;
+      await acceptCalibration(result, options);
+    }
   } catch (cause) {
     if (!options.isCurrent()) return;
     if (calibrationFlow.hasPendingWrite()) {
@@ -329,6 +372,7 @@ async function startCalibration() {
       readOnlyWait.value = true;
       return;
     }
+    calibrationWritePending.value = false;
     failureCode.value = cause instanceof Error ? cause.message : "";
     failedAction.value = "calibration";
     phase.value = "error";
@@ -337,18 +381,37 @@ async function startCalibration() {
 
 async function recoverCalibration() {
   const options = calibrationOptions();
-  const current = await calibrationFlow.read(options);
-  if (!options.isCurrent()) return;
   const pending = calibrationWritePending.value;
-  const result = pending ? calibrationFlow.reconcile(current) : current;
-  if (pending && !result) return;
-  resultReadRecovering.value = false;
-  calibrationWritePending.value = false;
-  if (result && (pending || result.activationStatus === "ACTIVE" || (!isRecal.value && !resumeDeferred.value))) {
-    acceptCalibration(result);
-  } else {
-    phase.value = "intro";
+  try {
+    const current = await calibrationFlow.read(options);
+    if (!options.isCurrent()) return;
+    const result = pending ? calibrationFlow.reconcile(current) : current;
+    if (pending && !result) { calibrationReadback.observe(); return; }
+    const active = result ? await readCurrentPhoneActive(result) : false;
+    if (!options.isCurrent()) return;
+    if (result && (pending || active || (!isRecal.value && !resumeDeferred.value))) {
+      await acceptCalibration(result, options, active);
+    } else {
+      phase.value = "intro";
+    }
+    if (!options.isCurrent()) return;
+    calibrationReadback.reset();
+    resultReadRecovering.value = false;
+    calibrationWritePending.value = false;
+  } catch (cause) {
+    calibrationReadback.reset();
+    if (options.isCurrent() && !calibrationFlow.hasPendingWrite()) {
+      calibrationWritePending.value = false;
+      resultReadRecovering.value = true;
+    }
+    throw cause;
   }
+}
+
+function resendCalibration() {
+  if (!calibrationResendAvailable.value) return;
+  calibrationReadback.reset();
+  void startCalibration(true);
 }
 
 // Calibration dial geometry (boards B1–B8, V1). The 375 and 390 tiers share the 300px dial; the unit uses the body role.
@@ -398,10 +461,14 @@ const deferSyncPending = ref(false);
 const deferNeedsCalibration = ref(false);
 let leaveAfterDeferral = false;
 
-useAutoRecovery({
-  failed: () => resultReadRecovering.value || calibrationWritePending.value,
+const calibrationResendAvailable = computed(() => calibrationWritePending.value && calibrationReadback.resendAvailable.value);
+const deferResendAvailable = computed(() => deferOutcome.value === "unknown" && deferReadback.resendAvailable.value && !activationBusy.value);
+
+const resultRecovery = useAutoRecovery({
+  failed: () => readOnlyWait.value && (resultReadRecovering.value || calibrationWritePending.value),
   active: () => nativePhoneAvailable && pageVisible.value,
   retry: recoverCalibration,
+  retryNotBefore: calibrationReadback.notBefore,
   repeatMs: 30_000,
 });
 
@@ -429,7 +496,7 @@ const dialMode = computed<DialMode | null>(() => !nativePhoneAvailable ? null
   : phase.value === "intro" ? "idle"
   : phase.value === "calibrating" ? (readOnlyWait.value ? "idle" : "scan")
   : phase.value === "result" ? "result" : null);
-const resultActive = computed(() => phase.value === "result" && canonical.value?.activationStatus === "ACTIVE");
+const resultActive = computed(() => phase.value === "result" && currentPhoneActive.value);
 const backLocked = computed(() => activationBusy.value || (phase.value === "calibrating" && !readOnlyWait.value));
 
 type HeadIcon = "check" | "return" | "clock" | "failed" | "alert";
@@ -486,7 +553,7 @@ const bar = computed<Bar>(() => {
   if (phase.value === "calibrating") return readOnlyWait.value
     ? { kind: "float", primary: { label: o.activatePhone, run: () => {}, off: true, busy: true, arrow: true } } : { kind: "none" };
   if (phase.value === "result") {
-    if (canonical.value?.activationStatus === "ACTIVE") return { kind: "float", primary: main(t.value.ui.notFoundCta, onActivate) };
+    if (resultActive.value) return { kind: "float", primary: main(t.value.ui.notFoundCta, onActivate) };
     if (inFlight.value === "activate") return { kind: "float", primary: { label: o.activationProcessing, run: () => {}, off: true, busy: true } };
     const primary = main(o.activatePhone, onActivate, true);
     const secondary = iosPhone ? later() : undefined;
@@ -603,7 +670,7 @@ const policyLines = computed(() => [
 
 // start calibration when entering that phase
 watch(phase, (p) => {
-  if (p === "calibrating") startCalibration();
+  if (p === "calibrating" && !calibrationWritePending.value) void startCalibration();
 });
 
 function retryCalibration(event?: Event) {
@@ -645,26 +712,37 @@ function completeOnboardingLocally(signOutOnFailure = true): boolean {
 
 type ActivationReadOutcome =
   | { kind: "active"; result: OnboardingCalibration }
+  | { kind: "completed-inactive"; result: OnboardingCalibration | null }
   | { kind: "rejected"; reason: string }
   | { kind: "pending" | "unconfirmed" | "not-found" };
 
-/** Only a fresh, successful null receipt paired with a scoped non-ACTIVE row authorizes replay. */
+/** Only a fresh, successful null receipt paired with a scoped non-ACTIVE phone authorizes replay. */
 async function readActivationOutcome(command: ActivationIntent, scope: RequestScope): Promise<ActivationReadOutcome> {
   let receipt;
   try {
     receipt = await onboardingCalibrationApi.activationReceipt(command.idempotencyKey);
-  } catch { /* The result read can still confirm that this installation is ACTIVE. */ }
+  } catch { /* The current phone facts can still confirm activation. */ }
   if (!scopeIsCurrent(scope)) return { kind: "unconfirmed" };
   if (receipt?.status === "PENDING") return { kind: "pending" };
-  if (receipt?.status === "SUCCEEDED") return acceptCurrentCanonical(scope, receipt.result)
-    ? { kind: "active", result: receipt.result } : { kind: "unconfirmed" };
 
   try {
+    if (receipt?.status === "SUCCEEDED") {
+      if (!acceptCurrentCanonical(scope, receipt.result)) return { kind: "unconfirmed" };
+      const active = await readCurrentPhoneActive(receipt.result);
+      if (active) return { kind: "active", result: receipt.result };
+      const current = await calibrationFlow.read({ ...calibrationOptions(scope), deviceId: command.deviceId });
+      return { kind: "completed-inactive", result: current };
+    }
     const result = await calibrationFlow.read({ ...calibrationOptions(scope), deviceId: command.deviceId });
-    if (result?.activationStatus === "ACTIVE" && result.calibrationAvailable) return { kind: "active", result };
-    if (receipt === null && result && result.activationStatus !== "ACTIVE") return { kind: "not-found" };
+    if (result && await readCurrentPhoneActive(result)) return { kind: "active", result };
+    if (receipt === null && result) return { kind: "not-found" };
   } catch { /* A failed result read cannot authorize replay. */ }
   return receipt?.status === "FAILED" ? { kind: "rejected", reason: receipt.reason } : { kind: "unconfirmed" };
+}
+
+function settleActivationCommand() {
+  if (activationIntent) finishPhoneCommand("activate", activationIntent);
+  activationIntent = null;
 }
 
 /** Apply only a confirmed activation; shared by explicit submission and GET recovery. */
@@ -672,9 +750,10 @@ function acceptActivation(activated: OnboardingCalibration, scope: RequestScope)
   if (activationCompleted || !acceptCurrentCanonical(scope, activated)) return;
   // Server success survives local persistence errors; retry synchronizes this result without another POST.
   canonical.value = activated;
+  currentPhoneActive.value = true;
   activationOutcome.value = "active";
   receiptNotFound.value = false;
-  activationIntent = null;
+  settleActivationCommand();
   if (!useSession().markCalibrated(auth.email || auth.accountId || "default") || !completeOnboardingLocally()) {
     throw new Error("PHONE_ACTIVATION_LOCAL_COMMIT_FAILED");
   }
@@ -692,11 +771,17 @@ function failActivation(cause: unknown) {
   phase.value = "error";
 }
 
-function applyActivationRead(outcome: ActivationReadOutcome, scope: RequestScope) {
+async function applyActivationRead(outcome: ActivationReadOutcome, scope: RequestScope) {
   receiptNotFound.value = outcome.kind === "not-found";
   if (outcome.kind === "active") acceptActivation(outcome.result, scope);
+  if (outcome.kind === "completed-inactive") {
+    settleActivationCommand();
+    activationOutcome.value = "idle";
+    if (outcome.result) await acceptCalibration(outcome.result, calibrationOptions(scope), false);
+    else phase.value = "intro";
+  }
   if (outcome.kind === "rejected") {
-    activationIntent = null;
+    settleActivationCommand();
     activationOutcome.value = "idle";
     throw new Error(outcome.reason);
   }
@@ -713,7 +798,7 @@ function recoverActivation(): Promise<void> {
     if (!current()) return;
     const outcome = await readActivationOutcome(command, scope);
     if (!current()) return;
-    try { applyActivationRead(outcome, scope); }
+    try { await applyActivationRead(outcome, scope); }
     catch (cause) {
       failActivation(cause);
       toast.error(head.value.title, head.value.body);
@@ -747,16 +832,16 @@ function replacementTrigger(event?: Event) {
 
 async function activate(event?: Event) {
   const before = canonical.value;
-  if (!pageVisible.value || activationCompleted || !nativePhoneAvailable || !mounted || !before?.calibrationAvailable
-      || before.calibrationStatus !== "MATCHED" || activationBusy.value
-      || deferOutcome.value === "unknown" || deferSyncPending.value) return;
+  if (!pageVisible.value || activationCompleted || !nativePhoneAvailable || !mounted || activationBusy.value
+      || deferOutcome.value === "unknown" || deferSyncPending.value
+      || (!activationIntent && (!before?.calibrationAvailable || before.calibrationStatus !== "MATCHED"))) return;
   if (activationOutcome.value === "unconfirmed" && !receiptNotFound.value) return;
   const restoreTrigger = replacementTrigger(event);
   let replacementCancelled = false;
   activationBusy.value = true;
   const scope = currentScope();
   try {
-    if (before.activationStatus === "ACTIVE") { acceptActivation(before, scope); return; }
+    if (currentPhoneActive.value && before) { acceptActivation(before, scope); return; }
 
     let command = activationIntent;
     if (command) {
@@ -765,9 +850,10 @@ async function activate(event?: Event) {
       receiptNotFound.value = false;
       const outcome = await readActivationOutcome(command, scope);
       if (!scopeIsCurrent(scope)) return;
-      applyActivationRead(outcome, scope);
-      if (outcome.kind !== "not-found") return;
+      await applyActivationRead(outcome, scope);
+      if (outcome.kind !== "not-found" || !scopeIsCurrent(scope)) return;
     } else {
+      if (!before) return;
       const previousPhase = phase.value;
       const previousOutcome = activationOutcome.value;
       activationOutcome.value = "preflight-unconfirmed";
@@ -785,10 +871,13 @@ async function activate(event?: Event) {
       const replacing = eligibility.binding !== null && (eligibility.binding.installationId !== before.deviceId
         || failureCode.value === "PHONE_REPLACEMENT_CONFIRMATION_REQUIRED");
       if (replacing) {
+        replacementSource.value = await readReplacementSourceDevice(eligibility.binding?.userDeviceId ?? null);
+        if (!scopeIsCurrent(scope)) return;
         const confirmed = await uiConfirm({ title: t.value.onboarding.replacementConfirmTitle,
           message: t.value.onboarding.replacementConfirmBody, confirmLabel: t.value.onboarding.replacementConfirmAction,
           owner: confirmOwner });
         if (!scopeIsCurrent(scope)) return;
+        replacementSource.value = null;
         if (!confirmed) {
           activationOutcome.value = previousOutcome;
           phase.value = previousPhase;
@@ -796,18 +885,22 @@ async function activate(event?: Event) {
           return;
         }
       }
-      command = {
-        deviceId: before.deviceId, revision: before.revision,
-        idempotencyKey: `phone-activation:active:${requireCryptoUuid()}`,
+      const saved = beginPhoneCommand(calibrationOptions(scope), "activate", {
+        revision: before.revision,
         versions: {
           expectedBindingVersion: eligibility.binding?.bindingVersion ?? null,
           expectedPolicyVersion: eligibility.policyVersion,
           replacementConfirmed: replacing,
           ...(eligibility.grantId ? { exceptionGrantId: eligibility.grantId } : {}),
         },
-        credential: phoneRecoveryCredential(apiRuntimeConfig.baseUrl, scope.accountKey),
-      };
+      });
+      command = saved.value;
       activationIntent = command;
+      if (saved.reused) {
+        activationOutcome.value = "unconfirmed";
+        failActivation(null);
+        return;
+      }
     }
 
     activationOutcome.value = "unconfirmed";
@@ -815,7 +908,7 @@ async function activate(event?: Event) {
     let activated: OnboardingCalibration;
     try {
       activated = await onboardingCalibrationApi.activate(command.deviceId, command.revision, command.idempotencyKey,
-        command.versions, command.credential);
+        command.versions, phoneRecoveryCredential(apiRuntimeConfig.baseUrl, scope.accountKey));
       if (!scopeIsCurrent(scope)) return;
       if (!acceptCurrentCanonical(scope, activated) || !activated.calibrationAvailable || activated.activationStatus !== "ACTIVE")
         throw new ApiError({ kind: "protocol", message: "PHONE_ACTIVATION_NOT_CONFIRMED" });
@@ -823,13 +916,8 @@ async function activate(event?: Event) {
       if (!scopeIsCurrent(scope)) return;
       const outcome = await readActivationOutcome(command, scope);
       if (!scopeIsCurrent(scope)) return;
-      applyActivationRead(outcome, scope);
-      if (outcome.kind === "active") return;
-      if (outcome.kind !== "pending" && confirmedPhoneActivationRejection(cause)) {
-        activationIntent = null;
-        activationOutcome.value = "idle";
-        receiptNotFound.value = false;
-      }
+      await applyActivationRead(outcome, scope);
+      if (outcome.kind === "active" || outcome.kind === "completed-inactive") return;
       throw cause;
     }
     acceptActivation(activated, scope);
@@ -845,6 +933,10 @@ async function activate(event?: Event) {
 }
 
 function finishDeferral(result: OnboardingCalibration) {
+  if (deferIntent) finishPhoneCommand("defer", deferIntent);
+  deferIntent = null;
+  deferReadback.reset();
+  currentPhoneActive.value = false;
   canonical.value = result;
   activationIntent = null;
   deferOutcome.value = null;
@@ -868,21 +960,48 @@ const deferRecovery = useAutoRecovery({
   active: () => nativePhoneAvailable && pageVisible.value,
   async retry() {
     const options = calibrationOptions();
-    const result = await calibrationFlow.read(options);
-    if (options.isCurrent() && result?.activationStatus === "DEFERRED") finishDeferral(result);
+    try {
+      const result = await calibrationFlow.read(options);
+      if (!options.isCurrent() || activationBusy.value) return;
+      if (result?.activationStatus === "DEFERRED") finishDeferral(result);
+      else if (deferIntent) {
+        if (result && !canonical.value) {
+          canonical.value = result;
+          if (result.calibrationAvailable && result.calibrationStatus === "MATCHED") phase.value = "result";
+        }
+        deferReadback.observe();
+      }
+    } catch (cause) {
+      deferReadback.reset();
+      throw cause;
+    }
   },
+  retryNotBefore: deferReadback.notBefore,
   repeatMs: 30_000,
 });
 
-async function deferPhoneActivation() {
-  if (!pageVisible.value || activationCompleted || !nativePhoneAvailable || !mounted || activationBusy.value || !canDefer.value
-      || (phase.value === "result" && !iosPhone)) return;
+function resendDeferral() {
+  if (deferResendAvailable.value) void deferPhoneActivation(true);
+}
+
+async function deferPhoneActivation(resend = false) {
+  if (!pageVisible.value || activationCompleted || !nativePhoneAvailable || !mounted || activationBusy.value
+      || (resend ? !deferResendAvailable.value : !canDefer.value || (phase.value === "result" && !iosPhone))) return;
   const current = deferOutcome.value === "rejected" ? null : canonical.value;
   deferOutcome.value = null;
   activationBusy.value = true;
+  if (resend) requestGeneration += 1;
   const scope = currentScope();
+  const options = calibrationOptions(scope);
+  let checking = resend;
   try {
-    if (isLogin.value) {
+    if (resend) {
+      deferReadback.reset();
+      const latest = await calibrationFlow.read(options);
+      if (!options.isCurrent()) return;
+      if (latest?.activationStatus === "DEFERRED") { finishDeferral(latest); return; }
+      checking = false;
+    } else if (isLogin.value) {
       // Login can mean replacing an existing phone. "NEEDS_CALIBRATION" alone
       // cannot distinguish that from an account which has never bound one.
       if (loginCheckNeeded.value || isRecal.value || canonical.value?.userDeviceId) {
@@ -898,17 +1017,19 @@ async function deferPhoneActivation() {
     }
     leaveAfterDeferral = true;
     const result = await confirmDeferredPhoneActivation({
-      initialOnly: isLogin.value,
-      current, deviceId: getDeviceId(),
-      command: (revision) => ({ revision, idempotencyKey: `phone-activation:deferred:${requireCryptoUuid()}` }),
-      isCurrent: () => scopeIsCurrent(scope),
+      ...options, initialOnly: isLogin.value, current,
       accept: (result) => acceptCurrentCanonical(scope, result),
-    });
-    if (!scopeIsCurrent(scope)) return;
+    }, command => { deferIntent = command; }, resend ? deferIntent ?? undefined : undefined);
+    if (!options.isCurrent()) return;
     if (result) finishDeferral(result);
     else deferOutcome.value = "unknown";
   } catch (cause) {
-    if (!scopeIsCurrent(scope)) return;
+    if (!options.isCurrent()) return;
+    if (checking) {
+      deferOutcome.value = "unknown";
+      return;
+    }
+    deferIntent = null;
     leaveAfterDeferral = false;
     deferOutcome.value = "rejected";
     const code = cause instanceof Error ? cause.message : "";
@@ -943,7 +1064,13 @@ onLoad((options) => {
   phase.value = "intro";
 });
 onMounted(() => {
-  if (nativePhoneAvailable && (isLogin.value || (!isRecal.value && !resumeDeferred.value))) phase.value = "calibrating";
+  if (!nativePhoneAvailable) return;
+  if (isLogin.value || (!isRecal.value && !resumeDeferred.value)) {
+    phase.value = "calibrating";
+    return;
+  }
+  try { restorePhoneWrite(calibrationOptions()); }
+  catch (cause) { failActivation(cause); }
 });
 // A dialog on the page (the replacement confirm) takes this press first (02 §2.7.1).
 const dialogHoldsBack = useDialogBackHeld();

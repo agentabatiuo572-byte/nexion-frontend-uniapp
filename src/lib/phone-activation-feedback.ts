@@ -21,6 +21,7 @@ add("GRANT_STATE_CHANGED", "phoneActivationGrantChanged");
 add("PHONE_REPLACEMENT_CONFIRMATION_REQUIRED", "phoneActivationConfirmationRequired");
 add("PHONE_CALIBRATION_RULES_CHANGED", "phoneCalibrationRulesChanged", "recalibrate");
 add("ONBOARDING_CALIBRATION_REQUIRED ONBOARDING_CALIBRATION_NOT_FOUND", "phoneActivationCalibrationRequired", "recalibrate");
+add("PHONE_INITIAL_DEFER_REQUIRES_UNBOUND", "phoneActivationRequestInvalid");
 add("ONBOARDING_CALIBRATION_REVISION_CONFLICT", "phoneActivationCalibrationChanged", "recalibrate");
 add("PHONE_CALIBRATION_PENDING_VERIFICATION", "phoneCalibrationPendingBody", "recalibrate");
 add("CURRENT_APP_REQUIRED APP_SESSION_REQUIRED PHONE_EXECUTION_SESSION_REQUIRED", "phoneActivationAppSessionRequired", "login");

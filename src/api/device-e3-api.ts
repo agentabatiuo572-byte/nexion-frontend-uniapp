@@ -68,6 +68,10 @@ export interface CanonicalE3Device {
   cumulativeOutputUsdt: number;
 }
 
+export function isCanonicalDeviceActiveLifecycle(status: string): boolean {
+  return ["ACTIVE", "ONLINE", "BUSY", "RUNNING", "OFFLINE"].includes(status);
+}
+
 export interface CanonicalE3Fleet {
   dailyUsdt: number;
   dailyNex: number;

@@ -67,7 +67,7 @@ import {
 import type { AppHomeOverview } from "@/api/app-home-api";
 import type { ApiRuntimeConfig } from "@/api/runtime-config";
 import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
-import type { CanonicalE3Device } from "@/api/device-e3-api";
+import { isCanonicalDeviceActiveLifecycle, type CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { READ_RECOVERY_DELAYS_MS, isHttpReadRateLimit, isTransientReadFailure } from "@/lib/remote-read-failure";
@@ -747,7 +747,7 @@ export const useApp = defineStore("app", () => {
     const capacity = device.capacityPct / 100;
     const fullDailyUsdt = capacity > 0 ? device.dailyUsdt / capacity : 0;
     const fullDailyNex = capacity > 0 ? device.dailyNex / capacity : 0;
-    const activeLifecycle = ["ACTIVE", "ONLINE", "BUSY", "RUNNING", "OFFLINE"].includes(device.status);
+    const activeLifecycle = isCanonicalDeviceActiveLifecycle(device.status);
     const active = device.activatedAt != null && device.deactivatedAt == null && activeLifecycle;
     const activationUnconfirmed = activeLifecycle && (device.activatedAt == null || device.deactivatedAt != null);
     return {

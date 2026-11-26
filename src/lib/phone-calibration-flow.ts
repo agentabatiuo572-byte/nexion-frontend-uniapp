@@ -1,6 +1,6 @@
 import type { CalibrationRequestSignals, OnboardingCalibration, OnboardingCalibrationApi } from "@/api/onboarding-calibration-api";
 import { ApiError } from "@/api/errors";
-import { confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
+import { beginPhoneCommand, confirmedPhoneWriteRejection, finishPhoneCommand, readPhoneCommand, type PhoneCommand } from "@/lib/phone-onboarding-commands";
 
 interface Options {
   deviceId: string;
@@ -31,17 +31,23 @@ function accept(result: OnboardingCalibration, options: Options) {
   return result;
 }
 
-/** Keep this page's exact observations, revision and key while its write is unconfirmed. */
+/** A pending write keeps its exact observations, revision and key across page instances. */
 export function createPhoneCalibrationFlow(deps: {
   api: Pick<OnboardingCalibrationApi, "result" | "calibrate">;
   collect: () => CalibrationRequestSignals | Promise<CalibrationRequestSignals>;
-  key: () => string;
 }) {
-  let intent: { signals: CalibrationRequestSignals; expectedRevision: number;
-    hadResult: boolean; idempotencyKey: string } | null = null;
+  let intent: PhoneCommand<"calibrate"> | null = null;
+  function settle() {
+    if (intent) finishPhoneCommand("calibrate", intent);
+    intent = null;
+  }
 
   return {
     reset() { intent = null; },
+    restore(options: Options) {
+      intent = readPhoneCommand(options, "calibrate");
+      return !!intent;
+    },
     hasPendingWrite() { return intent !== null; },
     async read(options: Options): Promise<OnboardingCalibration | null> {
       checkScope(options);
@@ -56,30 +62,31 @@ export function createPhoneCalibrationFlow(deps: {
       return accept(result, options);
     },
     reconcile(current: OnboardingCalibration | null): OnboardingCalibration | null {
-      if (!intent || !current) return null;
-      // The first insert may return revision 0. For an existing row we need
-      // a newer revision or an authoritative ACTIVE decision.
-      if (intent.hadResult && current.revision <= intent.expectedRevision
-          && current.activationStatus !== "ACTIVE") return null;
-      intent = null;
+      if (!intent || !current || (intent.hadResult && current.revision <= intent.revision)) return null;
+      settle();
       return current;
     },
-    async write(options: Options, current: OnboardingCalibration | null): Promise<OnboardingCalibration> {
+    async write(options: Options, current: OnboardingCalibration | null, resend = false): Promise<OnboardingCalibration> {
       checkScope(options);
-      if (!intent) {
+      if (resend && !intent) throw new Error("PHONE_CALIBRATION_COMMAND_UNAVAILABLE");
+      if (!resend) {
         const signals = await deps.collect();
         checkScope(options);
-        intent = { signals, expectedRevision: current?.revision ?? 0, hadResult: current !== null, idempotencyKey: deps.key() };
+        const command = beginPhoneCommand(options, "calibrate", {
+          signals, revision: current?.revision ?? 0, hadResult: current !== null,
+        });
+        intent = command.value;
+        if (command.reused) throw new Error("PHONE_CALIBRATION_COMMAND_PENDING");
       }
-      const command = intent;
+      const command = intent!;
       try {
-        const result = accept(await deps.api.calibrate(options.deviceId, command.signals,
-          command.expectedRevision, command.idempotencyKey), options);
-        intent = null;
+        const result = accept(await deps.api.calibrate(command.deviceId, command.signals,
+          command.revision, command.idempotencyKey), options);
+        settle();
         return result;
       } catch (cause) {
         checkScope(options);
-        if (confirmedPhoneActivationRejection(cause)) intent = null;
+        if (confirmedPhoneWriteRejection(cause)) settle();
         throw cause;
       }
     },

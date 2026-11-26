@@ -103,7 +103,7 @@ export interface PhoneActivationVersions {
 }
 
 export interface PhoneActivationEligibility {
-  binding: { installationId: string; bindingVersion: number } | null;
+  binding: { installationId: string; bindingVersion: number; userDeviceId: number | null } | null;
   policyVersion: number | null;
   canActivate: boolean;
   blockedReasons: string[];
@@ -292,7 +292,10 @@ export function createOnboardingCalibrationApi(client: ApiClient, environment: O
           || !Array.isArray(response.blockedReasons) || !response.blockedReasons.every(reason => typeof reason === "string")) return invalid();
       const grant = response.grant == null ? null : record(response.grant);
       return {
-        binding: binding ? { installationId: text(binding.installationId), bindingVersion: bindingVersion! } : null,
+        binding: binding ? {
+          installationId: text(binding.installationId), bindingVersion: bindingVersion!,
+          userDeviceId: binding.userDeviceId == null ? null : integer(binding.userDeviceId, 1),
+        } : null,
         policyVersion: version(policy.policyVersion), canActivate: response.canReplace,
         blockedReasons: response.blockedReasons as string[],
         ...(grant ? { grantId: text(grant.grantId) } : {}),

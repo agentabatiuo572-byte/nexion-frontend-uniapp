@@ -1,6 +1,6 @@
 import { deviceE3Api, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
-import { confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
+import { beginPhoneCommand, confirmedPhoneWriteRejection, finishPhoneCommand, type PhoneCommand, type PhoneCommandScope } from "@/lib/phone-onboarding-commands";
 import { isMissingPhoneCalibration } from "@/lib/phone-calibration-flow";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
@@ -30,32 +30,43 @@ function stale(): never {
  * revision-0 tombstone without inventing phone capability or reward facts.
  */
 export async function confirmDeferredPhoneActivation(
-  options: ConfirmDeferredPhoneActivationOptions,
+  options: Omit<ConfirmDeferredPhoneActivationOptions, "command"> & PhoneCommandScope,
+  remember: (command: PhoneCommand<"defer">) => void,
+  original?: PhoneCommand<"defer">,
 ): Promise<OnboardingCalibration | null> {
-  let current = options.current ?? null;
-  if (!current) {
-    try {
-      current = await onboardingCalibrationApi.result(options.deviceId);
-      if (!options.accept(current)) stale();
-    } catch (error: unknown) {
-      if (!options.isCurrent()) stale();
-      if (!isMissingPhoneCalibration(error)) throw error;
+  let command = original;
+  if (!command) {
+    let current = options.current ?? null;
+    if (!current) {
+      try {
+        current = await onboardingCalibrationApi.result(options.deviceId);
+        if (!options.accept(current)) stale();
+      } catch (error: unknown) {
+        if (!options.isCurrent()) stale();
+        if (!isMissingPhoneCalibration(error)) throw error;
+      }
     }
+    if (current?.activationStatus === "DEFERRED") return current;
+    if (current?.activationStatus === "ACTIVE") throw new Error("PHONE_DEFER_ACTIVE");
+    if (!options.isCurrent()) stale();
+    const pending = beginPhoneCommand(options, "defer", { revision: current?.revision ?? 0, initialOnly: options.initialOnly ?? false });
+    command = pending.value;
+    remember(command);
+    if (pending.reused) return null;
   }
-
-  if (current?.activationStatus === "DEFERRED") return current;
-  if (current?.activationStatus === "ACTIVE") throw new Error("PHONE_DEFER_ACTIVE");
-
-  const command = options.command(current?.revision ?? 0);
   if (!options.isCurrent()) stale();
   try {
-    const result = await onboardingCalibrationApi.defer(options.deviceId, command.revision, command.idempotencyKey, options.initialOnly);
+    const result = await onboardingCalibrationApi.defer(command.deviceId, command.revision, command.idempotencyKey, command.initialOnly);
     if (!options.isCurrent()) stale();
-    return options.accept(result) && result.activationStatus === "DEFERRED" ? result : null;
+    if (!options.accept(result) || result.activationStatus !== "DEFERRED") return null;
+    finishPhoneCommand("defer", command);
+    return result;
   } catch (cause) {
     if (!options.isCurrent()) stale();
-    if (confirmedPhoneActivationRejection(cause)) throw cause;
-    // The request may have committed. Let the visible page read the result.
+    if (confirmedPhoneWriteRejection(cause)) {
+      finishPhoneCommand("defer", command);
+      throw cause;
+    }
     return null;
   }
 }
