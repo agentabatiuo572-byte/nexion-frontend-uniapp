@@ -42,9 +42,6 @@
 .message-center .notification-chevron { flex-shrink: 0; align-self: center; color: var(--v5-ink-4); }
 .message-center .notification-detail { padding: 0 2px 14px 38px; }
 .message-center .notification-body { display: block; color: var(--v5-ink-3); font-size: var(--ui-type-message-preview); line-height: var(--ui-type-message-preview-lh); overflow-wrap: break-word; white-space: pre-wrap; }
-/* Compact trailing pill: a 32px glass inside the 44px tap target. */
-.message-center .notification-cta { display: flex; width: fit-content; margin: 4px 0 -6px auto; padding: 0 12px; gap: 4px; font-size: var(--ui-type-text-link); line-height: var(--ui-type-text-link-lh); }
-.message-center .notification-cta > .nx-liquid-glass { inset: 6px 0; }
 .message-center .message-state { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 0; font-size: 13px; line-height: 1.6; color: var(--v5-ink-3); text-align: center; }
 /* Nothing to show after the first read failed: the one sentence and 重新加载 sit in the middle of the feed (03 §3.4). */
 /* The one 重新加载 uses the shared recovery text button (03 §3.1); here it only sits centred under the sentence. */

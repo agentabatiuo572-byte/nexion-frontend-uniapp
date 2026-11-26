@@ -111,7 +111,7 @@
     </view>
 
     <view v-if="!stage && !expanded && task" class="nx-device-current-task" style="padding: 0 20px 16px">
-      <text class="block" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block nx-device-section-label">{{ t.earn.currentTask }}</text>
       <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.type) }}</text>
       <TaskV2Status :task="task" :paused="phoneTaskExpired" />
       <view class="flex items-center gap-3" style="margin-top: 10px">
@@ -182,7 +182,7 @@
     <!-- Server phones expose calibrated capacity; local factors are not measured live TOPS. -->
     <view v-if="phoneFactsReady && device.kind === 'phone' && device.capacitySource === 'server'" style="padding: 0 20px 12px">
       <view class="flex items-center justify-between gap-2">
-        <text :style="sectionLabelStyle">{{ t.earn.hashCapability }}</text>
+        <text class="nx-device-section-label">{{ t.earn.hashCapability }}</text>
         <view class="flex items-center gap-1.5">
           <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ visibility.mask(baselineTops == null ? '-' : `${baselineTops} ${t.onboarding.phoneComputeUnit}`) }}</text>
           <text v-if="capTier != null" style="font-size: 12px; color: var(--v5-ink-3)">{{ visibility.mask(fmt(t.earn.hashTier, { n: capTier })) }}</text>
@@ -194,7 +194,7 @@
     <!-- Mock phone: live hashpower (effective vs calibrated capability ceiling) -->
     <view v-if="phoneRunning && live" style="padding: 0 20px 12px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
-        <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
+        <text class="nx-device-section-label">{{ t.earn.hashLabel }}</text>
         <view class="flex items-center gap-1" :style="capChipStyle">
           <text style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }}</text>
           <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ visibility.mask(baselineTops?.toFixed(1) ?? '—') }} {{ t.onboarding.phoneComputeUnit }}</text>
@@ -226,7 +226,7 @@
     </view>
 
     <view v-else-if="phoneRunning" style="padding: 0 20px 12px">
-      <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
+      <text class="nx-device-section-label">{{ t.earn.hashLabel }}</text>
       <text class="block" style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }} · — {{ t.onboarding.phoneComputeUnit }}</text>
       <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.hashCapabilityUnknown }}</text>
     </view>
@@ -243,7 +243,7 @@
     <text v-if="detailPage" class="block device-section-title" style="padding:16px 20px 12px">{{ t.coreReview.jobs }}</text>
     <!-- Phone: reconnecting -->
     <view v-if="reconnecting && device.kind === 'phone'" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <view class="rounded-xl p-3" :style="warnBoxStyle">
         <view class="flex items-start gap-2.5">
           <view class="rounded-lg grid place-items-center shrink-0" :style="warnIconStyle">
@@ -260,7 +260,7 @@
 
     <!-- Phone: paused (no task) -->
     <view v-else-if="phoneFactsReady && !task && device.kind === 'phone' && device.pausedReason" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <view class="rounded-xl p-3 flex items-start gap-2.5" :style="warnBoxStyle">
         <view class="rounded-lg grid place-items-center shrink-0" :style="warnIconStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="pausedIconPath" /></svg>
@@ -274,7 +274,7 @@
 
     <!-- Phone: waiting placeholder -->
     <view v-else-if="!remoteApiEnabled && phoneFactsReady && !task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <view class="flex items-center gap-2" style="font-size: var(--ui-type-list-subtitle); color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">
         <svg v-if="taskHistoryReady" class="nx-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
         <text>{{ taskHistoryReady ? t.earn.phoneWaitingTask : t.earn.runtimeUnknown }}</text>
@@ -286,7 +286,7 @@
 
     <!-- Current task (non-reconnecting) -->
     <view v-if="!stage && task && !reconnecting" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <text class="block" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ visibility.mask(task.type) }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
@@ -308,7 +308,7 @@
          this list only mirrors settled task previews returned for this device. -->
     <view v-if="!stage && phoneFactsReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
       <view class="flex flex-wrap items-center justify-between" :style="{ marginBottom: taskHistoryReady && !deviceTodayCompleted.length ? '0' : '8px' }">
-        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
+        <text class="nx-device-section-label">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
         <view
           class="active:opacity-60"
           style="min-height: 44px; margin-left: auto; padding-left: 16px; display: flex; align-items: center"
@@ -352,7 +352,7 @@
 
     <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
     <view v-if="!stage && phoneFactsReady && !detailPage" style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
-      <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
+      <text class="block nx-device-section-label">{{ t.earn.todayEarnings }}</text>
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
              与卡内 −$锁定日产 / 未解锁潜在收益(仍 warning=Pending)语义不同,不可混用。 -->
@@ -823,12 +823,6 @@ const chevronBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
-const sectionLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  letterSpacing: "0.16em",
-  textTransform: "uppercase",
-  color: "var(--v5-ink-3)",
-};
 const capChipStyle: CSSProperties = {
   padding: "3px 8px",
   borderRadius: "9999px",
@@ -866,6 +860,9 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 </script>
 
 <style scoped>
+/* Section labels (01 §1.2): Latin all-caps at +0.04em; Chinese takes no tracking. */
+.nx-device-section-label { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--v5-ink-3); }
+.nx-device-section-label:lang(zh) { letter-spacing: 0; }
 .nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px var(--nx-overlay-bottom); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
 .nx-action-sheet__handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
 .nx-action-sheet__head { display: flex; flex-direction: column; gap: 2px; padding: 4px 4px 0; }

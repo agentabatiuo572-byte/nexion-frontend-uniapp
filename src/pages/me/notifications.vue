@@ -29,8 +29,10 @@
       <view v-else class="notification-feed" :class="{ 'notification-feed--failed': notifs.readFailedWithoutData }" :aria-busy="notifs.loading">
         <view v-if="!notifs.loading && !notifs.readFailedWithoutData && notifs.nextCursor && filtered.length === 0" role="status" class="message-state"><text>{{ t.notifs.moreToCheck }}</text></view>
         <EmptyState v-if="!notifs.loading && !notifs.readFailedWithoutData && !notifs.nextCursor && filtered.length === 0" kind="empty-list" :title="emptyTitle" :desc="notifs.items.length === 0 ? t.notifs.emptyBody : undefined" />
-        <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
+        <view v-for="(n, index) in filtered" :key="n.id" class="notification-item" :class="{ 'notification-item--read': !!n.readAt, 'notification-item--last': index === filtered.length - 1, 'notification-item--expanded': expandedId === n.id, 'notification-item--group-first': index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts), 'notification-item--group-last': index === filtered.length - 1 || dateHeading(n.ts) !== dateHeading(filtered[index + 1].ts) }">
           <text v-if="index === 0 || dateHeading(n.ts) !== dateHeading(filtered[index - 1].ts)" class="notification-date" role="heading" aria-level="2">{{ dateHeading(n.ts) }}</text>
+          <!-- Title row, expanded body and action are one card: the group's corners, divider and light shadow sit on it. -->
+          <view class="notification-card">
           <view class="notification-row" role="button" tabindex="0" :aria-label="n.earning ? earningRowLabel(n.earning) : platformDisplayText(n.title)" :aria-haspopup="n.earning ? 'dialog' : undefined" :aria-expanded="n.earning || directNotice(n) ? undefined : expandedId === n.id" @click="toggle(n)" @touchstart="onTouchStart(n, $event)" @touchend="onTouchEnd(n, $event)">
             <NxIconTile class="notification-tile" :tone="CATEGORY_TONES[notificationCategory(n)]" size="m"><view class="notification-glyph" v-html="kindIcon(n)" /></NxIconTile>
             <!-- Earnings credited (04.5): the amount takes the title slot; 收益到账 · device · job is the summary. -->
@@ -38,7 +40,8 @@
             <view v-else class="notification-content"><view class="notification-top"><view class="notification-heading"><text class="notification-title">{{ keepUnits(platformDisplayText(n.title)) }}</text><NxTag v-if="n.priority === 'critical' || n.priority === 'high'" tone="warning" :label="t.notifs.important" /></view></view><text v-if="n.body && expandedId !== n.id" class="notification-preview">{{ keepUnits(platformDisplayText(n.body)) }}</text></view>
 <view class="notification-meta"><text class="notification-time">{{ timeAgo(n.ts) }}</text><view v-if="!n.readAt" class="message-status-dot" aria-hidden="true" /></view>
           </view>
-          <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ keepUnits(platformDisplayText(n.body)) }}</text><view v-if="n.ctaHref" class="message-button notification-cta" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><LiquidGlass :radius="16" /><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2"><path d="M4 12h16m-7-7 7 7-7 7" /></svg></view></view>
+          <view v-if="expandedId === n.id" class="notification-detail"><text v-if="n.body" class="notification-body">{{ keepUnits(platformDisplayText(n.body)) }}</text><view v-if="n.ctaHref" class="nx-card-footer notification-footer"><view class="nx-card-action" role="button" tabindex="0" :aria-label="platformDisplayText(n.ctaLabel || t.me.open)" @click.stop="onTap(n)"><text>{{ platformDisplayText(n.ctaLabel || t.me.open) }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6" /></svg></view></view></view>
+          </view>
         </view>
         <view v-if="notifs.readFailedWithoutData" data-testid="notification-error" class="message-state" role="alert"><text>{{ notifsErrorText }}</text><view class="nx-card-recovery-action nx-card-recovery-action--quiet" role="button" :tabindex="notifs.loading ? -1 : 0" :aria-disabled="notifs.loading" :aria-label="t.ui.reload" @click="notificationRecovery.retry()"><text>{{ t.ui.reload }}</text></view></view>
         <view v-if="notifs.loading && !filtered.length && !notifs.readFailedWithoutData" class="message-state" role="status" aria-live="polite"><text>{{ t.help.loadingMore }}</text></view>
@@ -577,32 +580,39 @@ watch(filter, value => {
 .message-center .notification-feed { padding:0 16px 100px; }
 .message-center .notification-item { border:0; }
 .message-center .notification-date { margin:var(--v5-space-5) 4px 8px; font-size:var(--ui-type-message-meta); line-height:var(--ui-type-message-meta-lh); font-weight:500; }
-.message-center .notification-row { padding:14px 16px; background:var(--v5-surface); }
-.message-center .notification-item--group-first .notification-row { border-top-left-radius:22px; border-top-right-radius:22px; }
-.message-center .notification-item--group-last .notification-row { border-bottom-left-radius:22px; border-bottom-right-radius:22px; }
-.message-center .notification-item:not(.notification-item--group-first) .notification-row { border-top:1px solid var(--v5-border); }
+.message-center .notification-card { background:var(--v5-surface); }
+.message-center .notification-row { padding:14px 16px; }
+.message-center .notification-item--group-first .notification-card { border-top-left-radius:22px; border-top-right-radius:22px; }
+.message-center .notification-item--group-last .notification-card { border-bottom-left-radius:22px; border-bottom-right-radius:22px; }
+.message-center .notification-item:not(.notification-item--group-first) .notification-card { border-top:1px solid var(--v5-border); }
 .message-center .notification-tile { margin:0; }
 .notification-glyph { display:grid; place-items:center; }
 .message-center .notification-tile :deep(svg) { width:20px; height:20px; }
 /* A long title keeps whole words: the 重要 tag drops below it instead of squeezing the title mid-word. */
 .message-center .notification-heading { flex-wrap:wrap;gap:2px var(--v5-space-2); }
 .message-center .notification-title { overflow-wrap:break-word; }
-.message-center .notification-preview { margin-top:2px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
+.message-center .notification-preview { margin-top:4px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
 .message-center .notification-time { font-size:12px; line-height:16px; }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }
-.message-center .notification-detail { padding:0 16px 14px 68px; background:var(--v5-surface); }
+/* The expanded body starts on the title's text line (16 + 40 tile + 12); the action sits in the card footer (03 §3.1 P-67). */
+.message-center .notification-detail { padding:0 16px 14px 68px; }
+.message-center .notification-footer { margin-top:12px; }
+/* Expanded, the body follows the title 4px below (01 §1.1.1) instead of under the 40px tile; the card keeps the tile's height. */
+.message-center .notification-item--expanded .notification-row { padding-bottom:4px; }
+.message-center .notification-item--expanded .notification-tile { margin-bottom:-40px; }
+.message-center .notification-item--expanded .notification-card { min-height:68px; }
 /* Earnings credited row (04.5, 10.1): each amount is the card figure in Montserrat and the success colour, its unit the
    auxiliary figure; an amount and its unit never split, a second amount wraps whole. */
 .message-center .notification-amounts { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:6px; min-width:0; }
 .message-center .notification-amount { white-space:nowrap; color:var(--v5-success-ink); font:var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric:tabular-nums; }
 .message-center .notification-amount__unit { color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
 .message-center .notification-amount__sep { color:var(--v5-ink-4); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
-.message-center .notification-earning-summary { margin-top:2px; }
+.message-center .notification-earning-summary { margin-top:4px; }
 /* A device name stays whole on its line; one longer than the line ends in an ellipsis (the row's label and the detail carry it in full). */
 .message-center .notification-earning-device { display:inline-block; max-width:100%; vertical-align:bottom; }
 /* uni-app puts the words in an inner span; the clip and ellipsis sit on it, the element that holds the text. */
 .message-center .notification-earning-device :deep(span) { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .notification-management { position:absolute; right:16px; bottom:var(--nx-overlay-bottom); padding:0; }
-:global([data-theme="light"] .message-center .notification-row) { box-shadow:var(--v5-glass-shadow); }
+:global([data-theme="light"] .message-center .notification-card) { box-shadow:var(--v5-glass-shadow); }
 </style>
