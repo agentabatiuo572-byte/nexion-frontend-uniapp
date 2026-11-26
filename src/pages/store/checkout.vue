@@ -434,6 +434,7 @@ import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import { clearTrialTopup, originalTrialCheckoutHref, readTrialTopup, rememberTrialTopup } from "@/lib/trial-topup-return";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
+import { confirmInventoryPlacement } from "@/lib/inventory-placement-confirm";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
@@ -2311,6 +2312,13 @@ async function submitReview() {
     return;
   }
   if (dialogsOpen > 0 || checkoutPurchaseChecking.value) return;
+  // A new order whose device goes to inventory (the full-slots note above) waits for the user's confirmation (PRD §7.3).
+  if (!createdCheckoutOrder.value && !pendingCheckoutCreate.value && checkoutFullSlots.value && !checkoutCapacityBlocked.value) {
+    dialogsOpen += 1;
+    const accepted = await confirmInventoryPlacement(t.value, { count: 1, full: true }, "order", dialogOwner);
+    dialogsOpen = Math.max(0, dialogsOpen - 1);
+    if (!accepted || !isCurrentCheckoutRoute(scope)) return;
+  }
   if (step.value === 'select-payment') { goConfirm(); await nextTick(); if (!isCurrentCheckoutRoute(scope)) return; }
   if (step.value === 'confirm' && !checkoutPurchaseChecking.value) await requestConfirmPay();
 }
