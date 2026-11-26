@@ -28,9 +28,9 @@
         <view v-if="!visibility.hidden && progressPct != null" class="device-inventory-row__fill nx-progress__fill nx-viz-grow" :style="{ width: `${progressPct}%` }" />
       </view>
     </view>
-    <view v-else-if="active && (!remoteApiEnabled || device.kind !== 'phone')" class="device-inventory-row__task device-inventory-row__task--idle">
-      <view class="device-inventory-row__wait" aria-hidden="true" />
-      <text>{{ recovering ? computeCopy.statuses.RECOVERING : !runtimeConfirmed ? t.earn.runtimeUnknown : tasksConfirmed ? t.earn.noCurrentTask : t.earn.taskStatusUnavailable }}</text>
+    <view v-else-if="active" class="device-inventory-row__task device-inventory-row__task--idle" :class="{ 'device-inventory-row__task--warn': phoneIdleWarn }">
+      <view v-if="!phoneIdleWarn" class="device-inventory-row__wait" aria-hidden="true" />
+      <text>{{ remotePhone ? phoneIdleLabel : recovering ? computeCopy.statuses.RECOVERING : !runtimeConfirmed ? t.earn.runtimeUnknown : tasksConfirmed ? t.earn.noCurrentTask : t.earn.taskStatusUnavailable }}</text>
     </view>
 
     <slot name="replacement-status" />
@@ -133,6 +133,9 @@ import type { Device } from "@/store/types";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import { useT } from "@/i18n/use-t";
+import { usePhoneComputeCopy } from "@/i18n/phone-compute";
+import { phoneIdleState, phoneIdleText } from "@/lib/phone-task-idle";
+import { useApp } from "@/store/app";
 import { fmt, fmtMoney } from "@/i18n/format";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { deviceName } from "@/lib/device-copy";
@@ -195,11 +198,12 @@ const statusText = computed(() => {
   if (onlineState.value === "unknown") return t.value.earn.runtimeUnknown;
   return "";
 });
+const remotePhone = computed(() => remoteApiEnabled && props.device.kind === "phone");
 // Job progress follows the server task clock, exactly like the home device row.
 const now = ref(Date.now());
 const monotonicNow = ref(readMonotonicNowMs());
 useVisibleInterval(() => {
-  if (!props.active || !props.device.currentTask) return;
+  if (!props.active || (!props.device.currentTask && !remotePhone.value)) return;
   now.value = Date.now();
   monotonicNow.value = advanceMonotonicHighWater(monotonicNow.value, readMonotonicNowMs());
 }, 1000);
@@ -210,6 +214,12 @@ const progressPct = computed(() => props.runtimeConfirmed
     props.device.kind === "phone" ? props.device.phoneValidUntil : null) : null);
 const taskRunning = computed(() => onlineState.value === "online" && deviceTaskRunning(props.device)
   && (props.device.kind !== "phone" || props.device.phoneValidUntil == null || liveTaskNow.value < props.device.phoneValidUntil));
+// A remote phone without a task says why in its 当前作业 line, the same reading as the earn stage and device card.
+const app = useApp();
+const phoneCopy = usePhoneComputeCopy();
+const phoneIdle = computed(() => phoneIdleState(props.device, app, monotonicNow.value));
+const phoneIdleLabel = computed(() => phoneIdleText(phoneIdle.value, phoneCopy.value, t.value.earn));
+const phoneIdleWarn = computed(() => remotePhone.value && phoneIdle.value === "expired");
 const actionDisabled = computed(() => props.disabled || props.actionDisabled);
 const actionLabel = computed(() =>
   props.active ? props.deactivateLabel : props.disabled ? props.disabledLabel ?? props.slotsFullLabel : props.activateLabel,
@@ -316,6 +326,7 @@ async function chooseMenu(action: "toggle" | "tradein") {
 .device-inventory-row__bar { margin-top: 10px; }
 .device-inventory-row__fill { transition: width .6s linear; }
 .device-inventory-row__task--idle { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
+.device-inventory-row__task--warn { color: var(--v5-warning-ink); }
 .device-inventory-row__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
 .device-inventory-row__pending { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); color: var(--v5-warning-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .device-inventory-row__pending svg { flex: none; margin-top: 3px; }

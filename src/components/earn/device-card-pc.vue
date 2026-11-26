@@ -111,7 +111,7 @@
     </view>
 
     <view v-if="!stage && !expanded && task" class="nx-device-current-task" style="padding: 0 20px 16px">
-      <text class="block" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block nx-device-section-label">{{ t.earn.currentTask }}</text>
       <text class="block truncate" style="margin-top: 6px; font-size: 13px; color: var(--v5-ink-2)">{{ visibility.mask(task.type) }}</text>
       <TaskV2Status :task="task" :paused="phoneTaskExpired" />
       <view class="flex items-center gap-3" style="margin-top: 10px">
@@ -124,7 +124,7 @@
       <text v-else-if="awaitingExecutionResultConfirmation" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3)">{{ task?.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
     </view>
 
-    <view v-if="!stage && !expanded && phoneFactsReady && !task" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
+    <view v-if="!stage && !expanded && phoneFactsReady && !task" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)" :style="phoneIdleWarn ? { color: 'var(--v5-warning-ink)' } : undefined"><text>{{ remotePhoneIdle ? phoneIdleLabel : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
 
     <!-- Detail body (expanded; accordion) -->
     <view v-if="expanded || stage" class="nx-device-card__details" :class="{ 'earn-stage__body': stage }">
@@ -143,7 +143,7 @@
           <text v-else-if="awaitingExecutionResultConfirmation" class="earn-stage__note">{{ task?.executionMode === 'SIMULATED' ? computeCopy.confirming : t.earn.taskAwaitingExecutionResultConfirmation }}</text>
           <TaskV2Status :task="task" :paused="phoneTaskExpired" />
         </view>
-        <view v-else-if="stageJob === 'idle'" class="earn-stage__job"><view class="earn-stage__idle"><view v-if="taskHistoryReady" class="earn-stage__wait" aria-hidden="true" /><text>{{ taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view></view>
+        <view v-else-if="stageJob === 'idle'" class="earn-stage__job"><view class="earn-stage__idle" :class="{ 'earn-stage__idle--warn': phoneIdleWarn }"><view v-if="taskHistoryReady && !phoneIdleWarn" class="earn-stage__wait" aria-hidden="true" /><text>{{ remotePhoneIdle ? phoneIdleLabel : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view></view>
         <view v-else-if="stageJob === 'status'" class="earn-stage__job"><view class="earn-stage__idle"><text>{{ statusLabel }}</text></view></view>
       </template>
       <!-- device identity: gpu · location + lifecycle chip -->
@@ -180,7 +180,7 @@
 
     <!-- Mock phone: live hashpower (effective value; the capability ceiling is not shown) -->
     <view v-if="phoneRunning && live" style="padding: 0 20px 12px">
-      <text class="block" :style="sectionLabelStyle" style="margin-bottom: 8px">{{ t.earn.hashLabel }}</text>
+      <text class="block nx-device-section-label" style="margin-bottom: 8px">{{ t.earn.hashLabel }}</text>
       <view class="flex items-end justify-between">
         <view class="flex items-baseline" style="gap: 4px">
           <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; line-height: 1; font-weight: 500; color: var(--v5-brand); letter-spacing: -0.014em">{{ visibility.mask(live.effectiveTops.toFixed(1)) }}</text>
@@ -216,7 +216,7 @@
     <text v-if="detailPage" class="block device-section-title" style="padding:16px 20px 12px">{{ t.coreReview.jobs }}</text>
     <!-- Phone: reconnecting -->
     <view v-if="reconnecting && device.kind === 'phone'" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <view class="rounded-xl p-3" :style="warnBoxStyle">
         <view class="flex items-start gap-2.5">
           <view class="rounded-lg grid place-items-center shrink-0" :style="warnIconStyle">
@@ -233,7 +233,7 @@
 
     <!-- Phone: paused (no task) -->
     <view v-else-if="phoneFactsReady && !task && device.kind === 'phone' && device.pausedReason" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <view class="rounded-xl p-3 flex items-start gap-2.5" :style="warnBoxStyle">
         <view class="rounded-lg grid place-items-center shrink-0" :style="warnIconStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="pausedIconPath" /></svg>
@@ -247,18 +247,18 @@
 
     <!-- Phone: waiting placeholder -->
     <view v-else-if="!remoteApiEnabled && phoneFactsReady && !task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <view class="flex items-center gap-2" style="font-size: var(--ui-type-list-subtitle); color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">
         <svg v-if="taskHistoryReady" class="nx-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
         <text>{{ taskHistoryReady ? t.earn.phoneWaitingTask : t.earn.runtimeUnknown }}</text>
       </view>
     </view>
 
-    <view v-if="!stage && phoneFactsReady && !task && device.kind !== 'phone'" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)"><text>{{ recovering ? computeCopy.statuses.RECOVERING : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
+    <view v-if="!stage && phoneFactsReady && !task && (device.kind !== 'phone' || remotePhoneIdle)" class="nx-device-current-task-empty" style="padding:0 20px 16px;font-size:12px;color:var(--v5-ink-3)" :style="phoneIdleWarn ? { color: 'var(--v5-warning-ink)' } : undefined"><text>{{ remotePhoneIdle ? phoneIdleLabel : recovering ? computeCopy.statuses.RECOVERING : taskHistoryReady ? t.earn.noCurrentTask : t.earn.runtimeUnknown }}</text></view>
 
     <!-- Current task (non-reconnecting) -->
     <view v-if="!stage && task && !reconnecting" style="padding: 0 20px 16px">
-      <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
+      <text class="block mb-2 nx-device-section-label">{{ t.earn.currentTask }}</text>
       <text class="block" style="font-size: var(--ui-type-list-subtitle); font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ visibility.mask(task.type) }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 10px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.earn.phoneTaskPaused }}</text>
       <text v-if="task.status === 'PAUSED'" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.phoneTaskPausedHint }}</text>
@@ -280,7 +280,7 @@
          this list only mirrors settled task previews returned for this device. -->
     <view v-if="!stage && phoneFactsReady" class="nx-device-today-completed" data-device-today-completed="true" style="padding: 0 20px 16px">
       <view class="flex flex-wrap items-center justify-between" :style="{ marginBottom: taskHistoryReady && !deviceTodayCompleted.length ? '0' : '8px' }">
-        <text :style="sectionLabelStyle">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
+        <text class="nx-device-section-label">{{ t.earn.todayRecentCompleted }}<template v-if="taskHistoryReady"> ({{ visibility.mask(deviceTodayCompleted.length) }})</template></text>
         <view
           class="active:opacity-60"
           style="min-height: 44px; margin-left: auto; padding-left: 16px; display: flex; align-items: center"
@@ -304,7 +304,7 @@
     <!-- Phone: background mode toggles -->
     <view v-if="device.kind === 'phone' && !remoteApiEnabled" style="padding: 0 20px 12px">
       <view class="flex items-center gap-1.5 mb-2">
-        <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.earn.phoneSettingsTitle }}</text>
+        <text class="nx-device-section-label">{{ t.earn.phoneSettingsTitle }}</text>
         <view class="nx-device-help grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" role="button" tabindex="0" :aria-label="t.earn.phoneRequirementsHelpAria" :aria-expanded="showHelp" @click="showHelp = !showHelp"  @keydown.enter.stop.prevent="showHelp = !showHelp" @keydown.space.stop.prevent="showHelp = !showHelp">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
         </view>
@@ -324,7 +324,7 @@
 
     <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
     <view v-if="!stage && phoneFactsReady && !detailPage" style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
-      <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
+      <text class="block nx-device-section-label">{{ t.earn.todayEarnings }}</text>
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
         <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
              与卡内 −$锁定日产 / 未解锁潜在收益(仍 warning=Pending)语义不同,不可混用。 -->
@@ -394,6 +394,8 @@ import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
 import { canShowLivePhoneHashpower, computeLiveHashpower, isDeviceOnline, deviceOnlineState } from "@/lib/hashpower";
 import { fallbackCapability } from "@/lib/device-capability";
+import { phoneIdleState, phoneIdleText } from "@/lib/phone-task-idle";
+import { usePhoneComputeCopy } from "@/i18n/phone-compute";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -489,13 +491,21 @@ const statusLabel = computed(() => recovering.value ? computeCopy.value.statuses
   : onlineState.value === "online" ? t.value.earn.online : "");
 const statusOnline = computed(() => !recovering.value && onlineState.value === "online");
 const statusColor = computed(() => statusOnline.value ? "var(--v5-brand)" : "var(--v5-ink-3)");
-// Earn stage (P-62): which job row the stage shows. Phones without a task keep their own blocks below.
+// A remote phone with no task, not paused and not reconnecting says why in its 当前作业 line (shared with the warehouse row).
+const remotePhoneIdle = computed(() => remoteApiEnabled && props.device.kind === "phone" && phoneFactsReady.value && !task.value
+  && !reconnecting.value && !props.device.pausedReason);
+const phoneCopy = usePhoneComputeCopy();
+const phoneIdle = computed(() => phoneIdleState(props.device, app, monotonicNow.value));
+const phoneIdleLabel = computed(() => phoneIdleText(phoneIdle.value, phoneCopy.value, t.value.earn));
+// An expired run needs the user to reopen the App, so it reads as a warning (01 §1.1.1).
+const phoneIdleWarn = computed(() => remotePhoneIdle.value && phoneIdle.value === "expired");
+// Earn stage (P-62): which job row the stage shows. Local demo phones without a task keep their own blocks below.
 const stageOffline = computed(() => !recovering.value && onlineState.value === "offline");
 const stageJob = computed<"task" | "idle" | "status" | "none">(() => {
   if (stageOffline.value) return "none";
   if (recovering.value || onlineState.value === "unknown") return "status";
   if (task.value && !reconnecting.value) return "task";
-  if (phoneFactsReady.value && !task.value && props.device.kind !== "phone") return "idle";
+  if (phoneFactsReady.value && !task.value && (props.device.kind !== "phone" || remotePhoneIdle.value)) return "idle";
   return "none";
 });
 // Loops and the equalizer only move while the job really runs (not paused, queued, interrupted, recovering or awaiting its result).
@@ -790,12 +800,6 @@ const chevronBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
-const sectionLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  letterSpacing: "0.16em",
-  textTransform: "uppercase",
-  color: "var(--v5-ink-3)",
-};
 const warnBoxStyle: CSSProperties = {
   background: "color-mix(in oklab, var(--v5-warning) 8%, transparent)",
   border: "1px solid color-mix(in oklab, var(--v5-warning) 24%, transparent)",
@@ -827,6 +831,9 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 </script>
 
 <style scoped>
+/* Section labels (01 §1.2): Latin all-caps at +0.04em; Chinese takes no tracking. */
+.nx-device-section-label { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--v5-ink-3); }
+.nx-device-section-label:lang(zh) { letter-spacing: 0; }
 .nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px var(--nx-overlay-bottom); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
 .nx-action-sheet__handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
 .nx-action-sheet__head { display: flex; flex-direction: column; gap: 2px; padding: 4px 4px 0; }
@@ -925,6 +932,7 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 .earn-stage__note { display: block; font: 400 12px/18px var(--font-v5); color: var(--v5-ink-3); }
 .earn-stage__note--warn { color: var(--v5-warning-ink); }
 .earn-stage__idle { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; font: 400 13px/18px var(--font-v5); color: var(--v5-ink-3); }
+.earn-stage__idle--warn { color: var(--v5-warning-ink); }
 .earn-stage__wait { width: 14px; height: 14px; flex: none; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed var(--v5-ink-3); }
 .earn-stage__stats { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 16px 18px 0; padding: 12px 0; border-top: 1px solid var(--v5-border); border-bottom: 1px solid var(--v5-border); }
 .earn-stage__stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; padding: 0 4px; text-align: center; }
