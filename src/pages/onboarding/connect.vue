@@ -77,9 +77,9 @@
             <line v-for="(tick, i) in dialFace.ticks" :key="i" :class="tick.major ? 'cn-dial__major' : 'cn-dial__minor'" :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" />
           </svg></view>
           <view class="cn-dial__ring" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
-            <path v-for="(arc, i) in dialFace.arcs" :key="i" class="cn-dial__arc" :d="arc" />
+            <path v-for="(arc, i) in dialFace.arcs" :key="i" class="cn-dial__arc" fill="none" :d="arc" />
             <line v-for="(mark, i) in dialFace.marks" :key="'m' + i" class="cn-dial__arc" :x1="mark.x1" :y1="mark.y1" :x2="mark.x2" :y2="mark.y2" />
-            <circle class="cn-dial__inner" :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" />
+            <circle class="cn-dial__inner" fill="none" :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" />
           </svg></view>
           <!-- The count is shown while it runs; under reduced motion the final value shows at once (also in the App, where
                the count runs on a timer). The dial's name carries the one value screen readers hear. -->
@@ -120,11 +120,11 @@
       </view>
     </view>
     <view v-if="nativePhoneAvailable" class="cn-cta">
+      <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger; the bubble closes on a second tap, a tap outside or a scroll. -->
+      <view v-if="phase === 'result'" class="cn-rules">
+        <NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" />
+      </view>
       <view v-if="phase === 'result'" :class="{ 'cn-error-actions': iosPhone }">
-        <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger; the bubble closes on a second tap, a tap outside or a scroll. -->
-        <view class="cn-rules">
-          <NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" />
-        </view>
         <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
           <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : activateText }}</text>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -428,7 +428,7 @@ const dialFace = computed(() => {
 // keeps one line where the inner ring's chord at its height allows it, and steps its size down where it does not.
 const pageInstance = getCurrentInstance();
 function fitDial() {
-  if (!pageInstance?.proxy) return;
+  if (!pageInstance?.proxy) { dialReady.value = true; return; }
   const query = uni.createSelectorQuery().in(pageInstance.proxy);
   query.select(".cn-phase--dial").boundingClientRect();
   query.select(".cn-dial__unit").boundingClientRect();
@@ -816,6 +816,7 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 24px 20px;
   background: var(--v5-bg);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 .cn-bars { min-height: 44px; display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
@@ -911,10 +912,10 @@ onUnmounted(() => {
 [data-theme="light"] .cn-dial__lens { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 6%, transparent), transparent); }
 .cn-dial__ticks, .cn-dial__ring { inset: 0; }
 .cn-dial__ticks :deep(svg), .cn-dial__ring :deep(svg) { display: block; overflow: visible; }
-.cn-dial__major { stroke: var(--v5-brand); stroke-opacity: .6; stroke-width: 1.6; stroke-linecap: round; }
-.cn-dial__minor { stroke: var(--v5-ink); stroke-opacity: .18; stroke-width: 1; stroke-linecap: round; }
-.cn-dial__arc { fill: none; stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
-.cn-dial__inner { fill: none; stroke: var(--v5-brand); stroke-opacity: .22; stroke-width: 1; }
+.cn-dial__ticks :deep(.cn-dial__major) { stroke: var(--v5-brand); stroke-opacity: .6; stroke-width: 1.6; stroke-linecap: round; }
+.cn-dial__ticks :deep(.cn-dial__minor) { stroke: var(--v5-ink); stroke-opacity: .18; stroke-width: 1; stroke-linecap: round; }
+.cn-dial__ring :deep(.cn-dial__arc) { fill: none; stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
+.cn-dial__ring :deep(.cn-dial__inner) { fill: none; stroke: var(--v5-brand); stroke-opacity: .22; stroke-width: 1; }
 .cn-dial__num { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; }
 .cn-dial__value { display: grid; justify-items: center; }
 .cn-dial__v { grid-area: 1 / 1; font-family: var(--font-metric); font-variant-numeric: tabular-nums; font-size: inherit; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: var(--v5-brand); white-space: nowrap; }
