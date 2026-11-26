@@ -37,7 +37,7 @@
               </template>
               <template v-else>
                 <text class="tcs-plinth__label">{{ copy.estimateLabel }}</text>
-                <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount"><text class="tcs-amount__cur">$</text>{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
+                <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount">{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text><text class="tcs-amount__unit">&nbsp;USDT</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
                 <text id="tcs-basis" class="tcs-estimate-note"><text v-for="(part, i) in estimateNoteParts" :key="i" :class="{ 'tcs-estimate-note__num': part.value }">{{ part.text }}</text></text>
               </template>
             </view>
@@ -106,7 +106,7 @@ const loadingView = computed(() => trialView.config.value === null && !stateRead
 // The machine's placeholder disc shows until the catalog image is in (04 §4.1 中性占位).
 const imageReady = ref(false);
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
-// Sheet main amount (10 §10.2): the whole part stays, the $ and the decimals take the auxiliary ink; unknown is a whole 「—」.
+// Sheet main amount (10 §10.2): the whole part stays, the decimals and the USDT unit take the auxiliary ink; unknown is a whole 「—」.
 const estimateParts = computed(() => {
   if (trialView.estimatedOffsetUSD.value === null) return null;
   const [int, dec] = formatAmount(trialView.estimatedOffsetUSD.value).split('.');
@@ -115,15 +115,15 @@ const estimateParts = computed(() => {
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
 // The estimate card holds catalog information only (03 §3.4); a failed refresh is said on the status line by the button.
 // The basis line under the amount sets its figures in 500 (10 §10.2), so the sentence is split around its placeholders;
-// a "$" written right before a placeholder belongs to the figure.
+// each figure's unit follows it in the copy after a U+00A0 (03 §3.6.1).
 const estimateNoteParts = computed<{ text: string; value: boolean }[]>(() => {
   const config = trialView.config.value;
   if (!config) return stateReadFailed.value ? [] : [{ text: copy.value.loading, value: false }];
   if (config.shadowDailyUSD === null) return [];
   const values: Record<string, string> = { rate: formatAmount(config.shadowDailyUSD), days: String(config.trialDays), cap: formatAmount(config.trialOffsetCapUSD) };
-  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\$?\{\w+\})/).filter(Boolean).map((part) => {
-    const match = /^(\$?)\{(\w+)\}$/.exec(part);
-    return match && match[2] in values ? { text: match[1] + values[match[2]], value: true } : { text: part, value: false };
+  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\{\w+\})/).filter(Boolean).map((part) => {
+    const match = /^\{(\w+)\}$/.exec(part);
+    return match && match[1] in values ? { text: values[match[1]], value: true } : { text: part, value: false };
   });
 });
 const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
@@ -332,7 +332,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-skel { display:inline-block;vertical-align:middle;border-radius:8px;background:color-mix(in srgb,var(--v5-ink) 9%,transparent); }
 .tcs-skel--name { width:148px;height:20px; }
 .tcs-skel--tag { width:104px;height:24px;border-radius:999px; }
-.tcs-skel--amount { width:104px;height:32px; }
+.tcs-skel--amount { width:136px;height:32px; }
 
 /* Stage: the machine stands on the plinth's upper edge. */
 .tcs-stage { position:relative;--tcs-mach:248px;margin-top:-34px; }
@@ -358,10 +358,11 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-plinth__label { display:block;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 /* One amount-sized line: the skeleton sits on its middle like the figure would (board .amt). */
 .tcs-amount-row { display:block;height:var(--ui-type-wallet-amount-lh);margin-top:4px;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); }
-/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, $ and decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
+/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
 .tcs-amount { display:block;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount);letter-spacing:-.02em;color:var(--v5-brand);font-variant-numeric:tabular-nums;white-space:nowrap; }
-/* line-height 1: the smaller symbol sits inside the figure's line instead of growing it. */
-.tcs-amount__cur { color:var(--v5-ink-3);font-size:max(12px,.55em);line-height:1; }
+/* Unit (01 §1.2): USDT after the figure at max(12px, .4em), 500, auxiliary; line-height 1 keeps it inside the figure's line,
+   and the U+00A0 before it keeps it on that line (03 §3.6.1). */
+.tcs-amount__unit { font:500 max(12px,.4em)/1 var(--font-v5);letter-spacing:0;color:var(--v5-ink-3); }
 .tcs-amount__dec { color:var(--v5-ink-3); }
 .tcs-amount--unknown { color:var(--v5-ink-3); }
 /* Basis line under the amount: auxiliary figure 12/16, its figures 500 (10 §10.2). */

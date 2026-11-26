@@ -20,7 +20,7 @@
         <view v-if="trialOffer" class="hb-card hb-glow-cyan" :class="offerCount === 2 ? 'hb-half' : 'hb-wt'" :style="{ '--hb-i': voucherOffer ? 1 : 0 }" :data-trial-state="confirmedOffer?.status ?? status" role="button" :tabindex="trialOfferEnabled || showCapacityManagement ? 0 : -1" :aria-disabled="trialOfferEnabled || showCapacityManagement ? undefined : 'true'" :aria-label="trialOfferAria" @click="openTrialOffer" @keydown.enter.prevent="openTrialOffer" @keydown.space.prevent="openTrialOffer">
           <template v-if="offerCount === 2">
             <view class="hb-half__top"><image class="hb-half__art hb-half__art--device" :src="trialArt" mode="aspectFit" aria-hidden="true" /></view>
-            <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
+            <view class="hb-half__main"><text class="hb-amount hb-half__amount nx-num-amount">{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text><text v-if="estimateParts.known" class="hb-amount__unit">&nbsp;USDT</text></text><text class="hb-half__sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text></view>
             <view class="hb-rule" aria-hidden="true" />
             <view class="hb-half__foot">
               <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : fmt(copy.benefitTrialFree, { n: trialDays }) }}</text>
@@ -34,7 +34,7 @@
               <NxTag class="hb-wt__tag" tone="brand" :label="fmt(copy.benefitTrialFree, { n: trialDays })" />
             </view>
             <view class="hb-wt__txt">
-              <text class="hb-amount hb-wt__amount nx-num-amount"><text class="hb-amount__minor">{{ estimateParts.currency }}</text>{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text></text>
+              <text class="hb-amount hb-wt__amount nx-num-amount">{{ estimateParts.whole }}<text class="hb-amount__dec">{{ estimateParts.cents }}</text><text v-if="estimateParts.known" class="hb-amount__unit">&nbsp;USDT</text></text>
               <text class="hb-sub">{{ fmt(copy.benefitTrialSub, { name: trialName }) }}</text>
               <view class="hb-wt__row">
                 <text class="hb-label">{{ showCapacityFull ? copy.benefitSlotsFull : t.trial.homeNoPayment }}</text>
@@ -132,12 +132,12 @@ const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.d
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
 const trialArt = computed(() => confirmedOffer.value ? confirmedOffer.value.imageUrl : trialView.imageUrl.value);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
-// Same capped estimate the trial page and checkout quote (BUG 78).
+// Same capped estimate the trial page and checkout quote (BUG 78), written with its unit USDT (03 §3.6); unknown is a bare 「—」.
 const estimateText = computed(() => {
   const estimate = confirmedOffer.value ? confirmedOffer.value.estimatedOffsetUSD : trialView.estimatedOffsetUSD.value;
-  return estimate === null ? '—' : `$${formatAmount(estimate)}`;
+  return estimate === null ? '—' : formatAmount(estimate);
 });
-const estimateParts = computed(() => { const match = /^(\$?)(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { currency: match[1], whole: match[2], cents: match[3] ?? '' }; });
+const estimateParts = computed(() => { const match = /^(.*?)(\.\d+)?$/.exec(estimateText.value)!; return { whole: match[1], cents: match[2] ?? '', known: estimateText.value !== '—' }; });
 const creditText = computed(() => trialView.offsetUSD.value === null ? '—' : `$${formatAmount(trialView.offsetUSD.value)}`);
 const countdownText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialCountdown(trialView.remainingMs.value));
 // Keep the last confirmed label during a background read (BUG 14). [half pill, wide pill, screen-reader wording]
@@ -247,6 +247,8 @@ const trialReadFailed = computed(() => trial.lastReadFailed || trial.authoritySt
 
 .hb-amount { display:block;font-weight:500;letter-spacing:-.02em;color:var(--v5-brand);white-space:nowrap; }
 .hb-amount__minor { font-size:max(12px,.55em);color:var(--v5-ink-3); }
+/* Unit after the trial estimate (01 §1.2): max(12px, .4em), 500, auxiliary; U+00A0 keeps it on the figure's line (03 §3.6.1). */
+.hb-amount__unit { font:500 max(12px,.4em)/1 var(--font-v5);letter-spacing:0;color:var(--v5-ink-3); }
 .hb-amount__dec { color:var(--v5-ink-3); }
 .hb-label { min-width:0;font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 .hb-sub { font:400 12px/16px var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
