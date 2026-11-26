@@ -58,8 +58,10 @@ const methodText = computed(() => {
   }
 });
 const amount = computed(() => {
-  if (props.purchase.confirmedAmountUSD === null) return null;
-  const text = formatGroupedAmount(props.purchase.confirmedAmountUSD, 2);
+  const purchase = props.purchase;
+  const value = purchase.kind === "EXTERNAL" ? purchase.amountUSD ?? purchase.confirmedAmountUSD : purchase.confirmedAmountUSD;
+  if (value === null) return null;
+  const text = formatGroupedAmount(value, 2);
   const at = text.indexOf(".");
   return at < 0 ? { whole: text, decimals: "" } : { whole: text.slice(0, at), decimals: text.slice(at) };
 });

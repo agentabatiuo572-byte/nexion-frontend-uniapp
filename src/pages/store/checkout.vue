@@ -1300,9 +1300,10 @@ async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: Tria
   trialRefusalNo = key;
   trialResumeNo = undefined;
   const quote = result.refusal.quote;
-  if (!scopedTrialReviewQuote.value && quote && trialPriceRefused(result.refusal.reasonCode) && !hasTrialDiscountTerms(quote)) {
+  if (!scopedTrialReviewQuote.value && quote && trialPriceRefused(result.refusal.reasonCode)) {
     trialReviewClaimNo.value = claimNo;
-    trialQuoteChange.value = { previousAmountUSD: result.confirmedAmountUSD ?? quote.amountUSD, quote, historicalTerms: true };
+    trialQuoteChange.value = { previousAmountUSD: result.confirmedAmountUSD ?? quote.amountUSD, quote,
+      historicalTerms: !hasTrialDiscountTerms(quote) };
   }
   return false;
 }
@@ -2159,6 +2160,12 @@ const trialBalanceShortfallBelowCent = computed(() => trialBalanceShortfallUSD.v
 const trialNeedsTopup = computed(() => trialWalletOnly.value && (exactTrialDue.value ?? 0) > 0
   && ((trialBalanceShortfallUSD.value ?? 0) > 0 || trialServerShortfall.value));
 watch(() => app.user.usdtBalance, () => { trialServerShortfall.value = false; });
+const originalTrialPrincipal = computed(() => {
+  const original = trialOriginal.value;
+  if (original?.kind !== "EXTERNAL") return;
+  const businessAmount = originalTrialSnapshot.value?.businessAmountUsdt;
+  return originalTrialBreakdown.value?.amountUSD ?? (businessAmount === undefined ? original.amountUSD : Number(businessAmount));
+});
 const originalTrialPaymentQuote = computed(() => {
   const original = trialOriginal.value;
   const state = trialPaymentState.value;
@@ -2166,13 +2173,14 @@ const originalTrialPaymentQuote = computed(() => {
   if (original?.kind === "EXTERNAL" && originalTrialSnapshot.value && !originalTrialSnapshot.value.trialPurchaseBreakdown
       && state?.claimNo === original.claimNo
       && resolveTrialCheckoutProductId(state.config.trialProductId) === original.device.productNo
-      && state.quote?.amountUSD === original.confirmedAmountUSD) return state.quote;
+      && state.quote?.amountUSD === originalTrialPrincipal.value) return state.quote;
 });
 const shownTrialQuote = computed(() => trialReviewQuote.value ?? originalTrialPaymentQuote.value ?? retainedTrialReviewQuote.value);
 const shownPurchaseSubtotal = computed(() => originalTrialBreakdown.value?.priceUSD
   ?? (trialUnavailablePrice.value ? shownTrialQuote.value?.priceUSD ?? null : purchaseSubtotal.value));
-const shownConfirmationTotal = computed(() => originalTrialBreakdown.value?.amountUSD ?? legacyTrialResume.value?.amount ?? trialOriginal.value?.confirmedAmountUSD
-  ?? (trialUnavailablePrice.value ? retainedTrialReviewQuote.value?.amountUSD ?? null : confirmationTotal.value));
+const shownConfirmationTotal = computed(() => trialOriginal.value?.kind === "EXTERNAL" ? originalTrialPrincipal.value ?? null
+  : legacyTrialResume.value?.amount ?? trialOriginal.value?.confirmedAmountUSD
+    ?? (trialUnavailablePrice.value ? retainedTrialReviewQuote.value?.amountUSD ?? null : confirmationTotal.value));
 const shownTrialDueBelowCent = computed(() => !trialOriginal.value && !legacyTrialResume.value
   && trialDueBelowCent(exactTrialDue.value ?? retainedTrialReviewQuote.value?.amountUSD));
 const shownTrialDiscounts = computed(() => {
@@ -2249,9 +2257,12 @@ const trialQuotePending = computed(() => multiTrialCheckout.value && !trialOrigi
   && (trialReviewStatus.value === "loading" || trialReviewStatus.value === "failed"));
 const trialQuoteLoading = computed(() => trialQuotePending.value && trialReviewStatus.value === "loading");
 const trialPromoRowLabel = computed(() => {
-  if (originalTrialBreakdown.value || trialQuoteChange.value?.historicalTerms) return purchaseCopy.value.coPromoShort;
+  const original = trialOriginal.value;
+  const frozen = originalTrialBreakdown.value;
+  if ((original?.kind === "EXTERNAL" && !hasTrialDiscountTerms(frozen)) || trialQuoteChange.value?.historicalTerms)
+    return purchaseCopy.value.coPromoShort;
   const quote = multiTrialCheckout.value ? shownTrialQuote.value : freeTrial.authoritativeQuote;
-  const { discountRate, discountCapUSD: cap } = trialDiscountTerms(quote, trialCfg.value);
+  const { discountRate, discountCapUSD: cap } = trialDiscountTerms(frozen ?? quote, trialCfg.value);
   const pct = formatTrialDiscountPercent(discountRate);
   if (cap === null) return fmt(trialDetailCopy.value.promoRowNoCap, { pct });
   return fmt(trialDetailCopy.value.promoRow, { pct, cap: Number.isInteger(cap) ? `$${cap}` : `$${formatGroupedAmount(cap)}` });
@@ -2503,7 +2514,7 @@ function applyTrialCheckoutOutcome(scope: CheckoutRouteScope, reviewAlreadyRead 
   handledTrialRefusalNo = state.submissionNo;
   if (trialPriceRefused(reasonCode) && quote) {
     const historicalTerms = state.recovered && !hasTrialDiscountTerms(quote);
-    const liveQuote = historicalTerms && reviewAlreadyRead ? trialReviewOption.value?.quote : undefined;
+    const liveQuote = reviewAlreadyRead ? trialReviewOption.value?.quote : undefined;
     trialQuoteChange.value = { previousAmountUSD: state.confirmedAmountUSD ?? quote.amountUSD,
       quote: liveQuote ?? quote, historicalTerms: historicalTerms && !liveQuote };
     if (!trialReviewQuote.value) toast.warn(t.value.store.coTrialQuoteChanged);

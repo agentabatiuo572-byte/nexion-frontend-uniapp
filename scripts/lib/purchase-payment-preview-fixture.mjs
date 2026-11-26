@@ -204,6 +204,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
     const cutoff=Math.min(intent.deadline,intent.expirationTime?Date.parse(intent.expirationTime):Infinity);
     return {claimNo:intent.claimNo,kind:'EXTERNAL',intentNo:intent.intentNo,productNo,name,imageUrl,
       paymentMethod:intent.paymentMethod,expectedAmountUsdt:String(intent.payload.expectedAmountUsdt),
+      amountUsdt:intent.businessAmountUsdt,
       deadlineAt:new Date(cutoff).toISOString(),status:intent.status};
   }
   function originalTrialPurchase() {
@@ -451,11 +452,12 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const channel = Math.round(subtotal * 0.0125) + channelFixed, network = bank ? 0 : erc20 ? 380 : 25;
       if (trial) state.lastTrialPaymentQuote = {...body,amountUsdt:amount,subtotalUsdt:money(subtotal)};
       const trialDeviceSnapshot=trial?trialPurchaseDevice(quoteProducts[0],trial.config.trialProductName):undefined;
+      const trialQuote=trial&&wireTrialQuote(trial.quote);
       const trialPurchaseBreakdown=trial&&trialPurchaseOptionsEnabled(state)?{
         productNo:trialDeviceSnapshot.productNo,productName:trialDeviceSnapshot.name,
         ...(quoteProducts[0].tagline&&{productSubtitle:quoteProducts[0].tagline}),
-        ...Object.fromEntries(['priceUsdt','promoDiscountUsdt','offsetUsdt','earlyDiscountUsdt','amountUsdt']
-          .map(key=>[key,trial.quote[key].toFixed(6)])),
+        ...Object.fromEntries(['priceUsdt','promoDiscountUsdt','offsetUsdt','earlyDiscountUsdt','amountUsdt',
+          'discountRate','discountCapUsdt','earlyDiscountConfiguredUsdt'].map(key=>[key,trialQuote[key]])),
       }:undefined;
       const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: body.kind, paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
         businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: adjustment.toFixed(6), subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),

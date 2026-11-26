@@ -2,12 +2,13 @@ import type { TrialConversionQuote } from "@/api/trial-api";
 import type { TrialConfig } from "@/store/trial-config";
 import { formatAmount } from "./amount-display";
 
-export function hasTrialDiscountTerms(quote: TrialConversionQuote | null | undefined):
-  quote is TrialConversionQuote & { discountRate: number; discountCapUSD: number } {
+type TrialDiscountTerms = Pick<TrialConversionQuote, "discountRate" | "discountCapUSD">;
+
+export function hasTrialDiscountTerms(quote: TrialDiscountTerms | null | undefined): quote is Required<TrialDiscountTerms> {
   return quote?.discountRate !== undefined && quote.discountCapUSD !== undefined;
 }
 
-export function trialDiscountTerms(quote: TrialConversionQuote | null | undefined, config: TrialConfig) {
+export function trialDiscountTerms(quote: TrialDiscountTerms | null | undefined, config: TrialConfig) {
   return hasTrialDiscountTerms(quote) ? quote : config;
 }
 

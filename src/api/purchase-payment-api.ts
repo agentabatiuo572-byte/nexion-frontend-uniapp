@@ -3,7 +3,7 @@ import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
-import { parseTrialChangedQuote, parseTrialOriginalPurchase, TRIAL_DEVICE_RESELECTION_CODES, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
+import { parseTrialChangedQuote, parseTrialDiscountTerms, parseTrialOriginalPurchase, TRIAL_DEVICE_RESELECTION_CODES, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
@@ -32,7 +32,7 @@ export type TrialPurchaseOutcome = 'UNPAID_TERMINAL' | 'LATE_PAYMENT_REVIEW';
 type TrialPurchaseBreakdown = {
   productNo: string; productName: string; productSubtitle?: string;
   priceUSD: number; promoDiscountUSD: number; offsetUSD: number; earlyDiscountUSD: number; amountUSD: number;
-};
+} & Partial<Pick<TrialConversionQuote, 'discountRate' | 'discountCapUSD' | 'earlyDiscountConfiguredUSD'>>;
 const trialOriginalCodes = ['TRIAL_BALANCE_SUBMISSION_IN_PROGRESS', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'] as const;
 const trialRequoteCodes = ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_PRICING_CHANGED',
   'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED', 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'] as const;
@@ -93,6 +93,8 @@ function parseTrialPurchaseBreakdown(value: unknown): TrialPurchaseBreakdown {
     ...(raw.productSubtitle == null ? {} : { productSubtitle: text(raw.productSubtitle) }),
     priceUSD: amount(raw.priceUsdt), promoDiscountUSD: amount(raw.promoDiscountUsdt), offsetUSD: amount(raw.offsetUsdt),
     earlyDiscountUSD: amount(raw.earlyDiscountUsdt), amountUSD: amount(raw.amountUsdt),
+    ...parseTrialDiscountTerms(raw),
+    ...(raw.earlyDiscountConfiguredUsdt == null ? {} : { earlyDiscountConfiguredUSD: amount(raw.earlyDiscountConfiguredUsdt) }),
   };
 }
 const micros = (value: string): bigint => {

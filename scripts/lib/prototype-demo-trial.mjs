@@ -69,7 +69,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')unclaimedConfig.discountCapUSD='49.999999';
   const perDevice=state.trialPurchaseListState==='device-discounts';
-  if(perDevice&&state.trialDefaultDiscountState==='repriced')
+  if(state.trialDefaultDiscountState==='repriced')
     Object.assign(unclaimedConfig,{discountRate:'0.175',earlyPurchaseDiscountUSD:'5'});
   const trialTermsVersion=available?createHash('sha256').update(JSON.stringify([
     unclaimedConfig.trialProductId,unclaimedConfig.trialDays,product.monthlyEstimateUsdt??null,
