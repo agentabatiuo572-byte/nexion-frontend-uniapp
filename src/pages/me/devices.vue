@@ -204,8 +204,9 @@
     />
     <!-- Board S2/S4/S5: choosing the device to swap out, then the confirm step in the same sheet (03 §3.5.1 选择).
          With one candidate the sheet opens on the confirm step. While the request runs every exit stays shut. -->
-    <NxSheet :open="replacementDevice !== null" :title="replacementStep ? replacementCopy.confirmTitle : replacementCopy.choose" @close="closeReplacementSheet">
-      <view v-if="replacementDevice && !replacementStep" class="device-replacement-sheet">
+    <NxSheet :open="replacementDevice !== null" :title="replacementStep ? replacementCopy.confirmTitle : replacementCopy.choose"
+      :class="{ 'device-replacement-picker': !replacementStep }" @close="closeReplacementSheet">
+      <view v-if="replacementDevice && !replacementStep" class="device-replacement-sheet device-replacement-sheet--picker">
         <view class="device-replacement-lead">
           <DeviceArt class="device-replacement-lead__art" :device="replacementDevice" />
           <view class="device-replacement-lead__text"><template v-for="(part, i) in slotCopyParts(replacementCopy.lead, { new: deviceSide(replacementDevice) })" :key="i"><view v-if="part.key" class="device-replacement-name"><text class="device-replacement-name__text">{{ part.text }}</text><NxCodeValue v-if="part.code" class="device-replacement-code" :value="part.code" :label="part.text" :copyable="false" /></view><text v-else>{{ part.text }}</text></template></view>
@@ -857,6 +858,14 @@ function goStore() {
 .device-replacement-row :deep(.device-inventory-row__actions) { max-width: 100%; justify-content: flex-end; }
 /* Replacement sheet (boards S2, S4, S5): blocks 16 apart, the quiet exit last. */
 .device-replacement-sheet { display: flex; flex-direction: column; gap: 16px; }
+.device-replacement-picker :deep(.nx-sheet__body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.device-replacement-picker :deep(.nx-sheet__body:last-child::after) { flex: none; }
+.device-replacement-sheet--picker { min-height: 0; }
+.device-replacement-sheet--picker > :not(.device-replacement-list) { flex: none; }
 .device-replacement-lead { display: flex; align-items: center; gap: 8px; }
 .device-replacement-lead__art { flex: none; width: 36px; height: 36px; margin: -4px 0; }
 .device-replacement-lead__text { min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
@@ -864,7 +873,15 @@ function goStore() {
 /* A job read that failed is a status line (10.2): warning icon, body ink. */
 .device-replacement-job-note { display: flex; align-items: flex-start; gap: 8px; margin-top: -4px; color: var(--v5-ink-2); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .device-replacement-job-note > svg { flex: none; margin-top: calc((var(--ui-type-description-lh) - 16px) / 2); color: var(--v5-warning-ink); }
-.device-replacement-list { overflow: hidden; padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); }
+.device-replacement-list {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0;
+  border-radius: var(--v5-radius-m);
+  background: var(--v5-surface-2);
+}
 .device-replacement-target { display: flex; align-items: center; gap: 12px; padding: var(--ui-space-row-y) 12px var(--ui-space-row-y) 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .device-replacement-target + .device-replacement-target { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .device-replacement-target:active { background: color-mix(in srgb, var(--v5-ink) 4%, transparent); }
