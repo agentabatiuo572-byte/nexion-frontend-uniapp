@@ -42,6 +42,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const hasYield=product?.dailyEarn>0&&product.dailyEarnNEX>0;
   const available=hasYield&&product.available&&product.productType==='DEVICE'&&product.inventoryMode==='FINITE'&&product.stock>0;
   const unclaimedConfig=Object.assign(data.config,product&&previewTrialProductConfig(product));
+  // A long catalog name for the claim sheet's wrap check; the claim chain itself is unchanged.
+  if(state.trialNameState==='long')unclaimedConfig.trialProductName='UVELBox S100 Pro Max Edition 2026';
   if(state.trialStartPhaseClosed)unclaimedConfig.phaseOpen=false;
   if(!hasYield){
     unclaimedConfig.shadowDailyUSD=null;
@@ -61,6 +63,10 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(pricing==='cloud-share-half-cent')unclaimedConfig.trialOffsetCapUSD='6.34';
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')unclaimedConfig.discountCapUSD='49.999999';
+  const trialTermsVersion=available?createHash('sha256').update(JSON.stringify([
+    unclaimedConfig.trialProductId,unclaimedConfig.trialDays,product.monthlyEstimateUsdt??null,
+    unclaimedConfig.shadowDailyUSD,unclaimedConfig.shadowDailyNEX,unclaimedConfig.trialOffsetCapUSD,unclaimedConfig.trialPriceUSD,
+  ])).digest('hex'):undefined;
   const scenario=!available?'available':mode==='follow'?(state.benefitState==='finished'?'converted':state.benefitState==='grace'?'grace':state.benefitState==='claimed'?'active':'available'):mode;
   if(!state.trialRow){
     const claimConfig={...unclaimedConfig};
@@ -129,7 +135,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     const purchase=live&&usesOptions?originalPurchase():null;
     const purchaseSnapshot=purchase?.kind==='EXTERNAL'
       ? {...purchase,deadlineAt:new Date(atTrialClock(Date.parse(purchase.deadlineAt))).toISOString()} : purchase;
-    return {...data,config:live||row.state==='REDEEMED'?cfg:unclaimedConfig,state:reportedState,canStart,eligibilityReason:state.trialStartPhaseClosed?'phase-closed':eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
+    const config=live||row.state==='REDEEMED'?cfg:eligible&&trialTermsVersion?{...unclaimedConfig,trialTermsVersion}:unclaimedConfig;
+    return {...data,config,state:reportedState,canStart,eligibilityReason:state.trialStartPhaseClosed?'phase-closed':eligible&&!available?'product-unavailable':eligible&&capacityFull?'capacity-full':!canStart?(row.state==='REDEEMED'?'converted':live?'in-progress':'used'):undefined,
       claimNo:claimed?row.claimNo:null,version:row.version??0,serverNowEpochMs:trialNow,endReason:row.endReason??null,
       claimedAtEpochMs:claimed?row.startedAt:null,expiresAtEpochMs:claimed?row.startedAt+duration:null,
       graceEndsAtEpochMs:live?row.startedAt+duration+grace:null,
@@ -245,6 +252,12 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       if(current.eligibilityReason==='converted')refuse('TRIAL_ALREADY_REDEEMED');
       refuse('TRIAL_COOLDOWN_ACTIVE');
     }
+    const body=request.postDataJSON();
+    const requestedProduct=String(body.trialProductId??'').trim().toLowerCase();
+    const matchesProduct=body.trialProductId==null
+      ? typeof body.deviceName==='string'&&body.deviceName.trim()===unclaimedConfig.trialProductName
+      : (requestedProduct==='device-trial-standard'?previewDefaultTrialSku:requestedProduct)===unclaimedConfig.trialProductId;
+    if(!matchesProduct||(body.trialTermsVersion!=null&&body.trialTermsVersion!==trialTermsVersion))refuse('TRIAL_TERMS_CHANGED');
     if(mode==='claim-error'&&!state.trialStartFailed){
       state.trialStartFailed=true;
       refuse('TRIAL_QUOTA_STATE_UNAVAILABLE',null,503);

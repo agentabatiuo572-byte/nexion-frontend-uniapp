@@ -127,14 +127,16 @@ const standingReason = computed<TrialStartFailure | undefined>(() => {
   const reason = freeTrial.eligibility().reason;
   return reason === "unknown" ? undefined : reason;
 });
-const shownReason = computed<TrialStartFailure | undefined>(() => !claimErrorReason.value || claimErrorReason.value === "rejected"
+const shownReason = computed<TrialStartFailure | undefined>(() => !claimErrorReason.value
+  || claimErrorReason.value === "rejected" || claimErrorReason.value === "terms-changed"
   ? standingReason.value ?? claimErrorReason.value : claimErrorReason.value);
 const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
   "terms-required", "onboarding-required"].includes(shownReason.value ?? ""));
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
 const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
-const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
-  : claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value);
+const termsChanged = computed(() => shownReason.value === "terms-changed");
+const claimRetryable = computed(() => !termsChanged.value && (freeTrial.pendingStart ? freeTrial.startRetryable
+  : claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value));
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
   ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
 // View state only: the control that sent the claim stays in place with the busy spinner (03 §3.1 处理中锁定宽度、加载指示),
@@ -171,7 +173,8 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsCta
   : copy.value.activateCta);
-const claimErrorText = computed(() => freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
+const claimErrorText = computed(() => termsChanged.value && (!freeTrial.pendingStart || startNotRun.value) ? sheet.failureText("terms-changed")
+  : freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
   : staleRead.value ? t.value.exchange.staleSnapshot
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsRequired
@@ -191,6 +194,16 @@ async function onClaim() {
   if (shownReason.value === "terms-required") { hide(); navTo("/pages/onboarding/terms"); return; }
   // Lite has no setup step: a server setup refusal can only be resolved by support.
   if (shownReason.value === "onboarding-required") { hide(); navTo("/pages/support/messages"); return; }
+  const config = trialView.config.value;
+  if (!config) return;
+  const confirmedTerms = {
+    trialProductId: config.trialProductId,
+    trialTermsVersion: config.trialTermsVersion,
+    deviceName: trialView.deviceName.value,
+    trialDays: config.trialDays,
+    shadowDailyUSD: config.shadowDailyUSD,
+    trialOffsetCapUSD: config.trialOffsetCapUSD,
+  };
   const requestedEpoch = app.accountBindingEpoch;
   const requestedSequence = ++claimSequence;
   claimFromRetry.value = claimRetryable.value;
@@ -201,7 +214,7 @@ async function onClaim() {
   claimErrorReason.value = undefined;
   // Remote start first refreshes GET /api/trial/eligibility, then posts the
   // idempotent command and performs an authoritative readback.
-  const r = await freeTrial.start();
+  const r = await freeTrial.start(confirmedTerms);
   if (requestedSequence !== claimSequence) return;
   claiming.value = false;
   if (requestedEpoch !== app.accountBindingEpoch) return;
@@ -209,7 +222,7 @@ async function onClaim() {
   if (!r.ok) {
     if (r.reason === "read-failed" || r.reason === "confirming") return;
     claimErrorReason.value = r.reason;
-    claimError.value = true; // inline error + retry CTA, stay in the sheet
+    claimError.value = true;
     return;
   }
   claimError.value = false;

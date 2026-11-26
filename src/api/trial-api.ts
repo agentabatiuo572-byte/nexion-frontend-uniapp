@@ -197,12 +197,18 @@ export type TrialLifecycleReceipt =
   | { status: "SUCCEEDED"; claimNo: string }
   | { status: "REJECTED"; code: number; message: string };
 
+export interface TrialStartPayload {
+  deviceName: string;
+  trialProductId?: string;
+  trialTermsVersion?: string;
+}
+
 export interface TrialApi {
   state(): Promise<TrialAuthorityState>;
   purchaseOptions(): Promise<TrialPurchaseOptionsRead>;
   eligibility(): Promise<TrialAuthorityState>;
   command(kind: TrialLifecycleKind, commandKey: string): Promise<TrialLifecycleReceipt>;
-  start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
+  start(idempotencyKey: string, body: TrialStartPayload): Promise<TrialAuthorityState>;
   convert(productNo: string, expectedAmountUsdt: number | null, quoteVersion: string | null,
     idempotencyKey: string, authorization?: PaymentPasswordAuthorization): Promise<TrialConvertReceipt>;
   convertPurchase(productNo: string, expectedAmountUsdt: number, quoteVersion: string,
@@ -464,6 +470,8 @@ function trialConfig(value: unknown): Record<string, TrialConfigValue> {
   if (!source) return invalid();
   const result: Record<string, TrialConfigValue> = {};
   for (const [key, item] of Object.entries(source)) {
+    if (key === "trialProductId" && (typeof item !== "string" || !/^[A-Za-z0-9._-]{2,64}$/.test(item.trim()))) return invalid();
+    if (key === "trialTermsVersion" && (typeof item !== "string" || !/^[a-f0-9]{64}$/.test(item))) return invalid();
     const nullable = key === "trialOffsetCapUSD" || key === "shadowDailyUSD" || key === "shadowDailyNEX";
     if ((typeof item !== "string" && typeof item !== "boolean"
         && !(nullable && item === null)) || !key.trim()) return invalid();
@@ -614,10 +622,10 @@ export function createTrialApi(client: ApiClient): TrialApi {
         throw cause;
       }
     },
-    start: (idempotencyKey, deviceName) => parse({
+    start: (idempotencyKey, body) => parse({
       method: "POST",
       path: "/api/trial/start",
-      body: { deviceName },
+      body,
       idempotencyKey,
       retryAfterAuth: false,
     }),
