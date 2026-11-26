@@ -170,6 +170,12 @@ export function demoNotifications(locale, state, now, device, order) {
     { id: 905, kind: 'system', title: text('服务维护已完成', 'Maintenance complete', 'Bảo trì hoàn tất'),
       body: text('本次服务维护已完成，消息与订单查询已恢复。\n如页面仍显示维护前的内容，请返回后重新打开；尚未完成的操作请先查看当前状态再继续。', 'Maintenance is complete. Messages and order lookups are available again.\nIf a page still shows earlier information, reopen it. Check the current status of unfinished actions before continuing.', 'Bảo trì đã hoàn tất. Tin nhắn và tra cứu đơn hàng đã hoạt động lại.\nNếu trang vẫn hiển thị nội dung cũ, hãy mở lại. Kiểm tra trạng thái thao tác chưa hoàn tất trước khi tiếp tục.'),
       ctaHref: '', createdAt: at(0) },
+    // A long notice with a link and no label of its own: expands in place and shows the default 打开 action as the last
+    // card of its date group. Paged previews number their older notices from 900 down, so it stays out of those.
+    ...(state.notificationPageState === 'paginated' || state.notificationPageState === 'error' ? [] : [{ id: 900, kind: 'device',
+      title: text('本周设备运行报告', 'Weekly device report', 'Báo cáo thiết bị tuần này'),
+      body: text('本周设备运行稳定，作业和收益汇总已生成。打开后可查看每台设备的作业次数和收益明细，以实际到账为准。', 'Your devices ran steadily this week and the job and earnings summary is ready. Open it to see each device’s jobs and earnings; actual credits apply.', 'Thiết bị của bạn hoạt động ổn định trong tuần này và bản tổng hợp tác vụ, thu nhập đã sẵn sàng. Mở để xem tác vụ và thu nhập của từng thiết bị; số thực nhận là căn cứ.'),
+      ctaHref: '/earn', ctaLabel: '', createdAt: at(4) }]),
   ];
   if (state.fleetState === 'earning-credit') {
     const credits = demoEarningCredits(state).map(sample => ({
@@ -206,7 +212,7 @@ export function demoNotifications(locale, state, now, device, order) {
   }
   return rows.filter(row => !state.clearedNotificationIds?.includes(row.id)).map(row => ({
     ...row, priority: row.priority ?? (row.id === 903 ? 'high' : 'normal'),
-    ctaLabel: row.ctaHref ? text('查看详情', 'View details', 'Xem chi tiết') : '',
+    ctaLabel: row.ctaLabel ?? (row.ctaHref ? text('查看详情', 'View details', 'Xem chi tiết') : ''),
     readAt: row.readAt ?? (state.read || state.readIds?.includes(row.id) || row.id === 904 || row.id === 905 ? now : null),
   })).sort((a, b) => b.id - a.id);
 }
