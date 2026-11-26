@@ -1,99 +1,135 @@
 <template>
-  <StandalonePageShell class="est-root" :top-inset="24">
+  <StandalonePageShell class="est-root" :top-inset="4">
     <!-- #ifdef APP-PLUS -->
     <NativeGpuObserver :request="gpuRequest" @observation="gpuReader.receive" />
     <!-- #endif -->
-    <!-- Progress -->
-    <view class="est-bars">
-      <view class="est-back active:opacity-60" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" :aria-label="t.login.back" @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+    <!-- Guided header: back, the three-step track (done / current / upcoming), the step label. -->
+    <view class="ob-hd">
+      <view class="ob-back" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" :aria-label="t.login.back" :class="{ 'ob-back--off': deferBusy }" @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
+        <view class="ob-back__face nx-frosted-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+        </view>
       </view>
-      <view class="est-bar"><view class="est-bar__fill est-bar__fill--full" /></view>
-      <view class="est-bar"><view class="est-bar__fill est-bar__fill--full" /></view>
-      <view class="est-bar"><view class="est-bar__fill" /></view>
+      <view class="ob-track" role="img" :aria-label="t.onboarding.step2of3">
+        <view class="ob-track__seg ob-track__seg--done" /><view class="ob-track__seg ob-track__seg--cur" /><view class="ob-track__seg" />
+      </view>
     </view>
+    <text class="ob-eyebrow" aria-hidden="true">{{ t.onboarding.step2of3 }}</text>
+    <!-- A result state has the result head as its only title (NxResultHead); the estimate keeps the page title. -->
+    <template v-if="estimateShown">
+      <text class="ob-title" role="heading" aria-level="1">{{ t.onboarding.estimatorTitleH }}</text>
+      <text class="ob-sub">{{ t.onboarding.estimatorHint }}</text>
+    </template>
 
-    <view>
-      <text class="est-step">{{ t.onboarding.step2of3 }}</text>
-      <text class="est-title">{{ nativePhoneAvailable ? t.onboarding.estimatorTitleH : phoneActivationGuidance.title }}</text>
-      <text class="est-hint">{{ nativePhoneAvailable ? (deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDeferredHint : loadFailed ? t.onboarding.calibrationFailedTitle : (detected ? t.onboarding.estimatorHint : detectingText)) : phoneActivationGuidance.body }}</text>
-    </view>
-
-    <!-- Device reveal: loading → phone card -->
-    <view v-if="nativePhoneAvailable" class="est-reveal">
-        <view v-if="loadFailed || deferred" key="failed" class="est-loading est-loading--failed">
-          <text class="est-loading__t">{{ deferFailed ? t.onboarding.activationDeferFailedTitle : deferred ? t.onboarding.activationDefer : iosPending ? t.onboarding.phoneCalibrationPendingIosTitle : calibration?.calibrationStatus === 'PENDING_VERIFICATION' ? t.onboarding.phoneCalibrationPendingTitle : t.onboarding.calibrationFailedTitle }}</text>
-          <text v-if="loadFailed" class="est-failed__hint">{{ failureDetail }}</text>
-          <text v-if="!deferFailed" class="est-failed__hint">{{ t.onboarding.activationDeferredHint }}</text>
-          <text class="est-failed__hint">{{ t.onboarding.activationRewardGate }}</text>
-          <view class="est-failed__actions">
-            <view class="est-failed__button est-failed__button--primary" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
-              @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
-              <text>{{ deferred ? t.onboarding.calibrationStart : t.onboarding.activationRetry }}</text>
+    <view class="ob-content" :style="{ paddingBottom: barClearance + 'px' }">
+      <template v-if="estimateShown">
+        <!-- Focal card: the same five rows at fixed heights while loading, failed, pending or detected, so nothing moves. -->
+        <view class="est-hero nx-soft-glass" :class="{ 'anim-up': view === 'detected' }">
+          <view class="est-hero__art" aria-hidden="true">
+            <view class="est-hero__floor" />
+            <image class="est-hero__img" src="/static/img/home-glass-20260928/phone.webp" mode="aspectFit" />
+          </view>
+          <view class="est-hero__body">
+            <view class="est-hero__top">
+              <text class="est-hero__name">{{ t.onboarding.yourPhone }}</text>
+              <NxTag tone="success" class="est-hero__tag" :class="{ 'est-hero__tag--skel': view === 'loading' || view === 'write-pending', 'est-hero__tag--ghost': view === 'read-failed' }" :aria-hidden="view !== 'detected'">
+                <svg class="est-hero__tag-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ t.onboarding.detected }}
+              </NxTag>
             </view>
-            <view v-if="!deferFailed" class="est-failed__button" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy"
-              @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
-              <text>{{ t.onboarding.activationDefer }}</text>
-            </view>
+            <text class="est-hero__k">{{ t.bundle.estimatedDaily }}</text>
+            <template v-if="view === 'loading' || view === 'write-pending'">
+              <view class="est-amt"><view class="ob-skel" style="width: 112px; height: 32px" /></view>
+              <view class="est-amt2"><view class="ob-skel" style="width: 72px; height: 14px" /></view>
+              <view class="est-basis est-basis--status" role="status">
+                <view class="ob-spin ob-spin--s est-basis__spin" aria-hidden="true" />
+                <text class="est-basis__t">{{ view === 'write-pending' ? t.onboarding.calibrationWritePending : detectingText }}</text>
+              </view>
+            </template>
+            <template v-else-if="view === 'read-failed'">
+              <view class="est-amt est-amt--unknown" :aria-label="'— USDT' + t.onboarding.perDay"><text>—</text><text class="est-amt__u">{{ ' USDT' + t.onboarding.perDay }}</text></view>
+              <view class="est-amt2" :aria-label="'— UVT' + t.onboarding.perDay"><text>—</text><text class="est-amt2__u">{{ ' UVT' + t.onboarding.perDay }}</text></view>
+              <text class="est-basis"><text class="est-basis__v est-basis__v--unknown">—</text> {{ t.onboarding.phoneComputeUnit }}</text>
+            </template>
+            <template v-else>
+              <view class="est-amt" :aria-label="phoneUsdtLabel + ' USDT' + t.onboarding.perDay">
+                <text class="est-amt__int" aria-hidden="true">{{ phoneUsdtParts.int }}</text><text v-if="phoneUsdtParts.dec" class="est-amt__dec" aria-hidden="true">{{ phoneUsdtParts.dec }}</text><text class="est-amt__u" aria-hidden="true">{{ ' USDT' + t.onboarding.perDay }}</text>
+              </view>
+              <view class="est-amt2" :aria-label="phoneUvtLabel + ' UVT' + t.onboarding.perDay">
+                <text aria-hidden="true">{{ phoneUvtLabel }}</text><text class="est-amt2__u" aria-hidden="true">{{ ' UVT' + t.onboarding.perDay }}</text>
+              </view>
+              <text class="est-basis"><text class="est-basis__v">{{ calibration?.computeValue ?? '—' }}</text> {{ t.onboarding.phoneComputeUnit }}</text>
+            </template>
           </view>
         </view>
-        <view v-else-if="!detected" key="loading" class="est-loading">
-          <svg class="est-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-          </svg>
-          <text class="est-loading__t">{{ detectingText }}</text>
-        </view>
-        <view v-else key="reveal" class="est-phone nx-tint anim-up">
-          <view class="est-phone__badge"><NxTag tone="brand"><svg class="est-phone__badge-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ t.onboarding.detected }}</NxTag></view>
-          <view class="est-phone__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" />
-            </svg>
+
+        <!-- Device comparison: text and a ratio bar per row (no SKU identity, so no device image); unit and period once in the column head. -->
+        <template v-if="view !== 'detected' || compareRows.length">
+          <text class="est-sec">{{ t.onboarding.unlockMore }}</text>
+          <view class="est-list" :class="{ 'anim-up-delay': view === 'detected' }" :role="view === 'detected' ? 'list' : undefined">
+            <view class="est-list__head" aria-hidden="true"><text>{{ t.onboarding.colModel }}</text><text>{{ 'USDT' + t.onboarding.perDay }}</text></view>
+            <template v-if="view === 'detected'">
+              <view v-for="row in compareRows" :key="row.key" class="est-row" role="listitem" :aria-label="row.label + ', ' + row.times + ', ' + row.value + ' USDT' + t.onboarding.perDay">
+                <view class="est-row__t" aria-hidden="true">
+                  <text class="est-row__n">{{ row.label }}</text>
+                  <text class="est-row__s">{{ row.times }}</text>
+                </view>
+                <text class="est-row__v" aria-hidden="true">{{ row.value }}</text>
+                <view v-if="compareRows.length > 1" class="est-row__bar nx-progress" aria-hidden="true" :aria-valuenow="row.pct"><view class="nx-progress__fill nx-viz-grow" :style="{ width: row.pct + '%' }" /></view>
+              </view>
+            </template>
+            <template v-else>
+              <view v-for="n in 2" :key="n" class="est-row est-row--skel" aria-hidden="true">
+                <view class="est-row__t"><view class="est-row__n"><view class="ob-skel" style="width: 128px; height: 14px" /></view><view class="est-row__s"><view class="ob-skel" style="width: 96px; height: 12px" /></view></view>
+                <view class="est-row__v"><view class="ob-skel" style="width: 36px; height: 16px" /></view>
+                <view class="est-row__bar nx-progress" />
+              </view>
+            </template>
           </view>
-          <view class="est-phone__body">
-            <text class="est-phone__name">{{ t.onboarding.yourPhone }}</text>
-            <text class="est-phone__spec">{{ calibration?.computeValue }} {{ t.onboarding.phoneComputeUnit }} · {{ calibration?.tierName }}</text>
-          </view>
-          <view class="est-phone__rate">
-            <text class="est-phone__rate-v">{{ phoneRateLabel }}</text>
-            <text class="est-phone__rate-u">{{ t.onboarding.perDay }}</text>
-          </view>
-        </view>
+        </template>
+      </template>
+
+      <!-- Result states: NxResultHead is the only title. -->
+      <view v-else class="ob-rh">
+        <NxResultHead v-if="view === 'nonnative'" tone="neutral" icon="alert" :title="t.onboarding.nonNativeTitle" />
+        <NxResultHead v-else-if="view === 'deferred'" tone="neutral" icon="return" :title="t.onboarding.activationDeferredTitle" :description="t.onboarding.activationLaterBody" />
+        <NxResultHead v-else tone="warning" :icon="pendingKind ? 'clock' : 'alert'" :title="unavailableTitle" :description="unavailableBody" />
+      </view>
     </view>
 
-    <!-- Upgrade comparison -->
-    <view v-if="detected && (s1 || pro)" class="est-compare anim-up-delay">
-      <text class="est-compare__h">{{ t.onboarding.unlockMore }}</text>
-      <view v-if="s1" class="cmp">
-        <view class="cmp__icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
+    <!-- Bottom bar (04 §4.0): the shared layer picks the floating button, the status capsule or the tray from what is rendered. -->
+    <view class="ob-bar nx-glass-bar" :class="{ 'ob-bar--tray': barIsTray }">
+      <template v-if="view === 'nonnative'">
+        <view class="ob-btn ob-btn--glass nx-frosted-button" role="button" tabindex="0" data-system-chrome-primary @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator"><text>{{ t.login.back }}</text></view>
+      </template>
+      <view v-else-if="deferOutcome === 'unknown'" class="nx-tray-status" role="status"><text>{{ t.onboarding.activationDeferUnknown }}</text></view>
+      <template v-else-if="view === 'deferred'">
+        <view class="ob-tray-row">
+          <view class="ob-tray-text nx-tray-text" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" :aria-busy="deferBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+            <view v-if="deferBusy" class="ob-spin ob-spin--s" aria-hidden="true" /><text>{{ t.ui.notFoundCta }}</text>
+          </view>
+          <view class="ob-btn" :class="{ 'ob-btn--primary': !deferBusy }" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
+            <text>{{ t.onboarding.calibrationStart }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          </view>
         </view>
-        <view class="cmp__body">
-          <text class="cmp__label">{{ s1?.label ?? t.onboarding.withS1 }}</text>
-          <text class="cmp__sub">{{ multS1Label }} {{ t.onboarding.yourCurrentRate }}</text>
+      </template>
+      <template v-else-if="view === 'unavailable'">
+        <view class="ob-tray-row">
+          <view class="ob-tray-text nx-tray-text" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" :aria-busy="deferBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
+            <view v-if="deferBusy" class="ob-spin ob-spin--s" aria-hidden="true" /><text>{{ t.onboarding.iosActivateLater }}</text>
+          </view>
+          <view class="ob-btn" :class="{ 'ob-btn--primary': !deferBusy }" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
+            <text>{{ t.onboarding.iosRecalibrate }}</text>
+          </view>
         </view>
-        <text class="cmp__val">{{ s1Label }}{{ t.onboarding.perDay }}</text>
-      </view>
-      <view v-if="pro" class="cmp">
-        <view class="cmp__icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" /></svg>
+      </template>
+      <template v-else-if="view === 'read-failed'">
+        <text class="nx-tray-note">{{ t.onboarding.estimateReadFailed }}</text>
+        <view class="ob-tray-row">
+          <view class="ob-btn" role="button" tabindex="-1" aria-disabled="true"><text>{{ t.onboarding.startEarning }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view>
         </view>
-        <view class="cmp__body">
-          <text class="cmp__label">{{ pro?.label ?? t.onboarding.withPro }}</text>
-          <text class="cmp__sub">{{ proMonthlyLabel }}{{ t.onboarding.perMonth }}</text>
-        </view>
-        <text class="cmp__val">{{ proLabel }}{{ t.onboarding.perDay }}</text>
-      </view>
-    </view>
-
-    <!-- CTA -->
-    <view class="est-cta">
-      <view v-if="!nativePhoneAvailable" class="est-go est-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
-        <text class="est-go__t">{{ t.login.back }}</text>
-      </view>
-      <view v-else class="est-go" :class="{ 'est-go--on': detected, 'active:scale-[0.98]': detected }" role="button" :tabindex="detected ? 0 : -1" :aria-disabled="!detected" data-system-chrome-primary @click="goConnect" @keydown.enter.prevent="goConnect" @keydown.space.prevent="goConnect">
-        <text class="est-go__t">{{ t.onboarding.startEarning }}</text>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="detected ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+      </template>
+      <view v-else class="ob-btn" :class="{ 'ob-btn--primary': view === 'detected' }" role="button" :tabindex="view === 'detected' ? 0 : -1" :aria-disabled="view !== 'detected'" :aria-busy="view !== 'detected'" data-system-chrome-primary @click="goConnect" @keydown.enter.prevent="goConnect" @keydown.space.prevent="goConnect">
+        <view v-if="view !== 'detected'" class="ob-spin" aria-hidden="true" /><text>{{ t.onboarding.startEarning }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
     <ToastHost />
@@ -104,15 +140,15 @@
 import { toast } from "@/store/ui";
 import ToastHost from "@/components/toast-host.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
-import { formatAmount } from "@/lib/amount-display";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
+import { formatEstimate } from "@/lib/estimate-display";
 import { navReset } from "@/lib/route";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, getCurrentInstance, nextTick, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { getDeviceId } from "@/lib/device-id";
 import { hasNativeAndroidPhoneRuntime, hasNativePhoneRuntime, nativePhonePlatform } from "@/lib/native-phone-runtime";
-import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { useApp } from "@/store/app";
@@ -155,21 +191,27 @@ const loading = ref(false);
 const deferBusy = ref(false);
 const calibration = ref<OnboardingCalibration | null>(null);
 const iosPending = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION" && calibration.value.signals?.platform === "ios");
-const failureDetail = computed(() => iosPending.value
-  ? t.value.onboarding.phoneCalibrationPendingIosBody
-  : calibration.value?.calibrationStatus === "PENDING_VERIFICATION"
-  ? t.value.onboarding.phoneCalibrationPendingBody
-  : deferFailed.value ? t.value.onboarding.activationDeferFailed : t.value.onboarding.calibrationRetry);
 const comparison = (key: string) => computed(() => calibration.value?.comparisonConfig.find((item) => item.key === key) ?? null);
 const phone = comparison("phone");
 const s1 = comparison("s1");
 const pro = comparison("pro");
 const phoneRate = computed(() => calibration.value?.baseRateUsdt ?? phone.value?.dailyUsdt ?? null);
-const phoneRateLabel = computed(() => phoneRate.value === null ? "—" : `~$${formatAmount(phoneRate.value)}`);
-const s1Label = computed(() => s1.value ? `$${formatAmount(s1.value.dailyUsdt)}` : "—");
-const proLabel = computed(() => pro.value ? `$${formatAmount(pro.value.dailyUsdt)}` : "—");
-const proMonthlyLabel = computed(() => pro.value ? `~$${formatAmount(pro.value.dailyUsdt * 30)}` : "—");
-const multS1Label = computed(() => phoneRate.value && s1.value ? `${Math.round(s1.value.dailyUsdt / phoneRate.value)}×` : "—");
+const phoneUvt = computed(() => calibration.value?.baseRateNex ?? phone.value?.dailyNex ?? null);
+// Estimates show two significant figures (06 §6.2, formatEstimate); ratios and bars use the raw daily USDT.
+const phoneUsdtLabel = computed(() => phoneRate.value === null ? "—" : formatEstimate(phoneRate.value));
+const phoneUsdtParts = computed(() => { const [int, dec] = phoneUsdtLabel.value.split("."); return { int, dec: dec ? `.${dec}` : "" }; });
+const phoneUvtLabel = computed(() => phoneUvt.value === null ? "—" : formatEstimate(phoneUvt.value));
+const compareRows = computed(() => {
+  const rows = [s1.value, pro.value].filter((row): row is NonNullable<typeof row> => row !== null);
+  const max = Math.max(0, ...rows.map((row) => row.dailyUsdt));
+  return rows.map((row) => ({
+    key: row.key,
+    label: row.label,
+    value: formatEstimate(row.dailyUsdt),
+    times: phoneRate.value ? t.value.onboarding.timesPhoneDaily.replace("{n}", String(Math.round(row.dailyUsdt / phoneRate.value))) : "",
+    pct: max > 0 ? Math.round(row.dailyUsdt / max * 1000) / 10 : 0,
+  }));
+});
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let mounted = false;
@@ -182,7 +224,42 @@ const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationA
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const iosPhone = nativePhonePlatform() === "ios";
 const detectingText = computed(() => iosPhone ? t.value.onboarding.iosIdentifying : t.value.onboarding.detecting);
-const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
+
+// ── Placeholders for the logic round (report table: placeholder → meaning → board). Defaults keep today's behaviour. ──
+/** E12: the estimate read failed and the page recovers it on its own (read-only GET, no button). Until wired, a failed read
+ *  falls through to E04 with 「重新校准」 as today. */
+const estimateReadRecovering = ref(false);
+/** E13: the calibration write's outcome is unknown and is being read back; the CTA stays grey with a spinner. */
+const calibrationWritePending = ref(false);
+/** E08 / E14: how the last 「稍后激活」 ended. 'rejected' = the server refused (toast, page unchanged); 'unknown' = the result is
+ *  being read back (status capsule instead of the tray). */
+const deferOutcome = ref<"rejected" | "unknown" | null>(null);
+
+type EstimatorView = "nonnative" | "loading" | "write-pending" | "read-failed" | "detected" | "unavailable" | "deferred";
+const view = computed<EstimatorView>(() => !nativePhoneAvailable ? "nonnative"
+  : deferred.value ? "deferred"
+  : estimateReadRecovering.value ? "read-failed"
+  : loadFailed.value ? "unavailable"
+  : calibrationWritePending.value ? "write-pending"
+  : detected.value ? "detected" : "loading");
+const estimateShown = computed(() => view.value === "loading" || view.value === "write-pending" || view.value === "read-failed" || view.value === "detected");
+const pendingKind = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION" ? (iosPending.value ? "ios" : "android") : null);
+const unavailableTitle = computed(() => pendingKind.value === "ios" ? t.value.onboarding.phoneCalibrationPendingIosTitle
+  : pendingKind.value === "android" ? t.value.onboarding.phoneCalibrationPendingTitle : t.value.onboarding.calibrationFailedTitle);
+const unavailableBody = computed(() => pendingKind.value === "ios" ? t.value.onboarding.phoneCalibrationPendingIosBody
+  : pendingKind.value === "android" ? t.value.onboarding.phoneCalibrationPendingBody : t.value.onboarding.activationLaterBody);
+const barIsTray = computed(() => deferOutcome.value !== "unknown" && (view.value === "deferred" || view.value === "unavailable" || view.value === "read-failed"));
+// Content keeps clear of the bar: its measured height + 22 off the bottom + 16 (04 §4.0); the tray wraps on long languages.
+const barClearance = ref(86);
+const pageInstance = getCurrentInstance();
+function measureBar() {
+  if (!pageInstance?.proxy) return;
+  uni.createSelectorQuery().in(pageInstance.proxy).select(".ob-bar").boundingClientRect().exec((boxes: (UniApp.NodeInfo | null)[]) => {
+    const height = boxes[0]?.height;
+    if (height) barClearance.value = Math.ceil(height) + 38;
+  });
+}
+watch([view, deferOutcome, () => t.value.onboarding.iosActivateLater], () => { void nextTick(measureBar); }, { flush: "post" });
 
 function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
   return {
@@ -284,6 +361,7 @@ onLoad(() => {
 onMounted(() => {
   mounted = true;
   loadCalibration();
+  void nextTick(measureBar);
 });
 onUnmounted(() => {
   if (timer) clearTimeout(timer);
@@ -350,14 +428,14 @@ async function deferPhoneActivation() {
     if (!localPhoneStateCommitted && !remoteApiEnabled) throw new Error("PHONE_DEFER_LOCAL_COMMIT_FAILED");
     if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
 
-    toast.info(t.value.onboarding.activationDeferredToast);
+    toast.info(t.value.onboarding.activationDeferredToast, t.value.onboarding.activationDeferredToastBody);
     navReset({ url: "/pages/index/index", fail: () => {} });
   } catch {
     if (isCurrent(scope)) {
       calibration.value = null;
       deferFailed.value = true;
       loadFailed.value = true;
-      toast.info(t.value.onboarding.activationDeferFailed);
+      toast.warn(t.value.onboarding.activationDeferRejectedTitle);
     }
   } finally {
     if (isCurrent(scope)) deferBusy.value = false;
@@ -366,283 +444,86 @@ async function deferPhoneActivation() {
 </script>
 
 <style scoped>
-.est-root {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 24px 20px;
-  background: var(--v5-bg);
-  overflow-y: auto;
-}
-.est-bars {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
-  min-height: 44px;
-}
-.est-back { width: 44px; height: 44px; margin-left: -12px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 9999px; }
-.est-bar {
-  flex: 1;
-  height: 4px;
-  border-radius: 9999px;
-  background: var(--v5-surface);
-  overflow: hidden;
-}
-.est-bar__fill {
-  height: 100%;
-  width: 0;
-  background: var(--v5-brand);
-  transition: width 0.5s;
-}
-.est-bar__fill--full {
-  width: 100%;
-}
-.est-step {
-  display: block;
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--v5-brand);
-}
-.est-title {
-  display: block;
-  font-family: var(--font-v5);
-  margin-top: 4px;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--v5-ink);
-}
-.est-hint {
-  display: block;
-  margin-top: 4px;
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-3);
-}
-.est-reveal {
-  margin-top: 20px;
-}
-.est-loading {
-  height: 88px;
-  background: var(--v5-surface);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-.est-spin {
-  animation: est-spin 0.9s linear infinite;
-}
-@keyframes est-spin {
-  to { transform: rotate(360deg); }
-}
-.est-loading__t {
-  font-size: var(--ui-type-list-subtitle);
-  color: var(--v5-ink-3);
-}
-.est-loading--failed {
-  height: auto;
-  min-height: 150px;
-  padding: 16px;
-  flex-direction: column;
-  align-items: stretch;
-}
-.est-failed__hint {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--v5-ink-3);
-}
-.est-failed__actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-}
-.est-failed__button {
-  flex: 1;
-  min-height: 42px;
-  border: 1px solid var(--v5-line);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--v5-ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-.est-failed__button--primary {
-  border-color: var(--v5-brand);
-  background: var(--v5-brand);
-  color: var(--v5-on-brand);
-}
-/* Detected phone: its original brand hue as a tinted solid (01 §1.1.2) with the success halo. */
-.est-phone {
-  --nx-tint: var(--v5-brand);
-  position: relative;
-  border-radius: 12px;
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: var(--ui-glass-edge-shadow), 0 0 24px -4px color-mix(in srgb, var(--v5-brand) 35%, transparent);
-}
-/* The shared brand tag (03 §3.8) sits on the card's top edge; the page colour under it keeps its translucent dark fill even across the edge. */
-.est-phone__badge {
-  position: absolute;
-  top: -12px;
-  right: 12px;
-  border-radius: 999px;
-  background: var(--v5-bg);
-}
-.est-phone__badge-icon {
-  flex: none;
-  margin-right: 4px;
-}
-.est-phone__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--v5-brand) 25%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--v5-brand) 40%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.est-phone__body {
-  flex: 1;
-  min-width: 0;
-}
-.est-phone__name {
-  display: block;
-  font-size: var(--ui-type-subheading);
-  font-weight: var(--ui-type-subheading-weight);
-  color: var(--v5-ink);
-  overflow-wrap: break-word;
-}
-.est-phone__spec {
-  display: block;
-  font-size: 12px;
-  color: color-mix(in oklab, var(--v5-brand) 90%, transparent);
-  margin-top: 2px;
-  overflow-wrap: break-word;
-}
-.est-phone__rate {
-  text-align: right;
-  flex-shrink: 0;
-}
-.est-phone__rate-v {
-  display: block;
-  font-family: var(--font-metric);
-  font-variant-numeric: tabular-nums;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--v5-brand);
-}
-.est-phone__rate-u {
-  display: block;
-  font-size: 12px;
-  color: var(--v5-ink-4);
-}
-.est-compare {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.est-compare__h {
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--v5-ink-3);
-  padding: 0 4px;
-}
-.cmp {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 12px;
-  padding: 12px 16px;
-  background: var(--v5-surface);
-}
-.cmp__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  /* 原 --v5-surface 与外层 .cmp 同色 → 图标框隐形(双主题)。surface-3 = 内凹 inset 语义。 */
-  background: var(--v5-surface-3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.cmp__body {
-  flex: 1;
-  min-width: 0;
-}
-.cmp__label {
-  display: block;
-  font-size: var(--ui-type-list-subtitle);
-  font-weight: 500;
-  color: var(--v5-ink);
-}
-.cmp__sub {
-  display: block;
-  font-size: 12px;
-  color: var(--v5-ink-3);
-  margin-top: 2px;
-}
-.cmp__val {
-  font-family: var(--font-metric);
-  font-size: 20px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--v5-ink);
-}
-.est-cta {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-  margin-top: auto;
-  padding-top: 24px;
-  margin-right: 4px;
-  margin-left: 4px;
-  background: var(--v5-bg);
-}
-.est-go {
-  width: 100%;
-  height: 48px;
-  border-radius: 9999px;
-  background: var(--v5-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: transform 0.15s ease, background 0.3s ease;
-}
-.est-go--on {
-  background: var(--v5-brand);
-}
-.est-go__t {
-  font-size: var(--ui-type-button);
-  font-weight: var(--ui-type-button-weight);
-  color: var(--v5-ink-4);
-}
-.est-go--on .est-go__t {
-  color: var(--v5-on-brand);
-}
+.est-root { position: fixed; inset: 0; display: flex; flex-direction: column; padding-right: 16px; padding-left: 16px; background: var(--v5-bg); overflow-x: hidden; overflow-y: auto; }
 
-/* entrance */
-.anim-up {
-  animation: est-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.anim-up-delay {
-  animation: est-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
-}
-@keyframes est-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* Shared onboarding chrome (boards-onboarding; 03 §3.1, 04 §4.0, 10 §10.1). */
+.ob-hd { display: flex; align-items: center; gap: 10px; height: 44px; flex: none; }
+.ob-back { position: relative; width: 44px; height: 44px; margin-left: -2px; display: grid; place-items: center; flex: none; color: var(--v5-ink); }
+.ob-back__face { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; }
+.ob-back--off { opacity: .5; }
+.ob-track { flex: 1; display: flex; gap: 6px; padding-right: 4px; }
+/* Step track: done = brand, current = brand 40%, upcoming = ink 8%; one shape, three tones. */
+.ob-track__seg { flex: 1; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.ob-track__seg--done { background: var(--v5-brand); }
+.ob-track__seg--cur { background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
+.ob-eyebrow { display: block; margin-top: 16px; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-brand); white-space: nowrap; }
+.ob-title { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); letter-spacing: -.02em; color: var(--v5-ink); }
+:lang(zh) .ob-title { letter-spacing: 0; }
+.ob-sub { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.ob-content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 20px; }
+.ob-rh { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px 24px; }
+.ob-skel { display: inline-block; vertical-align: middle; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
+.ob-spin { flex: none; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: ob-spin .8s linear infinite; }
+.ob-spin--s { width: 14px; height: 14px; border-width: 1.8px; }
+@keyframes ob-spin { to { transform: rotate(360deg); } }
+/* Bottom bar: position here; material, disabled grey glass and tray text come from the shared .nx-glass-bar layer. */
+.ob-bar { position: fixed; z-index: 30; display: flex; flex-direction: column; }
+.ob-tray-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 8px; }
+.nx-tray-note + .ob-tray-row { margin-top: 8px; }
+.ob-tray-row .ob-btn { flex: 1 0 auto; }
+.ob-btn { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; color: var(--ui-tray-disabled-ink); }
+.ob-btn :deep(svg), .ob-tray-text :deep(svg) { flex: none; }
+.ob-btn--primary { background: var(--v5-brand); color: var(--v5-on-brand); }
+.ob-btn--primary:active { transform: scale(.98); }
+.ob-btn--glass { color: var(--v5-ink); }
+.ob-tray-text { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; flex: none; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+/* The busy secondary keeps full ink (03 §3.1 tray busy); the shared layer greys the disabled view itself, so set it on the children. */
+.ob-tray-text[aria-busy="true"] > * { color: var(--v5-ink); }
+.ob-btn :deep(text), .ob-tray-text :deep(text), .ob-btn :deep(uni-text), .ob-tray-text :deep(uni-text) { white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } .ob-btn--primary:active { transform: none; } }
+
+/* Focal card (01 §1.1.2 soft glass, no blur): phone art left, five fixed-height rows right. */
+.est-hero { position: relative; flex: none; display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: var(--ui-radius-surface, 22px); overflow: hidden; }
+.est-hero__art { position: relative; flex: none; width: 92px; height: 104px; }
+.est-hero__img { position: absolute; left: -25%; top: -22%; width: 150%; height: 150%; object-fit: contain; z-index: 1; }
+.est-hero__floor { position: absolute; left: -10px; right: -10px; bottom: -4px; height: 30px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-tech-cyan) 30%, transparent), transparent); }
+[data-theme="light"] .est-hero__floor { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent), transparent); }
+.est-hero__body { flex: 1; min-width: 0; }
+.est-hero__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
+.est-hero__name { flex: 0 1 auto; min-width: 0; font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.est-hero__tag-icon { flex: none; margin-right: 4px; }
+.est-hero__tag--skel { background: color-mix(in srgb, var(--v5-ink) 9%, transparent); color: transparent; }
+.est-hero__tag--skel .est-hero__tag-icon, .est-hero__tag--ghost { visibility: hidden; }
+.est-hero__k { display: block; margin-top: 12px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+/* Main amount (01 §1.2, 10.2 弹层主金额 size): Montserrat 500, integer brand (the card's one key figure), decimals and unit ink-3. */
+.est-amt { display: flex; align-items: baseline; height: var(--ui-type-wallet-amount-lh); margin-top: 4px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; color: var(--v5-brand); white-space: nowrap; }
+.est-amt__dec { color: var(--v5-ink-3); }
+.est-amt__u { font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); white-space: pre; }
+.est-amt--unknown { color: var(--v5-ink-3); }
+.est-amt2 { display: flex; align-items: baseline; height: var(--ui-type-subheading-lh); margin-top: 2px; font: 500 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-amount); color: var(--v5-ink-3); white-space: nowrap; }
+.est-amt2__u { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: pre; }
+.est-basis { display: block; height: var(--ui-type-description-lh); margin-top: 4px; white-space: nowrap; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.est-basis__v { font-weight: 500; color: var(--v5-ink); }
+.est-basis__v--unknown { color: var(--v5-ink-3); }
+.est-basis--status { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-2); }
+.est-basis__spin { color: var(--v5-brand); }
+/* Comparison: section title, one solid card, column head written once. */
+.est-sec { display: block; margin-top: var(--ui-space-section-gap); font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
+.est-list { flex: none; margin-top: 12px; padding: 0 16px; border-radius: var(--ui-radius-surface, 22px); background: var(--v5-surface); }
+[data-theme="light"] .est-list { box-shadow: var(--v5-glass-shadow); }
+.est-list__head { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; font: var(--ui-type-meta-weight, 400) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+.est-row { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 10px; align-items: center; padding: 14px 0; }
+.est-list__head + .est-row { padding-top: 8px; }
+.est-row + .est-row { border-top: 1px solid var(--v5-border); }
+.est-row__t { min-width: 0; }
+.est-row__n { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
+.est-row__s { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight, 400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.est-row--skel .est-row__n, .est-row--skel .est-row__s, .est-row--skel .est-row__v { white-space: nowrap; }
+.est-row__v { justify-self: end; align-self: start; font: var(--ui-type-card-figure-weight, 500) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; color: var(--v5-ink); white-space: nowrap; }
+.est-row__bar { grid-column: 1 / 3; margin: 1px 0; --nx-progress-hue: var(--v5-tech-cyan); }
+/* entrance, once */
+.anim-up { animation: est-up .32s cubic-bezier(.16, 1, .3, 1) both; }
+.anim-up-delay { animation: est-up .32s cubic-bezier(.16, 1, .3, 1) .15s both; }
+@keyframes est-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .anim-up, .anim-up-delay { animation: none; } }
 </style>
