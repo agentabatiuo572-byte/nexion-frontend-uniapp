@@ -79,7 +79,7 @@
         <CheckoutPaying v-if="originalExternalPaying && createdCheckoutOrder && (step === 'select-payment' || step === 'confirm')" class="checkout-paying-card" :order-no="createdCheckoutOrder.orderNo" @view="navTo('/pages/store/order-detail?id=' + encodeURIComponent(createdCheckoutOrder.orderNo))" />
         <view v-if="step === 'select-payment' || step === 'confirm'" class="checkout-product checkout-group">
           <view class="checkout-product-art"><image v-if="checkoutImage" :src="checkoutImage" mode="aspectFit" aria-hidden="true" @error="checkoutImageError" /></view>
-          <view class="checkout-product-copy"><text class="checkout-product-name">{{ trialOriginal?.device.productName ?? product?.name }}</text><text v-if="checkoutTagline && (!trialOriginal || trialOriginal.kind === 'EXTERNAL')" class="checkout-product-meta">{{ checkoutTagline }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--price" aria-hidden="true" /><CheckoutAmount v-else class="checkout-product-price" :value="shownPurchaseSubtotal" currency="USD" /><view v-if="multiTrialCheckout && !trialOriginalLocked && (trialReviewStatus !== 'terminal' || freeTrial.conversionWindowOpen)" class="checkout-change-device" role="link" tabindex="0" @click="changeTrialDevice" @keydown.enter.prevent="changeTrialDevice"><text class="nx-after-chevron">{{ purchaseCopy.coChangeDevice }}</text></view></view>
+          <view class="checkout-product-copy"><text class="checkout-product-name">{{ originalTrialBreakdown?.productName ?? trialOriginal?.device.productName ?? product?.name }}</text><text v-if="checkoutTagline && (!trialOriginal || trialOriginal.kind === 'EXTERNAL')" class="checkout-product-meta">{{ checkoutTagline }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--price" aria-hidden="true" /><CheckoutAmount v-else class="checkout-product-price" :value="shownPurchaseSubtotal" currency="USD" /><view v-if="multiTrialCheckout && !trialOriginalLocked && (trialReviewStatus !== 'terminal' || freeTrial.conversionWindowOpen)" class="checkout-change-device" role="link" tabindex="0" @click="changeTrialDevice" @keydown.enter.prevent="changeTrialDevice"><text class="nx-after-chevron">{{ purchaseCopy.coChangeDevice }}</text></view></view>
           <view class="checkout-quantity"><text class="checkout-product-meta">{{ t.store.coRowQuantity }}</text><text v-if="multiTrialCheckout" class="checkout-quantity-value">{{ trialShare ? checkoutQuantityLabel : fmt(purchaseCopy.coQtyDevice, { n: 1 }) }}</text><view v-else class="checkout-quantity-controls">
             <button class="checkout-quantity-button" disabled :aria-label="t.uiChrome.decreaseQty"><NxIcon name="minus" :size="20" /></button>
             <text class="checkout-quantity-value" aria-live="polite">{{ checkoutQuantityLabel }}</text>
@@ -444,7 +444,8 @@ import { paidOrderReceipt } from "@/api/order-api";
 import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt, trialPriceChanged as trialPriceRefused, type TrialAuthorityState, type TrialConversionQuote, type TrialOriginalPurchase, type TrialPurchaseOption } from "@/api/trial-api";
 import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
-import { trialDiscountDisplay } from "@/lib/trial-discount-display";
+import type { PurchasePaymentIntent } from "@/api/purchase-payment-api";
+import { formatTrialDiscountCap, hasTrialDiscountTerms, trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
 import { landingCopy } from "@/i18n/promotion-landing";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
 import { beginOrderAction, clearOrderAction, markOrderActionPaid, readOrderAction } from "@/lib/order-command-fence";
@@ -765,6 +766,7 @@ function invalidateCheckoutRoute(keepOrdinaryInitialization = false): void {
   checkoutRouteFence.invalidate();
   legacyTrialResultOwner.value = null;
   trialPaymentState.value = null;
+  trialPaymentSnapshot.value = null;
   activeCheckoutLoad = null;
   serverOrderRecovery.value = null;
   if (!keepOrdinaryInitialization) ordinaryCheckoutInitialized.value = false;
@@ -1085,6 +1087,7 @@ const product = computed<Product | undefined>(() => !productId.value || (remoteA
     ? productCatalogPresentation.value?.products.find((entry) => entry.id === productId.value)
     : getProduct(productId.value));
 const checkoutTagline = computed(() => {
+  if (originalTrialBreakdown.value) return originalTrialBreakdown.value.productSubtitle ?? "";
   const listing = product.value;
   if (!listing || (trialOriginal.value && trialOriginal.value.device.productNo !== listing.id)) return "";
   return remoteApiEnabled ? serverTagline(t.value, listing, locale.code) : listing.tagline;
@@ -1140,10 +1143,11 @@ type TrialReviewStatus = "ordinary" | "loading" | "failed" | "legacy" | "ready" 
 const trialReviewStatus = ref<TrialReviewStatus>("ordinary");
 const trialReviewOption = shallowRef<TrialPurchaseOption | null>(null);
 const trialReviewClaimNo = ref<string | null>(null);
-const trialQuoteChange = shallowRef<{ previousAmountUSD: number; quote: TrialConversionQuote } | null>(null);
+const trialQuoteChange = shallowRef<{ previousAmountUSD: number; quote: TrialConversionQuote; historicalTerms?: boolean } | null>(null);
 const trialServerShortfall = ref(false);
 const trialExternalWalletOnly = ref(false);
 const trialPaymentState = shallowRef<TrialAuthorityState | null>(null);
+const trialPaymentSnapshot = shallowRef<PurchasePaymentIntent | null>(null);
 const legacyTrialResultOwner = shallowRef<{ scope: CheckoutRouteScope; claimNo: string; key: string } | null>(null);
 const routedTrialRefusal = shallowRef<Extract<Awaited<ReturnType<typeof trialCheckout.readRoutedResult>>, { status: "refused" }> | null>(null);
 function clearTrialReviewQuote() {
@@ -1158,6 +1162,7 @@ watch(() => app.accountBindingEpoch, () => {
   trialServerShortfall.value = false;
   trialExternalWalletOnly.value = false;
   trialPaymentState.value = null;
+  trialPaymentSnapshot.value = null;
   legacyTrialResultOwner.value = null;
   trialTopupWalletReady.value = false;
   handledTrialRefusalNo = undefined;
@@ -1195,10 +1200,20 @@ const trialOriginal = computed<TrialOriginalPurchase | null>(() => {
     ? trialCheckout.originalPurchase ?? state.originalPurchase : state.originalPurchase;
   return "submission" in state ? { ...state.submission, status: state.status === "resumable" ? "RESUMABLE" : "PROCESSING" } : null;
 });
+const originalTrialSnapshot = computed(() => {
+  const original = trialOriginal.value;
+  const snapshot = trialPaymentSnapshot.value;
+  if (original?.kind === "EXTERNAL" && snapshot?.intentNo === original.paymentNo
+      && snapshot.claimNo === original.claimNo && original.device.productNo === productId.value) return snapshot;
+});
+const originalTrialBreakdown = computed(() => {
+  const breakdown = originalTrialSnapshot.value?.trialPurchaseBreakdown;
+  if (breakdown?.productNo === productId.value) return breakdown;
+});
 const scopedTrialReviewQuote = computed(() => {
   const option = trialReviewOption.value;
-  if (!option || option.productNo !== productId.value || trialReviewClaimNo.value !== trialCheckout.authority?.claimNo) return;
-  return trialQuoteChange.value?.quote ?? option.quote;
+  if (trialReviewClaimNo.value !== trialCheckout.authority?.claimNo) return;
+  return trialQuoteChange.value?.quote ?? (option?.productNo === productId.value ? option.quote : undefined);
 });
 const trialReviewQuote = computed(() => trialReviewStatus.value === "ready" && !trialOriginalLocked.value
   ? scopedTrialReviewQuote.value : undefined);
@@ -1248,6 +1263,7 @@ async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: Tria
     // External trial payments are limited to the original trial SKU on the server.
     if (!intent || resolveTrialCheckoutProductId(state.config.trialProductId) !== scope.productNo)
       return leaveTrialReview(null);
+    trialPaymentSnapshot.value = intent;
     if (intent.status === "DELIVERED" || intent.fulfilmentStatus === "DELIVERED") {
       const receipt = parseTrialConvertReceipt(intent.receipt);
       if (receipt.productNo !== scope.productNo || (receipt.claimNo && receipt.claimNo !== claimNo)) return leaveTrialReview(null);
@@ -1283,6 +1299,12 @@ async function recoverRoutedTrialPurchase(scope: CheckoutRouteScope, state: Tria
   routedTrialRefusal.value = result;
   trialRefusalNo = key;
   trialResumeNo = undefined;
+  const quote = result.refusal.quote;
+  if (!scopedTrialReviewQuote.value && quote && trialPriceRefused(result.refusal.reasonCode)) {
+    trialReviewClaimNo.value = claimNo;
+    trialQuoteChange.value = { previousAmountUSD: result.confirmedAmountUSD ?? quote.amountUSD, quote,
+      historicalTerms: !hasTrialDiscountTerms(quote) };
+  }
   return false;
 }
 
@@ -1337,7 +1359,14 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
       trialReviewStatus.value = "legacy";
       return false;
     }
-    if (trialOriginalLocked.value) return true;
+    if (trialOriginalLocked.value) {
+      const original = trialOriginal.value;
+      if (original?.kind === "EXTERNAL" && original.device.productNo === scope.productNo && !originalTrialSnapshot.value) {
+        const snapshot = await readTrialPurchasePayment(original.paymentNo, original.claimNo);
+        if (isCurrentCheckoutRoute(scope)) trialPaymentSnapshot.value = snapshot;
+      }
+      return true;
+    }
     if (!scope.productNo || !state.claimNo || !trialsCanConvert(state.status)) {
       leaveTrialReview(null);
       return true;
@@ -1372,7 +1401,7 @@ async function refreshMultiTrialReview(scope: CheckoutRouteScope, quiet = false,
     }
     trialReviewClaimNo.value = state.claimNo;
     trialReviewOption.value = option;
-    if (trialQuoteChange.value) trialQuoteChange.value = { ...trialQuoteChange.value, quote: option.quote };
+    if (trialQuoteChange.value) trialQuoteChange.value = { previousAmountUSD: trialQuoteChange.value.previousAmountUSD, quote: option.quote };
     trialReviewStatus.value = "ready";
     const outcome = activeTrialOutcome.value;
     if (trialRefusalNo && outcome?.status === "refused" && outcome.submissionNo === trialRefusalNo) {
@@ -2131,24 +2160,35 @@ const trialBalanceShortfallBelowCent = computed(() => trialBalanceShortfallUSD.v
 const trialNeedsTopup = computed(() => trialWalletOnly.value && (exactTrialDue.value ?? 0) > 0
   && ((trialBalanceShortfallUSD.value ?? 0) > 0 || trialServerShortfall.value));
 watch(() => app.user.usdtBalance, () => { trialServerShortfall.value = false; });
+const originalTrialPrincipal = computed(() => {
+  const original = trialOriginal.value;
+  if (original?.kind !== "EXTERNAL") return;
+  const businessAmount = originalTrialSnapshot.value?.businessAmountUsdt;
+  return originalTrialBreakdown.value?.amountUSD ?? (businessAmount === undefined ? original.amountUSD : Number(businessAmount));
+});
 const originalTrialPaymentQuote = computed(() => {
   const original = trialOriginal.value;
   const state = trialPaymentState.value;
   // Only this checkout's trial-state read can support the original payment's breakdown.
-  if (original?.kind === "EXTERNAL" && state?.claimNo === original.claimNo
+  if (original?.kind === "EXTERNAL" && originalTrialSnapshot.value && !originalTrialSnapshot.value.trialPurchaseBreakdown
+      && state?.claimNo === original.claimNo
       && resolveTrialCheckoutProductId(state.config.trialProductId) === original.device.productNo
-      && state.quote?.amountUSD === original.confirmedAmountUSD) return state.quote;
+      && state.quote?.amountUSD === originalTrialPrincipal.value) return state.quote;
 });
-const shownPurchaseSubtotal = computed(() => trialUnavailablePrice.value
-  ? (originalTrialPaymentQuote.value ?? retainedTrialReviewQuote.value)?.priceUSD ?? null : purchaseSubtotal.value);
-const shownConfirmationTotal = computed(() => legacyTrialResume.value?.amount ?? trialOriginal.value?.confirmedAmountUSD
-  ?? (trialUnavailablePrice.value ? retainedTrialReviewQuote.value?.amountUSD ?? null : confirmationTotal.value));
+const shownTrialQuote = computed(() => trialReviewQuote.value ?? originalTrialPaymentQuote.value ?? retainedTrialReviewQuote.value);
+const shownPurchaseSubtotal = computed(() => originalTrialBreakdown.value?.priceUSD
+  ?? (trialUnavailablePrice.value ? shownTrialQuote.value?.priceUSD ?? null : purchaseSubtotal.value));
+const shownConfirmationTotal = computed(() => trialOriginal.value?.kind === "EXTERNAL" ? originalTrialPrincipal.value ?? null
+  : legacyTrialResume.value?.amount ?? trialOriginal.value?.confirmedAmountUSD
+    ?? (trialUnavailablePrice.value ? retainedTrialReviewQuote.value?.amountUSD ?? null : confirmationTotal.value));
 const shownTrialDueBelowCent = computed(() => !trialOriginal.value && !legacyTrialResume.value
   && trialDueBelowCent(exactTrialDue.value ?? retainedTrialReviewQuote.value?.amountUSD));
 const shownTrialDiscounts = computed(() => {
+  const frozen = originalTrialBreakdown.value;
+  if (frozen) return trialDiscountDisplay(frozen);
   if (trialOriginal.value?.kind === "EXTERNAL" && !originalTrialPaymentQuote.value)
     return { promo: null, offset: null, early: null };
-  const quote = trialReviewQuote.value ?? originalTrialPaymentQuote.value ?? retainedTrialReviewQuote.value;
+  const quote = shownTrialQuote.value;
   if (!quote) return { promo: promoDiscount.value, offset: trialOffsetView.value.offsetUSD, early: trialOffsetView.value.earlyDiscountUSD };
   return trialDiscountDisplay(quote);
 });
@@ -2217,10 +2257,15 @@ const trialQuotePending = computed(() => multiTrialCheckout.value && !trialOrigi
   && (trialReviewStatus.value === "loading" || trialReviewStatus.value === "failed"));
 const trialQuoteLoading = computed(() => trialQuotePending.value && trialReviewStatus.value === "loading");
 const trialPromoRowLabel = computed(() => {
-  const pct = formatTrialDiscountPercent(trialCfg.value.discountRate);
-  const cap = trialCfg.value.discountCapUSD;
+  const original = trialOriginal.value;
+  const frozen = originalTrialBreakdown.value;
+  if ((original?.kind === "EXTERNAL" && !hasTrialDiscountTerms(frozen)) || trialQuoteChange.value?.historicalTerms)
+    return purchaseCopy.value.coPromoShort;
+  const quote = multiTrialCheckout.value ? shownTrialQuote.value : freeTrial.authoritativeQuote;
+  const { discountRate, discountCapUSD: cap } = trialDiscountTerms(frozen ?? quote, trialCfg.value);
+  const pct = formatTrialDiscountPercent(discountRate);
   if (cap === null) return fmt(trialDetailCopy.value.promoRowNoCap, { pct });
-  return fmt(trialDetailCopy.value.promoRow, { pct, cap: Number.isInteger(cap) ? `$${cap}` : `$${formatAmount(cap)}` });
+  return fmt(trialDetailCopy.value.promoRow, { pct, cap: formatTrialDiscountCap(cap) });
 });
 const trialWalletRowNote = computed(() => {
   if (trialZeroDue.value) return purchaseCopy.value.coZeroPayNote;
@@ -2468,7 +2513,10 @@ function applyTrialCheckoutOutcome(scope: CheckoutRouteScope, reviewAlreadyRead 
   }
   handledTrialRefusalNo = state.submissionNo;
   if (trialPriceRefused(reasonCode) && quote) {
-    trialQuoteChange.value = { previousAmountUSD: state.confirmedAmountUSD ?? quote.amountUSD, quote };
+    const historicalTerms = state.recovered && !hasTrialDiscountTerms(quote);
+    const liveQuote = reviewAlreadyRead ? trialReviewOption.value?.quote : undefined;
+    trialQuoteChange.value = { previousAmountUSD: state.confirmedAmountUSD ?? quote.amountUSD,
+      quote: liveQuote ?? quote, historicalTerms: historicalTerms && !liveQuote };
     if (!trialReviewQuote.value) toast.warn(t.value.store.coTrialQuoteChanged);
     trialResults.consume(resultKey);
     return;
@@ -4000,7 +4048,8 @@ watch(() => trialCheckout.authority, state => {
     void refreshMultiTrialReview(captureCheckoutRoute(), true, true);
 });
 useAutoRecovery({
-  failed: () => multiTrialCheckout.value && trialReviewStatus.value === "failed" && !trialOriginalLocked.value
+  failed: () => multiTrialCheckout.value && trialReviewStatus.value === "failed"
+    && (!trialOriginalLocked.value || trialOriginal.value?.kind === "EXTERNAL" && !originalTrialSnapshot.value)
     && !paymentFlowBusy.value && isTopCheckoutPage(),
   retry: () => refreshMultiTrialReview(captureCheckoutRoute()),
   repeatMs: 30_000,

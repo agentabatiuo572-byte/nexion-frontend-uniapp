@@ -22,7 +22,7 @@ type ConfirmedSubmission = Submission & { confirmedAmountUSD: number; quoteVersi
 
 type RefusedTrialCheckout = {
   status: "refused"; claimNo: string; submissionNo: string; productNo: string;
-  confirmedAmountUSD: number | null; refusal: TrialRefusal; legacyRefusal?: boolean;
+  confirmedAmountUSD: number | null; refusal: TrialRefusal; legacyRefusal?: boolean; recovered?: boolean;
 };
 type TrialCheckoutOutcome =
   | { status: "idle" | "storage-error" }
@@ -132,7 +132,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     }
   }
 
-  function finish(submission: SubmissionResultTarget, result: TrialPurchaseConvertResult) {
+  function finish(submission: SubmissionResultTarget, result: TrialPurchaseConvertResult, recovered = false) {
     if (result.status === "settled") {
       if (result.receipt.productNo !== submission.device.productNo || (result.receipt.claimNo && result.receipt.claimNo !== submission.claimNo))
         throw new Error("TRIAL_SUBMISSION_MISMATCH");
@@ -151,7 +151,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     } else {
       outcome.value = {
         status: "refused", claimNo: submission.claimNo, submissionNo: submission.submissionNo, productNo: submission.device.productNo,
-        confirmedAmountUSD: submission.confirmedAmountUSD, refusal: result,
+        confirmedAmountUSD: submission.confirmedAmountUSD, refusal: result, recovered,
       };
       useTrialPurchaseResult().publish({ status: "refused", claimNo: submission.claimNo, key: submission.submissionNo, reason: result.reasonCode });
     }
@@ -272,7 +272,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     const original = useFreeTrial().pendingConversion(productNo);
     if (!(reply.productNo || result.productNo) && original?.key !== submissionNo) return;
     return { status: "refused", claimNo, submissionNo, productNo, confirmedAmountUSD: null,
-      refusal: result, legacyRefusal: !reply.claimNo && !receiptClaim };
+      refusal: result, legacyRefusal: !reply.claimNo && !receiptClaim, recovered: true };
   }
 
   function readSubmission(): Promise<void> {
@@ -286,7 +286,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
           || (reply.claimNo && reply.claimNo !== submission.claimNo) || (reply.productNo && reply.productNo !== submission.device.productNo)
           || (reply.paymentMethod && reply.paymentMethod !== "WALLET")) return;
       const result = terminalResult(reply);
-      if (result) finish(submission, result);
+      if (result) finish(submission, result, true);
       else if (reply.canResumeSameKey && (reply.status === "PROCESSING" || reply.status === "NOT_SEEN")) {
         const trial = useFreeTrial();
         if (!await trial.refreshRemote() || !current() || workingSubmission.value?.submissionNo !== submission.submissionNo) return;
@@ -323,7 +323,7 @@ export const useTrialCheckout = defineStore("trial-checkout", () => {
     if (authority.value?.claimNo !== claimNo || "submission" in current
         || current.status === "original" || current.status === "settled") return;
     outcome.value = { status: "refused", claimNo, productNo, submissionNo: commandKey, confirmedAmountUSD: amount,
-      refusal };
+      refusal, recovered: true };
   }
 
   function clearSettled(orderNo: string) {

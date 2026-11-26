@@ -149,13 +149,13 @@ export const useTrialConfig = defineStore("trialConfig", () => {
     const shadowDailyNEX = raw.shadowDailyNEX === null ? null : number("shadowDailyNEX");
     const trialProductId = typeof raw.trialProductId === "string" ? raw.trialProductId.trim() : "";
     const trialProductName = resolveTrialDeviceName(trialProductId, raw.trialProductName);
-    if (discountRate > 100 || !trialProductName) {
+    if (discountRate > 1 || !trialProductName) {
       throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
     }
     config.value = {
       trialDays: integer("trialDays", 1),
       graceDays: integer("graceDays"),
-      discountRate: discountRate > 1 ? discountRate / 100 : discountRate,
+      discountRate,
       discountCapUSD: cap("discountCapUSD"),
       trialOffsetCapUSD: cap("trialOffsetCapUSD"),
       trialProductId,

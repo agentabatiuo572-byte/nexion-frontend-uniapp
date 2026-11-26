@@ -3,7 +3,7 @@ import { ApiError, isApiRefusal } from './errors';
 import { validateHostedPaymentUrl } from '@/lib/hosted-payment';
 import { isTronAddressValid } from '@/lib/tron-address';
 import { ORDER_STATUSES, type CanonicalOrderStatus } from './order-api';
-import { parseTrialChangedQuote, parseTrialOriginalPurchase, TRIAL_DEVICE_RESELECTION_CODES, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
+import { parseTrialChangedQuote, parseTrialDiscountTerms, parseTrialOriginalPurchase, TRIAL_DEVICE_RESELECTION_CODES, TRIAL_PRICE_CHANGES, trialPriceChanged, type TrialConversionQuote, type TrialOriginalPurchase } from './trial-api';
 
 export const purchaseKinds = ['ORDER_PAY', 'TRIAL_CONVERT', 'TRADE_IN', 'CAPACITY_REPLACE', 'CAPACITY_KEEP'] as const;
 export type PurchaseKind = typeof purchaseKinds[number];
@@ -29,6 +29,10 @@ export type PurchaseQuote = {
 export const purchasePaymentStatuses = ['CREATING', 'SUBMIT_UNKNOWN', 'AWAITING_PAYMENT', 'FUNDS_CONFIRMED', 'DELIVERED', 'MANUAL_REVIEW', 'EXPIRED'] as const;
 export type PurchasePaymentStatus = typeof purchasePaymentStatuses[number];
 export type TrialPurchaseOutcome = 'UNPAID_TERMINAL' | 'LATE_PAYMENT_REVIEW';
+type TrialPurchaseBreakdown = {
+  productNo: string; productName: string; productSubtitle?: string;
+  priceUSD: number; promoDiscountUSD: number; offsetUSD: number; earlyDiscountUSD: number; amountUSD: number;
+} & Partial<Pick<TrialConversionQuote, 'discountRate' | 'discountCapUSD' | 'earlyDiscountConfiguredUSD'>>;
 const trialOriginalCodes = ['TRIAL_BALANCE_SUBMISSION_IN_PROGRESS', 'PURCHASE_PAYMENT_EXISTING_INTENT_REQUIRED'] as const;
 const trialRequoteCodes = ['PURCHASE_PAYMENT_FEE_POLICY_CHANGED', 'PURCHASE_PAYMENT_PRICING_CHANGED',
   'PURCHASE_PAYMENT_QUOTE_EXPIRED', 'PURCHASE_PAYMENT_QUOTE_ALREADY_USED', 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND'] as const;
@@ -65,6 +69,7 @@ export type PurchasePaymentIntent = {
   /** A refunded payment still reports MANUAL_REVIEW to user clients; refundStatus says it has ended. */
   refundStatus?: 'REFUNDED';
   trialPurchaseOutcome?: TrialPurchaseOutcome;
+  trialPurchaseBreakdown?: TrialPurchaseBreakdown;
   claimNo?: string | null;
 } & PurchaseFinancialSnapshot;
 const invalid = () => new ApiError({ kind: 'protocol', message: 'PURCHASE_PAYMENT_RESPONSE_INVALID' });
@@ -77,6 +82,21 @@ const money = (raw: unknown): string => {
   if (typeof raw !== 'string' || !/^(0|[1-9]\d{0,11})(\.\d{1,2})?$/.test(raw)) throw invalid();
   return raw;
 };
+function parseTrialPurchaseBreakdown(value: unknown): TrialPurchaseBreakdown {
+  const raw = object(value);
+  const amount = (input: unknown) => {
+    if (typeof input !== 'string' || !/^(0|[1-9]\d{0,11})(\.\d{1,6})?$/.test(input)) throw invalid();
+    return Number(input);
+  };
+  return {
+    productNo: text(raw.productNo), productName: text(raw.productName),
+    ...(raw.productSubtitle == null ? {} : { productSubtitle: text(raw.productSubtitle) }),
+    priceUSD: amount(raw.priceUsdt), promoDiscountUSD: amount(raw.promoDiscountUsdt), offsetUSD: amount(raw.offsetUsdt),
+    earlyDiscountUSD: amount(raw.earlyDiscountUsdt), amountUSD: amount(raw.amountUsdt),
+    ...parseTrialDiscountTerms(raw),
+    ...(raw.earlyDiscountConfiguredUsdt == null ? {} : { earlyDiscountConfiguredUSD: amount(raw.earlyDiscountConfiguredUsdt) }),
+  };
+}
 const micros = (value: string): bigint => {
   const [whole, fraction = ''] = value.replace(/^-/, '').split('.');
   const units = BigInt(whole!) * 1000000n + BigInt(fraction.padEnd(6, '0'));
@@ -147,6 +167,8 @@ export function parsePurchaseIntent(value: unknown): PurchasePaymentIntent {
     ...(createdAt ? { createdAt } : {}),
     ...(raw.refundStatus === 'REFUNDED' ? { refundStatus: 'REFUNDED' as const } : {}),
     ...(fields.kind === 'TRIAL_CONVERT' && (raw.claimNo === null || typeof raw.claimNo === 'string') ? { claimNo: raw.claimNo } : {}),
+    ...(fields.kind === 'TRIAL_CONVERT' && raw.trialPurchaseBreakdown != null
+      ? { trialPurchaseBreakdown: parseTrialPurchaseBreakdown(raw.trialPurchaseBreakdown) } : {}),
     ...(fields.kind === 'TRIAL_CONVERT'
       && (raw.status === 'MANUAL_REVIEW' && raw.trialPurchaseOutcome === 'LATE_PAYMENT_REVIEW'
         || raw.status === 'EXPIRED' && raw.trialPurchaseOutcome === 'UNPAID_TERMINAL') ? { trialPurchaseOutcome: raw.trialPurchaseOutcome } : {}),
