@@ -2153,7 +2153,7 @@ export const fil: Messages = {
     pageTitle: "Libreng trial",
     toastActivated: "Na-activate ang libreng trial · UVELBox S1",
     offsetAccruedLabel: "Magagamit sa pagbili ng device",
-    offsetRemainderNote: "Mapupunta sa balanse mo ang ${remainder} na lampas sa cap ng credit pagkatapos bumili",
+    offsetRemainderNote: "Mapupunta sa balanse mo ang {remainder}\u00A0USDT na lampas sa cap ng credit pagkatapos bumili",
     offsetUsableUntil: "Magagamit ang credit sa trial hanggang {time}",
     buyCtaPlain: "Bumili",
     stoppedNote: "Huminto na ang production",

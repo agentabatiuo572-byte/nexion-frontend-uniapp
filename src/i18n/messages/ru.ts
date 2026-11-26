@@ -2153,7 +2153,7 @@ export const ru: Messages = {
     pageTitle: "Пробный период",
     toastActivated: "Пробный период начат · UVELBox S1",
     offsetAccruedLabel: "В счёт покупки устройства",
-    offsetRemainderNote: "${remainder} сверх лимита зачёта поступят на баланс после покупки",
+    offsetRemainderNote: "{remainder}\u00A0USDT сверх лимита зачёта поступят на баланс после покупки",
     offsetUsableUntil: "Пробный бонус действует до {time}",
     buyCtaPlain: "К покупке",
     stoppedNote: "Выработка остановлена",

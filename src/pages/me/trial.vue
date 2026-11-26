@@ -56,9 +56,9 @@
         <view class="trial-earned trial-rise trial-rise--2">
           <text class="trial-earned__label">{{ isGrace ? detail.graceAmountLabel : lifecycle.accruedLabel }}</text>
           <view class="trial-earned__amount">
-            <text class="nx-sr-only">{{ earnedParts[1] ? `${earnedParts[0]}.${earnedParts[1]}` : earnedParts[0] }}</text>
+            <text class="nx-sr-only">{{ earnedParts[1] ? `${earnedParts[0]}.${earnedParts[1]}` : earnedParts[0] }}&nbsp;USDT</text>
             <TrialCountAmount :config="earnedCount.config.value" :parts="earnedParts" tone="earned" />
-            <text class="trial-earned__unit">USDT</text>
+            <text class="trial-earned__unit" aria-hidden="true">USDT</text>
           </view>
           <!-- Each figure carries its own use: the USDT offsets a purchase, the UVT arrives after one (04 §4.6). -->
           <text class="trial-earned__note">{{ detail.creditOnBuy }}</text>
@@ -86,26 +86,29 @@
               <text class="trial-total__breakdown">{{ totalBreakdown }}</text>
               <view class="trial-total__line">
                 <text class="trial-total__label">{{ detail.totalLabel }}</text>
-                <text class="nx-sr-only">{{ totalParts[1] ? `${totalParts[0]}.${totalParts[1]}` : totalParts[0] }}</text>
+                <text class="nx-sr-only">{{ totalParts[1] ? `${totalParts[0]}.${totalParts[1]}` : totalParts[0] }}&nbsp;USDT</text>
                 <TrialCountAmount :config="totalCount.config.value" :parts="totalParts" tone="total" />
-                <text class="trial-unit-small trial-total__unit">USDT</text>
+                <text class="trial-unit-small trial-total__unit" aria-hidden="true">USDT</text>
                 <text v-if="purchaseQuote.rewardNEX > 0" class="trial-total__uvt">+ {{ visibility.mask(formatGroupedAmount(purchaseQuote.rewardNEX)) }}<text class="trial-unit-small">&nbsp;UVT</text></text>
               </view>
             </view>
 
+            <!-- Every amount from here to the perforation is USDT: the unit heads the amount column once, each cell is the
+                 bare number and still names its unit to screen readers (03 §3.6.1). -->
+            <view class="trial-rows__head" aria-hidden="true"><text>{{ purchase.payGroup }}</text><text class="trial-rows__unit">USDT</text></view>
             <view class="trial-rows" role="group" :aria-label="purchase.payGroup">
-              <view class="trial-row"><view class="trial-row__label"><text>{{ earlySaving ? detail.unitPrice : ticketDeviceName }}</text><text v-if="claimPriceDiffers" class="trial-row__claim">{{ detail.claimPrice }}</text></view><text class="trial-row__value">{{ usd(purchaseQuote.priceUSD) }}</text></view>
-              <view v-if="ticketDiscounts.promo > 0" class="trial-row"><view class="trial-row__label">{{ promoLabel }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ usd(ticketDiscounts.promo) }}</text></view>
-              <view v-if="earlySaving" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ usd(ticketDiscounts.early) }}</text></view>
-              <view v-if="ticketDiscounts.offset > 0" class="trial-row"><view class="trial-row__label">{{ detail.offsetRow }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">{{ visibility.mask(`−${usd(ticketDiscounts.offset)}`) }}</text></view>
+              <view class="trial-row"><view class="trial-row__label"><text>{{ earlySaving ? detail.unitPrice : ticketDeviceName }}</text><text v-if="claimPriceDiffers" class="trial-row__claim">{{ detail.claimPrice }}</text></view><text class="trial-row__value">{{ formatGroupedAmount(purchaseQuote.priceUSD) }}<text class="nx-sr-only">&nbsp;USDT</text></text></view>
+              <view v-if="ticketDiscounts.promo > 0" class="trial-row"><view class="trial-row__label">{{ promoLabel }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">−{{ formatGroupedAmount(ticketDiscounts.promo) }}<text class="nx-sr-only">&nbsp;USDT</text></text></view>
+              <view v-if="earlySaving" class="trial-row"><text class="trial-row__label">{{ detail.earlyRow }}</text><text class="trial-row__value">−{{ formatGroupedAmount(ticketDiscounts.early) }}<text class="nx-sr-only">&nbsp;USDT</text></text></view>
+              <view v-if="ticketDiscounts.offset > 0" class="trial-row"><view class="trial-row__label">{{ detail.offsetRow }}<NxTag class="trial-limit-tag" tone="warning">{{ detail.limitedTag }}</NxTag></view><text class="trial-row__value">{{ visibility.mask(`−${formatGroupedAmount(ticketDiscounts.offset)}`) }}<text class="nx-sr-only">&nbsp;USDT</text></text></view>
             </view>
             <view class="trial-sum">
-              <view class="trial-sum__row"><text class="trial-sum__label">{{ detail.discountTotal }}</text><text class="trial-sum__discount">{{ visibility.mask(`−${usd(discountTotal)}`) }}</text></view>
+              <view class="trial-sum__row"><text class="trial-sum__label">{{ detail.discountTotal }}</text><text class="trial-sum__discount">{{ visibility.mask(`−${formatGroupedAmount(discountTotal)}`) }}<text class="nx-sr-only">&nbsp;USDT</text></text></view>
               <view class="trial-sum__row">
                 <text class="trial-row__label">{{ detail.finalPrice }}</text>
                 <view class="trial-sum__price">
-                  <text class="trial-sum__strike">{{ usd(purchaseQuote.priceUSD) }}</text>
-                  <text class="trial-sum__amount" data-testid="trial-amount-due"><text class="trial-sum__currency">$</text>{{ dueParts[0] }}<text class="trial-dim">.{{ dueParts[1] }}</text></text>
+                  <text class="trial-sum__strike">{{ formatGroupedAmount(purchaseQuote.priceUSD) }}<text class="nx-sr-only">&nbsp;USDT</text></text>
+                  <text class="trial-sum__amount" data-testid="trial-amount-due">{{ dueParts[0] }}<text class="trial-dim">.{{ dueParts[1] }}</text><text class="nx-sr-only">&nbsp;USDT</text></text>
                 </view>
               </view>
             </view>
@@ -307,7 +310,7 @@ import TrialDevicePicker from "@/components/trial/trial-device-picker.vue";
 import TrialOriginalPurchaseCard from "@/components/trial/trial-original-purchase-card.vue";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
-import { formatTrialDiscountCap, trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
+import { trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
 
 const t = useT();
 const app = useApp();
@@ -469,10 +472,11 @@ watch(() => pageVisible.value && usePurchaseOptions.value && earlyQuoteLapsed.va
 });
 const earlyQuote = computed(() => status.value === "active" && purchaseQuote.value?.earlyPurchase ? purchaseQuote.value : null);
 
-// Prices and discounts are dollars; earnings and credit are USDT (a quote counts 1 USDT as $1).
-const usd = (value: number) => `$${formatGroupedAmount(value)}`;
-// Caps and the headline discount read as whole dollars when they are ("$50", "$10").
-const usdShort = (value: number) => (Number.isInteger(value) ? `$${value}` : usd(value));
+// Quote amounts are USDT (a quote counts 1 USDT as $1). Sentences and the tray write the unit after the figure,
+// joined by U+00A0; the ticket's rows carry it once in their header (03 §3.6.1).
+const usdt = (value: number) => `${formatGroupedAmount(value)}\u00A0USDT`;
+// Caps and the headline discount read as whole numbers when they are ("50 USDT", "10 USDT").
+const usdtShort = (value: number) => (Number.isInteger(value) ? `${value}\u00A0USDT` : usdt(value));
 /** Integer and decimal digits of a grouped amount, so the decimals can take the secondary colour. */
 function amountParts(value: number): [string, string] {
   const [whole, fraction = ""] = formatGroupedAmount(value).split(".");
@@ -536,7 +540,7 @@ const claimPriceDiffers = computed(() => {
 });
 const buyTitle = computed(() => {
   if (earlySaving.value) return fmt(selectedOption.value && !selectedOption.value.isTrialProduct ? detail.value.earlyTitleOther : detail.value.earlyTitle, {
-    device: ticketDeviceName.value, amount: usdShort(ticketDiscounts.value.early),
+    device: ticketDeviceName.value, amount: usdtShort(ticketDiscounts.value.early),
   });
   return isGrace.value ? detail.value.graceTitle : "";
 });
@@ -545,7 +549,7 @@ const buyTitle = computed(() => {
 const totalBreakdown = computed(() => {
   const quote = purchaseQuote.value;
   if (!quote) return "";
-  const discount = visibility.mask(usd(discountTotal.value));
+  const discount = `${visibility.mask(formatGroupedAmount(discountTotal.value))}\u00A0USDT`;
   const credit = quote.remainderUSD > 0 ? `${visibility.mask(formatGroupedAmount(quote.remainderUSD))} USDT`
     : quote.rewardNEX > 0 ? `${visibility.mask(formatGroupedAmount(quote.rewardNEX))} UVT` : "";
   return credit ? fmt(detail.value.totalBreakdown, { discount, credit }) : fmt(detail.value.totalDiscountOnly, { discount });
@@ -553,7 +557,7 @@ const totalBreakdown = computed(() => {
 const promoLabel = computed(() => {
   const { discountRate, discountCapUSD: cap } = trialDiscountTerms(purchaseQuote.value, cfg.value);
   const pct = formatTrialDiscountPercent(discountRate);
-  return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: formatTrialDiscountCap(cap) });
+  return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: usdtShort(cap) });
 });
 const conversionRefunded = computed(() => remoteApiEnabled && status.value === "converted"
   && displayState.value?.conversion?.refunded === true);
@@ -585,12 +589,12 @@ const trialBuyCtaText = computed(() => {
   if (usePurchaseOptions.value) {
     if (waitingForReselection.value) return detail.value.chooseDevice;
     return selectedOption.value && purchaseQuote.value
-      ? fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
+      ? fmt(detail.value.buyCta, { amount: usdt(purchaseQuote.value.amountUSD) }) : fleetCopy.value.buy;
   }
   if (productCatalogState.status === "error") return t.value.store.catalogErrorTitle;
   if (trialCatalogLoading.value) return w.value.buyCtaPlain;
   if (trialProductUnavailable.value) return t.value.store.temporarilyOutOfStock;
-  if (purchaseQuote.value) return fmt(detail.value.buyCta, { amount: usd(purchaseQuote.value.amountUSD) });
+  if (purchaseQuote.value) return fmt(detail.value.buyCta, { amount: usdt(purchaseQuote.value.amountUSD) });
   return w.value.buyCtaPlain;
 });
 // none-state eligibility (异常2 — concrete reason, never a generic error).
@@ -654,7 +658,7 @@ const rulesEarlyLine = computed(() => {
   const fullTerm = quote.settlementPolicy === "FULL_TERM_ON_CONVERSION";
   if (quote.earlyDiscountConfiguredUSD === 0) return fullTerm ? detail.value.rulesEarlyZero : "";
   return fmt(fullTerm ? detail.value.rulesEarlyFull : detail.value.rulesEarly, {
-    discount: usdShort(quote.earlyDiscountConfiguredUSD),
+    discount: usdtShort(quote.earlyDiscountConfiguredUSD),
   });
 });
 const rulesLines = computed(() => [
@@ -950,7 +954,9 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-total__label { font:500 13px/18px var(--font-v5); }
 .trial-total__unit { color:var(--v5-ink-3);font-weight:500; }
 .trial-total__uvt { color:var(--v5-nex-ink);font:500 15px/20px var(--font-v5);font-variant-numeric:tabular-nums;white-space:nowrap; }
-.trial-rows { display:flex;flex-direction:column;gap:10px;margin-top:16px; }
+.trial-rows__head { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:16px;color:var(--v5-ink-3);font:400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.trial-rows__unit { font-weight:500; }
+.trial-rows { display:flex;flex-direction:column;gap:10px;margin-top:8px; }
 .trial-row { display:flex;align-items:center;justify-content:space-between;gap:12px;font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums; }
 .trial-row__label { flex:1;min-width:0;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums;text-wrap:pretty; }
 .trial-row .trial-row__label { display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:2px; }
@@ -964,7 +970,6 @@ useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.va
 .trial-sum__price { flex:none;display:inline-flex;align-items:baseline;gap:8px;white-space:nowrap; }
 .trial-sum__strike { color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);font-variant-numeric:tabular-nums;text-decoration:line-through; }
 .trial-sum__amount { font:600 24px/30px var(--font-amount);font-variant-numeric:tabular-nums;letter-spacing:-0.02em; }
-.trial-sum__currency { color:var(--v5-ink-3);font-size:14px; }
 .trial-perf { position:relative;height:20px; }
 .trial-perf__notch { position:absolute;top:0;width:20px;height:20px;border-radius:50%;background:var(--v5-bg); }
 .trial-perf__notch--l { left:-10px; }
