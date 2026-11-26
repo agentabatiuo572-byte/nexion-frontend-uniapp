@@ -48,6 +48,7 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
     const t = getT();
     if (reason === "storage-unavailable") return t.errors.txNotSavedTitle;
     if (reason === "rejected") return copy.value.claimRejected;
+    if (reason === "terms-changed") return copy.value.claimTermsChanged;
     if (reason === "capacity-full") return copy.value.capacityFull;
     if (reason === "converted") return t.trial.eligReasonConverted;
     if (reason === "used") return t.trial.eligReasonUsed;

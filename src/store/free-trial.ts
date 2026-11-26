@@ -4,7 +4,7 @@ import { invalidateBeforePassiveTabRead, runForegroundStoreRead, runPassiveTabRe
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { defineStore } from "pinia";
 import { computed, ref, shallowRef, watch } from "vue";
-import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName } from "./trial-config";
+import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialCheckoutProductId, resolveTrialDeviceName, type TrialConfig } from "./trial-config";
 import { useTrialPurchaseResult } from "./trial-purchase-result";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
@@ -61,7 +61,15 @@ export type { TrialStatus } from "./trial-boundary";
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
-export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "read-failed" | "rejected" | "confirming" | "storage-unavailable";
+export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "terms-changed" | "read-failed" | "rejected" | "confirming" | "storage-unavailable";
+export type TrialClaimTerms = Pick<TrialConfig, "trialProductId" | "trialDays" | "shadowDailyUSD" | "trialOffsetCapUSD">
+  & { deviceName: string | null };
+
+function claimTermsChanged(confirmed: TrialClaimTerms, current: TrialConfig, deviceName: string | null): boolean {
+  return confirmed.trialProductId !== current.trialProductId || confirmed.deviceName !== deviceName
+    || confirmed.trialDays !== current.trialDays || confirmed.shadowDailyUSD !== current.shadowDailyUSD
+    || confirmed.trialOffsetCapUSD !== current.trialOffsetCapUSD;
+}
 /** The service's settled "not now": the same claim cannot succeed by trying again. */
 export function isTrialStartDenied(reason: TrialStartFailure | undefined): boolean {
   return reason === "quota-exhausted" || reason === "phase-closed" || reason === "risk" || reason === "product-unavailable";
@@ -247,7 +255,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const pendingStart = computed(() => pendingLifecycle.value?.command.kind === "start" ? pendingLifecycle.value : null);
   const pendingCancel = computed(() => pendingLifecycle.value?.command.kind === "cancel" ? pendingLifecycle.value : null);
   const startRetryable = ref(false);
-  const confirmedStartDenial = ref<TrialIneligibleReason | "rejected">();
+  const confirmedStartDenial = ref<TrialIneligibleReason | "rejected" | "terms-changed">();
   const confirmedStartClaimNo = ref<string | null>(null);
   const confirmedCancelClaimNo = ref<string | null>(null);
   const confirmedCancelDenial = ref<TrialCancelDenial>();
@@ -922,7 +930,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
   // Idempotent: a second call while ineligible is a no-op (spec 异常3 — one
   // trial per account, concurrent taps produce exactly one).
-  async function start(): Promise<{ ok: boolean; reason?: TrialStartFailure }> {
+  async function start(confirmedTerms?: TrialClaimTerms): Promise<{ ok: boolean; reason?: TrialStartFailure }> {
     if (remoteApiEnabled) {
       if (pendingCancel.value || (pendingStart.value && !startRetryable.value)) return { ok: false, reason: "confirming" };
       const retry = pendingStart.value;
@@ -953,6 +961,28 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       }
       let pending: PendingLifecycle | null;
       try {
+        if (confirmedTerms) {
+          const changed = claimTermsChanged(confirmedTerms, trialConfig, deviceName);
+          const saved = readLifecycleCommand(boundKey, true);
+          if (saved?.kind === "start" && (changed || saved.deviceName !== deviceName)) {
+            const retrying = startRetryable.value && pendingStart.value?.command.key === saved.key;
+            if (saved.state === "pending" && !retrying) {
+              pendingLifecycle.value = { command: saved, consecutiveReads: 0 };
+              startRetryable.value = false;
+              return { ok: false, reason: "confirming" };
+            }
+            // Both NOT_SEEN and startRetryable establish that the saved start did not run.
+            if (!removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey)) return { ok: false, reason: "storage-unavailable" };
+            if (retrying) {
+              pendingLifecycle.value = null;
+              startRetryable.value = false;
+            }
+          }
+          if (changed) {
+            confirmedStartDenial.value = "terms-changed";
+            return { ok: false, reason: "terms-changed" };
+          }
+        }
         pending = beginLifecycle({ kind: "start", key: commandKey("start"), state: "pending",
           previousClaimNo: authorityClaimNo.value, deviceName });
       } catch { return { ok: false, reason: "storage-unavailable" }; }
@@ -996,6 +1026,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     const elig = eligibility();
     if (!elig.ok) return { ok: false, reason: elig.reason };
     const cfg = useTrialConfig().config;
+    if (confirmedTerms && claimTermsChanged(confirmedTerms, cfg, resolveTrialDeviceName(cfg.trialProductId, cfg.trialProductName))) {
+      return { ok: false, reason: "terms-changed" };
+    }
     const now = mockServerNow();
     const exp = now + cfg.trialDays * ONE_DAY_MS;
     // 🔴 快照取在**任何**字段改动之前(审计 R7 P0:曾取在 status 置 active 之后,落盘失败回滚成
