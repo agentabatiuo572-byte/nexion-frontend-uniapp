@@ -1173,7 +1173,8 @@ onUnmounted(() => {
 /* Dial box: fills the height between the title and the 52px slot; the same box in every dial phase. */
 .cn-dialwrap { position: relative; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; }
 .cn-slot { flex: none; height: 52px; display: flex; justify-content: center; align-items: flex-start; }
-.cn-slot--enter > * { animation: cn-rise4 300ms cubic-bezier(.16, 1, .3, 1) 950ms both; }
+/* The rules row rises in from 950ms; like the bar, it is hidden until then, so it can't be tapped, focused or read. */
+.cn-slot--enter > * { animation: cn-slot-rise 300ms cubic-bezier(.16, 1, .3, 1) 950ms both; }
 .cn-rules { display: flex; justify-content: center; margin-top: 8px; }
 .cn-dial-tag { position: absolute; left: 50%; transform: translateX(-50%); }
 .cn-dial-tag__icon { flex: none; margin-right: 4px; }
@@ -1261,6 +1262,7 @@ onUnmounted(() => {
 @keyframes cn-burst { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.16); } }
 @keyframes cn-spin { to { transform: rotate(360deg); } }
 @keyframes cn-rise4 { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes cn-slot-rise { from { visibility: hidden; opacity: 0; transform: translateY(4px); } to { visibility: visible; opacity: 1; transform: none; } }
 @keyframes cn-unoff { from { opacity: .5; } to { opacity: 1; } }
 @keyframes cn-shift { from { transform: none; } to { transform: translateX(-13px); } }
 /* Reduced motion: no entrance, no sweep; the final value at once. */
