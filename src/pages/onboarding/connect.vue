@@ -1,5 +1,5 @@
 <template>
-  <StandalonePageShell class="cn-root" :top-inset="4">
+  <StandalonePageShell class="cn-root" :top-inset="4" :reserve-bottom="false">
     <!-- #ifdef APP-PLUS -->
     <NativeGpuObserver :request="gpuRequest" @observation="gpuReader.receive" />
     <!-- #endif -->
@@ -394,7 +394,9 @@ const head = computed<Head>(() => {
   if (iosPending.value) return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingIosTitle, body: o.phoneCalibrationPendingIosBody, link: "support" };
   if (canonical.value?.calibrationStatus === "PENDING_VERIFICATION") return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingTitle, body: o.phoneCalibrationPendingBody };
   if (loginCheckNeeded.value) return { tone: "warning", icon: "alert", title: o.phoneBindingReadUnavailableTitle, body: o.phoneBindingReadUnavailableBody };
-  if (failedAction.value === "calibration" || failedAction.value === "defer") return { tone: "warning", icon: "alert", title: o.calibrationFailedTitle, body: o.activationLaterBody };
+  // A failed 「稍后激活」 says only that; whether the server refused or the result is unknown is wired later (deferOutcome).
+  if (failedAction.value === "defer") return { tone: "warning", icon: "alert", title: o.activationDeferRejectedTitle };
+  if (failedAction.value === "calibration") return { tone: "warning", icon: "alert", title: o.calibrationFailedTitle, body: o.activationLaterBody };
   return { tone: "danger", icon: "failed", title: o.activationFailedTitle, body: o.phoneActivationRejected };
 });
 
@@ -823,7 +825,6 @@ async function deferPhoneActivation() {
       failureCode.value = cause instanceof Error ? cause.message : "";
       failedAction.value = "defer";
       phase.value = "error";
-      toast.warn(t.value.onboarding.activationDeferRejectedTitle);
     }
   } finally {
     if (isCurrentOnboardingCalibrationScope(requestScope, currentScope())) activationBusy.value = false;
@@ -884,7 +885,7 @@ onUnmounted(() => {
 .ob-title { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); letter-spacing: -.02em; color: var(--v5-ink); }
 :lang(zh) .ob-title { letter-spacing: 0; }
 .ob-sub { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
-.ob-content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 20px; }
+.ob-content { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; margin-top: 20px; }
 .ob-rh { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px 24px; }
 .ob-skel { display: inline-block; vertical-align: middle; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
 .ob-spin { flex: none; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: ob-spin .8s linear infinite; }
@@ -893,7 +894,6 @@ onUnmounted(() => {
 /* Bottom bar: position here; material, disabled grey glass and tray text come from the shared .nx-glass-bar layer. */
 .ob-bar { position: fixed; z-index: 30; display: flex; flex-direction: column; }
 .ob-tray-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 8px; }
-.nx-tray-note + .ob-tray-row { margin-top: 8px; }
 .ob-tray-row .ob-btn { flex: 1 0 auto; }
 .ob-btn { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; color: var(--ui-tray-disabled-ink); }
 .ob-btn :deep(svg), .ob-tray-text :deep(svg) { flex: none; }
@@ -921,7 +921,7 @@ onUnmounted(() => {
 .cn-dialwrap { position: relative; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; }
 .cn-slot { flex: none; height: 52px; display: flex; justify-content: center; align-items: flex-start; }
 .cn-slot--enter > * { animation: cn-rise4 300ms cubic-bezier(.16, 1, .3, 1) 950ms both; }
-.cn-rules { display: flex; justify-content: center; margin-top: 4px; }
+.cn-rules { display: flex; justify-content: center; margin-top: 8px; }
 .cn-dial-tag { position: absolute; left: 50%; transform: translateX(-50%); }
 .cn-dial-tag__icon { flex: none; margin-right: 4px; }
 .cn-dial-tag--anim { animation: cn-fade 300ms ease-out 900ms both; }

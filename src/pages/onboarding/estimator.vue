@@ -1,5 +1,5 @@
 <template>
-  <StandalonePageShell class="est-root" :top-inset="4">
+  <StandalonePageShell class="est-root" :top-inset="4" :reserve-bottom="false">
     <!-- #ifdef APP-PLUS -->
     <NativeGpuObserver :request="gpuRequest" @observation="gpuReader.receive" />
     <!-- #endif -->
@@ -460,7 +460,7 @@ async function deferPhoneActivation() {
 .ob-title { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); letter-spacing: -.02em; color: var(--v5-ink); }
 :lang(zh) .ob-title { letter-spacing: 0; }
 .ob-sub { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
-.ob-content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 20px; }
+.ob-content { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; margin-top: 20px; }
 .ob-rh { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px 24px; }
 .ob-skel { display: inline-block; vertical-align: middle; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
 .ob-spin { flex: none; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: ob-spin .8s linear infinite; }
@@ -469,7 +469,6 @@ async function deferPhoneActivation() {
 /* Bottom bar: position here; material, disabled grey glass and tray text come from the shared .nx-glass-bar layer. */
 .ob-bar { position: fixed; z-index: 30; display: flex; flex-direction: column; }
 .ob-tray-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 8px; }
-.nx-tray-note + .ob-tray-row { margin-top: 8px; }
 .ob-tray-row .ob-btn { flex: 1 0 auto; }
 .ob-btn { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; color: var(--ui-tray-disabled-ink); }
 .ob-btn :deep(svg), .ob-tray-text :deep(svg) { flex: none; }
