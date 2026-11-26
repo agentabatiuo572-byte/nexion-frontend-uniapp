@@ -308,7 +308,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 
 /* What is claimed, centred, clear of the close (52px each side). */
 .tcs-head { padding:0 52px;text-align:center; }
-.tcs-head--sub { margin-top:16px;padding:0 16px; }
+.tcs-head--sub { margin-top:16px; }
 .tcs-eyebrow { display:block;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3); }
 /* Sheet title role for the device name (03 §3.9, 10 §10.1); a long name wraps in full (03 §3.6.1 长名称). */
 .tcs-name { display:block;min-height:var(--ui-type-hero-title-lh);margin-top:4px;font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
