@@ -92,7 +92,7 @@ type ConversionResult = { ok: boolean; reason?: TrialConversionFailure; orderNo?
 type TrialReadStreak = { consecutiveReads: number; lastCountedAt?: number };
 const LIFECYCLE_COMMAND_KEY = "nexgrid-trial-lifecycle-commands-v1";
 const TRIAL_TERMS_CHANGED = "TRIAL_TERMS_CHANGED";
-type LifecycleCommand = { key: string; state: "pending" | "retry"; successfulClaimNo?: string } & (
+type LifecycleCommand = { key: string; state: "pending" | "retry"; successfulClaimNo?: string; retryNotSeen?: true } & (
   ({ kind: "start"; previousClaimNo: string | null } & TrialStartPayload)
   | { kind: "cancel"; previousClaimNo: string });
 type PendingLifecycle = TrialReadStreak & {
@@ -258,6 +258,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const pendingStart = computed(() => pendingLifecycle.value?.command.kind === "start" ? pendingLifecycle.value : null);
   const pendingCancel = computed(() => pendingLifecycle.value?.command.kind === "cancel" ? pendingLifecycle.value : null);
   const startRetryable = ref(false);
+  const startNotSeen = ref(false);
   const confirmedStartDenial = ref<TrialIneligibleReason | "rejected" | "terms-changed">();
   const confirmedStartClaimNo = ref<string | null>(null);
   const confirmedCancelClaimNo = ref<string | null>(null);
@@ -647,6 +648,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const savedCommand = readLifecycleCommand(boundKey);
       pendingLifecycle.value = savedCommand?.state === "pending" ? { command: savedCommand, consecutiveReads: 0 } : null;
       startRetryable.value = false;
+      startNotSeen.value = savedCommand?.kind === "start" && savedCommand.state === "retry" && savedCommand.retryNotSeen === true;
       confirmedStartDenial.value = undefined;
       confirmedStartClaimNo.value = null;
       confirmedCancelClaimNo.value = null;
@@ -696,6 +698,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   /** Boolean view of eligibility() — kept for the many entry-surface gates. */
   function canStart(): boolean {
     return eligibility().ok;
+  }
+
+  // A pending background read can keep an already confirmed claim entry openable.
+  // The sheet still uses canStart(), and start() reads eligibility again before posting.
+  function canOpenClaim(): boolean {
+    return canStart() || (authorityStatus.value === "loading" && remoteCanStart.value
+      && !lastReadFailed.value && !authorityResultUnknown.value);
   }
 
   function latestCheckoutState() {
@@ -790,18 +799,23 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     }
     // Reuse the whole request. Start's device name, product and version are part of the idempotency hash.
     const command = saved?.kind === draft.kind && saved.previousClaimNo === draft.previousClaimNo
-      ? { ...saved, state: "pending" as const } : draft;
+      ? { ...saved, state: "pending" as const, retryNotSeen: undefined } : draft;
     if (!writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, command)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
     const pending = { command, writing: true, consecutiveReads: 0 };
     startRetryable.value = false;
+    if (draft.kind === "start") startNotSeen.value = false;
     pendingLifecycle.value = pending;
     return pending;
   }
 
-  function finishLifecycle(pending: PendingLifecycle, retry = false) {
+  function finishLifecycle(pending: PendingLifecycle, retry: boolean | "not-seen" = false) {
     if (readLifecycleCommand(boundKey)?.key === pending.command.key) {
       if (retry) {
-        writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, { ...pending.command, state: "retry" });
+        const retryNotSeen = pending.command.kind === "start" && retry === "not-seen";
+        const saved = writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, {
+          ...pending.command, state: "retry", retryNotSeen: retryNotSeen ? true : undefined,
+        });
+        if (retryNotSeen && saved) startNotSeen.value = true;
         lifecycleRetrySequence = authorityRequestSequence;
       }
       else removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey);
@@ -912,7 +926,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           }
           return;
         case "NOT_SEEN":
-          finishLifecycle(pending, true);
+          finishLifecycle(pending, "not-seen");
           await refreshRemote(true);
           return;
         case "PROCESSING":
@@ -981,6 +995,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
                 || saved.trialProductId !== confirmedPayload.trialProductId
                 || saved.trialTermsVersion !== confirmedPayload.trialTermsVersion)) {
             if (!removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey)) return { ok: false, reason: "storage-unavailable" };
+            startNotSeen.value = false;
           }
           if (changed) {
             confirmedStartDenial.value = "terms-changed";
@@ -1372,12 +1387,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     deniedLegacyConversion, recoverLegacyConversion, clearLegacyConversionResult,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
     authorityStatus, authorityError, authorityResultUnknown, authorityIncomplete, lastReadFailed, transientReadFailure,
-    displayState, conversionWindowOpen, originalPurchase, purchasedDevice, pendingStart, startRetryable, confirmedStartClaimNo, confirmedStartDenial,
+    displayState, conversionWindowOpen, originalPurchase, purchasedDevice, pendingStart, startRetryable, startNotSeen, confirmedStartClaimNo, confirmedStartDenial,
     pendingCancel, confirmedCancelClaimNo, confirmedCancelDenial, lifecycleReadbackPending, recoverLifecycleCommand, confirmedHomeOffer,
     authoritativeShadowUSD, authoritativeShadowNEX,
     authoritativeOffsetUSD, authoritativeRemainderUSD, authoritativePriceUSD, authoritativeQuote, authoritativeConversion,
     authorityClaimNo, authorityVersion, authorityServerState, authoritativeProductIdentity,
-    eligibility, canStart, canConfirmOrdinaryProduct, isOwnTrialDevice, showPromo, showHeroPromo, confirmedOfferState,
+    eligibility, canStart, canOpenClaim, canConfirmOrdinaryProduct, isOwnTrialDevice, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
     refreshRemote, refreshEligibilityRemote, refreshVisible, refreshAtBoundary, serverTimeAt,

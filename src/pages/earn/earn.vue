@@ -78,7 +78,7 @@ import { readTabSnapshot, tabSnapshotPeriodCurrent } from "@/lib/tab-first-scree
 import { formatUsd } from "@/lib/usd-display";
 import { onUnmounted, computed, nextTick, ref, watch } from "vue";
 import { onHide, onShow } from "@/composables/use-tab-page-lifecycle";
-import { registerActivePageRefresh } from "@/lib/active-page-refresh";
+import { hasVisiblePullRefresh, registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { useEarnConfig } from "@/store/earn-config";
 import AppChassis from "@/components/tab-page-frame.vue";
@@ -115,9 +115,15 @@ const visibility = useDataVisibility();
 const range = ref<Range>("Today");
 const freeTrial = useFreeTrial();
 const trialClaimSheet = useTrialClaimSheet();
-const trialReadFailed = () => remoteApiEnabled && !trialClaimSheet.open && freeTrial.lastReadFailed;
+const trialReadFailed = () => remoteApiEnabled && freeTrial.lastReadFailed && !freeTrial.authorityResultUnknown;
 const readVisibleTrial = () => freeTrial.refreshVisible();
-useAutoRecovery({ failed: trialReadFailed, retry: readVisibleTrial });
+useAutoRecovery({
+  active: () => !trialClaimSheet.open,
+  failed: trialReadFailed,
+  retry: () => freeTrial.refreshRemote(),
+  repeatMs: 30_000,
+  repeatWhile: () => !hasVisiblePullRefresh(),
+});
 let earnPageVisible = false;
 let earnObservationEpoch = 0;
 let releaseActiveRefresh = () => {};
@@ -128,7 +134,7 @@ useAutoRecovery({
 async function refreshVisibleEarn() {
   if (!earnPageVisible || !remoteApiEnabled) return;
   await Promise.allSettled([
-    trialReadFailed() || trialClaimSheet.open ? undefined : readVisibleTrial(),
+    freeTrial.lastReadFailed || trialClaimSheet.open ? undefined : readVisibleTrial(),
     // Failed reads are awaited by the shared section registry, once each.
     app.remoteFleetStatus === "error" || app.remoteAssignmentStatus === "error" ? undefined : app.ensureRemoteFleet(),
     app.homeTruthStatus === "error" ? undefined : app.ensureHomeTruth(),
@@ -143,7 +149,7 @@ onShow(() => {
   releaseActiveRefresh = registerActivePageRefresh(refreshVisibleEarn, "pages/earn/earn");
   app.setTaskReadPageVisible("earn", true);
   if (remoteApiEnabled) {
-    if (!trialReadFailed() && !trialClaimSheet.open) void readVisibleTrial();
+    if (!freeTrial.lastReadFailed && !trialClaimSheet.open) void readVisibleTrial();
     void app.ensureRemoteFleet().catch(() => undefined);
     void app.ensureHomeTruth().catch(() => undefined);
     void observeDayOneEarnPage();

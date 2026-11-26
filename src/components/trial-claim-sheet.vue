@@ -151,8 +151,11 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
 const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
 const termsChanged = computed(() => shownReason.value === "terms-changed");
-const claimRetryable = computed(() => !termsChanged.value && (freeTrial.pendingStart ? freeTrial.startRetryable
-  : claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value));
+// An explicitly unreceived start has a saved retry but no pending receipt to poll.
+const startNotRun = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
+  : freeTrial.startNotSeen && !shownReason.value);
+const claimRetryable = computed(() => !termsChanged.value && (startNotRun.value || (!freeTrial.pendingStart
+  && claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value)));
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
   ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
 // View state only: a retry runs from the same bottom primary with its busy spinner (03 §3.1 处理中锁定宽度、加载指示), and the
@@ -161,8 +164,6 @@ const claimFromRetry = ref(false);
 const heldReasonText = ref("");
 const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
-// A start found not to have run offers 重新领取, so its line says it did not start (a hint), not that it is confirming (03 §3.5.2).
-const startNotRun = computed(() => !!freeTrial.pendingStart && freeTrial.startRetryable);
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
 const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
@@ -174,7 +175,7 @@ const staleRead = computed(() => freeTrial.transientReadFailure && trialView.dis
 // unknown-eligibility hint stands above the off primary, so it is never grey without a reason (03 §3.4 无权限／不可用).
 const eligibilityUnknown = computed(() => !activated.value && !claiming.value && !freeTrial.pendingStart && !claimError.value && !staleRead.value
   && freeTrial.authorityStatus === "ready" && !freeTrial.canStart() && freeTrial.eligibility().reason === "unknown");
-const reasonLine = computed(() => !!freeTrial.pendingStart || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
+const reasonLine = computed(() => !!freeTrial.pendingStart || startNotRun.value || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
   || eligibilityUnknown.value);
 // Only a failed read with nothing to show leaves the result block alone; a reason or status line keeps its state (A09 order).
 const readFailView = computed(() => !reasonLine.value && !activated.value && !claiming.value && stateReadFailed.value);
@@ -203,7 +204,8 @@ const primaryBusy = computed(() => claiming.value || confirmingStart.value);
 const primaryLabel = computed(() => showRetry.value ? t.value.trial.claimRetryCta : claimCtaLabel.value);
 const primaryLeaves = computed(() => !showRetry.value && claimOpensAnotherPage.value);
 const claimErrorText = computed(() => termsChanged.value && !confirmingStart.value ? sheet.failureText("terms-changed")
-  : freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
+  : startNotRun.value ? t.value.trial.claimNotStartedInline
+  : freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : staleRead.value ? t.value.exchange.staleSnapshot
   : eligibilityUnknown.value ? t.value.trial.eligReasonUnknown
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired

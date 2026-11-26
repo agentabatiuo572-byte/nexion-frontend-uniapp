@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { installTabSnapshotLifecycle, forgetTabSnapshotAccount, advanceTabSnapshotClock } from "@/lib/tab-first-screen-snapshot";
 import { runPassiveTabRead } from "@/lib/passive-tab-read";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { hasVisiblePullRefresh, refreshActivePage } from "@/lib/active-page-refresh";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { appDeviceOffline, appReadForeground, appReadOnline, documentReadVisible, foregroundReadAllowed } from "@/lib/foreground-read";
@@ -376,8 +377,8 @@ function stopTrialPoll() {
 }
 
 const IDLE_READ_MS = 30 * 60_000;
-const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/me", "pages/me/devices", "pages/me/trial",
-  "pages/store/store", "pages/store/detail"]);
+const trialRecoveryRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/devices", "pages/me/trial"]);
+const trialReadRoutes = new Set([...trialRecoveryRoutes, "pages/me/me", "pages/store/store", "pages/store/detail"]);
 let scheduledReadBinding = "";
 let idleReadOffset = 0;
 let lastIdleSlot = 0;
@@ -390,7 +391,13 @@ let nativeTrialTopupReadPending = false;
 // #endif
 
 function refreshVisibleResource(route: string) {
-  if (trialReadRoutes.has(route)) void useFreeTrial().refreshVisible(false, route === "pages/me/devices");
+  if (trialReadRoutes.has(route)) {
+    const trial = useFreeTrial();
+    // Visible recovery already owns failed reads on these pages and in the claim sheet.
+    if (useTrialClaimSheet().open || (trialRecoveryRoutes.has(route) && trial.lastReadFailed)
+      || (route === "pages/me/trial" && trial.authorityIncomplete)) return;
+    void trial.refreshVisible(false, route === "pages/me/devices");
+  }
   else if (route === "pages/me/wallet-bills") void refreshActivePage(route);
   else if (route === "pages/me/notifications" && useMessageDrawer().section === "notifications") {
     const notifications = useNotifications();

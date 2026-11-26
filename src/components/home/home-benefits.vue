@@ -73,7 +73,6 @@
   </NxSection>
 </template>
 <script setup lang="ts">
-import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import NxSection from '@/components/ui/nx-section.vue';
 import NxTag from '@/components/ui/nx-tag.vue';
@@ -99,8 +98,6 @@ const COUPON_ART = '/static/img/home-glass-20260928/coupon.webp';
 const copy = useAuditUiCopy(), t = useT(), lifecycleCopy = useTrialLifecycleCopy();
 const voucher = useVoucher(), voucherSheet = useVoucherClaimSheet();
 const trial = useFreeTrial(), trialCfg = useTrialConfig(), trialView = useTrialPresentation(), trialSheet = useTrialClaimSheet();
-useAutoRecovery({ failed: () => remoteApiEnabled && !trialSheet.open && !trial.authorityResultUnknown
-  && trial.authorityStatus === "error", retry: () => trialView.refresh() });
 const visibility = useDataVisibility();
 
 // Voucher: same remote/local sources as the previous home banner, split into claimable and claimed.
@@ -129,7 +126,7 @@ const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value
   && trialCfg.config.seatsLeftToday > 0 && (trial.showHeroPromo() || showCapacityFull.value)));
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
 const trialOfferEnabled = computed(() => trial.startRetryable ? eligibility.value.ok
-  : trialView.actionsReady.value && (capacityFull.value || eligibility.value.ok));
+  : trial.canOpenClaim() || trialView.actionsReady.value && capacityFull.value);
 // B53: only the confirmed trial product is named; until then the card shows the same "—" as its unknown amounts, never a default S1.
 const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '—');
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
