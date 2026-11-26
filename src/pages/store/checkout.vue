@@ -445,7 +445,7 @@ import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { parseTrialConvertReceipt, trialPriceChanged as trialPriceRefused, type TrialAuthorityState, type TrialConversionQuote, type TrialOriginalPurchase, type TrialPurchaseOption } from "@/api/trial-api";
 import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 import type { PurchasePaymentIntent } from "@/api/purchase-payment-api";
-import { hasTrialDiscountTerms, trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
+import { formatTrialDiscountCap, hasTrialDiscountTerms, trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
 import { landingCopy } from "@/i18n/promotion-landing";
 import { purchasePrincipalUsdt } from "@/api/device-e3-api";
 import { beginOrderAction, clearOrderAction, markOrderActionPaid, readOrderAction } from "@/lib/order-command-fence";
@@ -2185,7 +2185,7 @@ const shownTrialDueBelowCent = computed(() => !trialOriginal.value && !legacyTri
   && trialDueBelowCent(exactTrialDue.value ?? retainedTrialReviewQuote.value?.amountUSD));
 const shownTrialDiscounts = computed(() => {
   const frozen = originalTrialBreakdown.value;
-  if (frozen) return { promo: frozen.promoDiscountUSD, offset: frozen.offsetUSD, early: frozen.earlyDiscountUSD };
+  if (frozen) return trialDiscountDisplay(frozen);
   if (trialOriginal.value?.kind === "EXTERNAL" && !originalTrialPaymentQuote.value)
     return { promo: null, offset: null, early: null };
   const quote = shownTrialQuote.value;
@@ -2265,7 +2265,7 @@ const trialPromoRowLabel = computed(() => {
   const { discountRate, discountCapUSD: cap } = trialDiscountTerms(frozen ?? quote, trialCfg.value);
   const pct = formatTrialDiscountPercent(discountRate);
   if (cap === null) return fmt(trialDetailCopy.value.promoRowNoCap, { pct });
-  return fmt(trialDetailCopy.value.promoRow, { pct, cap: Number.isInteger(cap) ? `$${cap}` : `$${formatGroupedAmount(cap)}` });
+  return fmt(trialDetailCopy.value.promoRow, { pct, cap: formatTrialDiscountCap(cap) });
 });
 const trialWalletRowNote = computed(() => {
   if (trialZeroDue.value) return purchaseCopy.value.coZeroPayNote;
