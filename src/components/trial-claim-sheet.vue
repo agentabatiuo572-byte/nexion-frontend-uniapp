@@ -158,9 +158,9 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
 const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
 const termsChanged = computed(() => shownReason.value === "terms-changed");
 // An explicitly unreceived start has a saved retry but no pending receipt to poll.
-const startNotRun = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
-  : freeTrial.startNotSeen && !shownReason.value);
-const claimRetryable = computed(() => !termsChanged.value && (startNotRun.value || (!freeTrial.pendingStart
+const startNotSeen = computed(() => !freeTrial.pendingStart && freeTrial.startNotSeen && !shownReason.value);
+const startRetryAvailable = computed(() => startNotSeen.value || freeTrial.startRetryable);
+const claimRetryable = computed(() => !termsChanged.value && (startRetryAvailable.value || (!freeTrial.pendingStart
   && claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value)));
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
   ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
@@ -170,11 +170,12 @@ const claimFromRetry = ref(false);
 const heldReasonText = ref("");
 const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
-const checkingEligibility = computed(() => !activated.value && !claiming.value && !claimError.value && !startNotRun.value
+const checkingEligibility = computed(() => !activated.value && !claiming.value && !claimError.value && !startRetryAvailable.value
   && freeTrial.authorityStatus === "loading" && freeTrial.canOpenClaim());
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
 const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value
-  : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value || checkingEligibility.value);
+  : (!!freeTrial.pendingStart && (!freeTrial.startRetryable || !termsChanged.value))
+    || staleRead.value || checkingEligibility.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 // A refresh that failed over the shown data holds the claim: that is why 「免费激活」 is off, said as a status line beside it
 // while recovery reads again on its own (03 §3.1 禁用要有原因, §3.5.2).
@@ -184,7 +185,7 @@ const staleRead = computed(() => freeTrial.transientReadFailure && trialView.dis
 // unknown-eligibility hint stands above the off primary, so it is never grey without a reason (03 §3.4 无权限／不可用).
 const eligibilityUnknown = computed(() => !activated.value && !claiming.value && !freeTrial.pendingStart && !claimError.value && !staleRead.value
   && freeTrial.authorityStatus === "ready" && !freeTrial.canStart() && freeTrial.eligibility().reason === "unknown");
-const reasonLine = computed(() => !!freeTrial.pendingStart || startNotRun.value || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
+const reasonLine = computed(() => !!freeTrial.pendingStart || startNotSeen.value || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
   || checkingEligibility.value || eligibilityUnknown.value);
 // Only a failed read with nothing to show leaves the result block alone; a reason or status line keeps its state (A09 order).
 const readFailView = computed(() => !reasonLine.value && !activated.value && !claiming.value && stateReadFailed.value);
@@ -208,12 +209,13 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : copy.value.activateCta);
 // View state only: the one primary is the retry when the claim can be sent again (A06), busy while it is sent and while a
 // start the service took is still being confirmed (A07), so no greyed 「免费激活」 stands beside the status line.
-const confirmingStart = computed(() => !!freeTrial.pendingStart && !startNotRun.value);
+const confirmingStart = computed(() => !!freeTrial.pendingStart && !freeTrial.startRetryable);
 const primaryBusy = computed(() => claiming.value || confirmingStart.value);
 const primaryLabel = computed(() => showRetry.value ? t.value.trial.claimRetryCta : claimCtaLabel.value);
 const primaryLeaves = computed(() => !showRetry.value && claimOpensAnotherPage.value);
 const claimErrorText = computed(() => termsChanged.value && !confirmingStart.value ? sheet.failureText("terms-changed")
-  : startNotRun.value ? t.value.trial.claimNotStartedInline
+  : startNotSeen.value ? t.value.trial.claimNotStartedInline
+  : freeTrial.startRetryable ? t.value.trial.claimUnconfirmedRetryInline
   : freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : staleRead.value ? t.value.exchange.staleSnapshot
   : checkingEligibility.value ? t.value.trial.entryChecking

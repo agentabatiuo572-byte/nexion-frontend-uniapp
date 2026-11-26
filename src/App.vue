@@ -24,6 +24,7 @@ import {
   trialReservesSlotNow,
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
+import { useDataVisibility } from "@/store/data-visibility";
 import { useTrialCheckout } from "@/store/trial-checkout";
 import { useTrialPurchaseResult } from "@/store/trial-purchase-result";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
@@ -338,7 +339,7 @@ function showTrialNotices(before: ReturnType<typeof useFreeTrial>["status"], now
     }
   } else if (st.status === "grace" && st.graceEndsAt !== null) {
     const left = remainingMs(nowMs);
-    const credit = formatAmount(liveShadowUSD(nowMs));
+    const credit = useDataVisibility().mask(formatAmount(liveShadowUSD(nowMs)));
     if (!urgencyFired.grace1h && left > 0 && left <= URGENCY_1H_MS) {
       urgencyFired.grace1h = true;
       urgencyFired.grace24h = true; // don't double-push inside the last hour

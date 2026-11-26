@@ -2137,6 +2137,7 @@ export const ms: Messages = {
     sheetDismissCta: "Mungkin nanti",
     claimUnknownInline: "Pengaktifan percubaan sedang disahkan. Dikemas kini automatik selepas disahkan.",
     claimNotStartedInline: "Percubaan belum diaktifkan. Anda boleh cuba lagi.",
+    claimUnconfirmedRetryInline: "Keputusan pengaktifan belum dapat disahkan. Anda boleh cuba lagi; ia tidak akan diaktifkan dua kali.",
     claimOnboardingRequired: "Percubaan tidak boleh dituntut buat masa ini. Sila hubungi khidmat pelanggan.",
     claimOnboardingCta: "Hubungi bantuan",
     claimTermsRequired: "Percubaan belum bermula. Sahkan terma perkhidmatan, kemudian kembali untuk menuntutnya.",

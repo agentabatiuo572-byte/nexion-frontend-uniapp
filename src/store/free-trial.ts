@@ -895,7 +895,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       return;
     }
     const sameClaim = next.claimNo === previousClaimNo;
-    startRetryable.value = !active && sameClaim && !pending.refusal && next.canStart;
+    const retryable = !active && sameClaim && !pending.refusal && next.canStart;
+    if (mode === "legacy" && retryable && !confirmedByThreeReads(pending, next.serverNow)) return;
+    startRetryable.value = retryable;
     const reason = pending.refusal ?? next.eligibilityReason;
     if (active || !sameClaim || !reason || reason === "unknown" || startRetryable.value) {
       resetLifecycleStreak(pending);

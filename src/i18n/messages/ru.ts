@@ -2137,6 +2137,7 @@ export const ru: Messages = {
     sheetDismissCta: "Позже",
     claimUnknownInline: "Подтверждаем запуск пробного периода. Обновится автоматически.",
     claimNotStartedInline: "Пробный период не запущен. Можно попробовать ещё раз.",
+    claimUnconfirmedRetryInline: "Пока не удалось подтвердить активацию. Можно попробовать снова — повторной активации не будет.",
     claimOnboardingRequired: "Пробный период сейчас нельзя начать. Обратитесь в поддержку.",
     claimOnboardingCta: "Поддержка",
     claimTermsRequired: "Пробный период не начат. Примите условия использования и вернитесь.",

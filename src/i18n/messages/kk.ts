@@ -2137,6 +2137,7 @@ export const kk: Messages = {
     sheetDismissCta: "Кейінірек",
     claimUnknownInline: "Сынақтың іске қосылуы расталуда. Расталған соң өзі жаңарады.",
     claimNotStartedInline: "Сынақ іске қосылмады. Қайта көруге болады.",
+    claimUnconfirmedRetryInline: "Белсендіру нәтижесі әлі расталмады. Қайта көруге болады, екі рет белсендірілмейді.",
     claimOnboardingRequired: "Сынақты қазір алу мүмкін емес. Қолдау қызметіне жазыңыз.",
     claimOnboardingCta: "Қолдауға жазу",
     claimTermsRequired: "Сынақ басталмады. Қызмет шарттарын растап, алуға оралыңыз.",

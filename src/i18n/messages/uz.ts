@@ -2137,6 +2137,7 @@ export const uz: Messages = {
     sheetDismissCta: "Keyinroq",
     claimUnknownInline: "Sinov faollashtirilishi tasdiqlanmoqda. Tasdiqlangach, oʻzi yangilanadi.",
     claimNotStartedInline: "Sinov faollashtirilmadi. Qayta urinib koʻrishingiz mumkin.",
+    claimUnconfirmedRetryInline: "Faollashtirish natijasi hali tasdiqlanmadi. Qayta urinib koʻrishingiz mumkin, ikki marta faollashmaydi.",
     claimOnboardingRequired: "Sinovni hozir olib boʻlmaydi. Yordam xizmatiga murojaat qiling.",
     claimOnboardingCta: "Yordam xizmati",
     claimTermsRequired: "Sinov boshlanmadi. Xizmat shartlarini tasdiqlab, olish uchun qayting.",
