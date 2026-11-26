@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { demoDefaults, demoFixture, demoProducts } from "./lib/prototype-demo-data.mjs";
 
 const origin = "http://localhost";
-const state = { ...demoDefaults, trialState: "active", trialPurchaseListState: "five" };
+const state = { ...demoDefaults, trialState: "active", trialPurchaseListState: "device-discounts" };
 const trialState = () => demoFixture(new URL("/api/trial/state", origin), "zh", state, { method: () => "GET" });
 const purchaseOptions = () => {
   const read = demoFixture(new URL("/api/trial/purchase-options", origin), "zh", state, { method: () => "GET" });
@@ -18,7 +18,7 @@ const purchaseOptions = () => {
   assert.equal(rack.quoteVersion, rack.quote.quoteVersion);
   assert.deepEqual(trial.paymentMethods, ["WALLET", "CREGIS_USDT_BSC", "HDPAY_BANK"]);
   assert.deepEqual(rack.paymentMethods, ["WALLET"]);
-  return { trial, rack };
+  return { trial, rack, share: read.options.find(option => option.productNo === "cloud-share") };
 };
 const claim = trialState();
 const trialSku = claim.config.trialProductId;
@@ -26,6 +26,12 @@ assert.ok(claim.claimNo && trialSku && claim.quote, "preview has no live trial q
 const before = purchaseOptions();
 assert.equal(Number(before.trial.priceUsdt), Number(claim.quote.priceUsdt));
 assert.equal(before.trial.quote.quoteVersion, claim.quote.quoteVersion);
+assert.equal(Number(before.trial.quote.discountRate), 15, "the original trial device keeps default discounts");
+assert.equal(Number(before.trial.quote.earlyDiscountConfiguredUsdt), 10);
+assert.equal(Number(before.rack.quote.earlyDiscountConfiguredUsdt), 0);
+assert.equal(before.rack.quote.settlementPolicy, "FULL_TERM_ON_CONVERSION", "zero fixed discount still settles the full term");
+assert.equal(Number(before.share?.quote?.discountRate), 0.5, "option rates use wire percentages");
+assert.equal(Number(before.share?.quote?.promoDiscountUsdt), 1, "0.5% of the 200 USDT share is 1 USDT");
 
 state.trialPurchasePriceState = "trial-up";
 const raisedTrial = purchaseOptions().trial;

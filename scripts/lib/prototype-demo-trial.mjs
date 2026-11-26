@@ -23,6 +23,13 @@ export function registerTrialOriginalPayment(state,read){
   originalPaymentReaders.set(state,read);
 }
 const optionSku=['stellarrack-p1','cloud-share','stellarbox-pro','stellarbox-pro-v2','stellarbox-s1','stellarrack-p2'];
+const deviceDiscounts={
+  'stellarbox-s1': {discount:{ratePct:'25',capUsdt:'40'},earlyUsdt:'4'},
+  'stellarbox-pro': {},
+  'stellarbox-pro-v2': {discount:{ratePct:'20',capUsdt:'400'},earlyUsdt:'30'},
+  'stellarrack-p1': {earlyUsdt:'0'},
+  'cloud-share': {discount:{ratePct:'0.5',capUsdt:'50'}},
+};
 export const trialPurchaseOptionSku=state=>state.trialPurchaseOptionTarget==='trial-device'
   ? state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku) : 'stellarrack-p1';
 export const trialPurchaseOptionsEnabled=state=>state.trialPurchaseReadState!=='unsupported';
@@ -49,8 +56,6 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     unclaimedConfig.shadowDailyUSD=null;
     unclaimedConfig.shadowDailyNEX=null;
   }
-  // FEAT-TRIAL05 mirror of the Java quote: inside the original term the full claimed term is
-  // settled and a fixed discount comes off what is left to pay; 0 switches the rule off.
   unclaimedConfig.earlyPurchaseDiscountUSD??=String(state.trialEarlyDiscount??'10');
   // P-59 / backend B13-B14: the trial discount caps at $50; an empty offset cap is JSON null in App responses.
   unclaimedConfig.discountCapUSD='50';unclaimedConfig.trialOffsetCapUSD=null;
@@ -63,6 +68,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   if(pricing==='cloud-share-half-cent')unclaimedConfig.trialOffsetCapUSD='6.34';
   // Repricing a confirmed precision quote changes live promo policy, never the claim's price or rates.
   if(pricing==='precision-repriced')unclaimedConfig.discountCapUSD='49.999999';
+  const perDevice=state.trialPurchaseListState==='device-discounts';
+  if(perDevice&&state.trialDefaultDiscountState==='repriced')
+    Object.assign(unclaimedConfig,{discountRate:'0.175',earlyPurchaseDiscountUSD:'5'});
   const trialTermsVersion=available?createHash('sha256').update(JSON.stringify([
     unclaimedConfig.trialProductId,unclaimedConfig.trialDays,product.monthlyEstimateUsdt??null,
     unclaimedConfig.shadowDailyUSD,unclaimedConfig.shadowDailyNEX,unclaimedConfig.trialOffsetCapUSD,unclaimedConfig.trialPriceUSD,
@@ -94,8 +102,9 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const row=state.trialRow;
   // Saved preview rows predate per-claim identities.
   if(row.state!=='ELIGIBLE')row.claimNo??=newClaimNo();
-  // Historical terms still determine accrual and lifecycle dates. Only the live promo cap can be repriced.
-  let cfg={...unclaimedConfig,...row.claimConfig,discountCapUSD:unclaimedConfig.discountCapUSD};
+  // Claim terms determine accrual and the offset cap. The three purchase discounts are live.
+  const {discountRate,discountCapUSD,earlyPurchaseDiscountUSD}=unclaimedConfig;
+  let cfg={...unclaimedConfig,...row.claimConfig,discountRate,discountCapUSD,earlyPurchaseDiscountUSD};
   let duration=Number(cfg.trialDays)*day,grace=Number(cfg.graceDays)*day;
   const usesOptions=trialPurchaseOptionsEnabled(state);
   const trialProduct=()=>products.find(item=>item.id===cfg.trialProductId);
@@ -111,11 +120,11 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   },cfg.trialProductName);
   function accruedAt(at){
     const days=min(BigInt(Math.max(0,Math.floor((at-row.startedAt)/1000)))*100000000n/86400n,BigInt(cfg.trialDays)*100000000n);
-    const dailyShadow=units(cfg.shadowDailyUSD);
+    const dailyShadow=units(cfg.shadowDailyUSD??0);
     // The loopback preview can advance accrual between interactions without changing the claim or quote terms.
     const shadow=state.trialPreviewAccruedMicros===undefined ? dailyShadow*days/100000000n
       : min(BigInt(state.trialPreviewAccruedMicros),dailyShadow*BigInt(cfg.trialDays));
-    return {shadow:max(0n,shadow-units(state.trialAccrualReductionUsdt??0)),nex:units(cfg.shadowDailyNEX)*days/100000000n};
+    return {shadow:max(0n,shadow-units(state.trialAccrualReductionUsdt??0)),nex:units(cfg.shadowDailyNEX??0)*days/100000000n};
   }
   const snapshot=()=>{
     if(row.state==='ACTIVE'&&now>=row.startedAt+duration)row.state='GRACE';
@@ -148,24 +157,43 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       offsetUsdt:quote?.offsetUsdt??0,remainderUsdt:quote?.remainderUsdt??0,priceUsdt:Number(cfg.trialPriceUSD),
       ...(quote?{quote}:{}),...(conversion||{}),...(claimed&&usesOptions?{originalPurchase:purchaseSnapshot}: {})};
   };
+  function applicableDiscounts(sku){
+    const settings=perDevice&&sku!==cfg.trialProductId?deviceDiscounts[sku]:undefined;
+    let discount=settings?.discount,earlyUsdt=settings?.earlyUsdt;
+    if(settings&&sku==='stellarbox-pro-v2'){
+      if(state.trialDeviceDiscountState==='repriced')discount={ratePct:'5',capUsdt:'400'};
+      if(state.trialDeviceDiscountState==='discount-follows')discount=undefined;
+      if(state.trialDeviceDiscountState==='early-follows')earlyUsdt=undefined;
+    }
+    // Both inputs become millionths of one percent. The default wire value is a fraction.
+    return {
+      rate:discount?units(discount.ratePct):units(discountRate,8),
+      cap:units(discount?.capUsdt??discountCapUSD),
+      early:units(earlyUsdt??earlyPurchaseDiscountUSD)/10000n*10000n,
+    };
+  }
   function quoteFor(shadow,nex,inTerm,sku=cfg.trialProductId,priceUsdt=cfg.trialPriceUSD){
-      const discount=units(cfg.earlyPurchaseDiscountUSD)/10000n*10000n;
-      const early=inTerm&&discount>0n,price=units(priceUsdt);
+      const {rate,cap,early:discount}=applicableDiscounts(sku);
+      const claim=row.claimConfig;
+      const fullTermSnapshot=Number.isFinite(row.startedAt)&&Number(claim?.trialDays)>0
+        &&Number(claim?.shadowDailyUSD)>0&&Number(claim?.shadowDailyNEX)>0&&Number(claim?.trialPriceUSD)>0
+        &&(claim?.trialOffsetCapUSD===null||Number(claim?.trialOffsetCapUSD)>=0);
+      const early=inTerm&&fullTermSnapshot,price=units(priceUsdt);
       const settled=early?max(units(cfg.shadowDailyUSD)*BigInt(cfg.trialDays),shadow):shadow;
       const reward=early?max(units(cfg.shadowDailyNEX)*BigInt(cfg.trialDays),nex):nex;
-      const rate=units(cfg.discountRate,8),normalizedRate=rate>100000000n?rate/100n:rate;
-      const promo=capped(price*normalizedRate/100000000n,cfg.discountCapUSD);
+      const promo=min(price*rate/100000000n,cap);
       // Only real accrual offsets the price after promo; the rest of the settlement is paid out.
       const offset=min(capped(shadow,cfg.trialOffsetCapUSD),max(0n,price-promo)),baseDiscount=min(price,promo+offset);
       const base=max(0n,price-baseDiscount),earlyDiscount=early?min(discount,base):0n,amount=base-earlyDiscount;
       const settlementPolicy=early?'FULL_TERM_ON_CONVERSION':'ACCRUED_ON_CONVERSION';
       const terms=usesOptions
-        ? [row.claimNo,sku,fixed(price),cfg.discountRate,cfg.discountCapUSD,cfg.earlyPurchaseDiscountUSD,cfg.trialOffsetCapUSD]
+        ? [row.claimNo,sku,fixed(price),fixed(rate),fixed(cap),fixed(discount),cfg.trialOffsetCapUSD]
         : early?['ACCRUED_OFFSET',row.claimNo,...[settled,reward,promo].map(fixed),fixed(discount).slice(0,-4),cfg.trialOffsetCapUSD==null?'null':fixed(units(cfg.trialOffsetCapUSD))]:null;
       const quoteVersion=terms?settlementPolicy+':'+createHash('sha256').update(usesOptions?JSON.stringify(terms):terms.join('|')).digest('hex').slice(0,usesOptions?24:16):settlementPolicy;
       return {settlementPolicy,quoteVersion,earlyPurchase:early,priceUsdt:number(price),accruedUsdt:number(shadow),accruedNex:number(nex),
         settledUsdt:number(settled),rewardNex:number(reward),earlyRewardUsdt:number(settled-shadow),earlyRewardNex:number(reward-nex),
-        offsetUsdt:number(offset),remainderUsdt:number(settled-offset),promoDiscountUsdt:number(promo),earlyDiscountConfiguredUsdt:number(discount),earlyDiscountUsdt:number(earlyDiscount),
+        offsetUsdt:number(offset),remainderUsdt:number(settled-offset),promoDiscountUsdt:number(promo),
+        discountRate:fixed(rate),discountCapUsdt:fixed(cap),earlyDiscountConfiguredUsdt:number(discount),earlyDiscountUsdt:number(earlyDiscount),
         discountUsdt:number(baseDiscount+earlyDiscount),amountUsdt:number(amount),earlyEndsAtEpochMs:early?row.startedAt+duration:null,trialOffsetCapUSD:cfg.trialOffsetCapUSD};
   }
 
@@ -196,6 +224,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   }
 
   function extraProductNos() {
+    if(perDevice)return Object.keys(deviceDiscounts).filter(sku=>sku!==cfg.trialProductId);
     const extraCount=state.trialPurchaseListState==='five'?4:state.trialPurchaseListState==='two'?1:0;
     return optionSku.filter(sku=>sku!==cfg.trialProductId).slice(0,extraCount);
   }
@@ -310,12 +339,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
         refuse('TRIAL_PRODUCT_NOT_AVAILABLE');
       refuse(reason==='TRIAL_PRODUCT_QUOTE_UNAVAILABLE'?'TRIAL_DAILY_YIELD_INVALID':reason);
     }
-    let quote=option?.quote??current.quote;
-    if(paid){
-      const pricedAt=atTrialClock(paid.pricingAt);
-      const {shadow,nex}=accruedAt(pricedAt);
-      quote=quoteFor(shadow,nex,pricedAt<row.startedAt+duration);
-    }
+    const quote=paid?paid.trialQuote:option?.quote??current.quote;
+    if(!quote)refuse('TRIAL_NOT_CONVERTIBLE');
     const amount=quote.amountUsdt;
     // convert confirms cents, while the quote, debit and receipt retain six decimals.
     const expected=body.expectedAmountUsdt;
@@ -326,7 +351,7 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
     if((units(amount)+5000n)/10000n>units(expected,2)) refuse('TRIAL_AMOUNT_MISMATCH',changed);
     const hardwareQuotaUsedAt=requirePurchase(body.productNo,isTrialProduct);
     if(!paid&&amount>0&&units(demoWalletUsdt(state))<units(amount))refuse('TRIAL_WALLET_INSUFFICIENT');
-    const device=isTrialProduct?trialDevice():trialPurchaseDevice(selectedProduct);
+    const device=paid?paid.trialDeviceSnapshot:isTrialProduct?trialDevice():trialPurchaseDevice(selectedProduct);
     state.lastTrialConversion={productNo:body.productNo,expectedAmountUsdt:body.expectedAmountUsdt,quoteVersion:body.quoteVersion,serverQuoteVersion:quote.quoteVersion,amountUsdt:amount};
     const orderNo='TRC-DEMO'+now;
     if(!paid&&amount>0)postDemoWalletEntries(state,{bizNo:orderNo,bizType:'TRIAL_CHARGE',

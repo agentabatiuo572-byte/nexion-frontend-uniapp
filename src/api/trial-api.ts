@@ -23,7 +23,7 @@ export interface TrialConversionOutcome {
 export interface TrialConversionQuote {
   settlementPolicy: TrialSettlementPolicy;
   quoteVersion: string;
-  /** True only inside the original term with the early-purchase policy on. */
+  /** True when an in-term purchase qualifies for full-term settlement. */
   earlyPurchase: boolean;
   priceUSD: number;
   /** Real accrual so far — never replaced by the settled totals. */
@@ -37,6 +37,9 @@ export interface TrialConversionQuote {
   offsetUSD: number;
   remainderUSD: number;
   promoDiscountUSD: number;
+  /** Fraction for display, normalized from the quote's wire percentage. */
+  discountRate?: number;
+  discountCapUSD?: number;
   /** The configured fixed discount (rules copy); this order may apply less. */
   earlyDiscountConfiguredUSD: number;
   earlyDiscountUSD: number;
@@ -320,8 +323,13 @@ export function parseTrialConversionQuote(value: unknown): TrialConversionQuote 
       || row.earlyPurchase !== (policy === "FULL_TERM_ON_CONVERSION")
       || (row.earlyPurchase && earlyEndsAt === null)
       || Object.values(amounts).some(amount => amount === null)) return invalid();
+  const rawRate = row.discountRate;
+  const pct = typeof rawRate === "string" && /^\d+(?:\.\d+)?$/.test(rawRate) ? finiteNumber(rawRate) : null;
+  const cap = finiteNumber(row.discountCapUsdt);
   return { settlementPolicy: policy as TrialSettlementPolicy, quoteVersion: version,
-    earlyPurchase: row.earlyPurchase, ...amounts as { [K in keyof typeof amounts]: number }, earlyEndsAt };
+    earlyPurchase: row.earlyPurchase, ...amounts as { [K in keyof typeof amounts]: number }, earlyEndsAt,
+    ...(pct !== null && pct <= 100 ? { discountRate: Number(`${rawRate}e-2`) } : {}),
+    ...(cap !== null ? { discountCapUSD: cap } : {}) };
 }
 
 const QUOTE_UNAVAILABLE = "TRIAL_PRODUCT_QUOTE_UNAVAILABLE";

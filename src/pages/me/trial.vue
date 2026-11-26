@@ -306,7 +306,7 @@ import TrialDevicePicker from "@/components/trial/trial-device-picker.vue";
 import TrialOriginalPurchaseCard from "@/components/trial/trial-original-purchase-card.vue";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
-import { trialDiscountDisplay } from "@/lib/trial-discount-display";
+import { trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
 
 const t = useT();
 const app = useApp();
@@ -550,8 +550,8 @@ const totalBreakdown = computed(() => {
   return credit ? fmt(detail.value.totalBreakdown, { discount, credit }) : fmt(detail.value.totalDiscountOnly, { discount });
 });
 const promoLabel = computed(() => {
-  const pct = formatTrialDiscountPercent(cfg.value.discountRate);
-  const cap = cfg.value.discountCapUSD;
+  const { discountRate, discountCapUSD: cap } = trialDiscountTerms(purchaseQuote.value, cfg.value);
+  const pct = formatTrialDiscountPercent(discountRate);
   return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: usdShort(cap) });
 });
 const conversionRefunded = computed(() => remoteApiEnabled && status.value === "converted"
@@ -648,15 +648,21 @@ const barNoteWarn = computed(() => barNote.value !== "" && barNote.value === det
 // Rules sheet (spec ⑥: pre-purchase offset / no cash-out / post-purchase
 // remainder → balance / expiry).
 const rulesOpen = ref(false);
+const rulesEarlyLine = computed(() => {
+  const quote = purchaseQuote.value;
+  if (!quote) return "";
+  const fullTerm = quote.settlementPolicy === "FULL_TERM_ON_CONVERSION";
+  if (quote.earlyDiscountConfiguredUSD === 0) return fullTerm ? detail.value.rulesEarlyZero : "";
+  return fmt(fullTerm ? detail.value.rulesEarlyFull : detail.value.rulesEarly, {
+    discount: usdShort(quote.earlyDiscountConfiguredUSD),
+  });
+});
 const rulesLines = computed(() => [
   cfg.value.trialOffsetCapUSD === null ? detail.value.rulesBeforeNoCap
     : fmt(w.value.rulesBefore, { cap: formatGroupedAmount(cfg.value.trialOffsetCapUSD) }),
   w.value.rulesNoCash,
   w.value.rulesAfter,
-  ...(earlyQuote.value && earlyQuote.value.earlyDiscountConfiguredUSD > 0 ? [fmt(
-    earlyQuote.value.settlementPolicy === "FULL_TERM_ON_CONVERSION" ? detail.value.rulesEarlyFull : detail.value.rulesEarly,
-    { discount: usdShort(earlyQuote.value.earlyDiscountConfiguredUSD) },
-  )] : []),
+  ...(rulesEarlyLine.value ? [rulesEarlyLine.value] : []),
   lifecycle.value.rulesRefund,
   w.value.rulesExpiry,
 ]);
