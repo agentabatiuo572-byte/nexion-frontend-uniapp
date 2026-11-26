@@ -74,6 +74,9 @@ const trialLifecycle=createTrialLifecyclePreview(state,(url,request,mode)=>{
     state.trialStartPhaseClosed=true;
     throw Object.assign(new Error('TRIAL_START_PREVIEW_UNKNOWN_DENIAL'),{status:409});
   }
+  // A generic refusal that leaves the account eligible: the sheet offers 重新领取 under 「暂时无法领取。」.
+  if(mode==='rejected-retryable'&&url.pathname==='/api/trial/start')
+    throw Object.assign(new Error('TRIAL_START_PREVIEW_UNKNOWN_DENIAL'),{status:409});
   if(mode==='rejected'){
     if(url.pathname==='/api/trial/start')state.trialStartPhaseClosed=true;
     else if(state.trialRow?.state==='ACTIVE'&&!checkoutFlow?.originalTrialPurchase())
