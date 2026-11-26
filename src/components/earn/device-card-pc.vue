@@ -133,7 +133,6 @@
         <text class="block" style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-2)">{{ phoneActivationGuidance.body }}</text>
         <view v-if="nativePhoneAvailable" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand); font-size: 12px; font-weight: 600" role="button" tabindex="0" @click.stop="goPhoneBinding"  @keydown.enter.stop.prevent="goPhoneBinding" @keydown.space.stop.prevent="goPhoneBinding"><text class="nx-after-arrow">{{ t.myDevices.phoneActivationCta }}</text></view>
       </view>
-      <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" />
       <template v-if="stage">
         <view v-if="stageOffline" class="earn-stage__offline-art" aria-hidden="true"><DeviceArt class="earn-stage__offline-image" :device="device" /><view class="earn-stage__floor" /></view>
         <JobGauge v-else :progress="gaugeProgress" :idle="gaugeIdle" :live="gaugeProgress != null && jobRunning" :label="task ? visibility.mask(task.type) : t.earn.currentTask"><DeviceArt :device="device" /></JobGauge>
@@ -179,29 +178,9 @@
         </view>
       </view>
 
-    <!-- Server phones expose calibrated capacity; local factors are not measured live TOPS. -->
-    <view v-if="phoneFactsReady && device.kind === 'phone' && device.capacitySource === 'server'" style="padding: 0 20px 12px">
-      <view class="flex items-center justify-between gap-2">
-        <text :style="sectionLabelStyle">{{ t.earn.hashCapability }}</text>
-        <view class="flex items-center gap-1.5">
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink-2)">{{ visibility.mask(baselineTops == null ? '-' : `${baselineTops} ${t.onboarding.phoneComputeUnit}`) }}</text>
-          <text v-if="capTier != null" style="font-size: 12px; color: var(--v5-ink-3)">{{ visibility.mask(fmt(t.earn.hashTier, { n: capTier })) }}</text>
-        </view>
-      </view>
-      <text v-if="baselineTops == null" class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.hashCapabilityUnknown }}</text>
-    </view>
-
-    <!-- Mock phone: live hashpower (effective vs calibrated capability ceiling) -->
+    <!-- Mock phone: live hashpower (effective value; the capability ceiling is not shown) -->
     <view v-if="phoneRunning && live" style="padding: 0 20px 12px">
-      <view class="flex items-center justify-between" style="margin-bottom: 8px">
-        <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
-        <view class="flex items-center gap-1" :style="capChipStyle">
-          <text style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }}</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ visibility.mask(baselineTops?.toFixed(1) ?? '—') }} {{ t.onboarding.phoneComputeUnit }}</text>
-          <text style="color: var(--v5-ink-4)">·</text>
-          <text style="color: var(--v5-brand)">{{ visibility.mask(capTier == null ? '—' : fmt(t.earn.hashTier, { n: capTier })) }}</text>
-        </view>
-      </view>
+      <text class="block" :style="sectionLabelStyle" style="margin-bottom: 8px">{{ t.earn.hashLabel }}</text>
       <view class="flex items-end justify-between">
         <view class="flex items-baseline" style="gap: 4px">
           <text class="tabular-nums" style="font-family: var(--font-metric); font-size: 34px; line-height: 1; font-weight: 500; color: var(--v5-brand); letter-spacing: -0.014em">{{ visibility.mask(live.effectiveTops.toFixed(1)) }}</text>
@@ -223,12 +202,6 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
         <text style="font-size: 12px; line-height: 1.35; color: var(--v5-ink-2); text-wrap: pretty">{{ t.earn.hashCarrierH5Network }} · {{ t.earn.hashCarrierUpgradeHook }}</text>
       </view>
-    </view>
-
-    <view v-else-if="phoneRunning" style="padding: 0 20px 12px">
-      <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
-      <text class="block" style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }} · — {{ t.onboarding.phoneComputeUnit }}</text>
-      <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.hashCapabilityUnknown }}</text>
     </view>
 
     <view v-if="detailPage" id="device-statistics" class="device-statistics" tabindex="-1" :aria-label="t.coreReview.statistics">
@@ -411,7 +384,6 @@ import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
 import TaskV2Status from "@/components/earn/task-v2-status.vue";
-import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, hasServerLifecycleProjection, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
@@ -581,7 +553,6 @@ function goTaskHistory() {
 }
 
 // ── Mock phone live hashpower (effective = capability × local demo factors) ──
-// Server phones show their calibrated capacity above without a fabricated live value.
 const phoneRunning = computed(
   () => phoneLocalReady.value && canShowLivePhoneHashpower(props.device),
 );
@@ -590,7 +561,6 @@ const phoneRunning = computed(
 const FALLBACK_CAP = fallbackCapability();
 const baselineTops = computed(() => props.device.capabilityTops ?? (remoteApiEnabled ? null : FALLBACK_CAP.tops));
 const cfg = useConfig();
-const capTier = computed(() => props.device.capabilityTier ?? (remoteApiEnabled ? null : FALLBACK_CAP.tier));
 const deviceOnline = computed(() => phoneLocalReady.value && isDeviceOnline(props.device, now.value));
 const live = computed(() => {
   const baseline = baselineTops.value;
@@ -825,12 +795,6 @@ const sectionLabelStyle: CSSProperties = {
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-ink-3)",
-};
-const capChipStyle: CSSProperties = {
-  padding: "3px 8px",
-  borderRadius: "9999px",
-  fontSize: "12px",
-  background: "var(--v5-surface-2)",
 };
 const warnBoxStyle: CSSProperties = {
   background: "color-mix(in oklab, var(--v5-warning) 8%, transparent)",

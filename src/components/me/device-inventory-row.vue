@@ -32,7 +32,6 @@
       <view class="device-inventory-row__wait" aria-hidden="true" />
       <text>{{ recovering ? computeCopy.statuses.RECOVERING : !runtimeConfirmed ? t.earn.runtimeUnknown : tasksConfirmed ? t.earn.noCurrentTask : t.earn.taskStatusUnavailable }}</text>
     </view>
-    <PhoneComputeStatus v-if="remoteApiEnabled && device.kind === 'phone'" :device-id="device.id" style="margin:12px 0 0" />
 
     <slot name="replacement-status" />
     <view v-if="device.pendingDeactivate && !$slots['replacement-status']" class="device-inventory-row__pending">
@@ -144,7 +143,6 @@ import { useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import { advanceMonotonicHighWater, projectServerNow, readMonotonicNowMs } from "@/lib/server-deadline-clock";
 import { deviceTaskRecovering, deviceTaskRunning, taskProgressPercent } from "@/lib/task-progress";
 import { useComputeV2Copy } from "@/i18n/compute-v2";
-import PhoneComputeStatus from "@/components/earn/phone-compute-status.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import type { CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
