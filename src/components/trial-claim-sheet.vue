@@ -14,12 +14,9 @@
           <text class="tcs-read-state__hint">{{ copy.autoRetrying }}</text>
         </view>
         <template v-else>
-          <!-- Result head (03 §3.6.1): 56px success circle, the sheet title (overview role, 03 §3.9) and one body line. -->
-          <view v-if="activated" class="tcs-result" role="status" aria-live="polite">
-            <view class="tcs-result__icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6" /></svg></view>
-            <text class="tcs-result__title">{{ copy.activationSuccessTitle }}</text>
-            <text class="tcs-result__body">{{ copy.activationSuccessBody }}</text>
-          </view>
+          <!-- Result head (03 §3.6.1, shared NxResultHead in its sheet size): 56px success circle, the overview-role title as a
+               heading, one body line. No toast speaks while the sheet is open, so the head announces its appearance once. -->
+          <view v-if="activated" class="tcs-result"><NxResultHead tone="success" size="sheet" announce :title="copy.activationSuccessTitle" :description="copy.activationSuccessBody" /></view>
           <!-- What is claimed: field name, device name, trial length (01 §1.1.1 字段名; 03 §3.8 NxTag). The same block stays after activation. -->
           <view class="tcs-head" :class="{ 'tcs-head--sub': activated }">
             <text class="tcs-eyebrow">{{ copy.productLabel }}</text>
@@ -77,6 +74,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { formatAmount } from "@/lib/amount-display";
@@ -312,12 +310,8 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-body--alone { padding-bottom:var(--nx-overlay-bottom); }
 .tcs-foot { flex:none;padding:0 16px var(--nx-overlay-bottom); }
 
-/* Result head after activation (03 §3.6.1 结果头): 56px circle, success 14% fill; title in the sheet-title role (03 §3.9). */
-.tcs-result { display:flex;flex-direction:column;align-items:center;padding:4px 44px 0;text-align:center; }
-.tcs-result__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-success-ink);background:color-mix(in srgb,var(--v5-success-ink) 14%,transparent); }
-.tcs-result__title { display:block;margin-top:12px;font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
-/* Sheet body copy (10 §10.1 常规短正文, body ink). */
-.tcs-result__body { display:block;margin-top:4px;font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+/* Places the result head after activation: 4px under the sheet top, clear of the close (44px each side). */
+.tcs-result { padding:4px 44px 0; }
 
 /* What is claimed, centred, clear of the close (52px each side). */
 .tcs-head { padding:0 52px;text-align:center; }
@@ -327,7 +321,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-name { display:block;min-height:var(--ui-type-hero-title-lh);margin-top:4px;font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
 /* Under the result head the device name is a card title (03 §3.9), so two 20px titles do not compete. */
 .tcs-head--sub .tcs-name { min-height:var(--ui-type-card-title-lh);font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5);letter-spacing:0; }
-.tcs-name:lang(zh),.tcs-result__title:lang(zh) { letter-spacing:0; }
+.tcs-name:lang(zh) { letter-spacing:0; }
 .tcs-tag-row { display:flex;justify-content:center;margin-top:8px; }
 .tcs-skel { display:inline-block;vertical-align:middle;border-radius:8px;background:color-mix(in srgb,var(--v5-ink) 9%,transparent); }
 .tcs-skel--name { width:148px;height:20px; }
@@ -391,9 +385,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 /* Entrance (07 §7.1): once, transform and opacity only. */
 .tcs-machine { animation:tcs-rise .6s .12s cubic-bezier(.16,1,.3,1) both; }
 .tcs-plinth__floor { animation:tcs-floor .6s .2s ease-out both; }
-.tcs-result__icon { animation:tcs-pop .42s .1s cubic-bezier(.34,1.56,.64,1) both; }
 @keyframes tcs-rise { from { opacity:0;transform:translateY(12px); } to { opacity:1;transform:none; } }
 @keyframes tcs-floor { from { opacity:0; } to { opacity:1; } }
-@keyframes tcs-pop { from { opacity:0;transform:scale(.6); } to { opacity:1;transform:none; } }
-@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-machine,.tcs-plinth__floor,.tcs-result__icon { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-machine,.tcs-plinth__floor { animation:none; } }
 </style>
