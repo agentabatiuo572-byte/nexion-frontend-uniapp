@@ -60,7 +60,7 @@ export type PurchaseChoice = { method: 'WALLET' } | { method: 'EXTERNAL'; receip
 export type PurchaseStep = 'methods' | 'network' | 'bank';
 type DefinitePaymentNotice = 'rejectQuotaPaused' | 'rejectQuotaMonthFull' | 'rejectQuotaSoldOut' | 'rejectConditionsUnmet' | 'rejectGateConditionsUnmet' | 'rejectPurchaseSetup' | 'trialConversionClosed' | 'trialNotConvertible';
 type EligibilityRetry = 'rejectEligibilityUnavailable';
-export type PurchaseNotice = '' | 'keepOrder' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'refunded' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | 'rejectCapacityPurchaseRetired' | DefinitePaymentNotice;
+export type PurchaseNotice = '' | 'keepOrder' | 'reminder' | 'timeShort' | 'timeout' | 'bankFailed' | 'review' | 'late' | 'refunded' | 'delivery' | 'leave' | 'changed' | 'quoteChanged' | 'orderExpired' | 'orderClosed' | 'orderMissing' | 'gone' | 'networkPaused' | 'existing' | 'originalUnavailable' | 'rejectTradeinBusy' | 'rejectTradeinWalletOnly' | 'rejectTradeinOwner' | 'rejectTradeinPriceChanged' | 'rejectCapacitySourceChanged' | 'rejectCapacityPurchaseRetired' | DefinitePaymentNotice;
 const TABLE = PURCHASE_PAYMENT_RECORDS_TABLE, KEYS = 'uvel-purchase-payment-keys-accounts-v1';
 const POLL_MS = 5000, POLL_BACKOFF = [5000, 10000, 20000, 30000], SHORT_DEADLINE_MS = 5 * 60000;
 const REVIEW_POLL_MS = 60000;

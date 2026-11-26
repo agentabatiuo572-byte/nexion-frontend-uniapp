@@ -356,7 +356,7 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
 import { DEVICE_SPECS, createDevice } from "@/store/device-types";
-import { computeTradeInCredit, ladderBandFor, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
+import { computeTradeInCredit, getTradeinSourcePrice, ladderBandFor, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, isPhaseReached, isTradeInTargetAvailable } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -768,7 +768,7 @@ function kindLabel(kind: DeviceKind): string {
 /** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
 function previewCredit(oldDevice: Device, targetPriceUsdt: number): number {
   return computeTradeInCredit(
-    oldDevice.paidPriceUsdt ?? 0,
+    getTradeinSourcePrice(oldDevice),
     Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0),
     targetPriceUsdt,
   );
@@ -1000,9 +1000,7 @@ async function loadRemoteRetireTargets() {
   const requestIsCurrent = () => purchaseMounted && props.active && request === remoteRetireRequest
     && isCurrentAccountScope(requestScope) && key === remoteRetireLoadKey.value && state.value === current
     && requestOrigin.environment === apiRuntimeConfig.environment && requestOrigin.baseUrl === apiRuntimeConfig.baseUrl;
-  const paid = source.paidPriceUsdt ?? 0;
-  const candidates = PRODUCTS.filter(product => product.productType === "DEVICE"
-    && (!config.requireHigherPrice || product.price > paid));
+  const candidates = PRODUCTS.filter(product => product.productType === "DEVICE");
   remoteRetireLoadError.value = false;
   remoteRetirePending.value = candidates.length > 0;
   await Promise.allSettled(candidates.map(async ({ id }) => {
@@ -1097,16 +1095,16 @@ const retireView = computed(() => {
     };
   }
   if (!device) return null;
-  const paid = device.paidPriceUsdt ?? 0;
+  const sourcePrice = remoteApiEnabled ? 0 : getTradeinSourcePrice(device);
   // 目标 = 目录中合规的可购 SKU(select 列表,不手输;规格 DEV02A ⑥)。
   // 「仅限更高价」与「已上架 ∨ 抢先购窗口」均为运营可配规则,消费 flag 不硬编码。
   const targets = PRODUCTS.filter(
     (p) =>
       p.productType === "DEVICE" && (!remoteApiEnabled || canonicalTradeinConfig.value?.enabled) &&
-      (!(remoteApiEnabled ? canonicalTradeinConfig.value?.requireHigherPrice !== false : TRADEIN_LADDER_RULES.requireHigherPrice) || p.price > paid) &&
       (remoteApiEnabled
         ? remoteRetireEligibleTargets.value.has(p.id)
-        : isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value)),
+        : sourcePrice > 0 && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > sourcePrice)
+          && isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value)),
   ).map((p) => {
     // 抢先购窗口内的未正式上架目标,行尾加「抢先升级」标(默认关闭时零渲染)。
     const early = !!p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase)
@@ -1160,10 +1158,10 @@ const tradeinView = computed(() => {
   const remoteQuote = remoteApiEnabled ? canonicalQuote.value : null;
   if (remoteApiEnabled && (!remoteQuote || remoteQuote.sourceDeviceId !== Number(oldDevice.id)
       || remoteQuote.targetProductNo !== s.newKind)) return null;
-  const paid = remoteQuote?.sourceActualPaidUsdt ?? oldDevice.paidPriceUsdt ?? 0;
+  const sourcePrice = remoteQuote?.sourceCurrentPriceUsdt ?? getTradeinSourcePrice(oldDevice);
   const earned = remoteQuote?.cumulativeOutputUsdt ?? Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0);
   const credit = remoteQuote?.discountUsdt ?? previewCredit(oldDevice, s.newPrice);
-  const band = remoteQuote ? null : ladderBandFor(paid, earned);
+  const band = remoteQuote ? null : ladderBandFor(sourcePrice, earned);
   const creditRatePct = remoteQuote ? remoteQuote.creditRatePct : band?.creditPct ?? null;
   const estNet = remoteQuote?.payableUsdt ?? Math.max(0, +(s.newPrice - credit).toFixed(2));
   const targetPrice = remoteQuote?.targetPriceUsdt ?? s.newPrice;
@@ -1183,8 +1181,7 @@ const tradeinView = computed(() => {
     targetPrice: formatGroupedAmount(targetPrice),
     // How much of the target price the credit covers, drawn from the two server figures; no bar position when either is unknown.
     creditPct: targetPrice > 0 ? Math.round(Math.min(100, Math.max(0, credit / targetPrice * 100))) : null,
-    // 抵扣 = 比例 × 旧机实付净额 (PRD §7.5.1): the base and the rate behind the credit.
-    basis: fmtParts(t.value.tradein.sheetBasis, { paid: `$${formatGroupedAmount(paid)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
+    basis: fmtParts(t.value.tradein.sheetBasis, { price: `$${formatGroupedAmount(sourcePrice)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
     // An active old device loses its running job on payment (PRD §7.5.1, BUG-542); same condition as before, both branches.
     taskVoid: remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null,
     fundsGap: remoteQuote && !remoteQuote.sufficientFunds

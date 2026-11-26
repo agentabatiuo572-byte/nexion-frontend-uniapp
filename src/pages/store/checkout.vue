@@ -399,7 +399,7 @@ import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, type Product } from "@/mock/products";
-import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG, getTradeinSourcePrice } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, tradeInEarlyWindowOk } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -1607,7 +1607,7 @@ const appliedTradeinView = computed(() => {
   if (remoteApiEnabled && (!quote || quote.sourceDeviceId !== Number(device.id)
       || quote.targetProductNo !== p.id)) return null;
   const credit = quote?.discountUsdt ?? computeTradeInCredit(
-      device.paidPriceUsdt ?? 0,
+      getTradeinSourcePrice(device),
       Math.max(0, device.cumulativeEarningsUsdt ?? 0),
       p.price,
     );
@@ -1621,7 +1621,7 @@ function resolveQuotedTradeIn(): { device: (typeof app.devices)[number]; credit:
   if (!quotedTradeIn || !p || trialConversionMode.value) return null;
   const device = app.devices.find((d) => d.id === quotedTradeIn!.deviceId);
   if (!device || (!remoteApiEnabled && isDeviceTaskBlocked(device))) return null;
-  const credit = computeTradeInCredit(device.paidPriceUsdt ?? 0, Math.max(0, device.cumulativeEarningsUsdt ?? 0), p.price);
+  const credit = computeTradeInCredit(getTradeinSourcePrice(device), Math.max(0, device.cumulativeEarningsUsdt ?? 0), p.price);
   return credit > 0 ? { device, credit } : null;
 }
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);

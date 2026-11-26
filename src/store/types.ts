@@ -517,7 +517,7 @@ export interface AppState {
   // FEAT-DEV02 upgrade trade-in — there is deliberately NO dedicated store
   // action: the checkout persist block composes it atomically (debit net →
   // remove old device → createOrder{tradeInCredit, tradeInDeviceId} → bill).
-  // Credit = computeTradeInCredit(paidPriceUsdt, cumulativeEarningsUsdt,
+  // Credit = computeTradeInCredit(sourceCurrentPriceUsdt, cumulativeEarningsUsdt,
   // targetPrice) — checkout-only, NEVER credited to balance. Production:
   // POST /api/orders carries tradeInDeviceId; server re-computes the credit
   // and retires the device in the same transaction.

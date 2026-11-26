@@ -25,8 +25,9 @@ import {
   UPGRADE_LADDER,
   TRADEIN_LADDER_RULES,
   computeTradeInCredit,
+  getTradeinSourcePrice,
 } from "@/mock/tradein-config";
-import { DEVICE_PRICE_USDT } from "@/store/device-types";
+import { getProduct } from "@/mock/products";
 
 // ─────────────────────────────────────────────────────────────── Context
 
@@ -226,21 +227,19 @@ export function eligibleTradeInDevices(
   ctx: EligibilityContext,
 ): Device[] {
   if (!cfg.enabled) return [];
-  const targetPrice = DEVICE_PRICE_USDT[targetKind] ?? 0;
+  const targetPrice = getProduct(targetKind)?.price ?? 0;
   if (targetPrice <= 0) return [];
   return ctx.devices
     .filter((d) => {
-      const paid = d.paidPriceUsdt ?? 0;
-      if (paid <= 0) return false;
-      if (d.kind === "cloud-share") return false;
-      if (TRADEIN_LADDER_RULES.requireHigherPrice && !(targetPrice > paid)) return false;
+      const sourcePrice = getTradeinSourcePrice(d);
+      if (sourcePrice <= 0 || (TRADEIN_LADDER_RULES.requireHigherPrice && targetPrice <= sourcePrice)) return false;
       if (isDeviceTaskBlocked(d)) return false; // 激活中且任务运行 → 入口阻断,不入候选
       return true;
     })
     .sort(
       (a, b) =>
-        computeTradeInCredit(b.paidPriceUsdt ?? 0, b.cumulativeEarningsUsdt ?? 0, targetPrice) -
-        computeTradeInCredit(a.paidPriceUsdt ?? 0, a.cumulativeEarningsUsdt ?? 0, targetPrice),
+        computeTradeInCredit(getTradeinSourcePrice(b), b.cumulativeEarningsUsdt ?? 0, targetPrice) -
+        computeTradeInCredit(getTradeinSourcePrice(a), a.cumulativeEarningsUsdt ?? 0, targetPrice),
     );
 }
 

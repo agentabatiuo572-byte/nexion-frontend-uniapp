@@ -16,7 +16,10 @@ const REASONS = {
 
 export const CAPACITY_REPLACEMENT_PURCHASE_RETIRED = 'CAPACITY_REPLACEMENT_PURCHASE_RETIRED';
 
-const TRADEIN_REASONS = new Map<string, 'rejectTradeinBusy' | 'rejectTradeinOwner' | 'rejectCapacitySourceChanged' | 'rejectCapacityPurchaseRetired'>([
+const TRADEIN_REASONS = new Map<string, 'rejectTradeinBusy' | 'rejectTradeinOwner' | 'rejectTradeinPriceChanged' | 'rejectCapacitySourceChanged' | 'rejectCapacityPurchaseRetired'>([
+  ['TRADEIN_QUOTE_CHANGED', 'rejectTradeinPriceChanged'],
+  ['TRADEIN_SOURCE_CURRENT_PRICE_UNAVAILABLE', 'rejectTradeinPriceChanged'],
+  ['TRADEIN_HIGHER_PRICE_REQUIRED', 'rejectTradeinPriceChanged'],
   ['CAPACITY_REPLACEMENT_SOURCE_CHANGED', 'rejectCapacitySourceChanged'],
   [CAPACITY_REPLACEMENT_PURCHASE_RETIRED, 'rejectCapacityPurchaseRetired'],
   ['SIMULATED_DEVICE_BUSY', 'rejectTradeinBusy'],
