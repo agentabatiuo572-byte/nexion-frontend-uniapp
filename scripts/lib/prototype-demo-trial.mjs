@@ -42,6 +42,8 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const hasYield=product?.dailyEarn>0&&product.dailyEarnNEX>0;
   const available=hasYield&&product.available&&product.productType==='DEVICE'&&product.inventoryMode==='FINITE'&&product.stock>0;
   const unclaimedConfig=Object.assign(data.config,product&&previewTrialProductConfig(product));
+  // A long catalog name for the claim sheet's wrap check; the claim chain itself is unchanged.
+  if(state.trialNameState==='long')unclaimedConfig.trialProductName='UVELBox S100 Pro Max Edition 2026';
   if(state.trialStartPhaseClosed)unclaimedConfig.phaseOpen=false;
   if(!hasYield){
     unclaimedConfig.shadowDailyUSD=null;

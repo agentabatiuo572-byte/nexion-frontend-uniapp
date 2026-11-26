@@ -41,7 +41,7 @@
               <template v-else>
                 <text class="tcs-plinth__label">{{ copy.estimateLabel }}</text>
                 <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount"><text class="tcs-amount__cur">$</text>{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
-                <text class="tcs-estimate-note"><text v-for="(part, i) in estimateNoteParts" :key="i" :class="{ 'tcs-estimate-note__num': part.value }">{{ part.text }}</text></text>
+                <text id="tcs-basis" class="tcs-estimate-note"><text v-for="(part, i) in estimateNoteParts" :key="i" :class="{ 'tcs-estimate-note__num': part.value }">{{ part.text }}</text></text>
               </template>
             </view>
           </view>
@@ -65,7 +65,7 @@
           </template>
           <!-- One submit entry at a time: retrying the claim is this sheet's own primary (03 §3.1 例外: the retried action is
                the main one and already sits at the bottom), and a claim being sent or confirmed keeps its spinner here. -->
-          <NxButton v-else variant="primary" :label="primaryLabel" :busy="primaryBusy" :busy-label="copy.activating" :disabled="claimDisabled" :aria-describedby="claimDisabled && reasonLine ? 'tcs-reason' : undefined" @click="onClaim"><text>{{ primaryLabel }}</text><NxIcon v-if="primaryLeaves" name="arrow-right" :size="20" /></NxButton>
+          <NxButton v-else variant="primary" :label="primaryLabel" :busy="primaryBusy" :busy-label="copy.activating" :disabled="claimDisabled" :aria-describedby="claimDisabled ? reasonLine ? 'tcs-reason' : loadingView ? 'tcs-basis' : undefined : undefined" @click="onClaim"><text>{{ primaryLabel }}</text><NxIcon v-if="primaryLeaves" name="arrow-right" :size="20" /></NxButton>
           <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="dismissLabel" @click.stop="hide" @keydown.enter.stop.prevent="hide" @keydown.space.stop.prevent="hide"><text class="tcs-dismiss-t">{{ dismissLabel }}</text></view>
         </view>
       </view>
@@ -329,6 +329,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-machine__art { position:absolute;left:-25%;top:-25%;width:150%;height:150%; }
 /* Neutral stand-in while the image is not in: a soft body over a disc (the board's placeholder), no outline. */
 .tcs-machine__art :deep(.catalog-machine-image__placeholder) { inset:30% 32.7% 39.3%;border:none;border-radius:16px;background:color-mix(in srgb,var(--v5-ink) 7%,transparent); }
+.tcs-machine__art :deep(.catalog-machine-image__placeholder svg), .tcs-machine__art :deep(.catalog-machine-image__placeholder .nx-native-svg) { width:40px;height:40px; }
 .tcs-machine__disc { position:absolute;left:4%;right:4%;top:70%;height:20%;border-radius:50%;background:color-mix(in srgb,var(--v5-ink) 7%,transparent); }
 /* The plinth: the trial sheet's brand-tinted solid (01 §1.1.2 纯色 · 试用领取弹层的展台), a faint brand grid fading out around
    the text, and a cyan floor light under the machine (01 §1.1.2 页面效果). No outline. */
@@ -342,7 +343,8 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-plinth > :not(.tcs-plinth__grid):not(.tcs-plinth__fade):not(.tcs-plinth__floor) { position:relative; }
 /* Field names on the plinth: auxiliary ink, 400 (01 §1.1.1 字段名), 4px above the figure (01 §1.3). */
 .tcs-plinth__label { display:block;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
-.tcs-amount-row { display:flex;justify-content:center;align-items:center;height:var(--ui-type-wallet-amount-lh);margin-top:4px; }
+/* One amount-sized line: the skeleton sits on its middle like the figure would (board .amt). */
+.tcs-amount-row { display:block;height:var(--ui-type-wallet-amount-lh);margin-top:4px;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); }
 /* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, $ and decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
 .tcs-amount { display:block;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount);letter-spacing:-.02em;color:var(--v5-brand);font-variant-numeric:tabular-nums;white-space:nowrap; }
 /* line-height 1: the smaller symbol sits inside the figure's line instead of growing it. */
