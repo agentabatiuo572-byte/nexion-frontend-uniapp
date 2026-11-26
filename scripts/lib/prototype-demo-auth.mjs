@@ -54,7 +54,7 @@ export function createAuthDemo(state) {
         installationId:state.savedAttemptState==='legacy-empty'?'':'preview-previous-browser-id',executionSupported:false,
         authMethod:'OTP',authReference:'LOGIN-'+randomBytes(16).toString('hex'),pending:true,context:{countryCode:'+86',phone:'13800000000'}};
       const registration=state.savedAttemptState==='registration';
-      const user=registration?{...existing,userId:900002,phone:'13800000001',onboardingComplete:false}:existing;
+      const user=registration?{...existing,userId:583920417,phone:'13800000001',onboardingComplete:false}:existing;
       if(registration)Object.assign(attempt,{authMethod:'REGISTRATION',authReference:user.countryCode+':'+user.phone,
         context:{countryCode:user.countryCode,phone:user.phone,language:'en',sponsorCode:null,challengeNo:'REG-'+randomBytes(16).toString('hex')}});
       attempts.set(attempt.loginAttemptId,{...attempt,response:{user,...(registration?{registrationReceipt:receipt(null)}:{})}});
@@ -220,7 +220,7 @@ export function createAuthDemo(state) {
           if(otp.installationId!==(headers['x-nexgrid-installation-id']??''))return fail(428,'USER_CAPTCHA_REQUIRED');
           if(state.registrationState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
           if(state.registrationState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
-          return issueLogin({...existing,userId:900002,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode),body.deviceName);
+          return issueLogin({...existing,userId:583920417,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode),body.deviceName);
         }
         if(path.endsWith('/complete'))return ok({status:'PASSWORD_RESET',revokedSessionCount:0});
         return ok({status:path.includes('/register/')?'REGISTRATION_OTP_VERIFIED':'PASSWORD_RESET_OTP_VERIFIED'});
