@@ -2126,6 +2126,7 @@ export const id: Messages = {
     sheetDismissCta: "Nanti saja",
     claimUnknownInline: "Aktivasi uji coba sedang dikonfirmasi. Diperbarui otomatis setelah dikonfirmasi.",
     claimNotStartedInline: "Uji coba belum aktif. Anda bisa mencoba lagi.",
+    claimUnconfirmedRetryInline: "Hasil aktivasi belum dapat dipastikan. Anda bisa mencoba lagi; tidak akan aktif dua kali.",
     claimOnboardingRequired: "Uji coba belum dimulai. Selesaikan pengaturan awal, lalu kembali untuk klaim.",
     claimOnboardingCta: "Selesaikan pengaturan awal",
     claimTermsRequired: "Uji coba belum dimulai. Setujui ketentuan layanan, lalu kembali untuk klaim.",

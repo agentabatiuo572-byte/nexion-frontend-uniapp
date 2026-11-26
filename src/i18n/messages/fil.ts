@@ -2126,6 +2126,7 @@ export const fil: Messages = {
     sheetDismissCta: "Mamaya na",
     claimUnknownInline: "Kinukumpirma ang pag-activate ng trial. Kusang mag-a-update kapag nakumpirma.",
     claimNotStartedInline: "Hindi na-activate ang trial. Puwede mong subukan ulit.",
+    claimUnconfirmedRetryInline: "Hindi pa makumpirma ang resulta ng pag-activate. Puwede mong subukan ulit — hindi ito mag-a-activate nang dalawang beses.",
     claimOnboardingRequired: "Hindi pa nagsisimula ang trial. Tapusin ang unang setup, saka bumalik para i-claim ito.",
     claimOnboardingCta: "Tapusin ang unang setup",
     claimTermsRequired: "Hindi pa nagsisimula ang trial. Kumpirmahin ang tuntunin ng serbisyo, saka bumalik para i-claim ito.",

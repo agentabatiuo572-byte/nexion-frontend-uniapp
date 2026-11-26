@@ -6,7 +6,7 @@ export const trialReceiptOptions = [
   ['rejected', '响应丢失 · 已被拒'],
   ['not-seen', '未受理'],
   ['processing', '处理中'],
-  ['indeterminate', '无法确认'],
+  ['indeterminate', 'INDETERMINATE · 结果无法确认'],
   ['unsupported', '旧后端无回执接口'],
 ];
 
