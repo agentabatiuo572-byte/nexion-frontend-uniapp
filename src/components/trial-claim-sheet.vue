@@ -80,7 +80,7 @@ import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
@@ -300,6 +300,12 @@ watch(() => sheet.open, open => {
   claimErrorReason.value = undefined;
   activated.value = !claiming.value && !freeTrial.pendingStart && trialView.displayReady.value && trialView.active.value;
   openedActivated.value = activated.value;
+});
+// A claim confirmed here swaps the primary for 「查看设备」: focus moves onto it once it is drawn, never back to the sheet
+// root (03 §3.5 焦点); the result itself is said only by the status region above.
+watch(activated, (now, was) => {
+  if (!now || was || !sheet.open || openedActivated.value) return;
+  void nextTick(() => document.querySelector<HTMLElement>(".tcs-root .tcs-ctas .nx-button")?.focus());
 });
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。

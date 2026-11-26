@@ -1710,9 +1710,9 @@ progressLabel: "进度",
     // 生命周期 toast + 紧迫推送(App 层 poll;零自动动作)
     graceStartToast: "试用已结束 · 设备停止产出,抵扣金可用至 {time}",
     endedToast: "试用抵扣金与 UVT 已失效。",
-    urgency24h: "试用 24 小时内结束 · 现在购买最高抵 ${amount}",
-    urgencyGrace24h: "试用抵扣金 ${amount} 与 UVT 将在 24 小时内失效。",
-    urgencyGrace1h: "试用抵扣金 ${amount} 与 UVT 将在 1 小时内失效。",
+    urgency24h: "试用 24 小时内结束 · 现在购买最高抵 {amount}\u00A0USDT",
+    urgencyGrace24h: "试用抵扣金 {amount}\u00A0USDT 与 UVT 将在 24 小时内失效。",
+    urgencyGrace1h: "试用抵扣金 {amount}\u00A0USDT 与 UVT 将在 1 小时内失效。",
   },
   myDevices: {
     // /me MyDevicesEntry — ported from v5 design draft

@@ -2188,9 +2188,9 @@ export const fil: Messages = {
     convertedDevicesCta: "Tingnan ang mga device ko",
     graceStartToast: "Tapos ang trial · huminto ang production. Magagamit ang credit mo hanggang {time}",
     endedToast: "Hindi na valid ang credit sa trial at UVT sa trial.",
-    urgency24h: "Matatapos ang trial sa loob ng 24 oras · Bumili ngayon at makatipid ng hanggang ${amount}",
-    urgencyGrace24h: "Mag-e-expire sa loob ng 24 oras ang ${amount} na credit sa trial at UVT sa trial.",
-    urgencyGrace1h: "Mag-e-expire sa loob ng 1 oras ang ${amount} na credit sa trial at UVT sa trial.",
+    urgency24h: "Matatapos ang trial sa loob ng 24 oras · Bumili ngayon at makatipid ng hanggang {amount}\u00A0USDT",
+    urgencyGrace24h: "Mag-e-expire sa loob ng 24 oras ang {amount}\u00A0USDT na credit sa trial at UVT sa trial.",
+    urgencyGrace1h: "Mag-e-expire sa loob ng 1 oras ang {amount}\u00A0USDT na credit sa trial at UVT sa trial.",
   },
   myDevices: {
     sectionTitle: "Aking mga device",

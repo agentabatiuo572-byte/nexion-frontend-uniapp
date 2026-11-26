@@ -2188,9 +2188,9 @@ export const uz: Messages = {
     convertedDevicesCta: "Qurilmalarimni koʻrish",
     graceStartToast: "Sinov tugadi · ishlash toʻxtadi. Sinov mablagʻining amal qilish muddati: {time}",
     endedToast: "Sinov mablagʻi va sinov UVT endi amal qilmaydi.",
-    urgency24h: "Sinov 24 soat ichida tugaydi · Hozir oling va koʻpi bilan ${amount} tejang",
-    urgencyGrace24h: "${amount} sinov mablagʻi va sinov UVT 24 soat ichida bekor boʻladi.",
-    urgencyGrace1h: "${amount} sinov mablagʻi va sinov UVT 1 soat ichida bekor boʻladi.",
+    urgency24h: "Sinov 24 soat ichida tugaydi · Hozir oling va koʻpi bilan {amount}\u00A0USDT tejang",
+    urgencyGrace24h: "{amount}\u00A0USDT sinov mablagʻi va sinov UVT 24 soat ichida bekor boʻladi.",
+    urgencyGrace1h: "{amount}\u00A0USDT sinov mablagʻi va sinov UVT 1 soat ichida bekor boʻladi.",
   },
   myDevices: {
     sectionTitle: "Qurilmalarim",

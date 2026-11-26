@@ -2188,9 +2188,9 @@ export const id: Messages = {
     convertedDevicesCta: "Lihat perangkat saya",
     graceStartToast: "Uji coba berakhir · produksi berhenti. Kredit uji coba Anda berlaku hingga {time}",
     endedToast: "Kredit uji coba dan UVT uji coba sudah tidak berlaku.",
-    urgency24h: "Uji coba berakhir dalam 24 jam · Beli sekarang, hemat hingga ${amount}",
-    urgencyGrace24h: "Kredit uji coba ${amount} dan UVT uji coba kedaluwarsa dalam 24 jam.",
-    urgencyGrace1h: "Kredit uji coba ${amount} dan UVT uji coba kedaluwarsa dalam 1 jam.",
+    urgency24h: "Uji coba berakhir dalam 24 jam · Beli sekarang, hemat hingga {amount}\u00A0USDT",
+    urgencyGrace24h: "Kredit uji coba {amount}\u00A0USDT dan UVT uji coba kedaluwarsa dalam 24 jam.",
+    urgencyGrace1h: "Kredit uji coba {amount}\u00A0USDT dan UVT uji coba kedaluwarsa dalam 1 jam.",
   },
   myDevices: {
     sectionTitle: "Perangkat saya",

@@ -2188,9 +2188,9 @@ export const ms: Messages = {
     convertedDevicesCta: "Lihat peranti saya",
     graceStartToast: "Percubaan tamat · penjanaan dihentikan. Kredit anda boleh digunakan sehingga {time}",
     endedToast: "Kredit percubaan dan UVT percubaan tidak lagi sah.",
-    urgency24h: "Percubaan tamat dalam 24 jam · Beli sekarang dan jimat sehingga ${amount}",
-    urgencyGrace24h: "Kredit percubaan ${amount} dan UVT percubaan luput dalam 24 jam.",
-    urgencyGrace1h: "Kredit percubaan ${amount} dan UVT percubaan luput dalam 1 jam.",
+    urgency24h: "Percubaan tamat dalam 24 jam · Beli sekarang dan jimat sehingga {amount}\u00A0USDT",
+    urgencyGrace24h: "Kredit percubaan {amount}\u00A0USDT dan UVT percubaan luput dalam 24 jam.",
+    urgencyGrace1h: "Kredit percubaan {amount}\u00A0USDT dan UVT percubaan luput dalam 1 jam.",
   },
   myDevices: {
     sectionTitle: "Peranti saya",
