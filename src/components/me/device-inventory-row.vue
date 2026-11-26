@@ -30,7 +30,7 @@
     </view>
     <view v-else-if="active" class="device-inventory-row__task device-inventory-row__task--idle" :class="{ 'device-inventory-row__task--warn': phoneIdleWarn }">
       <view v-if="!phoneIdleWarn" class="device-inventory-row__wait" aria-hidden="true" />
-      <text>{{ remotePhone ? phoneIdleLabel : recovering ? computeCopy.statuses.RECOVERING : !runtimeConfirmed ? t.earn.runtimeUnknown : tasksConfirmed ? t.earn.noCurrentTask : t.earn.taskStatusUnavailable }}</text>
+      <text>{{ recovering ? computeCopy.statuses.RECOVERING : !runtimeConfirmed ? t.earn.runtimeUnknown : remotePhone ? phoneIdleLabel : tasksConfirmed ? t.earn.noCurrentTask : t.earn.taskStatusUnavailable }}</text>
     </view>
 
     <slot name="replacement-status" />
@@ -219,7 +219,7 @@ const app = useApp();
 const phoneCopy = usePhoneComputeCopy();
 const phoneIdle = computed(() => phoneIdleState(props.device, app, monotonicNow.value));
 const phoneIdleLabel = computed(() => phoneIdleText(phoneIdle.value, phoneCopy.value, t.value.earn));
-const phoneIdleWarn = computed(() => remotePhone.value && phoneIdle.value === "expired");
+const phoneIdleWarn = computed(() => remotePhone.value && !recovering.value && props.runtimeConfirmed && phoneIdle.value === "expired");
 const actionDisabled = computed(() => props.disabled || props.actionDisabled);
 const actionLabel = computed(() =>
   props.active ? props.deactivateLabel : props.disabled ? props.disabledLabel ?? props.slotsFullLabel : props.activateLabel,

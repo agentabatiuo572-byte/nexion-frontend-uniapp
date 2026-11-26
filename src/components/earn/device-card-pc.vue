@@ -496,9 +496,10 @@ const remotePhoneIdle = computed(() => remoteApiEnabled && props.device.kind ===
   && !reconnecting.value && !props.device.pausedReason);
 const phoneCopy = usePhoneComputeCopy();
 const phoneIdle = computed(() => phoneIdleState(props.device, app, monotonicNow.value));
-const phoneIdleLabel = computed(() => phoneIdleText(phoneIdle.value, phoneCopy.value, t.value.earn));
+// A server-side recovery reads 恢复中 first, as it does for other devices and in the card header.
+const phoneIdleLabel = computed(() => recovering.value ? computeCopy.value.statuses.RECOVERING : phoneIdleText(phoneIdle.value, phoneCopy.value, t.value.earn));
 // An expired run needs the user to reopen the App, so it reads as a warning (01 §1.1.1).
-const phoneIdleWarn = computed(() => remotePhoneIdle.value && phoneIdle.value === "expired");
+const phoneIdleWarn = computed(() => remotePhoneIdle.value && !recovering.value && phoneIdle.value === "expired");
 // Earn stage (P-62): which job row the stage shows. Local demo phones without a task keep their own blocks below.
 const stageOffline = computed(() => !recovering.value && onlineState.value === "offline");
 const stageJob = computed<"task" | "idle" | "status" | "none">(() => {

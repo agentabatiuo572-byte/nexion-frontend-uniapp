@@ -13,15 +13,17 @@ type PhoneIdleFacts = {
 };
 
 export function phoneIdleState(device: Device, app: PhoneIdleFacts, monotonicNow: number): PhoneIdleState {
-  if (app.nativePhoneTaskRecoveryDeviceId === device.id || device.simulationState === "CLOSING") return "restoring";
-  if (app.nativePhoneConfigWaitDeviceId === device.id || device.simulationState === "WAITING_CONFIG") return "notReady";
+  // Same order as the retired task card: this App's own wait for the task config first, then an unread or failed task
+  // read (03 §3.5.2: no failure sentence, 状态待确认 like other devices) before any state taken from the last read.
+  if (app.nativePhoneConfigWaitDeviceId === device.id) return "notReady";
+  if (app.remoteAssignmentStatus === "error"
+    || (!app.remoteAssignmentHasSnapshot && (app.remoteAssignmentStatus === "idle" || app.remoteAssignmentStatus === "loading"))) return "unknown";
+  if (device.simulationState === "WAITING_CONFIG") return "notReady";
   // The run window closes on the server clock, projected from the last task read.
   if (device.simulationState === "EXPIRED" || (device.phoneValidUntil != null && device.taskServerNow != null
     && device.taskServerNowReceivedAt != null
     && projectServerNow(device.taskServerNow, device.taskServerNowReceivedAt, monotonicNow) >= device.phoneValidUntil)) return "expired";
-  // A failed task read says nothing of its own (03 §3.5.2): like other devices the line reads 状态待确认 until a read succeeds.
-  if (app.remoteAssignmentStatus === "error"
-    || (!app.remoteAssignmentHasSnapshot && (app.remoteAssignmentStatus === "idle" || app.remoteAssignmentStatus === "loading"))) return "unknown";
+  if (app.nativePhoneTaskRecoveryDeviceId === device.id || device.simulationState === "CLOSING") return "restoring";
   return "idle";
 }
 
