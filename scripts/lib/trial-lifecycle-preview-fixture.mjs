@@ -71,13 +71,14 @@ export function createTrialLifecyclePreview(state, execute) {
         if (identity !== previous.identity) return response(409, 'IDEMPOTENCY_KEY_CONFLICT');
         // An unresolved start with no saved response can execute again with the original payload.
         const retryableStart = kind === 'start' && previous.receipt.status === 'INDETERMINATE' && !previous.result;
-        const rolledBack = previous.result?.status === 503 && previous.result.body.message === 'TRIAL_QUOTA_STATE_UNAVAILABLE';
-        if (!retryableStart && !rolledBack)
+        if (!retryableStart)
           return previous.result ?? response(409, 'IDEMPOTENCY_REQUEST_IN_PROGRESS');
       }
       const mode = state[setting[kind]] ?? 'normal';
-      if (mode === 'not-seen') {
+      const firstClaimUnreceived = kind === 'start' && state.trialState === 'claim-error' && !state.trialStartFailed;
+      if (mode === 'not-seen' || (mode === 'normal' && firstClaimUnreceived)) {
         state[setting[kind]] = 'normal';
+        if (firstClaimUnreceived) state.trialStartFailed = true;
         return unavailable();
       }
       const command = {

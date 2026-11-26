@@ -260,10 +260,6 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
       ? typeof body.deviceName==='string'&&body.deviceName.trim()===unclaimedConfig.trialProductName
       : (requestedProduct==='device-trial-standard'?previewDefaultTrialSku:requestedProduct)===unclaimedConfig.trialProductId;
     if(!matchesProduct||(body.trialTermsVersion!=null&&body.trialTermsVersion!==trialTermsVersion))refuse('TRIAL_TERMS_CHANGED');
-    if(mode==='claim-error'&&!state.trialStartFailed){
-      state.trialStartFailed=true;
-      refuse('TRIAL_QUOTA_STATE_UNAVAILABLE',null,503);
-    }
     cfg={...unclaimedConfig};
     duration=Number(cfg.trialDays)*day;grace=Number(cfg.graceDays)*day;
     Object.assign(row,{state:'ACTIVE',claimNo:newClaimNo(),startedAt:now,finishedAt:null,endReason:null,cooldownUntil:null,
