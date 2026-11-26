@@ -58,7 +58,7 @@ export function createAuthDemo(state) {
         },
       };
       const response = oauth ? session(existing) : {
-        ...session({ ...existing, userId: 900002, phone, onboardingComplete: false }),
+        ...session({ ...existing, userId: 583920417, phone, onboardingComplete: false }),
         registrationReceipt,
       };
       saved = { attempt, response, recoverUnavailable: state.savedAttemptState === 'registration-retry' };
@@ -105,7 +105,7 @@ export function createAuthDemo(state) {
         }
         if (state.registrationState === 'device-limit') return failure(409, 'USER_REGISTRATION_DEVICE_LIMIT');
         return issueLogin({
-          ...session({ ...existing, userId: 900002, countryCode: body.countryCode, phone: body.phone, onboardingComplete: false }),
+          ...session({ ...existing, userId: 583920417, countryCode: body.countryCode, phone: body.phone, onboardingComplete: false }),
           registrationReceipt,
         }, body.deviceName);
       }
