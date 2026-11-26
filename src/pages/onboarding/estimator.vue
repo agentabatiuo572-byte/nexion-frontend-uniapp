@@ -44,10 +44,7 @@
           <text class="est-loading__t">{{ detectingText }}</text>
         </view>
         <view v-else key="reveal" class="est-phone nx-tint anim-up">
-          <view class="est-phone__pill">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text class="est-phone__pill-t">{{ t.onboarding.detected }}</text>
-          </view>
+          <view class="est-phone__badge"><NxTag tone="brand"><svg class="est-phone__badge-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ t.onboarding.detected }}</NxTag></view>
           <view class="est-phone__icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" />
@@ -106,6 +103,7 @@
 <script setup lang="ts">
 import { toast } from "@/store/ui";
 import ToastHost from "@/components/toast-host.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { formatAmount } from "@/lib/amount-display";
 import { navReset } from "@/lib/route";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
@@ -488,27 +486,19 @@ async function deferPhoneActivation() {
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: var(--ui-glass-edge-shadow), 0 0 24px -4px rgba(198, 255, 58, 0.35);
+  box-shadow: var(--ui-glass-edge-shadow), 0 0 24px -4px color-mix(in srgb, var(--v5-brand) 35%, transparent);
 }
-.est-phone__pill {
+/* The shared brand tag (03 §3.8) sits on the card's top edge; the page colour under it keeps its translucent dark fill even across the edge. */
+.est-phone__badge {
   position: absolute;
-  top: -10px;
+  top: -12px;
   right: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: var(--v5-brand);
+  border-radius: 999px;
+  background: var(--v5-bg);
 }
-.est-phone__pill-t {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--v5-on-brand);
+.est-phone__badge-icon {
+  flex: none;
+  margin-right: 4px;
 }
 .est-phone__icon {
   width: 40px;

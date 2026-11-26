@@ -586,7 +586,7 @@ watch(filter, value => {
 /* A long title keeps whole words: the 重要 tag drops below it instead of squeezing the title mid-word. */
 .message-center .notification-heading { flex-wrap:wrap;gap:2px var(--v5-space-2); }
 .message-center .notification-title { overflow-wrap:break-word; }
-.message-center .notification-preview { margin-top:2px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
+.message-center .notification-preview { margin-top:4px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
 .message-center .notification-time { font-size:12px; line-height:16px; }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }
@@ -603,7 +603,7 @@ watch(filter, value => {
 .message-center .notification-amount { white-space:nowrap; color:var(--v5-success-ink); font:var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); font-variant-numeric:tabular-nums; }
 .message-center .notification-amount__unit { color:var(--v5-ink-3); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
 .message-center .notification-amount__sep { color:var(--v5-ink-4); font:var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); white-space:nowrap; }
-.message-center .notification-earning-summary { margin-top:2px; }
+.message-center .notification-earning-summary { margin-top:4px; }
 /* A device name stays whole on its line; one longer than the line ends in an ellipsis (the row's label and the detail carry it in full). */
 .message-center .notification-earning-device { display:inline-block; max-width:100%; vertical-align:bottom; }
 /* uni-app puts the words in an inner span; the clip and ellipsis sit on it, the element that holds the text. */
