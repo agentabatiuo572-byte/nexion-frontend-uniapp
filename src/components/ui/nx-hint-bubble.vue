@@ -5,14 +5,20 @@
   one sentence per paragraph (at most three), no buttons. A tap on the icon toggles it; a tap outside it, a scroll anywhere
   or Esc closes it; opening one closes any other. Screen readers read the full text as the icon's name, so the bubble
   itself is hidden from them.
+  With `label` the trigger is a whole row, the label text then the icon (one control, 44px high), and the bubble still points
+  at the icon; its name is the label followed by the full text.
   The parent may own `open` (v-model:open): inside a dialog, Esc and back reach the dialog first, so the dialog's close
   closes an open bubble before anything else (see tradein-sheets.vue). Without it the component keeps its own state.
 -->
 <template>
-  <view :id="rootId" class="nx-hint" :class="`nx-hint--${tone}`" :style="{ width: size + 'px', height: size + 'px' }">
-    <view class="nx-hint__trigger" role="button" tabindex="0" :aria-label="label" :aria-expanded="isOpen ? 'true' : 'false'"
-      :style="{ width: size + 'px', height: size + 'px' }" @click.stop="toggle" @keydown.enter.prevent="onKey" @keydown.space.prevent="onKey">
-      <NxIcon :name="tone === 'warning' ? 'hint-warn' : 'hint-info'" :size="size" />
+  <view :id="rootId" class="nx-hint" :class="[`nx-hint--${tone}`, { 'nx-hint--labeled': label }]" :style="label ? undefined : { width: size + 'px', height: size + 'px' }">
+    <view class="nx-hint__trigger" role="button" tabindex="0" :aria-label="spoken" :aria-expanded="isOpen ? 'true' : 'false'"
+      :style="label ? undefined : { width: size + 'px', height: size + 'px' }" @click.stop="toggle" @keydown.enter.prevent="onKey" @keydown.space.prevent="onKey">
+      <template v-if="label">
+        <text class="nx-hint__label">{{ label }}</text>
+        <view :id="glyphId" class="nx-hint__glyph"><NxIcon :name="tone === 'warning' ? 'hint-warn' : 'hint-info'" :size="size" /></view>
+      </template>
+      <NxIcon v-else :name="tone === 'warning' ? 'hint-warn' : 'hint-info'" :size="size" />
     </view>
     <view v-if="isOpen" :id="bubbleId" class="nx-hint__bubble" :class="{ 'nx-hint__bubble--placed': placed }" :style="bubbleStyle" aria-hidden="true" @touchmove="close">
       <text v-for="(line, index) in lines" :key="index" class="nx-hint__line">{{ line }}</text>
@@ -32,14 +38,15 @@ const openHint = sharedRef<string | null>(null);
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import NxIcon from '@/components/ui/nx-icon.vue';
-const props = withDefaults(defineProps<{ open?: boolean; text: string | readonly string[]; tone?: 'neutral' | 'warning'; size?: 16 | 20 }>(), { open: undefined, tone: 'neutral', size: 16 });
+const props = withDefaults(defineProps<{ open?: boolean; text: string | readonly string[]; tone?: 'neutral' | 'warning'; size?: 16 | 20; label?: string }>(), { open: undefined, tone: 'neutral', size: 16, label: '' });
 const emit = defineEmits<{ (event: 'update:open', open: boolean): void }>();
 const instance = getCurrentInstance();
 const uid = instance?.uid;
 const rootId = `nx-hint-${uid}`;
 const bubbleId = `nx-hint-bubble-${uid}`;
+const glyphId = `nx-hint-glyph-${uid}`;
 const lines = computed(() => (typeof props.text === 'string' ? [props.text] : props.text).slice(0, 3));
-const label = computed(() => lines.value.join(' '));
+const spoken = computed(() => [props.label, ...lines.value].filter(Boolean).join(' '));
 const ownOpen = ref(false);
 const isOpen = computed(() => props.open ?? ownOpen.value);
 const placed = ref(false);
@@ -72,9 +79,10 @@ function onEscape(event: KeyboardEvent) {
   close();
 }
 type Box = { left: number; width: number };
-// Pointing at the icon: centred on it, then kept 16px inside the sheet or page it sits in.
-function setPlace(anchor: Box, bubbleWidth: number, boundsLeft: number, boundsRight: number) {
-  const centre = anchor.left + anchor.width / 2;
+// Pointing at the icon: centred on it, then kept 16px inside the sheet or page it sits in. The bubble is placed from the
+// component's root; a labelled row points at its icon, not the row's middle.
+function setPlace(anchor: Box, icon: Box, bubbleWidth: number, boundsLeft: number, boundsRight: number) {
+  const centre = icon.left + icon.width / 2;
   const start = Math.min(Math.max(centre - bubbleWidth / 2, boundsLeft + EDGE), boundsRight - EDGE - bubbleWidth);
   left.value = start - anchor.left;
   arrowX.value = centre - start;
@@ -85,7 +93,8 @@ function placeInDom() {
   const bubble = document.getElementById(bubbleId);
   if (!el || !bubble) return;
   const bounds = (el.closest('.nx-glass-sheet, .nx-chassis') ?? document.documentElement).getBoundingClientRect();
-  setPlace(el.getBoundingClientRect(), bubble.getBoundingClientRect().width, bounds.left, bounds.right);
+  const anchor = el.getBoundingClientRect();
+  setPlace(anchor, (props.label ? document.getElementById(glyphId)?.getBoundingClientRect() : null) ?? anchor, bubble.getBoundingClientRect().width, bounds.left, bounds.right);
 }
 // The App's logic layer has no DOM: the same measure through the selector query.
 function placeNative() {
@@ -93,10 +102,12 @@ function placeNative() {
   const query = uni.createSelectorQuery().in(instance.proxy);
   query.select(`#${rootId}`).boundingClientRect();
   query.select(`#${bubbleId}`).boundingClientRect();
+  query.select(`#${props.label ? glyphId : rootId}`).boundingClientRect();
   query.exec((boxes: (UniApp.NodeInfo | null)[]) => {
-    const [anchor, bubble] = boxes;
+    const [anchor, bubble, icon] = boxes;
     if (!isOpen.value || !anchor || !bubble || anchor.left === undefined || anchor.width === undefined || bubble.width === undefined) return;
-    setPlace({ left: anchor.left, width: anchor.width }, bubble.width, 0, uni.getSystemInfoSync().windowWidth);
+    const point = icon?.left !== undefined && icon.width !== undefined ? { left: icon.left, width: icon.width } : { left: anchor.left, width: anchor.width };
+    setPlace({ left: anchor.left, width: anchor.width }, point, bubble.width, 0, uni.getSystemInfoSync().windowWidth);
   });
 }
 function listen(on: boolean) {
@@ -140,6 +151,13 @@ onBeforeUnmount(() => {
 .nx-hint__trigger::after { content: ""; position: absolute; top: calc(50% - 22px); bottom: calc(50% - 22px); left: calc(50% - 22px); right: calc(50% - 22px); }
 .nx-hint__trigger:active { opacity: .6; }
 .nx-hint__trigger:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 4px; border-radius: 50%; }
+/* Labelled row: label and icon are one 44px-high control, text-link role (13/18, 500, ink-3); the bubble sits 6px above the row. */
+.nx-hint--labeled .nx-hint__trigger { display: flex; align-items: center; gap: 4px; min-height: 44px; }
+.nx-hint--labeled .nx-hint__trigger::after { inset: 0; }
+.nx-hint--labeled .nx-hint__trigger:focus-visible { border-radius: 8px; outline-offset: 0; }
+.nx-hint__label { font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+.nx-hint__glyph { display: flex; flex: none; }
+.nx-hint--labeled .nx-hint__bubble { bottom: calc(100% + 6px); }
 /* The toast's face (03 §3.5.1): dark translucent in both themes, light text, blur, the shared top highlight. It sits 16px
    above the icon, so the 6px arrow's tip stays about 10px clear of the line it explains. */
 .nx-hint__bubble { position: absolute; z-index: 3; text-align: left; bottom: calc(100% + 16px); box-sizing: border-box; width: max-content; max-width: min(280px, calc(100vw - 32px));

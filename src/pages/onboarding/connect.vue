@@ -1,5 +1,5 @@
 <template>
-  <StandalonePageShell class="cn-root" :top-inset="24" @click="rulesExpanded = false">
+  <StandalonePageShell class="cn-root" :top-inset="24">
     <!-- #ifdef APP-PLUS -->
     <NativeGpuObserver :request="gpuRequest" @observation="gpuReader.receive" />
     <!-- #endif -->
@@ -19,7 +19,7 @@
       <text v-if="!nativePhoneAvailable || (phase !== 'result' && phase !== 'error')" class="cn-sub">{{ nativePhoneAvailable ? subText : phoneActivationGuidance.body }}</text>
     </view>
 
-    <view v-if="nativePhoneAvailable">
+    <view v-if="nativePhoneAvailable" class="cn-main">
       <!-- Phase: intro -->
       <view v-if="phase === 'intro'" key="intro" class="cn-phase">
         <view class="cn-why">
@@ -66,16 +66,29 @@
           </view>
         </view>
       </view>
-      <view v-else-if="phase === 'result'" key="result" class="cn-phase anim-up">
-        <view class="cn-score cn-score--hex" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
-          <view class="cn-score__aurora" aria-hidden="true" />
-          <view class="cn-score__hex" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 220 220" focusable="false">
-            <path class="cn-score__ring cn-score__ring--halo" :d="scoreHexPath" />
-            <path class="cn-score__ring cn-score__ring--edge" :d="scoreHexPath" />
+      <!-- Calibration dial: tick ring, four arcs and the inner ring in brand colour only. The inner ring and the number keep
+           their size; on a short screen only the outer dial moves in (down to dialGeo.min), then the page scrolls. -->
+      <view v-else-if="phase === 'result'" key="result" class="cn-phase cn-phase--dial" :style="{ minHeight: dialGeo.min + 'px' }">
+        <view class="cn-dial" :class="{ 'cn-dial--ready': dialReady }" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`"
+          :style="{ width: dialSize + 'px', height: dialSize + 'px' }">
+          <view class="cn-dial__glow" aria-hidden="true" />
+          <view class="cn-dial__lens" aria-hidden="true" :style="{ width: dialGeo.inner * 2 + 'px', height: dialGeo.inner * 2 + 'px' }" />
+          <view class="cn-dial__ticks" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
+            <line v-for="(tick, i) in dialFace.ticks" :key="i" :class="tick.major ? 'cn-dial__major' : 'cn-dial__minor'" :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" />
           </svg></view>
-          <view class="cn-score__num">
-            <text class="cn-score__v">{{ shownScore }}</text>
-            <text class="cn-score__d">{{ t.onboarding.phoneComputeUnit }}</text>
+          <view class="cn-dial__ring" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
+            <path v-for="(arc, i) in dialFace.arcs" :key="i" class="cn-dial__arc" :d="arc" />
+            <line v-for="(mark, i) in dialFace.marks" :key="'m' + i" class="cn-dial__arc" :x1="mark.x1" :y1="mark.y1" :x2="mark.x2" :y2="mark.y2" />
+            <circle class="cn-dial__inner" :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" />
+          </svg></view>
+          <!-- The count is shown while it runs; under reduced motion the final value shows at once (also in the App, where
+               the count runs on a timer). The dial's name carries the one value screen readers hear. -->
+          <view class="cn-dial__num" aria-hidden="true">
+            <view class="cn-dial__value" :style="{ fontSize: dialNumberSize + 'px' }">
+              <text class="cn-dial__v cn-dial__v--count">{{ shownScore }}</text>
+              <text class="cn-dial__v cn-dial__v--final">{{ finalScore }}</text>
+            </view>
+            <text class="cn-dial__unit" :style="{ fontSize: dialUnitSize + 'px', lineHeight: dialGeo.unitLh + 'px' }">{{ t.onboarding.phoneComputeUnit }}</text>
           </view>
         </view>
       </view>
@@ -108,9 +121,13 @@
     </view>
     <view v-if="nativePhoneAvailable" class="cn-cta">
       <view v-if="phase === 'result'" :class="{ 'cn-error-actions': iosPhone }">
+        <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger; the bubble closes on a second tap, a tap outside or a scroll. -->
+        <view class="cn-rules">
+          <NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" />
+        </view>
         <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
           <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : activateText }}</text>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
         <view v-if="iosPhone && canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
           <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosActivateLater }}</text>
@@ -140,15 +157,6 @@
         </view>
       </view>
     </view>
-    <view v-if="nativePhoneAvailable && phase === 'result'" class="cn-policy-float" @click.stop>
-      <view v-if="rulesExpanded" id="cn-policy-details" class="cn-policy-float__list" role="tooltip">
-        <text class="cn-policy-float__title">{{ t.onboarding.policyTitle }}</text>
-        <text v-for="(line, i) in policyLines" :key="i" class="cn-policy__t">{{ line }}</text>
-      </view>
-      <view class="cn-policy-float__button" role="button" tabindex="0" :aria-label="t.onboarding.policyTitle" :aria-expanded="rulesExpanded" aria-controls="cn-policy-details" @click="rulesExpanded = !rulesExpanded" @keydown.enter.prevent="rulesExpanded = !rulesExpanded" @keydown.space.prevent="rulesExpanded = !rulesExpanded">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5" /><path d="M12 8h.01" /></svg>
-      </view>
-    </view>
     <GlobalUi />
   </StandalonePageShell>
 </template>
@@ -157,12 +165,13 @@
 import { navReset, navTo } from "@/lib/route";
 import { hasNativeAndroidPhoneRuntime, hasNativePhoneRuntime, nativePhonePlatform } from "@/lib/native-phone-runtime";
 import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, getCurrentInstance, nextTick, onMounted, onUnmounted, watch } from "vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
 import { onLoad, onBackPress, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
+import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
@@ -213,7 +222,6 @@ const resumeDeferred = ref(false);
 type Phase = "intro" | "calibrating" | "result" | "error";
 type FailedAction = "calibration" | "activate" | "defer";
 const phase = ref<Phase>("intro");
-const rulesExpanded = ref(false);
 const shownScore = ref(0);
 let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
@@ -379,7 +387,68 @@ async function startCalibration() {
 }
 
 // The real API remains authoritative; animation only counts up to its confirmed score.
-const scoreHexPath = "M110 20 L176 52 Q200 65 200 88 L200 132 Q200 155 176 168 L110 200 L44 168 Q20 155 20 132 L20 88 Q20 65 44 52 Z";
+// Calibration dial geometry (design B1–B8). The 375 and 390 tiers share the 300px dial; the unit uses the body role.
+const windowWidth = uni.getSystemInfoSync().windowWidth;
+const dialGeo = windowWidth >= 375
+  ? { max: 300, inner: 105.9, base: 52, unit: windowWidth >= 390 ? 15 : 14, unitLh: windowWidth >= 390 ? 22 : 21, min: 250 }
+  : { max: 272, inner: 96, base: 48, unit: 14, unitLh: 21, min: 229 };
+const DIAL_GAP = 6;   // number → unit
+const DIAL_CLEAR = 4; // text corners stay this far inside the inner ring
+const dialSize = ref(dialGeo.min);
+const dialReady = ref(false);
+const dialUnitSize = ref(dialGeo.unit);
+// The number is sized from the final string (dot included), never the shorter count. JetBrains Mono advances 0.6em, less
+// the −0.02em tracking: a string of n characters at size f is 0.58·n·f wide. The block (number at line-height 1, gap, unit
+// line) is centred, so its far corner sits at (0.29·n·f, f/2 + (gap + unit line)/2); solving that distance for the inner
+// ring less the clearance gives the largest size that stays inside, capped at the tier's 52/48.
+const dialNumberSize = computed(() => {
+  const n = Math.max(1, String(finalScore.value).length), half = (DIAL_GAP + dialGeo.unitLh) / 2, r = dialGeo.inner - DIAL_CLEAR;
+  const a = (0.29 * n) ** 2 + 0.25;
+  return Math.min(dialGeo.base, Math.floor((-half + Math.sqrt(half * half - 4 * a * (half * half - r * r))) / (2 * a)));
+});
+const dialFace = computed(() => {
+  const d = dialSize.value, c = d / 2, margin = dialGeo.max * 0.03, rTick = c - margin, gap = rTick - dialGeo.inner;
+  const rArc = dialGeo.inner + gap * 0.57, major = Math.min(dialGeo.max * 0.034, gap * 0.3);
+  const at = (deg: number, r: number) => [c + Math.sin(deg * Math.PI / 180) * r, c - Math.cos(deg * Math.PI / 180) * r].map(v => +v.toFixed(2));
+  const ticks = Array.from({ length: 72 }, (_, i) => {
+    const isMajor = i % 6 === 0, [x1, y1] = at(i * 5, rTick), [x2, y2] = at(i * 5, rTick - (isMajor ? major : major / 2));
+    return { major: isMajor, x1, y1, x2, y2 };
+  });
+  const arcs = [0, 1, 2, 3].map(k => {
+    const [sx, sy] = at(k * 90 + 14, rArc), [ex, ey] = at(k * 90 + 76, rArc);
+    return `M${sx} ${sy} A${rArc.toFixed(2)} ${rArc.toFixed(2)} 0 0 1 ${ex} ${ey}`;
+  });
+  const marks = [0, 1, 2, 3].map(k => {
+    const [x1, y1] = at(k * 90, rArc - gap * 0.3), [x2, y2] = at(k * 90, rArc + gap * 0.16);
+    return { x1, y1, x2, y2 };
+  });
+  return { ticks, arcs, marks };
+});
+// The phase fills the height between the title and the rules row; the dial takes it, clamped to [min, max]. The unit
+// keeps one line where the inner ring's chord at its height allows it, and steps its size down where it does not.
+const pageInstance = getCurrentInstance();
+function fitDial() {
+  if (!pageInstance?.proxy) return;
+  const query = uni.createSelectorQuery().in(pageInstance.proxy);
+  query.select(".cn-phase--dial").boundingClientRect();
+  query.select(".cn-dial__unit").boundingClientRect();
+  query.exec((boxes: (UniApp.NodeInfo | null)[]) => {
+    if (phase.value !== "result") return;
+    const [box, unit] = boxes;
+    if (box?.height) dialSize.value = Math.max(dialGeo.min, Math.min(dialGeo.max, Math.floor(box.height)));
+    if (unit?.width) {
+      const r = dialGeo.inner - DIAL_CLEAR, halfBlock = (dialNumberSize.value + DIAL_GAP + dialGeo.unitLh) / 2;
+      const chord = 2 * Math.sqrt(r * r - halfBlock * halfBlock);
+      if (unit.width > chord) dialUnitSize.value = Math.floor(dialGeo.unit * chord / unit.width);
+    }
+    dialReady.value = true;
+  });
+}
+watch(phase, next => {
+  dialReady.value = false;
+  dialUnitSize.value = dialGeo.unit;
+  if (next === "result" && !iosPhone) void nextTick(fitDial);
+});
 watch([phase, finalScore], ([next, score]) => {
   if (scoreTimer) clearInterval(scoreTimer);
   scoreTimer = null;
@@ -779,12 +848,8 @@ onUnmounted(() => {
 .cn-test__track { margin-top: 10px; height: 4px; border-radius: 9999px; background: var(--v5-surface-2); overflow: hidden; }
 .cn-test__fill { height: 100%; border-radius: 9999px; transition: width 0.15s linear; }
 
-.cn-score { position: relative; overflow: hidden; border-radius: 16px; padding: 20px; text-align: center; background: radial-gradient(70% 80% at 50% 0%, color-mix(in oklab, var(--v5-brand) 18%, transparent) 0%, transparent 60%), var(--v5-surface); border: 1px solid var(--v5-border); box-shadow: var(--v5-card-shadow-lift-strong); }
 .cn-score__cap { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-score__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.18em; color: var(--v5-brand); }
-.cn-score__num { margin-top: 12px; display: flex; align-items: baseline; justify-content: center; gap: 4px; }
-.cn-score__v { font-family: var(--font-metric); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.025em; color: var(--v5-brand); font-size: 56px; font-weight: 600; }
-.cn-score__d { font-family: var(--font-metric); font-variant-numeric: tabular-nums; color: var(--v5-ink-3); font-size: 20px; font-weight: 500; }
 .cn-score__tier { display: block; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--v5-ink); }
 .cn-score__yield { margin: 12px auto 0; display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); }
 .cn-score__yield-cap { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
@@ -820,7 +885,9 @@ onUnmounted(() => {
 .cn-link { min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .cn-link__t { font-size: 13px; color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 3px; }
 
+.cn-main { flex: 1 0 auto; display: flex; flex-direction: column; }
 .cn-cta { margin-top: auto; padding-top: 24px; }
+.cn-rules { display: flex; justify-content: center; margin-bottom: 4px; }
 .cn-go { width: 100%; height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--v5-brand); transition: transform 0.15s ease; }
 .cn-go--glow { box-shadow: 0 0 24px color-mix(in oklab, var(--v5-brand) 35%, transparent); }
 .cn-go__t { font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); color: var(--v5-on-brand); }
@@ -832,19 +899,39 @@ onUnmounted(() => {
 .anim-up { animation: cn-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes cn-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-.cn-score--hex { --score-size: clamp(184px, 32vh, 306px); width: 100%; height: var(--score-size); box-sizing: border-box; display: grid; place-items: center; border: 0; background: transparent; box-shadow: none; padding: 0; overflow: visible; isolation: isolate; }
-.cn-score__aurora { grid-area: 1 / 1; width: min(70vw, 220px); height: min(70vw, 220px); border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--v5-brand) 42%, transparent), transparent 64%); filter: blur(24px); animation: cn-aurora 5s ease-in-out infinite alternate; }
-.cn-score__hex { grid-area: 1 / 1; width: calc(var(--score-size) - 16px); height: calc(var(--score-size) - 16px); animation: cn-hex-breathe 7s ease-in-out infinite; }
-.cn-score__hex :deep(svg) { display: block; }
-.cn-score__hex :deep(.cn-score__ring) { fill: none; stroke-linejoin: round; }
-.cn-score__hex :deep(.cn-score__ring--halo) { stroke: color-mix(in oklab, var(--v5-brand) 18%, transparent); stroke-width: 8; }
-.cn-score__hex :deep(.cn-score__ring--edge) { stroke: var(--v5-brand); stroke-width: 3.4; filter: drop-shadow(0 0 9px color-mix(in oklab, var(--v5-brand) 48%, transparent)); }
-.cn-score--hex .cn-score__num { grid-area: 1 / 1; z-index: 1; margin: 0; }
-.cn-policy-float { position: fixed; right: 20px; bottom: var(--nx-overlay-bottom); z-index: 20; }
-.cn-policy-float__button { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--v5-ink-2); background: var(--v5-surface); }
-.cn-policy-float__list { position: absolute; right: 0; bottom: 54px; width: min(280px, calc(100vw - 40px)); box-sizing: border-box; padding: 16px; border-radius: 14px; background: var(--v5-surface-2); display: flex; flex-direction: column; gap: 8px; }
-.cn-policy-float__title { color: var(--v5-ink); font-size: 12px; font-weight: 600; }
-@keyframes cn-aurora { from { transform: scale(.95); opacity: .7; } to { transform: scale(1.08); opacity: 1; } }
-@keyframes cn-hex-breathe { 0%, 100% { transform: scale(.97) rotate(0deg); } 50% { transform: scale(1.03) rotate(3deg); } }
-@media (prefers-reduced-motion: reduce) { .cn-score__aurora, .cn-score__hex { animation: none; } }
+/* Calibration dial (design B1–B8): brand colour only. The phase takes the free height (min = the smallest dial); the dial
+   sits in its middle at the size fitDial measured. Dark: a soft brand glow and a lens in the inner ring; light: the lens only. */
+.cn-phase--dial { flex: 1 0 0; position: relative; }
+.cn-dial { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); visibility: hidden; }
+.cn-dial--ready { visibility: visible; }
+.cn-dial__glow, .cn-dial__lens, .cn-dial__ticks, .cn-dial__ring, .cn-dial__num { position: absolute; }
+.cn-dial__glow { inset: -14%; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 24%, transparent), color-mix(in srgb, var(--v5-brand) 9%, transparent) 48%, transparent 100%); }
+[data-theme="light"] .cn-dial__glow { display: none; }
+.cn-dial__lens { left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent); }
+[data-theme="light"] .cn-dial__lens { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 6%, transparent), transparent); }
+.cn-dial__ticks, .cn-dial__ring { inset: 0; }
+.cn-dial__ticks :deep(svg), .cn-dial__ring :deep(svg) { display: block; overflow: visible; }
+.cn-dial__major { stroke: var(--v5-brand); stroke-opacity: .6; stroke-width: 1.6; stroke-linecap: round; }
+.cn-dial__minor { stroke: var(--v5-ink); stroke-opacity: .18; stroke-width: 1; stroke-linecap: round; }
+.cn-dial__arc { fill: none; stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
+.cn-dial__inner { fill: none; stroke: var(--v5-brand); stroke-opacity: .22; stroke-width: 1; }
+.cn-dial__num { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; }
+.cn-dial__value { display: grid; justify-items: center; }
+.cn-dial__v { grid-area: 1 / 1; font-family: var(--font-metric); font-variant-numeric: tabular-nums; font-size: inherit; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: var(--v5-brand); white-space: nowrap; }
+.cn-dial__v--final { visibility: hidden; }
+.cn-dial__unit { display: block; max-width: 100%; margin-top: 6px; font-family: var(--font-v5); font-weight: 400; color: var(--v5-ink-3); text-align: center; white-space: nowrap; }
+/* Entrance once (07 §7.1.1): ticks turn in, arcs lock, the glow fades in; transform and opacity only, no loop. */
+@media (prefers-reduced-motion: no-preference) {
+  .cn-dial--ready .cn-dial__glow { animation: cn-fade .6s ease-out both; }
+  .cn-dial--ready .cn-dial__ring { animation: cn-lock .9s cubic-bezier(.16, 1, .3, 1) both; }
+  .cn-dial--ready .cn-dial__ticks { animation: cn-dial-in 1.1s cubic-bezier(.16, 1, .3, 1) both; }
+}
+/* Reduced motion: no entrance, and the final value instead of the count. */
+@media (prefers-reduced-motion: reduce) {
+  .cn-dial__v--count { visibility: hidden; }
+  .cn-dial__v--final { visibility: visible; }
+}
+@keyframes cn-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cn-lock { from { opacity: 0; transform: scale(1.14); } to { opacity: 1; transform: none; } }
+@keyframes cn-dial-in { from { opacity: 0; transform: rotate(-36deg); } to { opacity: 1; transform: none; } }
 </style>
