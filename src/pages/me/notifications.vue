@@ -593,8 +593,13 @@ watch(filter, value => {
 /* The expanded body starts on the title's text line (16 + 40 tile + 12); the action sits in the card footer (03 §3.1 P-67). */
 .message-center .notification-detail { padding:0 16px 14px 68px; }
 .message-center .notification-footer { margin-top:12px; }
-/* Expanded, the body follows the title 4px below (01 §1.1.1) instead of under the 40px tile; the card keeps the tile's height. */
-.message-center .notification-item--expanded .notification-row { padding-bottom:4px; }
+/* Expanded, the body follows the title 4px below (01 §1.3) instead of under the 40px tile; the card keeps the tile's height.
+   Neither the 44px row floor nor the time/unread column may stretch the title row: the column lies flat beside the time,
+   and the 44px touch area moves to ::after, which reaches from the card top over the body's first line. */
+.message-center .notification-card { position:relative; }
+.message-center .notification-item--expanded .notification-row { padding-bottom:4px; min-height:0; }
+.message-center .notification-item--expanded .notification-row::after { content:""; position:absolute; top:0; left:0; right:0; height:44px; }
+.message-center .notification-item--expanded .notification-meta { flex-direction:row; align-items:center; min-height:0; }
 .message-center .notification-item--expanded .notification-tile { margin-bottom:-40px; }
 .message-center .notification-item--expanded .notification-card { min-height:68px; }
 /* Earnings credited row (04.5, 10.1): each amount is the card figure in Montserrat and the success colour, its unit the
