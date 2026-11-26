@@ -2327,13 +2327,6 @@ async function submitReview() {
     return;
   }
   if (dialogsOpen > 0 || checkoutPurchaseChecking.value) return;
-  // A new order whose device goes to inventory (the full-slots note above) waits for the user's confirmation (PRD §7.3).
-  if (!createdCheckoutOrder.value && !pendingCheckoutCreate.value && checkoutFullSlots.value && !checkoutCapacityBlocked.value) {
-    dialogsOpen += 1;
-    const accepted = await confirmInventoryPlacement(t.value, { count: 1, full: true }, "order", dialogOwner);
-    dialogsOpen = Math.max(0, dialogsOpen - 1);
-    if (!accepted || !isCurrentCheckoutRoute(scope)) return;
-  }
   if (step.value === 'select-payment') { goConfirm(); await nextTick(); if (!isCurrentCheckoutRoute(scope)) return; }
   if (step.value === 'confirm' && !checkoutPurchaseChecking.value) await requestConfirmPay();
 }
@@ -2878,6 +2871,18 @@ async function onConfirmPay() {
     if (checkoutCapacityBlocked.value) {
       step.value = "select-payment";
       return;
+    }
+    // The device goes to inventory at the capacity just re-read (the full-slots note): the user confirms before the
+    // order is created (PRD §7.3), and the total must still be the one they tapped.
+    if (checkoutFullSlots.value) {
+      const accepted = await confirmInventoryPlacement(t.value, { count: 1, full: true }, "order", dialogOwner);
+      if (!accepted || !isCurrentCheckoutRoute(recoveryScope) || step.value !== "confirm") { confirming = false; return; }
+      if (!totalStillConfirmed(confirmedAmount)) {
+        confirming = false;
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
     }
     await submitRemoteOrder();
     return;
