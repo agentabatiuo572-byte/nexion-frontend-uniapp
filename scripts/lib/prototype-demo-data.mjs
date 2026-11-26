@@ -117,6 +117,7 @@ export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all'
 Object.assign(demoDefaults,{
   trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
   trialPurchaseReadState:'normal',trialPurchasePriceState:'normal',trialOriginalPurchaseState:'none',trialPurchaseWindow:'follow',
+  trialDefaultDiscountState:'initial',trialDeviceDiscountState:'initial',
   trialStartReceiptState:'normal',trialCancelReceiptState:'normal',purchaseCreateReceiptState:'normal',
 });
 export const demoOptions = {
@@ -139,7 +140,9 @@ export const demoOptions = {
   trialStartReceiptState:[...trialReceiptOptions,['rejected-unknown','通用拒绝（未知原因）＋资格重读']],
   trialCancelReceiptState:trialReceiptOptions,
   purchaseCreateReceiptState:[['normal','正常建单'],['processing','原建单请求处理中（稍后出单）']],
-  trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share']],
+  trialPurchaseListState:[['only-trial','仅试用设备'],['two','2 款 · 含 Rack P1'],['five','5 款 · 含 Cloud Share'],['device-discounts','5 款 · 按设备优惠（S1、Cloud Share 售价 200）']],
+  trialDefaultDiscountState:[['initial','15% · 上限 50 · 立减 10'],['repriced','17.5% · 上限 50 · 立减 5']],
+  trialDeviceDiscountState:[['initial','折扣 20% · 上限 400 · 立减 30'],['repriced','折扣改为 5% · 上限 400 · 立减 30'],['discount-follows','折扣跟随默认 · 立减 30'],['early-follows','折扣 20% · 上限 400 · 立减跟随默认']],
   trialPurchaseOptionTarget:[['rack-p1','UVELRack P1'],['trial-device','本人试用设备']],
   trialPurchaseOptionState:[['normal','正常'],['sold-out','缺货'],['quota-exhausted','名额用完'],['quota-requirements','硬件名额条件不足'],['ineligible','商品购买条件不满足'],['quote-error','单款报价失败'],['unlisted','下架'],['image-missing','清单未返回图片']],
   trialPurchaseReadState:[['normal','正常读取'],['loading','清单慢速读取'],['error','清单读取失败'],['unsupported','后端未支持（404）']],
@@ -257,7 +260,8 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
   };
   const products=skuDefinitions.map(([id,name,tier,listPrice,monthlyTarget,dailyEarnNEX,gpu,vram,watts],index)=>{
     const monthlyEstimateUsdt=id===previewDefaultTrialSku&&state.catalogState==='trial-h2-yield-updated'?225:monthlyTarget;
-    const basePrice=index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, 'sub-cent':11.774117, 'sub-cent-crossing':19.072962, precision:402.123456,
+    const discountSamplePrice=state.trialPurchaseListState==='device-discounts'&&['stellarbox-s1','cloud-share'].includes(id);
+    const basePrice=discountSamplePrice?200:index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, 'sub-cent':11.774117, 'sub-cent-crossing':19.072962, precision:402.123456,
       'precision-repriced':402.123456, 'excess-offset':15, capped:1000, repriced:1000 })[state.trialQuoteState]??listPrice;
     const priceChange=state.trialPurchasePriceState==='extra-up'&&id==='stellarrack-p1'?100:
       id===trialSku?({ 'trial-up':100,'trial-down':-100 })[state.trialPurchasePriceState]??0:0;
