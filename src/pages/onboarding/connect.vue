@@ -484,7 +484,7 @@ function onActivate(event?: Event) {
   busyAction.value = "activate";
   void activate(event);
 }
-function onDefer() { if (activationBusy.value) return; busyAction.value = "defer"; void deferPhoneActivation(); }
+function onDefer() { void deferPhoneActivation(); }
 function recalibrateNow() {
   if (activationBusy.value || deferOutcome.value === "unknown" || deferSyncPending.value) return;
   activationIntent = null;
@@ -550,7 +550,12 @@ const rawBar = computed<Bar>(() => {
   const pair = (primary: BarButton): Bar => { const secondary = later(); return secondary ? { kind: "tray", primary, secondary } : { kind: "float", primary }; };
   if (!nativePhoneAvailable) return { kind: "float", primary: { label: t.value.login.back, run: leaveConnect, glass: true } };
   // A write the server never confirmed, after three read-backs: the user may send the same command again (03 §3.5.2).
-  if (deferResendAvailable.value) return { kind: "tray", note: o.activationDeferResendBody, primary: { label: o.iosActivateLater, run: resendDeferral } };
+  const deferResending = inFlight.value === "defer" && deferOutcome.value === "unknown";
+  if (deferResendAvailable.value || deferResending) return {
+    kind: "tray",
+    note: o.activationDeferResendBody,
+    primary: { label: o.iosActivateLater, run: resendDeferral, off: deferResending, busy: deferResending },
+  };
   if (deferOutcome.value === "unknown") return { kind: "status", label: o.activationDeferUnknown };
   if (deferSyncPending.value) return { kind: "float", primary: main(o.phoneActivationSyncAction, () => { void deferRecovery.retry(); }) };
   if (deferOutcome.value === "rejected" && deferNeedsCalibration.value)
@@ -742,7 +747,7 @@ function completeOnboardingLocally(signOutOnFailure = true): boolean {
 type ActivationReadOutcome =
   | { kind: "active"; result: OnboardingCalibration }
   | { kind: "completed-inactive"; result: OnboardingCalibration | null }
-  | { kind: "rejected"; reason: string }
+  | { kind: "rejected"; reason: string; calibration: OnboardingCalibration | null }
   | { kind: "pending" | "unconfirmed" | "not-found" };
 
 /** Only a fresh, successful null receipt paired with a scoped non-ACTIVE phone authorizes replay. */
@@ -754,6 +759,7 @@ async function readActivationOutcome(command: ActivationIntent, scope: RequestSc
   if (!scopeIsCurrent(scope)) return { kind: "unconfirmed" };
   if (receipt?.status === "PENDING") return { kind: "pending" };
 
+  let calibration: OnboardingCalibration | null = null;
   try {
     if (receipt?.status === "SUCCEEDED") {
       if (!acceptCurrentCanonical(scope, receipt.result)) return { kind: "unconfirmed" };
@@ -765,8 +771,11 @@ async function readActivationOutcome(command: ActivationIntent, scope: RequestSc
     const result = await calibrationFlow.read({ ...calibrationOptions(scope), deviceId: command.deviceId });
     if (result && await readCurrentPhoneActive(result)) return { kind: "active", result };
     if (receipt === null && result) return { kind: "not-found" };
+    if (result?.activationStatus === "CALIBRATED" && result.calibrationAvailable && result.calibrationStatus === "MATCHED") {
+      calibration = result;
+    }
   } catch { /* A failed result read cannot authorize replay. */ }
-  return receipt?.status === "FAILED" ? { kind: "rejected", reason: receipt.reason } : { kind: "unconfirmed" };
+  return receipt?.status === "FAILED" ? { kind: "rejected", reason: receipt.reason, calibration } : { kind: "unconfirmed" };
 }
 
 function settleActivationCommand() {
@@ -810,6 +819,7 @@ async function applyActivationRead(outcome: ActivationReadOutcome, scope: Reques
     else phase.value = "intro";
   }
   if (outcome.kind === "rejected") {
+    if (outcome.calibration) canonical.value = outcome.calibration;
     settleActivationCommand();
     activationOutcome.value = "idle";
     throw new Error(outcome.reason);
@@ -1022,7 +1032,8 @@ async function deferPhoneActivation(resend = false) {
   if (!pageVisible.value || activationCompleted || !nativePhoneAvailable || !mounted || activationBusy.value
       || (resend ? !deferResendAvailable.value : !canDefer.value || (phase.value === "result" && !iosPhone))) return;
   const current = deferOutcome.value === "rejected" ? null : canonical.value;
-  deferOutcome.value = null;
+  if (!resend) deferOutcome.value = null;
+  busyAction.value = "defer";
   activationBusy.value = true;
   if (resend) requestGeneration += 1;
   const scope = currentScope();
@@ -1081,7 +1092,9 @@ function leaveConnect() {
   navReset({ url: "/pages/index/index", fail: () => {} });
   // #endif
   // #ifndef H5
-  navReset({ url: isLogin.value ? "/pages/index/index" : isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
+  // Returning to the estimator while the command is pending would immediately reopen this page.
+  const onboardingReturn = activationIntent ? "/pages/onboarding/intro" : "/pages/onboarding/estimator";
+  navReset({ url: isLogin.value ? "/pages/index/index" : isRecal.value ? "/pages/me/devices" : onboardingReturn, fail: () => {} });
   // #endif
 }
 

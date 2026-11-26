@@ -253,7 +253,6 @@ const deferOutcome = ref<"rejected" | "unknown" | null>(null);
 const deferSyncPending = ref(false);
 let deferNeedsCalibration = false;
 let recalibrationRequested = false;
-let activationCommandPending = false;
 let deferIntent: PhoneCommand<"defer"> | null = null;
 const calibrationReadback = createPhoneWriteReadback();
 const deferReadback = createPhoneWriteReadback();
@@ -309,6 +308,12 @@ function calibrationOptions(scope = scopePair()) {
   };
 }
 
+function resumePendingActivation(options: ReturnType<typeof calibrationOptions>): boolean {
+  if (!options.isCurrent() || !readPhoneCommand(options, "activate")) return false;
+  navReset({ url: "/pages/onboarding/connect", fail: () => {} });
+  return true;
+}
+
 async function acceptEstimate(result: OnboardingCalibration, options: ReturnType<typeof calibrationOptions>, knownActive?: boolean | null) {
   const active = knownActive ?? await readCurrentPhoneActive(result);
   if (!options.isCurrent()) return;
@@ -335,8 +340,8 @@ async function loadCalibration(recalibrate = false, resend = false) {
   deferred.value = false;
   loading.value = true;
   try {
-    activationCommandPending = !resend && !!readPhoneCommand(options, "activate");
-    if (!resend && !activationCommandPending) {
+    if (resumePendingActivation(options)) return;
+    if (!resend) {
       deferIntent = readPhoneCommand(options, "defer");
       if (deferIntent) {
         leaveAfterDeferral = true;
@@ -354,11 +359,6 @@ async function loadCalibration(recalibrate = false, resend = false) {
       current = await calibrationFlow.read(options);
       const active = current && await readCurrentPhoneActive(current);
       if (!options.isCurrent()) return;
-      if (activationCommandPending) {
-        if (current?.activationStatus !== "DEFERRED" && current) await acceptEstimate(current, options, false);
-        else loadFailed.value = true;
-        return;
-      }
       if (resend) {
         const result = calibrationFlow.reconcile(current);
         if (result) {
@@ -398,15 +398,14 @@ async function recoverCalibration() {
   const options = calibrationOptions();
   const pending = calibrationWritePending.value;
   try {
+    if (resumePendingActivation(options)) return;
     const current = await calibrationFlow.read(options);
     if (!options.isCurrent()) return;
     const result = pending ? calibrationFlow.reconcile(current) : current;
     if (pending && !result) { calibrationReadback.observe(); return; }
-    activationCommandPending = !!readPhoneCommand(options, "activate");
-    const active = result && !activationCommandPending ? await readCurrentPhoneActive(result) : false;
+    const active = result ? await readCurrentPhoneActive(result) : false;
     if (!options.isCurrent()) return;
-    if (result && !(activationCommandPending && result.activationStatus === "DEFERRED")
-        && (pending || !recalibrationRequested || active || activationCommandPending)) {
+    if (result && (pending || !recalibrationRequested || active)) {
       await acceptEstimate(result, options, active);
     } else {
       loadFailed.value = true;
@@ -442,10 +441,6 @@ function resendCalibration() {
 
 function retryCalibration() {
   if (!nativePhoneAvailable || loading.value || deferBusy.value || deferOutcome.value === "unknown") return;
-  if (activationCommandPending) {
-    navReset({ url: "/pages/onboarding/connect", fail: () => {} });
-    return;
-  }
   if (deferred.value) {
     navReset({ url: "/pages/onboarding/connect?mode=resume", fail: () => {} });
     return;
@@ -477,7 +472,6 @@ watch(() => String(app.accountKey || ""), (next) => {
   calibrationFlow.reset();
   deferIntent = null;
   currentPhoneActive.value = false;
-  activationCommandPending = false;
   calibrationReadback.reset();
   deferReadback.reset();
   detected.value = false;
@@ -586,7 +580,7 @@ async function deferPhoneActivation(resend: boolean | Event = false) {
   const retry = resend === true;
   if (!nativePhoneAvailable || !mounted || deferBusy.value || loading.value || calibrationWritePending.value
       || (retry ? !deferResendAvailable.value : deferOutcome.value === "unknown")
-      || currentPhoneActive.value || activationCommandPending) return;
+      || currentPhoneActive.value) return;
   leaveAfterDeferral = true;
   if (deferSyncPending.value) { void deferRecovery.retry(); return; }
   const current = deferOutcome.value === "rejected" ? null : calibration.value;
