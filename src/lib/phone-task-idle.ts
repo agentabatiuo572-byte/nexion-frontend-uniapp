@@ -1,7 +1,7 @@
 import { projectServerNow } from "@/lib/server-deadline-clock";
 import type { Device } from "@/store/types";
 
-/** What the 当前作业 line says for a remote phone without a current task (PRD 6.11, BUG-526), most urgent first.
+/** What the 当前作业 line says for a remote phone without a current task (PRD 6.11, BUG-526), in the order phoneIdleState checks them.
  * Shared by the earn stage, the device card and the device warehouse row; a running or paused task keeps its own row. */
 export type PhoneIdleState = "restoring" | "notReady" | "expired" | "unknown" | "idle";
 
