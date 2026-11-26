@@ -143,7 +143,7 @@ import NxTag from "@/components/ui/nx-tag.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import { formatEstimate } from "@/lib/estimate-display";
 import { navReset } from "@/lib/route";
-import { onBackPress, onLoad } from "@dcloudio/uni-app";
+import { onBackPress, onHide, onLoad, onShow } from "@dcloudio/uni-app";
 import { ref, computed, getCurrentInstance, nextTick, onMounted, onUnmounted, watch } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
@@ -153,13 +153,14 @@ import { onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
-import { useSession } from "@/store/session";
 import { markAuthAccountOnboardingComplete } from "@/store/auth-account";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { createEstimatorScope, isCurrentEstimatorScope, type EstimatorScope } from "@/lib/estimator-scope";
 import { requireCryptoUuid } from "@/lib/secure-command-id";
-import { confirmDeferredPhoneActivation } from "@/lib/defer-phone-activation";
+import { confirmDeferredPhoneActivation, syncDeferredPhoneActivation } from "@/lib/defer-phone-activation";
+import { phoneActivationFeedback } from "@/lib/phone-activation-feedback";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { collectDeviceSignals } from "@/lib/device-signals";
 // #ifdef APP-PLUS
 import NativeGpuObserver from "@/components/native-gpu-observer.vue";
@@ -185,7 +186,6 @@ const app = useApp();
 const auth = useAuth();
 const detected = ref(false);
 const loadFailed = ref(false);
-const deferFailed = ref(false);
 const deferred = ref(false);
 const loading = ref(false);
 const deferBusy = ref(false);
@@ -215,32 +215,32 @@ const compareRows = computed(() => {
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let mounted = false;
+const pageVisible = ref(true);
+onShow(() => { pageVisible.value = true; });
+onHide(() => { pageVisible.value = false; });
 let accountEpoch = 0;
 let generation = 0;
 let accountWatchKey = String(app.accountKey || "");
-let deferIntent: { revision: number; idempotencyKey: string } | null = null;
 const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationApi,
   collect: collectCalibrationSignals, key: () => `onboarding:${requireCryptoUuid()}` });
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const iosPhone = nativePhonePlatform() === "ios";
 const detectingText = computed(() => iosPhone ? t.value.onboarding.iosIdentifying : t.value.onboarding.detecting);
 
-// ── Placeholders for the logic round (report table: placeholder → meaning → board). Defaults keep today's behaviour. ──
-/** E12: the estimate read failed and the page recovers it on its own (read-only GET, no button). Until wired, a failed read
- *  falls through to E04 with 「重新校准」 as today. */
 const estimateReadRecovering = ref(false);
-/** E13: the calibration write's outcome is unknown and is being read back; the CTA stays grey with a spinner. */
 const calibrationWritePending = ref(false);
-/** E08 / E14: how the last 「稍后激活」 ended. 'rejected' = the server refused (toast, page unchanged); 'unknown' = the result is
- *  being read back (status capsule instead of the tray). */
 const deferOutcome = ref<"rejected" | "unknown" | null>(null);
+const deferSyncPending = ref(false);
+let deferNeedsCalibration = false;
+let recalibrationRequested = false;
+let leaveAfterDeferral = false;
 
 type EstimatorView = "nonnative" | "loading" | "write-pending" | "read-failed" | "detected" | "unavailable" | "deferred";
 const view = computed<EstimatorView>(() => !nativePhoneAvailable ? "nonnative"
   : deferred.value ? "deferred"
   : estimateReadRecovering.value ? "read-failed"
-  : loadFailed.value ? "unavailable"
   : calibrationWritePending.value ? "write-pending"
+  : loadFailed.value ? "unavailable"
   : detected.value ? "detected" : "loading");
 const estimateShown = computed(() => view.value === "loading" || view.value === "write-pending" || view.value === "read-failed" || view.value === "detected");
 const pendingKind = computed(() => calibration.value?.calibrationStatus === "PENDING_VERIFICATION" ? (iosPending.value ? "ios" : "android") : null);
@@ -273,60 +273,96 @@ function isCurrent(scope: { estimator: EstimatorScope; remote: RemoteAccountRequ
     && isCurrentAccountScope(scope.remote);
 }
 
-function loadCalibration(recalibrate = false) {
-  if (!nativePhoneAvailable) return;
-  const scope = scopePair();
-  loadFailed.value = false;
-  deferFailed.value = false;
-  deferred.value = false;
-  loading.value = true;
-  void Promise.resolve().then(() => calibrationFlow.run({ deviceId: getDeviceId(), accountKey: auth.accountId,
+function calibrationOptions(scope = scopePair()) {
+  return {
+    deviceId: getDeviceId(), accountKey: auth.accountId,
     isCurrent: () => isCurrent(scope) && auth.isAuthenticated,
-    recalibrate,
-  })).then((result) => {
-    if (!isCurrent(scope)) return;
-    if (result.activationStatus === "DEFERRED") {
-      calibration.value = result;
-      detected.value = false;
-      deferred.value = true;
-      return;
-    }
-    if (!result.calibrationAvailable || result.calibrationStatus !== "MATCHED" || (result.activationStatus !== "CALIBRATED" && result.activationStatus !== "ACTIVE")) {
-      calibration.value = result;
-      detected.value = false;
-      loadFailed.value = true;
-      return;
-    }
-    calibration.value = result;
-    scheduleReveal();
-  }).catch(() => {
-    if (!mounted || !isCurrentEstimatorScope(scope.estimator,
-      createEstimatorScope(String(app.accountKey || ""), accountEpoch, generation))) return;
-    calibration.value = null;
-    detected.value = false;
-    loadFailed.value = true;
-  }).finally(() => {
-    if (mounted && isCurrentEstimatorScope(scope.estimator,
-      createEstimatorScope(String(app.accountKey || ""), accountEpoch, generation))) loading.value = false;
-  });
+  };
 }
 
-function retryCalibration() {
-  if (deferBusy.value) return;
+function acceptEstimate(result: OnboardingCalibration) {
+  calibration.value = result;
+  if (result.activationStatus === "DEFERRED") {
+    finishDeferral(result);
+    return;
+  }
+  if (!result.calibrationAvailable || result.calibrationStatus !== "MATCHED") {
+    loadFailed.value = true;
+    return;
+  }
+  scheduleReveal();
+}
+
+async function loadCalibration(recalibrate = false) {
   if (!nativePhoneAvailable) return;
-  if (loading.value) return;
-  if (deferFailed.value) { void deferPhoneActivation(); return; }
+  const scope = scopePair();
+  const options = calibrationOptions(scope);
+  recalibrationRequested = recalibrate;
+  loadFailed.value = false;
+  estimateReadRecovering.value = false;
+  deferred.value = false;
+  loading.value = true;
+  try {
+    let current: OnboardingCalibration | null;
+    try {
+      current = await calibrationFlow.read(options);
+    } catch {
+      if (isCurrent(scope)) estimateReadRecovering.value = true;
+      return;
+    }
+    if (!options.isCurrent()) return;
+    const reconciled = calibrationFlow.reconcile(current);
+    const result = reconciled ?? (current && (!recalibrate || current.activationStatus === "ACTIVE")
+      ? current : await calibrationFlow.write(options, current));
+    if (options.isCurrent()) acceptEstimate(result);
+  } catch {
+    if (isCurrent(scope)) {
+      calibrationWritePending.value = calibrationFlow.hasPendingWrite();
+      loadFailed.value = !calibrationWritePending.value;
+    }
+  } finally {
+    if (isCurrent(scope)) loading.value = false;
+  }
+}
+
+async function recoverCalibration() {
+  const scope = scopePair();
+  const options = calibrationOptions(scope);
+  const current = await calibrationFlow.read(options);
+  if (!options.isCurrent()) return;
+  const pending = calibrationWritePending.value;
+  const result = pending ? calibrationFlow.reconcile(current) : current;
+  if (pending && !result) return;
+  calibrationWritePending.value = false;
+  estimateReadRecovering.value = false;
+  if (result && (pending || !recalibrationRequested || result.activationStatus === "ACTIVE")) {
+    acceptEstimate(result);
+  } else {
+    loadFailed.value = true;
+  }
+}
+
+useAutoRecovery({
+  failed: () => !loading.value && (estimateReadRecovering.value || calibrationWritePending.value),
+  active: () => nativePhoneAvailable && pageVisible.value,
+  retry: recoverCalibration,
+  repeatMs: 30_000,
+});
+
+function retryCalibration() {
+  if (!nativePhoneAvailable || loading.value || deferBusy.value || deferOutcome.value === "unknown") return;
   if (deferred.value) {
     navReset({ url: "/pages/onboarding/connect?mode=resume", fail: () => {} });
     return;
   }
   generation += 1;
   if (timer) clearTimeout(timer);
-  const needsCalibration = calibration.value !== null && calibration.value.calibrationStatus !== "MATCHED";
+  const needsCalibration = recalibrationRequested || deferNeedsCalibration || (calibration.value !== null && calibration.value.calibrationStatus !== "MATCHED");
+  deferOutcome.value = null;
+  deferNeedsCalibration = false;
   detected.value = false;
   calibration.value = null;
-  calibrationFlow.reset();
-  loadCalibration(needsCalibration);
+  void loadCalibration(needsCalibration);
 }
 
 function scheduleReveal() {
@@ -343,12 +379,16 @@ watch(() => String(app.accountKey || ""), (next) => {
   accountEpoch += 1;
   generation += 1;
   deferBusy.value = false;
-  deferIntent = null;
   calibrationFlow.reset();
   detected.value = false;
   loadFailed.value = false;
-  deferFailed.value = false;
   deferred.value = false;
+  estimateReadRecovering.value = false;
+  calibrationWritePending.value = false;
+  deferOutcome.value = null;
+  deferSyncPending.value = false;
+  deferNeedsCalibration = false;
+  leaveAfterDeferral = false;
   calibration.value = null;
   loadCalibration();
 });
@@ -376,15 +416,9 @@ onBackPress(() => {
 });
 
 function goConnect() {
-  if (!nativePhoneAvailable || !detected.value || !calibration.value?.calibrationAvailable) return;
+  if (!nativePhoneAvailable || !detected.value || deferOutcome.value === "unknown"
+      || !calibration.value?.calibrationAvailable) return;
   navReset({ url: "/pages/onboarding/connect", fail: () => {} });
-}
-
-function completeOnboardingLocally(): boolean {
-  if (!auth.completeOnboarding()) return false;
-  if (markAuthAccountOnboardingComplete(auth.email || auth.accountId || "default") || remoteApiEnabled) return true;
-  if (!auth.requireOnboarding()) auth.signOut();
-  return false;
 }
 
 function leaveEstimator() {
@@ -398,45 +432,65 @@ function leaveEstimator() {
   // #endif
 }
 
+function finishDeferral(result: OnboardingCalibration) {
+  calibration.value = result;
+  detected.value = false;
+  deferred.value = true;
+  deferOutcome.value = null;
+  deferNeedsCalibration = false;
+  const accountKey = auth.email || auth.accountId || "default";
+  const synchronized = syncDeferredPhoneActivation(accountKey)
+    && (auth.onboardingComplete || auth.completeOnboarding())
+    && (markAuthAccountOnboardingComplete(accountKey) || remoteApiEnabled);
+  deferSyncPending.value = !synchronized;
+  if (!synchronized || !leaveAfterDeferral) return;
+  leaveAfterDeferral = false;
+  toast.info(t.value.onboarding.activationDeferredToast, t.value.onboarding.activationDeferredToastBody);
+  navReset({ url: "/pages/index/index", fail: () => {} });
+}
+
+const deferRecovery = useAutoRecovery({
+  failed: () => !deferBusy.value && (deferOutcome.value === "unknown" || deferSyncPending.value),
+  active: () => nativePhoneAvailable && pageVisible.value,
+  async retry() {
+    const options = calibrationOptions();
+    const result = await calibrationFlow.read(options);
+    if (options.isCurrent() && result?.activationStatus === "DEFERRED") finishDeferral(result);
+  },
+  repeatMs: 30_000,
+});
+
 async function deferPhoneActivation() {
-  if (!nativePhoneAvailable || !mounted || deferBusy.value || loading.value) return;
+  if (!nativePhoneAvailable || !mounted || deferBusy.value || loading.value || deferOutcome.value === "unknown"
+      || calibration.value?.activationStatus === "ACTIVE") return;
+  leaveAfterDeferral = true;
+  if (deferSyncPending.value) {
+    void deferRecovery.retry();
+    return;
+  }
+  const current = deferOutcome.value === "rejected" ? null : calibration.value;
+  deferOutcome.value = null;
   deferBusy.value = true;
   const scope = scopePair();
   const deviceId = getDeviceId();
   try {
-    const deferred = await confirmDeferredPhoneActivation({
-      current: calibration.value,
-      deviceId,
-      command: (revision) => {
-        if (!deferIntent || deferIntent.revision !== revision) {
-          deferIntent = {
-            revision,
-            idempotencyKey: `phone-activation:deferred:${requireCryptoUuid()}`,
-          };
-        }
-        return deferIntent;
-      },
+    const result = await confirmDeferredPhoneActivation({
+      current, deviceId,
+      command: (revision) => ({ revision, idempotencyKey: `phone-activation:deferred:${requireCryptoUuid()}` }),
       isCurrent: () => isCurrent(scope),
       accept: (result) => isCurrent(scope) && calibrationBelongsTo(result, auth.accountId, deviceId),
     });
-    if (!isCurrent(scope) || deferred.activationStatus !== "DEFERRED") return;
-
-    calibration.value = deferred;
-    const phoneDevice = app.devices.find((device) => device.kind === "phone");
-    const localPhoneStateCommitted = (remoteApiEnabled || !phoneDevice || app.deactivateDevice(phoneDevice.id))
-      && useSession().markPhoneActivationDeferred(auth.email || auth.accountId || "default");
-    if (!localPhoneStateCommitted && !remoteApiEnabled) throw new Error("PHONE_DEFER_LOCAL_COMMIT_FAILED");
-    if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
-
-    toast.info(t.value.onboarding.activationDeferredToast, t.value.onboarding.activationDeferredToastBody);
-    navReset({ url: "/pages/index/index", fail: () => {} });
-  } catch {
-    if (isCurrent(scope)) {
-      calibration.value = null;
-      deferFailed.value = true;
-      loadFailed.value = true;
-      toast.warn(t.value.onboarding.activationDeferRejectedTitle);
-    }
+    if (!isCurrent(scope)) return;
+    if (result) finishDeferral(result);
+    else deferOutcome.value = "unknown";
+  } catch (cause) {
+    if (!isCurrent(scope)) return;
+    leaveAfterDeferral = false;
+    deferOutcome.value = "rejected";
+    const code = cause instanceof Error ? cause.message : "";
+    deferNeedsCalibration = phoneActivationFeedback(code)?.action === "recalibrate";
+    const o = t.value.onboarding;
+    toast.warn(o.activationDeferRejectedTitle, code === "ONBOARDING_CALIBRATION_REVISION_CONFLICT" ? o.activationDeferRejectedBody : undefined);
   } finally {
     if (isCurrent(scope)) deferBusy.value = false;
   }

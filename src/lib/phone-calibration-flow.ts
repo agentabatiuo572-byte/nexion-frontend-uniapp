@@ -1,12 +1,11 @@
 import type { CalibrationRequestSignals, OnboardingCalibration, OnboardingCalibrationApi } from "@/api/onboarding-calibration-api";
 import { ApiError } from "@/api/errors";
+import { confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
 
 interface Options {
   deviceId: string;
   accountKey: string;
   isCurrent: () => boolean;
-  /** Only an explicit remeasurement may replace an existing result. */
-  recalibrate?: boolean;
 }
 
 export function calibrationBelongsTo(result: OnboardingCalibration, accountKey: string, deviceId: string): boolean {
@@ -15,72 +14,72 @@ export function calibrationBelongsTo(result: OnboardingCalibration, accountKey: 
     && accountKey === `user:${result.userId}` && result.deviceId === deviceId;
 }
 
-/** A page owns this intent; retries keep its exact observations, revision and key. */
+export function isMissingPhoneCalibration(error: unknown): boolean {
+  return error instanceof ApiError && error.message === "ONBOARDING_CALIBRATION_NOT_FOUND"
+    && ((error.kind === "http" && error.status === 404) || (error.kind === "business" && error.code === 404));
+}
+
+function checkScope(options: Options) {
+  if (!options.isCurrent()) throw new Error("ONBOARDING_CALIBRATION_SCOPE_STALE");
+}
+
+function accept(result: OnboardingCalibration, options: Options) {
+  checkScope(options);
+  if (!calibrationBelongsTo(result, options.accountKey, options.deviceId)) {
+    throw new ApiError({ kind: "protocol", message: "ONBOARDING_CALIBRATION_SCOPE_INVALID" });
+  }
+  return result;
+}
+
+/** Keep this page's exact observations, revision and key while its write is unconfirmed. */
 export function createPhoneCalibrationFlow(deps: {
   api: Pick<OnboardingCalibrationApi, "result" | "calibrate">;
   collect: () => CalibrationRequestSignals | Promise<CalibrationRequestSignals>;
   key: () => string;
 }) {
-  let intent: { accountKey: string; deviceId: string; signals: CalibrationRequestSignals;
-    expectedRevision: number; hadResult: boolean; idempotencyKey: string } | null = null;
+  let intent: { signals: CalibrationRequestSignals; expectedRevision: number;
+    hadResult: boolean; idempotencyKey: string } | null = null;
 
   return {
     reset() { intent = null; },
-    async run(options: Options): Promise<OnboardingCalibration> {
-      const check = () => {
-        if (!options.isCurrent()) throw new Error("ONBOARDING_CALIBRATION_SCOPE_STALE");
-      };
-      const accept = (result: OnboardingCalibration) => {
-        check();
-        if (!calibrationBelongsTo(result, options.accountKey, options.deviceId)) {
-          throw new ApiError({ kind: "protocol", message: "ONBOARDING_CALIBRATION_SCOPE_INVALID" });
-        }
-        return result;
-      };
-      check();
-      if (intent && (intent.accountKey !== options.accountKey || intent.deviceId !== options.deviceId)) intent = null;
-      let current: OnboardingCalibration | null = null;
+    hasPendingWrite() { return intent !== null; },
+    async read(options: Options): Promise<OnboardingCalibration | null> {
+      checkScope(options);
+      let result: OnboardingCalibration;
       try {
-        current = accept(await deps.api.result(options.deviceId));
-      } catch (error) {
-        check();
-        // A missing record is the normal first-registration path, not a failed
-        // hardware test. An unavailable endpoint/session is never permission to write.
-        if (!(error instanceof ApiError) || error.status !== 404
-            || error.message !== "ONBOARDING_CALIBRATION_NOT_FOUND") throw error;
+        result = await deps.api.result(options.deviceId);
+      } catch (cause) {
+        checkScope(options);
+        if (isMissingPhoneCalibration(cause)) return null;
+        throw cause;
       }
-      check();
-      // Read after an uncertain POST (or another tab's write) wins over replay.
-      // In particular, never overwrite a newer ACTIVE or DEFERRED decision.
-      if (current && (!options.recalibrate || (intent && (!intent.hadResult || current.revision > intent.expectedRevision)))) {
-        intent = null;
-        return current;
-      }
+      return accept(result, options);
+    },
+    reconcile(current: OnboardingCalibration | null): OnboardingCalibration | null {
+      if (!intent || !current) return null;
+      // The first insert may return revision 0. For an existing row we need
+      // a newer revision or an authoritative ACTIVE decision.
+      if (intent.hadResult && current.revision <= intent.expectedRevision
+          && current.activationStatus !== "ACTIVE") return null;
+      intent = null;
+      return current;
+    },
+    async write(options: Options, current: OnboardingCalibration | null): Promise<OnboardingCalibration> {
+      checkScope(options);
       if (!intent) {
         const signals = await deps.collect();
-        check();
-        intent = { accountKey: options.accountKey, deviceId: options.deviceId,
-          signals, expectedRevision: current?.revision ?? 0, hadResult: current !== null, idempotencyKey: deps.key() };
+        checkScope(options);
+        intent = { signals, expectedRevision: current?.revision ?? 0, hadResult: current !== null, idempotencyKey: deps.key() };
       }
       const command = intent;
-      check();
       try {
-        const result = accept(await deps.api.calibrate(command.deviceId, command.signals,
-          command.expectedRevision, command.idempotencyKey));
+        const result = accept(await deps.api.calibrate(options.deviceId, command.signals,
+          command.expectedRevision, command.idempotencyKey), options);
         intent = null;
         return result;
       } catch (cause) {
-        check();
-        // The response may have been lost after commit. Reconcile from the
-        // authoritative read without creating a second calibration/activation.
-        try {
-          const readback = accept(await deps.api.result(command.deviceId));
-          // The first inserted row has revision 0, just like its create request.
-          if (!command.hadResult || readback.revision > command.expectedRevision) {
-            intent = null;
-            return readback;
-          }
-        } catch { check(); }
+        checkScope(options);
+        if (confirmedPhoneActivationRejection(cause)) intent = null;
         throw cause;
       }
     },

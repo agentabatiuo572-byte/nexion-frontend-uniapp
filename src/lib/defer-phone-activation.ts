@@ -1,5 +1,9 @@
-import { deviceE3Api, onboardingCalibrationApi } from "@/api/runtime";
-import { ApiError, isAmbiguousOutcome } from "@/api/errors";
+import { deviceE3Api, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
+import { ApiError } from "@/api/errors";
+import { confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
+import { isMissingPhoneCalibration } from "@/lib/phone-calibration-flow";
+import { useApp } from "@/store/app";
+import { useSession } from "@/store/session";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 
 interface DeferredPhoneActivationCommand {
@@ -27,7 +31,7 @@ function stale(): never {
  */
 export async function confirmDeferredPhoneActivation(
   options: ConfirmDeferredPhoneActivationOptions,
-): Promise<OnboardingCalibration> {
+): Promise<OnboardingCalibration | null> {
   let current = options.current ?? null;
   if (!current) {
     try {
@@ -35,44 +39,35 @@ export async function confirmDeferredPhoneActivation(
       if (!options.accept(current)) stale();
     } catch (error: unknown) {
       if (!options.isCurrent()) stale();
-      if (!(error instanceof ApiError) || error.kind !== "http" || error.status !== 404) throw error;
-      current = null;
+      if (!isMissingPhoneCalibration(error)) throw error;
     }
   }
 
   if (current?.activationStatus === "DEFERRED") return current;
+  if (current?.activationStatus === "ACTIVE") throw new Error("PHONE_DEFER_ACTIVE");
 
-  const deviceId = current?.deviceId || options.deviceId;
   const command = options.command(current?.revision ?? 0);
   if (!options.isCurrent()) stale();
   try {
-    current = await onboardingCalibrationApi.defer(deviceId, command.revision, command.idempotencyKey, ...(options.initialOnly ? [true] as const : []));
-    if (!options.accept(current)) stale();
-  } catch (cause: unknown) {
+    const result = await onboardingCalibrationApi.defer(options.deviceId, command.revision, command.idempotencyKey, options.initialOnly);
     if (!options.isCurrent()) stale();
-    let readback: OnboardingCalibration | null = null;
-    try {
-      readback = await onboardingCalibrationApi.result(deviceId);
-      if (!options.accept(readback)) stale();
-    } catch (readbackError: unknown) {
-      if (!options.isCurrent()) stale();
-      const missing = readbackError instanceof ApiError
-        && readbackError.kind === "http"
-        && readbackError.status === 404;
-      if (!missing && !isAmbiguousOutcome(readbackError)) throw readbackError;
-    }
-    if (readback?.activationStatus === "DEFERRED") return readback;
-    if (!isAmbiguousOutcome(cause)) throw cause;
-
-    // Reuse the exact command after an ambiguous response, including the
-    // before-first-calibration case where readback still returns 404. The
-    // server either deduplicates a committed request or applies this one once.
-    current = await onboardingCalibrationApi.defer(deviceId, command.revision, command.idempotencyKey, ...(options.initialOnly ? [true] as const : []));
-    if (!options.accept(current)) stale();
+    return options.accept(result) && result.activationStatus === "DEFERRED" ? result : null;
+  } catch (cause) {
+    if (!options.isCurrent()) stale();
+    if (confirmedPhoneActivationRejection(cause)) throw cause;
+    // The request may have committed. Let the visible page read the result.
+    return null;
   }
+}
 
-  if (current.activationStatus !== "DEFERRED") throw new Error("PHONE_DEFER_NOT_CONFIRMED");
-  return current;
+/** Update this installation only after the server has confirmed DEFERRED. */
+export function syncDeferredPhoneActivation(accountKey: string): boolean {
+  const session = useSession();
+  if (session.isCurrentDevicePhoneActivationDeferred(accountKey)) return true;
+  const app = useApp();
+  const phone = app.devices.find((device) => device.kind === "phone");
+  return (remoteApiEnabled || !phone || app.deactivateDevice(phone.id))
+    && session.markPhoneActivationDeferred(accountKey);
 }
 
 /** H5 initial setup only: never convert an existing calibration/phone to DEFERRED. */
