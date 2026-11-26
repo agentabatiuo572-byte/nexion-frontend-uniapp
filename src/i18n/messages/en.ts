@@ -2557,9 +2557,9 @@ rankBenefits: "View rank benefits",
     activationDeferredToast: "Phone activation deferred. Reactivate later from Device inventory.",
     resultTitle: "Calibration complete",
     policyTitle: "Task acceptance rules",
-    policyLine1: "Open the app with a network connection to pick up tasks. Wi-Fi or cellular both work.",
-    policyLine2: "With the screen locked or the app in the background, tasks continue for up to about 1 hour. A task not finished by then earns nothing; reopen the app to pick up tasks again.",
-    policyLine3: "Signing in on the web stops phone compute. Reactivate it in the app afterward.",
+    policyLine1: "Open the app with a network connection to pick up tasks; Wi-Fi or cellular both work.",
+    policyLine2: "With the screen locked or the app in the background, tasks continue for up to about 1 hour, and a task not finished by then earns nothing; reopen the app to pick up tasks again.",
+    policyLine3: "Signing in on the web stops phone compute; reactivate it in the app afterward.",
     activatePhone: "Activate phone compute",
     // New-device recalibration variant (re-measures THIS phone's compute; copy
     // swaps in when connect.vue runs with ?mode=recalibrate)
