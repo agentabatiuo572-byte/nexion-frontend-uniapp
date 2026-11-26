@@ -462,8 +462,7 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
       const trialPurchaseBreakdown=trial&&trialPurchaseOptionsEnabled(state)?{
         productNo:trialDeviceSnapshot.productNo,productName:trialDeviceSnapshot.name,
         ...(quoteProducts[0].tagline&&{productSubtitle:quoteProducts[0].tagline}),
-        ...Object.fromEntries(['priceUsdt','promoDiscountUsdt','offsetUsdt','earlyDiscountUsdt','amountUsdt',
-          'discountRate','discountCapUsdt','earlyDiscountConfiguredUsdt'].map(key=>[key,trialQuote[key]])),
+        ...Object.fromEntries(['priceUsdt','promoDiscountUsdt','offsetUsdt','earlyDiscountUsdt','amountUsdt'].map(key=>[key,trialQuote[key]])),
       }:undefined;
       const quote = {paymentQuoteId: `PPQ-PREVIEW-${++sequence}`, kind: body.kind, paymentMethod: body.paymentMethod, network: bank ? 'VND_BANK' : erc20 ? 'ERC20' : 'BSC',
         businessAmountUsdt: Number(amount).toFixed(6), roundingAdjustmentUsdt: adjustment.toFixed(6), subtotalUsdt: money(subtotal), channelFeeUsdt: money(channel),
@@ -474,7 +473,11 @@ export function createPurchasePaymentPreviewFixture(state, locale) {
           trialOffsetBasis:trialPurchaseOptionsEnabled(state)?'ACCRUED_B90':'ACCRUED',...(bank&&{fxVersion:1})}),
         ...(trialPurchaseBreakdown&&{trialPurchaseBreakdown})};
       quotes.set(quote.paymentQuoteId, {quote, subject, deadline, pricingAt: now, payload, replacementQuote, trialDeviceSnapshot});
-      return {status: 200, message: 'OK', data: quote};
+      // The external-quote response exposes terms that the stored payment snapshot omits.
+      const data = trialPurchaseBreakdown ? {...quote, trialPurchaseBreakdown: {...trialPurchaseBreakdown,
+        discountRate: trialQuote.discountRate, discountCapUsdt: trialQuote.discountCapUsdt,
+        earlyDiscountConfiguredUsdt: trialQuote.earlyDiscountConfiguredUsdt}} : quote;
+      return {status: 200, message: 'OK', data};
     }
     if (path === `${base}-intents` && method === 'POST') {
       if (!ownsPayments) return refused(404, 'PURCHASE_PAYMENT_QUOTE_NOT_FOUND');

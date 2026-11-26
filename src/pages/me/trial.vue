@@ -307,7 +307,7 @@ import TrialDevicePicker from "@/components/trial/trial-device-picker.vue";
 import TrialOriginalPurchaseCard from "@/components/trial/trial-original-purchase-card.vue";
 import { productDailyEstimateRange } from "@/lib/product-estimates";
 import { trialDeviceNeedsReselection, trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
-import { trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
+import { formatTrialDiscountCap, trialDiscountDisplay, trialDiscountTerms } from "@/lib/trial-discount-display";
 
 const t = useT();
 const app = useApp();
@@ -550,7 +550,7 @@ const totalBreakdown = computed(() => {
 const promoLabel = computed(() => {
   const { discountRate, discountCapUSD: cap } = trialDiscountTerms(purchaseQuote.value, cfg.value);
   const pct = formatTrialDiscountPercent(discountRate);
-  return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: usdShort(cap) });
+  return cap === null ? fmt(detail.value.promoRowNoCap, { pct }) : fmt(detail.value.promoRow, { pct, cap: formatTrialDiscountCap(cap) });
 });
 const conversionRefunded = computed(() => remoteApiEnabled && status.value === "converted"
   && displayState.value?.conversion?.refunded === true);

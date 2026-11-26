@@ -1,6 +1,6 @@
 import type { TrialConversionQuote } from "@/api/trial-api";
 import type { TrialConfig } from "@/store/trial-config";
-import { formatAmount } from "./amount-display";
+import { formatAmount, formatGroupedAmount } from "./amount-display";
 
 type TrialDiscountTerms = Pick<TrialConversionQuote, "discountRate" | "discountCapUSD">;
 
@@ -12,8 +12,13 @@ export function trialDiscountTerms(quote: TrialDiscountTerms | null | undefined,
   return hasTrialDiscountTerms(quote) ? quote : config;
 }
 
+export function formatTrialDiscountCap(cap: number) {
+  return Number.isInteger(cap) ? `$${cap}` : `$${formatGroupedAmount(cap, "full")}`;
+}
+
 /** Keep the displayed discount rows equal to the difference between the two displayed prices. */
-export function trialDiscountDisplay(quote: TrialConversionQuote) {
+export function trialDiscountDisplay(quote: Pick<TrialConversionQuote,
+  "priceUSD" | "amountUSD" | "promoDiscountUSD" | "offsetUSD" | "earlyDiscountUSD">) {
   const cents = (amount: number) => Number(formatAmount(amount, 2).replace(".", ""));
   const total = cents(quote.priceUSD) - cents(quote.amountUSD);
   const early = quote.promoDiscountUSD === 0 && quote.offsetUSD === 0 ? total : cents(quote.earlyDiscountUSD);
