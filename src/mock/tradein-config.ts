@@ -3,7 +3,7 @@
  * Production: GET /api/config/tradein (TBD; candidate name, not yet in PRD §9.11).
  * Admin mutates via PUT /api/admin/tradein/config (TBD; candidate).
  * FEAT-DEV02 (Aligned 2026-07-06):随时下架 + 产出阶梯抵扣。抵扣由文件底部的
- * TRADEIN_CREDIT_LADDER / computeTradeInCredit 承载(按「累计产出 ÷ 实付价」
+ * TRADEIN_CREDIT_LADDER / computeTradeInCredit 承载(按「累计产出 ÷ 旧机当前售价」
  * 落档,仅结算抵减,永不入余额);无持有时长门槛。
  *
  * Schema:
@@ -15,7 +15,8 @@
  *   - inventory: 回收库存软/硬上限(预留)。
  */
 
-import type { DeviceKind } from "@/store/types";
+import type { Device, DeviceKind } from "@/store/types";
+import { getProduct } from "@/mock/products";
 
 // ─────────────────────────────────────────────────────────────── Rule schema
 
@@ -158,18 +159,17 @@ export function previousTier(kind: DeviceKind): DeviceKind | null {
 // 唯一抵扣引擎(无持有时长门槛)。Server-authoritative: same GET
 // /api/config/tradein payload, `creditLadder` + `ladderRules` keys; admin edits
 // via「升级置换阶梯」panel (E domain);canon 哨兵三端对账默认值。
-// Ladder semantics (FEAT-DEV02 ③, Aligned 2026-07-06): credit = paidPrice ×
-// creditPct(band of cumulative-output ÷ paid-price), checkout-only,
+// Credit = current catalog price × creditPct(band of cumulative output ÷ current catalog price),
 // NEVER credited to balance. Bands are left-closed right-open, contiguous from
 // 0%, strictly decreasing creditPct (structure enforced by
 // scripts/check-capacity-curve-parity.mjs).
 
 export interface CreditLadderRow {
-  /** Inclusive lower bound of cumulative-output ÷ paid-price, in percent. */
+  /** Inclusive lower bound of cumulative output ÷ current catalog price, in percent. */
   minRatioPct: number;
   /** Exclusive upper bound in percent; null = open-ended top band. */
   maxRatioPct: number | null;
-  /** Percent of the paid price returned as checkout-only credit. */
+  /** Percent of the current catalog price returned as checkout-only credit. */
   creditPct: number;
 }
 
@@ -182,31 +182,24 @@ export const TRADEIN_CREDIT_LADDER: CreditLadderRow[] = [
 ];
 
 export const TRADEIN_LADDER_RULES = {
-  /** Target catalog price must be STRICTLY greater than the device's paid price. */
+  /** Target catalog price must be strictly higher than the old model's current price. */
   requireHigherPrice: true,
   /** Max devices credited against a single checkout. */
   maxDevicesPerOrder: 1,
 } as const;
 
-/**
- * USD checkout credit for retiring a device against a higher-priced purchase.
- *
- *   credit = paidPrice × creditPct(band of cumulative ÷ paidPrice)
- *
- * paidPrice ≤ 0 (gifted/free device) → 0: NOT eligible at all (FEAT-DEV02A
- * 异常3 — not an Infinity-ratio band). Clamped to the target price so payable
- * can never go negative (defensive: unreachable under default rules where
- * requireHigherPrice holds and creditPct ≤ 100, but the ladder is
- * operator-editable).
- */
-/** 产出比所在档(1-based)与该档抵扣率;paidPrice≤0 → null(不可置换,非落档)。 */
+export function getTradeinSourcePrice(device: Pick<Device, "kind" | "productCode" | "paidPriceUsdt">): number {
+  if (device.paidPriceUsdt <= 0 || device.kind === "cloud-share") return 0;
+  return getProduct(device.productCode || device.kind)?.price ?? 0;
+}
+
 export function ladderBandFor(
-  paidPriceUsdt: number,
+  sourcePriceUsdt: number,
   cumulativeEarningsUsdt: number,
   ladder: CreditLadderRow[] = TRADEIN_CREDIT_LADDER,
 ): { band: number; creditPct: number } | null {
-  if (paidPriceUsdt <= 0) return null;
-  const ratioPct = (Math.max(0, cumulativeEarningsUsdt) / paidPriceUsdt) * 100;
+  if (sourcePriceUsdt <= 0) return null;
+  const ratioPct = (Math.max(0, cumulativeEarningsUsdt) / sourcePriceUsdt) * 100;
   const idx = ladder.findIndex(
     (r) => ratioPct >= r.minRatioPct && (r.maxRatioPct === null || ratioPct < r.maxRatioPct),
   );
@@ -214,18 +207,14 @@ export function ladderBandFor(
 }
 
 export function computeTradeInCredit(
-  paidPriceUsdt: number,
+  sourcePriceUsdt: number,
   cumulativeEarningsUsdt: number,
   targetPriceUsdt: number,
   ladder: CreditLadderRow[] = TRADEIN_CREDIT_LADDER,
 ): number {
-  if (paidPriceUsdt <= 0) return 0;
-  const ratioPct = (Math.max(0, cumulativeEarningsUsdt) / paidPriceUsdt) * 100;
-  const row = ladder.find(
-    (r) => ratioPct >= r.minRatioPct && (r.maxRatioPct === null || ratioPct < r.maxRatioPct),
-  );
-  if (!row) return 0;
-  const raw = paidPriceUsdt * (row.creditPct / 100);
+  const band = ladderBandFor(sourcePriceUsdt, cumulativeEarningsUsdt, ladder);
+  if (!band) return 0;
+  const raw = sourcePriceUsdt * (band.creditPct / 100);
   // Lower clamp guards operator-editable inputs (negative target price) —
   // credit may reduce payable, never increase it or go negative.
   return +Math.max(0, Math.min(raw, targetPriceUsdt)).toFixed(2);

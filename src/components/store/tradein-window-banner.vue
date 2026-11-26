@@ -34,7 +34,7 @@ import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { PRODUCTS } from "@/mock/products";
-import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { computeTradeInCredit, getTradeinSourcePrice, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable } from "@/store/product-availability";
@@ -91,11 +91,11 @@ const mockBest = computed<BannerQuote | null>(() => {
   if (!DEFAULT_TRADEIN_CONFIG.enabled) return null;
   let out: { name: string; credit: number; target: string; net: number } | null = null;
   for (const d of app.visibleDevices) {
-    const paid = d.paidPriceUsdt ?? 0;
-    if (paid <= 0 || d.kind === "cloud-share") continue;
+    const sourcePrice = getTradeinSourcePrice(d);
+    if (sourcePrice <= 0) continue;
     const targets = PRODUCTS.filter(
       (p) =>
-        p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+        p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > sourcePrice) &&
         (isProductAvailable(p, phase.value)
           || (p.available === undefined
             && isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value))),
@@ -103,7 +103,7 @@ const mockBest = computed<BannerQuote | null>(() => {
     if (targets.length === 0) continue;
     const target = targets.reduce((a, b) => (a.price < b.price ? a : b));
     const credit = computeTradeInCredit(
-      paid,
+      sourcePrice,
       Math.max(0, d.cumulativeEarningsUsdt ?? 0),
       target.price,
     );
