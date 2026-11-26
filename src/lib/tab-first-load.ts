@@ -3,7 +3,6 @@ import { apiRuntimeConfig, remoteApiEnabled, sessionVault } from "@/api/runtime"
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useLocaleStore } from "@/store/locale";
-import { useFreeTrial } from "@/store/free-trial";
 import { useVoucher } from "@/store/voucher";
 import { useEarnConfig } from "@/store/earn-config";
 import { productCatalogState, revalidateProductCatalog } from "@/store/product-catalog";
@@ -81,7 +80,7 @@ export function useTabFirstLoad(homeVisible: Ref<boolean>, settleHome: (current:
           // pages. No hidden page, observation, execution or polling lifecycle.
           const reads: (() => Promise<unknown>)[] = stage === 1 ? [
             () => app.ensureHomeTruth(), () => app.ensureRemoteFleet(),
-            () => useFreeTrial().refreshVisible(), () => useVoucher().revalidateRemote(),
+            () => useVoucher().revalidateRemote(),
             () => readHomePromotions(`${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`, true),
             () => revalidateProductCatalog(), () => useEarnConfig().ensure(),
             () => ensureServerProductPhase(),

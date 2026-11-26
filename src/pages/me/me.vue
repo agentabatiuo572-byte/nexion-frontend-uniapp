@@ -60,6 +60,7 @@ import { useWeeklyQuestTargetClosed } from "@/composables/use-quest-target-avail
 import { useMeEntryRead } from "@/composables/use-me-entry-read";
 import { useNow } from "@/composables/use-now";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrialAuthorityRead } from "@/composables/use-trial-authority-read";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
@@ -175,6 +176,7 @@ const remoteOrdersHasRead = ref(false);
 let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
 const remoteMeActive = ref(false);
+const trialAuthority = useTrialAuthorityRead(() => remoteMeActive.value, { eligibilityFallback: true });
 let meEntryReadPending = true;
 const entryRead = useMeEntryRead(() => remoteMeActive.value);
 const entrySeen = useMeEntrySeen();
@@ -516,14 +518,6 @@ async function refreshRemoteSecurity() {
   }
 }
 
-async function refreshRemoteTrial() {
-  // BUG 173: 原来是 state + eligibility 两次串行 RTT —— 卡片 4.2s 才出现、
-  // 7.0s 第二次置 loading 又把它禁掉,用户看到两段抖动。
-  // GET /api/trial/state 的权威答复里已经带 canStart/eligibilityReason,
-  // 一次读取就能定态;eligibility 读取只留作 state 读失败后的修复路径。
-  return trial.refreshVisible(true);
-}
-
 async function refreshRemoteMe(explicit = false) {
   if (!remoteApiEnabled || !remoteMeActive.value || !foregroundReadAllowed()) return;
   await settleRemoteMeLoaders([
@@ -546,7 +540,7 @@ async function refreshRemoteMe(explicit = false) {
     ["security", refreshRemoteSecurity],
     ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.readError)],
     ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
-    ["trial", refreshRemoteTrial],
+    ["trial", () => trialAuthority.failed() ? undefined : trialAuthority.refresh()],
     ["vouchers", () => voucher.revalidateRemote()],
     ["rank", () => vrank.ensureCanonicalVRank()],
     ["genesis", () => genesis.ensureSummary()],

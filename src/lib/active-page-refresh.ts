@@ -17,7 +17,8 @@ export function hasVisiblePullRefresh(): boolean {
 type PageRecovery = {
   failed: () => boolean;
   pending: () => boolean;
-  retry: () => Promise<boolean>;
+  // A page may sequence dependent reads itself and still report their failures here.
+  retry?: () => Promise<boolean>;
   // A pending result keeps polling after a good read, so a pull must not report it as failed.
   quiet: () => boolean;
 };
@@ -35,10 +36,10 @@ export function hasFailedPageSections(): boolean {
 
 /** Await each failed section, including a read already in flight, without a request burst. */
 export async function refreshFailedPageSections(isCurrent: () => boolean): Promise<boolean> {
-  const sections = [...pageRecoveries].filter(section => section.failed() || section.pending());
+  const sections = [...pageRecoveries].filter(section => section.retry && (section.failed() || section.pending()));
   for (const section of sections) {
     if (!isCurrent()) return false;
-    if (!pageRecoveries.has(section)) continue;
+    if (!pageRecoveries.has(section) || !section.retry) continue;
     await section.retry();
   }
   return isCurrent() && sections.some(section => !section.quiet() && pageRecoveries.has(section) && section.failed());

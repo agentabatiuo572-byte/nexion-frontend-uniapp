@@ -29,6 +29,7 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue';
 import { onShow, onHide, onLoad } from '@/composables/use-tab-page-lifecycle';
+import { useAutoRecovery } from '@/composables/use-auto-recovery';
 import AppChassis from '@/components/tab-page-frame.vue';
 import GreetingHeader from '@/components/home/greeting-header.vue';
 import TechMoneyCard from '@/components/home/tech-money-card.vue';
@@ -47,11 +48,12 @@ import { useLocaleStore } from '@/store/locale';
 import { useConfig } from '@/store/config';
 import { useApp } from '@/store/app';
 import { useFreeTrial } from '@/store/free-trial';
+import { useTrialClaimSheet } from '@/store/trial-claim-sheet';
 import { remoteApiEnabled, sessionVault } from '@/api/runtime';
 import type { PublicPromotion } from '@/api/promotion-contracts';
 import { createPromotionReadFence, isPromotionActive } from '@/lib/promotion-entry';
 import { readHomePromotions } from '@/store/home-promotions';
-import { registerActivePageRefresh } from '@/lib/active-page-refresh';
+import { hasVisiblePullRefresh, registerActivePageRefresh } from '@/lib/active-page-refresh';
 import { useNexFaucet } from '@/store/nex-faucet';
 import { useProfile } from '@/store/profile';
 import { useVoucher } from '@/store/voucher';
@@ -62,6 +64,16 @@ import { navTo } from '@/lib/route';
 import { useAuth } from '@/store/auth';
 // #endif
 const t = useT(), locale = useLocaleStore(), config = useConfig(), app = useApp();
+const trial = useFreeTrial(), trialSheet = useTrialClaimSheet();
+useAutoRecovery({
+  active: () => !trialSheet.open,
+  failed: () => remoteApiEnabled && trial.lastReadFailed && !trial.authorityResultUnknown,
+  retry: () => trial.refreshRemote(),
+  repeatMs: 30_000,
+  repeatWhile: () => !hasVisiblePullRefresh(),
+});
+// Failed reads join the page's recovery during pull, foreground and reconnect.
+const readVisibleTrial = () => trial.lastReadFailed || trialSheet.open ? undefined : trial.refreshVisible();
 // #ifdef H5
 const auth = useAuth();
 function goAppDownload() { navTo('/pages/register/success?download=1'); }
@@ -78,7 +90,7 @@ const homeGrid = ref<{ refresh: () => Promise<unknown> } | null>(null);
 const homeTrust = ref<{ refresh: () => Promise<unknown> } | null>(null);
 useTabFirstLoad(visible, async current => {
   await Promise.allSettled([
-    app.ensureHomeTruth(), useFreeTrial().refreshVisible(),
+    app.ensureHomeTruth(), readVisibleTrial(),
     useNexFaucet().ensureRemote(10_000), useProfile().ensureAvatar(),
     useVoucher().revalidateRemote(), config.revalidate(), homeActions.value?.refresh(),
     (async () => {
@@ -92,7 +104,7 @@ async function refreshVisibleHome() {
   fence.invalidate(); pendingTicket = null;
   await Promise.allSettled([
     refresh(), app.ensureHomeTruth(), app.ensureRemoteFleet(),
-    useFreeTrial().refreshVisible(),
+    readVisibleTrial(),
     useNexFaucet().ensureRemote(), useProfile().ensureAvatar(),
     homeActions.value?.refresh(), homeGrid.value?.refresh(), homeTrust.value?.refresh(),
   ]);
@@ -118,7 +130,7 @@ async function refresh(passive=false) {
     }
   } finally {if(pendingTicket===ticket)pendingTicket=null;}
 }
-onShow(() => { visible.value = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); void useFreeTrial().refreshVisible(); });
+onShow(() => { visible.value = true; releaseActiveRefresh(); releaseActiveRefresh = registerActivePageRefresh(refreshVisibleHome); app.setTaskReadPageVisible("home", true); void refresh(true); void readVisibleTrial(); });
 onHide(() => { releaseActiveRefresh(); visible.value = false; app.setTaskReadPageVisible("home", false); });
 onUnmounted(() => { releaseActiveRefresh(); visible.value = false; app.setTaskReadPageVisible("home", false); fence.invalidate(); });
 onLoad(() => locale.ensureSystemDetected());

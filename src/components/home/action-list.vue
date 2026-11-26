@@ -16,7 +16,6 @@ import { useAuth } from '@/store/auth';
 import { useQuest } from '@/store/quest';
 import { useOrders } from '@/store/orders';
 import { useVoucher } from '@/store/voucher';
-import { useFreeTrial } from '@/store/free-trial';
 import { useConfig } from '@/store/config';
 import { accountApi, remoteApiEnabled, sessionVault } from '@/api/runtime';
 import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevision } from '@/api/order-api';
@@ -36,7 +35,7 @@ import NxListGroup from '@/components/ui/nx-list-group.vue';
 import HomeActionRowView, { type HomeActionRow } from './home-action-row.vue';
 import { uiLocale } from "@/i18n";
 const visibility = useDataVisibility();
-const app = useApp(), quest = useQuest(), orders = useOrders(), voucher = useVoucher(), trial = useFreeTrial(), config = useConfig(), copy = useAuditUiCopy();
+const app = useApp(), quest = useQuest(), orders = useOrders(), voucher = useVoucher(), config = useConfig(), copy = useAuditUiCopy();
 const auth = useAuth();
 const expanded = ref(false), securityNeedsAction = ref(false), ordersReady = ref(false);
 const t = useT(), initialPending = ref(remoteApiEnabled);
@@ -73,7 +72,7 @@ async function refresh() {
   if (!remoteApiEnabled || app.accountKey === 'default') { initialPending.value = false; return; }
   const current = () => visible && request === generation && scope === passiveTabReadScope(false);
   await Promise.allSettled([
-    quest.ensureRemote(), runPassiveTabRead('trial-state', () => trial.refreshRemote()), voucher.revalidateRemote(),
+    quest.ensureRemote(), voucher.revalidateRemote(),
     refreshOrderActions(),
     runPassiveTabRead('security-overview', () => accountApi.securityOverview()).then(security => { if(current()) securityNeedsAction.value = !security.twoFactorEnabled; }).catch(() => { if(current()) securityNeedsAction.value = false; }),
   ]);

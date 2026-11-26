@@ -314,7 +314,10 @@ const app = useApp();
 const freeTrial = useFreeTrial();
 const claimSheet = useTrialClaimSheet();
 const pageVisible = ref(false);
-onShow(() => { pageVisible.value = true; void freeTrial.refreshVisible(); });
+onShow(() => {
+  pageVisible.value = true;
+  if (!freeTrial.lastReadFailed && !freeTrial.authorityIncomplete && !claimSheet.open) void freeTrial.refreshVisible();
+});
 onHide(() => { pageVisible.value = false; });
 const trialConfig = useTrialConfig();
 const visibility = useDataVisibility();
@@ -593,7 +596,7 @@ const trialBuyCtaText = computed(() => {
 // none-state eligibility (异常2 — concrete reason, never a generic error).
 const canStartNow = computed(() => {
   void now.value; // re-evaluate each tick (eligibility isn't reactive on config alone)
-  return freeTrial.canStart();
+  return freeTrial.canOpenClaim();
 });
 const claimVisible = computed(() => status.value === "none" || (status.value === "ended" && (displayState.value?.canStart ?? canStartNow.value)));
 const ineligibleReasonText = computed(() => {
@@ -829,7 +832,7 @@ watch(pageVisible, (visible, _, onCleanup) => {
   const unregisterPresenter = trialResults.registerPresenter(claimNo => displayState.value?.claimNo === claimNo);
   const unregisterRefresh = registerActivePageRefresh(async () => {
     if (purchaseClaim.value) {
-      await freeTrial.refreshRemote();
+      if (!freeTrial.lastReadFailed && !freeTrial.authorityIncomplete && !claimSheet.open) await freeTrial.refreshRemote();
       if (!purchaseConfirmation.value) await optionsRead.refresh();
     }
   }, "pages/me/trial");

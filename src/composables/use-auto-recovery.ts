@@ -11,6 +11,7 @@ export function useAutoRecovery(options: {
   failed: () => boolean;
   retry: () => Promise<unknown>;
   retryOnPullOrReconnect?: () => Promise<unknown>;
+  pullManagedByPage?: boolean;
   active?: () => boolean;
   repeatMs?: number;
   repeatWhile?: () => boolean;
@@ -107,7 +108,7 @@ export function useAutoRecovery(options: {
       return;
     }
     release = registerPageRecovery({
-      failed: options.failed, pending: () => inFlight !== null, retry,
+      failed: options.failed, pending: () => inFlight !== null, retry: options.pullManagedByPage ? undefined : retry,
       // Conditional repeats also serve ordinary failed reads when pull is available.
       quiet: () => typeof options.quiet === "function" ? options.quiet()
         : options.quiet ?? (options.repeatMs !== undefined && options.repeatWhile === undefined),

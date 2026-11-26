@@ -271,7 +271,7 @@ import { trustNumberedRows } from "@/lib/trust-fields";
 import { usePublishedTrust } from "@/composables/use-published-trust";
 import { serverLanguage } from "@/i18n";
 import ProductBadge from "@/components/store/product-badge.vue";
-import { useTrialCreditOption, useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { useStoreTrialCreditRead, useTrialCreditOption } from "@/composables/use-trial-credit-option";
 import { useFreeTrial } from "@/store/free-trial";
 import { resolveTrialCheckoutProductId } from "@/store/trial-config";
 import { useTrialCheckout } from "@/store/trial-checkout";
@@ -595,7 +595,7 @@ const priceText = computed(() => product.value ? `$${formatAmount(product.value.
 // Trial-credit entry (PLAN §2.3, R13): only on the plain product page, not an activity or voucher entry, whose buy
 // button is not the full-price purchase the tray note describes.
 const trialCreditReadVisible = () => stickyPageVisible.value && !publicOnly.value;
-const trialCreditRead = useTrialCreditOptionsRead(trialCreditReadVisible);
+const trialCreditRead = useStoreTrialCreditRead(trialCreditReadVisible);
 watch(trialCreditReadVisible, (visible, _, onCleanup) => {
   if (visible) onCleanup(registerActivePageRefresh(trialCreditRead.refresh, "pages/store/detail"));
 }, { immediate: true });

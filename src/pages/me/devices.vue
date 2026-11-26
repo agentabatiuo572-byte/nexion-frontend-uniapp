@@ -307,6 +307,8 @@ import { canControlDevice } from "@/lib/device-control-platform";
 import { getProductMedia } from "@/lib/product-media";
 import { deviceOnlineState } from "@/lib/hashpower";
 import { useFreeTrial } from "@/store/free-trial";
+import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useTrialCheckout } from "@/store/trial-checkout";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
@@ -359,6 +361,7 @@ function closeReplacementDialogs() {
 }
 watch([() => app.accountKey, () => app.accountBindingEpoch], closeReplacementDialogs);
 const trial = useFreeTrial();
+const trialClaimSheet = useTrialClaimSheet();
 const trialCheckout = useTrialCheckout();
 const inventoryPageVisible = ref(false);
 const inventoryRead = useMeEntryRead(() => inventoryPageVisible.value);
@@ -379,7 +382,7 @@ watch([inventoryRead.visible, inventoryRead.ready, () => app.accountBindingEpoch
 onShow(() => {
   inventoryPageVisible.value = true;
   app.setDeviceInventoryVisible(true);
-  void trial.refreshVisible(false, true);
+  if (!trial.lastReadFailed) void trial.refreshVisible(false, true);
 });
 onHide(() => {
   inventoryPageVisible.value = false;
@@ -420,18 +423,27 @@ const inventoryError = computed(() => !inventoryReady.value && (app.remoteFleetS
   || trial.authorityStatus === "error"
   || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")));
 const inventoryLoading = computed(() => !inventoryReady.value && !inventoryError.value);
-async function retryInventory(retryTransientAssignments = false) {
-  await Promise.all([readShownInventory(() => refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments)), trial.poll(Date.now())]);
+function refreshInventory(retryTransientAssignments = false) {
+  return readShownInventory(() => refreshRemoteFleetAfterCatalog(app.accountKey, retryTransientAssignments));
+}
+async function retryInventory() {
+  await Promise.all([refreshInventory(), trial.poll(Date.now())]);
 }
 useAutoRecovery({
-  failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading" && trial.authorityStatus !== "loading"
+  failed: () => remoteApiEnabled && app.remoteFleetStatus !== "loading"
     && productCatalogState.status !== "loading" && (app.remoteFleetStatus === "error"
-      || (!trialConfirming.value && trial.authorityStatus === "error")
       || app.remoteAssignmentStatus === "error"
       || (app.remoteFleetHasSnapshot && !app.remoteAssignmentHasSnapshot && app.remoteAssignmentStatus === "idle")
       || (apiRuntimeConfig.environment === "dev" && productCatalogState.status === "error")),
-  retry: retryInventory,
-  retryOnPullOrReconnect: () => retryInventory(true),
+  retry: refreshInventory,
+  retryOnPullOrReconnect: () => refreshInventory(true),
+});
+useAutoRecovery({
+  active: () => !trialClaimSheet.open && !trialConfirming.value,
+  failed: () => remoteApiEnabled && trial.lastReadFailed && !trial.authorityResultUnknown,
+  retry: () => trial.refreshRemote(),
+  repeatMs: 30_000,
+  repeatWhile: () => !hasVisiblePullRefresh(),
 });
 
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.kind !== "phone" && d.activatedAt !== null));
