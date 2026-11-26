@@ -305,6 +305,8 @@ watch(() => sheet.open, open => {
 // root (03 §3.5 焦点); the result itself is said only by the status region above.
 watch(activated, (now, was) => {
   if (!now || was || !sheet.open || openedActivated.value) return;
+  // The App logic layer has no DOM (same guard as useDialogA11y).
+  if (typeof document === "undefined") return;
   void nextTick(() => document.querySelector<HTMLElement>(".tcs-root .tcs-ctas .nx-button")?.focus());
 });
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
