@@ -347,14 +347,17 @@ const footerNote = computed(() => {
   return signedIn.value && !quote.value ? t.value.promotion.loading : '';
 });
 // The page renders these states and actions in its existing tray.
+// An unpaid original for this selection stays reachable here even when the activity or quote no longer allows a new purchase.
+const originalRead=ref(0);
+const originalCheckout=computed(()=>{void originalRead.value;return signedIn.value&&selection.value.length>0&&resumesOriginalCheckout();});
 const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
-  note:footerNote.value,
-  signedIn:signedIn.value,canContinue:canOpenDevices.value||canContinue.value,
-  continueLabel:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
-  showTotal:selection.value.length>=2,
-  total:quote.value&&quoteStatus.value==='ready'?quote.value.amountUsdt:null,
-  saved:quote.value&&quoteStatus.value==='ready'&&Number(quote.value.discountUsdt)>0?quote.value.discountUsdt:null,
-  devices:canOpenDevices.value,
+  note:originalCheckout.value?'':footerNote.value,
+  signedIn:signedIn.value,canContinue:originalCheckout.value||canOpenDevices.value||canContinue.value,
+  continueLabel:originalCheckout.value?t.value.promotion.resume:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
+  showTotal:selection.value.length>=2&&!originalCheckout.value,
+  total:!originalCheckout.value&&quote.value&&quoteStatus.value==='ready'?quote.value.amountUsdt:null,
+  saved:!originalCheckout.value&&quote.value&&quoteStatus.value==='ready'&&Number(quote.value.discountUsdt)>0?quote.value.discountUsdt:null,
+  devices:!originalCheckout.value&&canOpenDevices.value,
   continue:continueCheckout,signIn,
 });
 // The single-model action for the page's bottom bar (same handler as before).
@@ -366,20 +369,21 @@ function expireQuote(){
   quoteExpired.value=true;
 }
 async function continueCheckout(){
+  if(resumesOriginalCheckout()){void navTo(promotionCheckoutHref(selection.value,scopeId.value));return;}
   if(canOpenDevices.value){void navTo('/pages/me/devices');return;}
   if(!quote.value)return;
   if(!freshQuote()){expireQuote();return;}
   if(!canContinue.value)return;
   // Devices going to inventory (the tray note) need the user's confirmation before checkout (PRD §7.3).
   const placement=inventoryPlacement.value;
-  if(placement?.purchased&&!resumesOriginalCheckout()&&!await confirmInventoryPlacement(t.value,placement,'checkout',inventoryDialogOwner))return;
+  if(placement?.purchased&&!await confirmInventoryPlacement(t.value,placement,'checkout',inventoryDialogOwner))return;
   if(!freshQuote()){expireQuote();return;}
   if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
 }
 onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;useUI().clearConfirmsBy(inventoryDialogOwner);});
 onShow(()=>{
   const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
-  visible.value=true;invalidate(recheckCapacity);
+  visible.value=true;invalidate(recheckCapacity);originalRead.value++;
   if(recheckCapacity)capacityRecheckPending.value=true;
 });
 watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQuote.value,ready=>{
