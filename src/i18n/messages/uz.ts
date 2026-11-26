@@ -2142,7 +2142,7 @@ export const uz: Messages = {
     pageTitle: "Bepul sinov",
     toastActivated: "Bepul sinov faollashtirildi · UVELBox S1",
     offsetAccruedLabel: "Qurilma xaridiga ishlatish mumkin",
-    offsetRemainderNote: "Limitdan ortgan ${remainder} xariddan keyin balansingizga tushadi",
+    offsetRemainderNote: "Limitdan ortgan {remainder}\u00A0USDT xariddan keyin balansingizga tushadi",
     offsetUsableUntil: "Sinov mablagʻining amal qilish muddati: {time}",
     buyCtaPlain: "Xaridga oʻtish",
     stoppedNote: "Ishlash toʻxtadi",

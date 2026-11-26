@@ -2242,7 +2242,7 @@ const trialTrayWarning = computed(() => {
     return trialBalanceShortfallBelowCent.value ? purchaseCopy.value.coShortTiny : fmt(purchaseCopy.value.coShortBy, { amount: formatAmount(shortfall) });
   }
   if (trialQuoteChange.value && !trialOriginalLocked.value) {
-    return trialPriceChanged.value ? fmt(purchaseCopy.value.coPriceUpdated, { amount: `$${formatAmount(trialQuoteChange.value.quote.amountUSD)}` }) : purchaseCopy.value.coPolicyUpdated;
+    return trialPriceChanged.value ? fmt(purchaseCopy.value.coPriceUpdated, { amount: `${formatAmount(trialQuoteChange.value.quote.amountUSD)}\u00A0USDT` }) : purchaseCopy.value.coPolicyUpdated;
   }
   return "";
 });

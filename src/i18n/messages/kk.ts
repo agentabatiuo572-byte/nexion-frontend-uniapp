@@ -2142,7 +2142,7 @@ export const kk: Messages = {
     pageTitle: "Тегін сынақ",
     toastActivated: "Тегін сынақ белсендірілді · UVELBox S1",
     offsetAccruedLabel: "Құрылғы сатып алуға қолжетімді",
-    offsetRemainderNote: "Шегерім шегінен асқан ${remainder} сатып алғаннан кейін балансқа түседі",
+    offsetRemainderNote: "Шегерім шегінен асқан {remainder}\u00A0USDT сатып алғаннан кейін балансқа түседі",
     offsetUsableUntil: "Сынақ бонусын қолдану мерзімі: {time}",
     buyCtaPlain: "Сатып алуға өту",
     stoppedNote: "Өндіріс тоқтады",

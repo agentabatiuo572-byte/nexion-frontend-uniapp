@@ -2142,7 +2142,7 @@ export const id: Messages = {
     pageTitle: "Uji coba gratis",
     toastActivated: "Uji coba gratis aktif · UVELBox S1",
     offsetAccruedLabel: "Bisa dipakai untuk membeli perangkat",
-    offsetRemainderNote: "${remainder} di atas batas potongan masuk ke saldo Anda setelah pembelian",
+    offsetRemainderNote: "{remainder}\u00A0USDT di atas batas potongan masuk ke saldo Anda setelah pembelian",
     offsetUsableUntil: "Kredit uji coba berlaku hingga {time}",
     buyCtaPlain: "Beli sekarang",
     stoppedNote: "Produksi telah berhenti",

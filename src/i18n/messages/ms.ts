@@ -2142,7 +2142,7 @@ export const ms: Messages = {
     pageTitle: "Percubaan percuma",
     toastActivated: "Percubaan percuma diaktifkan · UVELBox S1",
     offsetAccruedLabel: "Boleh ditolak daripada harga peranti",
-    offsetRemainderNote: "${remainder} melebihi had kredit masuk ke baki anda selepas pembelian",
+    offsetRemainderNote: "{remainder}\u00A0USDT melebihi had kredit masuk ke baki anda selepas pembelian",
     offsetUsableUntil: "Kredit percubaan boleh digunakan sehingga {time}",
     buyCtaPlain: "Pergi membeli",
     stoppedNote: "Penjanaan telah dihentikan",
