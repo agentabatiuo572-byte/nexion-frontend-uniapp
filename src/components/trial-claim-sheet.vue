@@ -152,9 +152,9 @@ const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-
   "terms-required", "onboarding-required"].includes(shownReason.value ?? ""));
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
 const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
-const claimRetryable = computed(() => freeTrial.pendingStart ? freeTrial.startRetryable
-  : claimError.value && shownReason.value === claimErrorReason.value && shownReason.value !== "terms-changed"
-    && !claimOpensAnotherPage.value && !claimDenied.value);
+const termsChanged = computed(() => shownReason.value === "terms-changed");
+const claimRetryable = computed(() => !termsChanged.value && (freeTrial.pendingStart ? freeTrial.startRetryable
+  : claimError.value && shownReason.value === claimErrorReason.value && !claimOpensAnotherPage.value && !claimDenied.value));
 const claimDisabled = computed(() => claiming.value || claimDenied.value || (freeTrial.pendingStart
   ? !freeTrial.canStart() : !claimOpensAnotherPage.value && (!trialView.actionsReady.value || !freeTrial.canStart())));
 // View state only: a retry runs from the same bottom primary with its busy spinner (03 §3.1 处理中锁定宽度、加载指示), and the
@@ -204,7 +204,8 @@ const confirmingStart = computed(() => !!freeTrial.pendingStart && !startNotRun.
 const primaryBusy = computed(() => claiming.value || confirmingStart.value);
 const primaryLabel = computed(() => showRetry.value ? t.value.trial.claimRetryCta : claimCtaLabel.value);
 const primaryLeaves = computed(() => !showRetry.value && claimOpensAnotherPage.value);
-const claimErrorText = computed(() => freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
+const claimErrorText = computed(() => termsChanged.value && !confirmingStart.value ? sheet.failureText("terms-changed")
+  : freeTrial.pendingStart ? startNotRun.value ? t.value.trial.claimNotStartedInline : t.value.trial.claimUnknownInline
   : staleRead.value ? t.value.exchange.staleSnapshot
   : eligibilityUnknown.value ? t.value.trial.eligReasonUnknown
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired

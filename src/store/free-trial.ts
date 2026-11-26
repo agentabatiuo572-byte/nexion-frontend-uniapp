@@ -964,19 +964,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         if (confirmedTerms) {
           const changed = claimTermsChanged(confirmedTerms, trialConfig, deviceName);
           const saved = readLifecycleCommand(boundKey, true);
-          if (saved?.kind === "start" && (changed || saved.deviceName !== deviceName)) {
-            const retrying = startRetryable.value && pendingStart.value?.command.key === saved.key;
-            if (saved.state === "pending" && !retrying) {
-              pendingLifecycle.value = { command: saved, consecutiveReads: 0 };
-              startRetryable.value = false;
-              return { ok: false, reason: "confirming" };
-            }
-            // Both NOT_SEEN and startRetryable establish that the saved start did not run.
+          // A saved retry was refused before execution or explicitly NOT_SEEN.
+          // A still-pending start may only be retried with its original key and payload.
+          if (saved?.kind === "start" && saved.state === "retry" && (changed || saved.deviceName !== deviceName)) {
             if (!removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey)) return { ok: false, reason: "storage-unavailable" };
-            if (retrying) {
-              pendingLifecycle.value = null;
-              startRetryable.value = false;
-            }
           }
           if (changed) {
             confirmedStartDenial.value = "terms-changed";
