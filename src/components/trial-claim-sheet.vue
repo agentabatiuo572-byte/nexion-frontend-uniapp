@@ -1,5 +1,5 @@
 <template>
-  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="activated ? copy.activationSuccessTitle : copy.activateTitle">
+  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="openedActivated ? copy.activationSuccessTitle : copy.activateTitle">
     <view class="tcs-backdrop" @click="hide" />
     <view class="nx-glass-sheet tcs-panel" @click.stop>
       <!-- The shared sheet close (as NxSheet): neutral glass M, round (03 §3.1 圆形关闭, 全站玻璃控件边缘). The wrapper only places it. -->
@@ -7,6 +7,11 @@
 
       <!-- Content scrolls under a pinned footer when it outgrows the screen, so the actions never leave it (03 §3.5 长内容). -->
       <view class="tcs-body" :class="{ 'tcs-body--alone': readFailView }">
+        <!-- Result head (03 §3.6.1, shared NxResultHead in its sheet size): 56px success circle, the overview-role title as a
+             heading, one body line. Said once, by one path: this status region stays mounted while the sheet is open and the
+             head is added to it when the claim is confirmed here. A sheet opened on an active trial is named by its title on
+             open instead, so the region then carries no live role. -->
+        <view class="tcs-result" :class="{ 'tcs-result--shown': activated }" :role="openedActivated ? undefined : 'status'"><NxResultHead v-if="activated" tone="success" size="sheet" :live="false" :title="copy.activationSuccessTitle" :description="copy.activationSuccessBody" /></view>
         <!-- Nothing to show at all: the result alone, recovering on its own (03 §3.5.2, 04.5); only the close stays. -->
         <view v-if="readFailView" class="tcs-read-state" role="status">
           <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
@@ -14,9 +19,6 @@
           <text class="tcs-read-state__hint">{{ copy.autoRetrying }}</text>
         </view>
         <template v-else>
-          <!-- Result head (03 §3.6.1, shared NxResultHead in its sheet size): 56px success circle, the overview-role title as a
-               heading, one body line. No toast speaks while the sheet is open, so the head announces its appearance once. -->
-          <view v-if="activated" class="tcs-result"><NxResultHead tone="success" size="sheet" announce :title="copy.activationSuccessTitle" :description="copy.activationSuccessBody" /></view>
           <!-- What is claimed: field name, device name, trial length (01 §1.1.1 字段名; 03 §3.8 NxTag). The same block stays after activation. -->
           <view class="tcs-head" :class="{ 'tcs-head--sub': activated }">
             <text class="tcs-eyebrow">{{ copy.productLabel }}</text>
@@ -133,6 +135,9 @@ const remainingText = computed(() => trialView.remainingMs.value === null ? '—
 // error with retry (spec ⑤: failure is never silent).
 const claiming = ref(false);
 const { activated } = storeToRefs(sheet);
+// Whether the sheet opened on an already active trial: then the dialog is named by the result and the head is not
+// announced again; otherwise the name stays as opened, so a claim confirmed here is said once, by the result region.
+const openedActivated = ref(sheet.open && activated.value);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
 // View state only: the service's settled answer while the claim cannot go ahead. A refusal that a re-read did not lift, and the
@@ -294,6 +299,7 @@ watch(() => sheet.open, open => {
   claimError.value = false;
   claimErrorReason.value = undefined;
   activated.value = !claiming.value && !freeTrial.pendingStart && trialView.displayReady.value && trialView.active.value;
+  openedActivated.value = activated.value;
 });
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
@@ -316,8 +322,8 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-body--alone { padding-bottom:var(--nx-overlay-bottom); }
 .tcs-foot { flex:none;padding:0 16px var(--nx-overlay-bottom); }
 
-/* Places the result head after activation: 4px under the sheet top, clear of the close (44px each side). */
-.tcs-result { padding:4px 44px 0; }
+/* Places the result head after activation: 4px under the sheet top, clear of the close (44px each side); empty, it takes no room. */
+.tcs-result--shown { padding:4px 44px 0; }
 
 /* What is claimed, centred, clear of the close (52px each side). */
 .tcs-head { padding:0 52px;text-align:center; }

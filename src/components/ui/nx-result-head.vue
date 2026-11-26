@@ -9,8 +9,7 @@
   another way (e.g. a toast with the same words), so one change is read out once. The icon pops once when it mounts or changes; static under
   reduced motion. Extra content (amount, note) goes in the default slot, centred under the line.
   size="sheet" is the same head inside a sheet (03 §3.5, 10.1): the title takes the overview role and the line the regular
-  short body, as a sheet's own title and body do; the sheet places it. Pass announce when the result appears in place and
-  nothing else says it (no toast, no focus move): the region is live from the start, so its appearance is read out once.
+  short body, as a sheet's own title and body do; the sheet places it.
 -->
 <template>
   <view class="nx-result-head" :class="[`nx-result-head--${tone}`, { 'nx-result-head--sheet': size === 'sheet' }]">
@@ -37,13 +36,13 @@ import { computed, onMounted, ref } from "vue";
 
 type Tone = "success" | "warning" | "neutral" | "danger" | "brand";
 type Icon = "check" | "return" | "clock" | "shield" | "failed" | "alert";
-const props = withDefaults(defineProps<{ tone: Tone; title: string; description?: string; icon?: Icon; titleTestid?: string; live?: boolean; announce?: boolean; size?: "page" | "sheet" }>(), { live: true, announce: false, size: "page" });
+const props = withDefaults(defineProps<{ tone: Tone; title: string; description?: string; icon?: Icon; titleTestid?: string; live?: boolean; size?: "page" | "sheet" }>(), { live: true, size: "page" });
 const toneIcon: Record<Tone, Icon> = { success: "check", warning: "clock", neutral: "return", danger: "failed", brand: "check" };
 const glyph = computed(() => props.icon ?? toneIcon[props.tone]);
 // The region turns live after it is shown, so appearing (often next to a toast) is not read out; later changes are.
 const armed = ref(false);
 onMounted(() => { armed.value = true; });
-const speaks = computed(() => props.live && (armed.value || props.announce));
+const speaks = computed(() => props.live && armed.value);
 </script>
 
 <style scoped>
