@@ -2117,7 +2117,6 @@ export const ms: Messages = {
     entryClaimCta: "Tuntut",
     entryChecking: "Menyemak kelayakan…",
     entryUnavailable: "Tidak boleh dituntut",
-    entryRetry: "Semak kelayakan semula",
     activeTitle: "Percubaan berjalan · {state}",
     activeStateActive: "Aktif",
     activeStateGrace: "Penjanaan dihentikan",

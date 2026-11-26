@@ -2117,7 +2117,6 @@ export const id: Messages = {
     entryClaimCta: "Klaim sekarang",
     entryChecking: "Memeriksa kelayakan…",
     entryUnavailable: "Belum bisa diklaim",
-    entryRetry: "Cek ulang kelayakan",
     activeTitle: "Uji coba berjalan · {state}",
     activeStateActive: "Aktif",
     activeStateGrace: "Produksi berhenti",

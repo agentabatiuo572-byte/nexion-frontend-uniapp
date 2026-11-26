@@ -2117,7 +2117,6 @@ export const ru: Messages = {
     entryClaimCta: "Получить",
     entryChecking: "Проверяем условия…",
     entryUnavailable: "Сейчас недоступно",
-    entryRetry: "Проверить снова",
     activeTitle: "Пробный период · {state}",
     activeStateActive: "Активен",
     activeStateGrace: "Выработка остановлена",

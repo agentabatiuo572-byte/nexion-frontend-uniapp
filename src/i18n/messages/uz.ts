@@ -2117,7 +2117,6 @@ export const uz: Messages = {
     entryClaimCta: "Hozir olish",
     entryChecking: "Shartlar tekshirilmoqda…",
     entryUnavailable: "Olib boʻlmaydi",
-    entryRetry: "Qayta tekshirish",
     activeTitle: "Sinov davom etmoqda · {state}",
     activeStateActive: "Faol",
     activeStateGrace: "Ishlash toʻxtadi",

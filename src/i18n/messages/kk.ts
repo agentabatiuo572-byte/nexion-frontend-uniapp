@@ -2117,7 +2117,6 @@ export const kk: Messages = {
     entryClaimCta: "Қазір алу",
     entryChecking: "Шарттар тексерілуде…",
     entryUnavailable: "Алу қолжетімсіз",
-    entryRetry: "Шарттарды қайта тексеру",
     activeTitle: "Сынақ жүріп жатыр · {state}",
     activeStateActive: "Белсенді",
     activeStateGrace: "Өндіріс тоқтады",

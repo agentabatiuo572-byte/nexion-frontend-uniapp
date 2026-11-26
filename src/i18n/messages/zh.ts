@@ -1634,7 +1634,6 @@ progressLabel: "进度",
     entryClaimCta: "马上领取",
     entryChecking: "正在核实资格…",
     entryUnavailable: "暂不可领取",
-    entryRetry: "重新核实资格",
     // /me TrialEntry — active state
     activeTitle: "试用进行中 · {state}",
     activeStateActive: "体验中",

@@ -2117,7 +2117,6 @@ export const fil: Messages = {
     entryClaimCta: "I-claim na",
     entryChecking: "Sinusuri ang eligibility…",
     entryUnavailable: "Hindi ma-claim",
-    entryRetry: "Suriin ulit ang eligibility",
     activeTitle: "Tumatakbo ang trial · {state}",
     activeStateActive: "Aktibo",
     activeStateGrace: "Huminto ang production",

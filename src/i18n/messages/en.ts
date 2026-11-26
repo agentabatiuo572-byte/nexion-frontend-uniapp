@@ -1649,7 +1649,6 @@ progressLabel: "Progress",
     entryClaimCta: "Claim now",
     entryChecking: "Checking eligibility…",
     entryUnavailable: "Claim unavailable",
-    entryRetry: "Retry eligibility check",
     // /me TrialEntry — active state
     activeTitle: "Trial in progress · {state}",
     activeStateActive: "Active",
