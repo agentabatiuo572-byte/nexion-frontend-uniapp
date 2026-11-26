@@ -60,6 +60,7 @@ import { useWeeklyQuestTargetClosed } from "@/composables/use-quest-target-avail
 import { useMeEntryRead } from "@/composables/use-me-entry-read";
 import { useNow } from "@/composables/use-now";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrialAuthorityRead } from "@/composables/use-trial-authority-read";
 import { runPassiveTabRead, invalidatePassiveTabRead, passiveTabReadScope } from "@/lib/passive-tab-read";
 import { useDataVisibility } from "@/store/data-visibility";
 import { formatAmount } from "@/lib/amount-display";
@@ -175,6 +176,7 @@ const remoteOrdersHasRead = ref(false);
 let remoteSecurityRequest = 0;
 let remoteOrdersRequest = 0;
 const remoteMeActive = ref(false);
+const trialAuthority = useTrialAuthorityRead(() => remoteMeActive.value, { eligibilityFallback: true });
 let meEntryReadPending = true;
 const entryRead = useMeEntryRead(() => remoteMeActive.value);
 const entrySeen = useMeEntrySeen();
@@ -538,7 +540,7 @@ async function refreshRemoteMe(explicit = false) {
     ["security", refreshRemoteSecurity],
     ["notifications", () => runPassiveTabRead('notifications', () => notifications.refreshRemote(), undefined, () => notifications.hasRemoteSnapshot && !notifications.loading && !notifications.readError)],
     ["conversations", () => runPassiveTabRead('conversations', () => conversations.refresh(), { owner: conversations.scopeInvalidated }, () => !conversations.loading && !conversations.error)],
-    ["trial", () => trial.refreshVisible(true)],
+    ["trial", () => trialAuthority.failed() ? undefined : trialAuthority.refresh()],
     ["vouchers", () => voucher.revalidateRemote()],
     ["rank", () => vrank.ensureCanonicalVRank()],
     ["genesis", () => genesis.ensureSummary()],

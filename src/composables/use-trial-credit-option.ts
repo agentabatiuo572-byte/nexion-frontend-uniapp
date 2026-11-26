@@ -3,6 +3,7 @@ import type { TrialPurchaseOption } from "@/api/trial-api";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrialAuthorityRead } from "@/composables/use-trial-authority-read";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialCheckout } from "@/store/trial-checkout";
 import { trialExternalCreatePending } from "@/store/purchase-payment";
@@ -44,11 +45,13 @@ export function useTrialCreditOption(productNo: () => string | undefined, forCon
  * Visible consumers share one authoritative list read per claim. Pages call the returned
  * refresh alongside their other pull-to-refresh reads.
  */
-export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProduct?: () => string | undefined) {
+export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProduct?: () => string | undefined,
+  { pullManagedByPage = false } = {}) {
   const trial = useFreeTrial();
   const options = useTrialPurchaseOptions();
   const confirming = useTrialPurchaseConfirmation();
   const claim = computed(() => {
+    if (pullManagedByPage && trial.lastReadFailed) return null;
     const state = trial.displayState;
     return state?.claimNo === trial.authorityClaimNo && (state?.status === "active" || state?.status === "grace")
       ? state.claimNo : null;
@@ -62,6 +65,7 @@ export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProdu
   }
   const recovery = useAutoRecovery({
     active, failed, retry: read, quiet: () => trial.authorityResultUnknown || confirming.value, repeatMs: 30_000,
+    pullManagedByPage,
     repeatWhile: () => !hasVisiblePullRefresh(),
   });
   watch([visible, claim, foregroundReadAllowed], ([shown, claimNo, allowed]) => {
@@ -75,4 +79,18 @@ export function useTrialCreditOptionsRead(visible: () => boolean, takeEntryProdu
     if (allowed && (!failed() || productNo)) void read().catch(() => {});
   }, { immediate: true });
   return { refresh: () => failed() ? recovery.retry() : read() };
+}
+
+/** A shop pull reads the trial first, then refreshes the list for that claim. */
+export function useStoreTrialCreditRead(visible: () => boolean) {
+  const authority = useTrialAuthorityRead(visible, { pullManagedByPage: true });
+  const options = useTrialCreditOptionsRead(visible, undefined, { pullManagedByPage: true });
+  watch([visible, foregroundReadAllowed], ([shown, allowed]) => {
+    if (shown && allowed && !authority.failed()) void authority.refresh();
+  }, { immediate: true });
+  return {
+    async refresh() {
+      if (await authority.refresh()) await options.refresh();
+    },
+  };
 }

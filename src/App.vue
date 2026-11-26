@@ -377,8 +377,8 @@ function stopTrialPoll() {
 }
 
 const IDLE_READ_MS = 30 * 60_000;
-const trialRecoveryRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/devices", "pages/me/trial"]);
-const trialReadRoutes = new Set([...trialRecoveryRoutes, "pages/me/me", "pages/store/store", "pages/store/detail"]);
+const trialReadRoutes = new Set(["pages/index/index", "pages/earn/earn", "pages/me/devices", "pages/me/trial",
+  "pages/me/me", "pages/store/store", "pages/store/detail"]);
 let scheduledReadBinding = "";
 let idleReadOffset = 0;
 let lastIdleSlot = 0;
@@ -394,7 +394,7 @@ function refreshVisibleResource(route: string) {
   if (trialReadRoutes.has(route)) {
     const trial = useFreeTrial();
     // Visible recovery already owns failed reads on these pages and in the claim sheet.
-    if (useTrialClaimSheet().open || (trialRecoveryRoutes.has(route) && trial.lastReadFailed)
+    if (useTrialClaimSheet().open || trial.lastReadFailed
       || (route === "pages/me/trial" && trial.authorityIncomplete)) return;
     void trial.refreshVisible(false, route === "pages/me/devices");
   }

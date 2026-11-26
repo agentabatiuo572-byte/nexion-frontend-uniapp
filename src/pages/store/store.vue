@@ -87,7 +87,7 @@ import UpgradeSpotlight from "@/components/store/upgrade-spotlight.vue";
 // The voucher ticket is a LoopScope: its art bobs only while the ticket is on screen and the page is shown.
 import LoopScope from "@/components/loop-scope.vue";
 import ProductCard from "@/components/store/product-card.vue";
-import { useTrialCreditOptionsRead } from "@/composables/use-trial-credit-option";
+import { useStoreTrialCreditRead } from "@/composables/use-trial-credit-option";
 import BundleEntryCard from "@/components/store/bundle-entry-card.vue";
 import { useCart } from "@/store/cart";
 import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
@@ -164,7 +164,7 @@ let storeViewAttempt: { scopeKey: string; userId: number; event: ReturnType<type
 let releaseActiveRefresh = () => {};
 // Trial-credit list for the cards' 「可用试用抵扣金」 tag: one read per visit, shared with the detail page (PLAN §2.3).
 const trialCreditReadVisible = ref(false);
-const trialCreditRead = useTrialCreditOptionsRead(() => trialCreditReadVisible.value && !publicOnly.value);
+const trialCreditRead = useStoreTrialCreditRead(() => trialCreditReadVisible.value && !publicOnly.value);
 async function refreshVisibleStore() {
   if (!storePageVisible) return;
   if (publicOnly.value) return;

@@ -592,13 +592,24 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return remoteApiEnabled && foregroundReadAllowed() && !!session && boundKey === `user:${session.user.userId}`;
   }
 
-  async function refreshVisible(eligibilityFallback = false, foregroundInventory = false): Promise<boolean> {
+  async function readVisibleAuthority(readState: () => Promise<boolean>, eligibilityFallback?: () => boolean): Promise<boolean> {
     if (!canReadVisible()) return false;
     const epoch = accountBindingEpoch;
-    const read = foregroundInventory ? runForegroundStoreRead : runPassiveTabRead;
-    const ready = await read("trial-state", () => refreshRemote(), undefined, () => authorityStatus.value === "ready");
-    if (ready || !eligibilityFallback || epoch !== accountBindingEpoch || !canReadVisible()) return ready;
+    const ready = await readState();
+    if (ready || !eligibilityFallback?.() || epoch !== accountBindingEpoch || !canReadVisible()) return ready;
     return runPassiveTabRead("trial-eligibility", () => refreshEligibilityRemote(), undefined, () => authorityStatus.value === "ready");
+  }
+
+  function refreshVisible(eligibilityFallback: false | (() => boolean) = false, foregroundInventory = false): Promise<boolean> {
+    const read = foregroundInventory ? runForegroundStoreRead : runPassiveTabRead;
+    return readVisibleAuthority(
+      () => read("trial-state", () => refreshRemote(), undefined, () => authorityStatus.value === "ready"),
+      eligibilityFallback || undefined,
+    );
+  }
+
+  function recoverVisible(eligibilityFallback?: () => boolean): Promise<boolean> {
+    return readVisibleAuthority(() => refreshRemote(), eligibilityFallback);
   }
 
   async function refreshAtBoundary(boundary: number): Promise<boolean> {
@@ -1395,7 +1406,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     eligibility, canStart, canOpenClaim, canConfirmOrdinaryProduct, isOwnTrialDevice, showPromo, showHeroPromo, confirmedOfferState,
     promoSlot,
     start, convert, cancel, poll, bindAccount, snapshot, getBindingEpoch, takeExpiryNotice,
-    refreshRemote, refreshEligibilityRemote, refreshVisible, refreshAtBoundary, serverTimeAt,
+    refreshRemote, refreshEligibilityRemote, refreshVisible, recoverVisible, refreshAtBoundary, serverTimeAt,
   };
 });
 
