@@ -13,7 +13,7 @@
 .message-center .message-button { position: relative; min-height: 44px; padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; border-radius: 24px; color: var(--v5-ink-2); font-size: var(--ui-type-compact-button); line-height: var(--ui-type-compact-button-lh); cursor: pointer; }
 .message-center .message-button > text, .message-center .message-button > svg, .message-center .message-button > .nx-native-svg { position: relative; }
 .message-center .message-button:active, .message-center .notification-row:active { opacity: .75; }
-.message-center .message-button:focus-visible, .message-center .notification-row:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+.message-center .message-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .message-center .message-button[aria-disabled="true"] { opacity: .5; pointer-events: none; }
 .message-center .message-icon-button { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 999px; color: var(--v5-ink-2); background: transparent; }
 .message-center .message-heading { padding: 4px 2px 0; }

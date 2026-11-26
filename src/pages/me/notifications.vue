@@ -600,6 +600,12 @@ watch(filter, value => {
 .message-center .notification-item--expanded .notification-row { padding-bottom:4px; min-height:0; }
 .message-center .notification-item--expanded .notification-row::after { content:""; position:absolute; top:0; left:0; right:0; height:44px; }
 .message-center .notification-item--expanded .notification-meta { flex-direction:row; align-items:center; min-height:0; }
+/* Keyboard focus rings the whole card along its inner edge and corners: it holds the icon tile even where the expanded
+   tile reaches below the title row, and neighbouring cards or the scroll edge cannot cover or clip it. */
+.message-center .notification-row { border-radius:inherit; }
+.message-center .notification-row:focus-visible { outline:none; }
+.message-center .notification-row:focus-visible::before { content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 2px var(--v5-brand); pointer-events:none; }
+@media (forced-colors: active) { .message-center .notification-row:focus-visible::before { box-shadow:none; outline:2px solid Highlight; outline-offset:-2px; } }
 .message-center .notification-item--expanded .notification-tile { margin-bottom:-40px; }
 .message-center .notification-item--expanded .notification-card { min-height:68px; }
 /* Earnings credited row (04.5, 10.1): each amount is the card figure in Montserrat and the success colour, its unit the
