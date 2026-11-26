@@ -13,8 +13,8 @@ import { remoteApiEnabled, trialApi, apiClient, sessionVault } from "@/api/runti
 import { isTrialAuthorizationRefusal, parseTrialConvertReceipt, type TrialConvertReceipt } from "@/api/trial-api";
 import { readPaymentCommand } from "@/api/payment-command-api";
 import type { PaymentPasswordAuthorization } from "@/api/payment-password-api";
-import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote, TrialLifecycleKind, TrialLifecycleReceipt } from "@/api/trial-api";
-import { asApiError, isAmbiguousEnvelopeOutcome } from "@/api/errors";
+import type { TrialAuthorityState, TrialConversionOutcome, TrialConversionQuote, TrialLifecycleKind, TrialLifecycleReceipt, TrialStartPayload } from "@/api/trial-api";
+import { asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import {
   resolveTrialAt,
   accruedShadow,
@@ -62,13 +62,15 @@ export type { TrialStatus } from "./trial-boundary";
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
 export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "terms-changed" | "read-failed" | "rejected" | "confirming" | "storage-unavailable";
-export type TrialClaimTerms = Pick<TrialConfig, "trialProductId" | "trialDays" | "shadowDailyUSD" | "trialOffsetCapUSD">
+export type TrialClaimTerms = Pick<TrialConfig, "trialProductId" | "trialTermsVersion" | "trialDays" | "shadowDailyUSD" | "trialOffsetCapUSD">
   & { deviceName: string | null };
 
 function claimTermsChanged(confirmed: TrialClaimTerms, current: TrialConfig, deviceName: string | null): boolean {
   return confirmed.trialProductId !== current.trialProductId || confirmed.deviceName !== deviceName
     || confirmed.trialDays !== current.trialDays || confirmed.shadowDailyUSD !== current.shadowDailyUSD
-    || confirmed.trialOffsetCapUSD !== current.trialOffsetCapUSD;
+    || confirmed.trialOffsetCapUSD !== current.trialOffsetCapUSD
+    || (confirmed.trialTermsVersion !== undefined && current.trialTermsVersion !== undefined
+      && confirmed.trialTermsVersion !== current.trialTermsVersion);
 }
 /** The service's settled "not now": the same claim cannot succeed by trying again. */
 export function isTrialStartDenied(reason: TrialStartFailure | undefined): boolean {
@@ -89,8 +91,9 @@ type LegacyConversion = {
 type ConversionResult = { ok: boolean; reason?: TrialConversionFailure; orderNo?: string };
 type TrialReadStreak = { consecutiveReads: number; lastCountedAt?: number };
 const LIFECYCLE_COMMAND_KEY = "nexgrid-trial-lifecycle-commands-v1";
+const TRIAL_TERMS_CHANGED = "TRIAL_TERMS_CHANGED";
 type LifecycleCommand = { key: string; state: "pending" | "retry"; successfulClaimNo?: string } & (
-  { kind: "start"; previousClaimNo: string | null; deviceName: string }
+  ({ kind: "start"; previousClaimNo: string | null } & TrialStartPayload)
   | { kind: "cancel"; previousClaimNo: string });
 type PendingLifecycle = TrialReadStreak & {
   command: LifecycleCommand;
@@ -785,7 +788,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       pendingLifecycle.value = { command: saved, consecutiveReads: 0 };
       return null;
     }
-    // Reuse the whole request. Start's device name is part of the backend's idempotency hash.
+    // Reuse the whole request. Start's device name, product and version are part of the idempotency hash.
     const command = saved?.kind === draft.kind && saved.previousClaimNo === draft.previousClaimNo
       ? { ...saved, state: "pending" as const } : draft;
     if (!writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, command)) throw new Error("ACCOUNT_COMMAND_STORAGE_UNAVAILABLE");
@@ -812,11 +815,11 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     writeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey, pending.command);
   }
 
-  async function rejectLifecycleStart(reason: TrialIneligibleReason) {
+  async function rejectLifecycleStart(reason: TrialIneligibleReason | "terms-changed") {
     // In-flight eligibility started before the refusal cannot restore the old permission.
     lastAppliedSequence = ++authorityRequestSequence;
     remoteCanStart.value = false;
-    remoteEligibilityReason.value = reason;
+    remoteEligibilityReason.value = reason === "terms-changed" ? "unknown" : reason;
     confirmedPromoVisible.value = false;
     confirmedHeroVisible.value = false;
     confirmedStartDenial.value = reason === "unknown" ? "rejected" : reason;
@@ -901,7 +904,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         case "REJECTED":
           finishLifecycle(pending);
           if (kind === "start") {
-            await rejectLifecycleStart(commandFailureReason(receipt.message));
+            await rejectLifecycleStart(receipt.code === 409 && receipt.message === TRIAL_TERMS_CHANGED
+              ? "terms-changed" : commandFailureReason(receipt.message));
           } else {
             confirmedCancelDenial.value = cancelDenial(receipt.message);
             await refreshRemote(true);
@@ -975,14 +979,22 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           }
         }
         pending = beginLifecycle({ kind: "start", key: commandKey("start"), state: "pending",
-          previousClaimNo: authorityClaimNo.value, deviceName });
+          previousClaimNo: authorityClaimNo.value, deviceName,
+          ...(confirmedTerms?.trialTermsVersion && confirmedTerms.trialProductId ? {
+            trialProductId: confirmedTerms.trialProductId, trialTermsVersion: confirmedTerms.trialTermsVersion,
+          } : {}),
+        });
       } catch { return { ok: false, reason: "storage-unavailable" }; }
       if (!pending || pending.command.kind !== "start") return { ok: false, reason: "confirming" };
       confirmedStartClaimNo.value = null;
-      const { key, deviceName: sentDeviceName } = pending.command;
+      const { key, deviceName: sentDeviceName, trialProductId, trialTermsVersion } = pending.command;
       const authRevision = sessionVault.revision();
       try {
-        const receipt = await trialApi.start(key, sentDeviceName);
+        const receipt = await trialApi.start(key, {
+          deviceName: sentDeviceName,
+          ...(trialProductId === undefined ? {} : { trialProductId }),
+          ...(trialTermsVersion === undefined ? {} : { trialTermsVersion }),
+        });
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         if (receipt.claimNo) rememberLifecycleSuccess(pending, receipt.claimNo);
       } catch (error) {
@@ -996,14 +1008,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           return { ok: false, reason: failure.message === "USER_ONBOARDING_REQUIRED" ? "onboarding-required" : "terms-required" };
         }
         const reason = commandFailureReason(failure.message);
+        const termsChanged = isApiRefusal(error, 409, TRIAL_TERMS_CHANGED);
         if (failure.kind === "http" && failure.status === 409 && failure.code === 409 && reason !== "unknown") {
           pending.refusal = reason;
         } else if (failure.kind === "auth") {
           await apiClient.refreshSession(authRevision).catch(() => {});
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
-        } else if (!isAmbiguousEnvelopeOutcome(error)) {
+        } else if (termsChanged || !isAmbiguousEnvelopeOutcome(error)) {
           finishLifecycle(pending);
-          await rejectLifecycleStart(reason);
+          await rejectLifecycleStart(termsChanged ? "terms-changed" : reason);
           if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
           return { ok: false, reason: confirmedStartDenial.value };
         }

@@ -63,13 +63,16 @@ export function createTrialLifecyclePreview(state, execute) {
       if (!validKey(rawKey)) return response(422, rawKey?.trim() ? 'IDEMPOTENCY_KEY_INVALID' : 'IDEMPOTENCY_KEY_REQUIRED');
       const key = rawKey.trim();
       const identity = JSON.stringify(kind === 'start'
-        ? [body.paymentMethodId ?? null, body.deviceName ?? null] : String(body.reason ?? '').trim().toLowerCase());
+        ? [body.paymentMethodId ?? null, body.deviceName ?? null, body.trialProductId ?? null, body.trialTermsVersion ?? null]
+        : String(body.reason ?? '').trim().toLowerCase());
       const scopedKey = scope(account, kind, key);
       const previous = commands.get(scopedKey);
       if (previous) {
         if (identity !== previous.identity) return response(409, 'IDEMPOTENCY_KEY_CONFLICT');
-        // The first activation preset rolls back before writing a claim.
-        if (previous.result?.status !== 503 || previous.result.body.message !== 'TRIAL_QUOTA_STATE_UNAVAILABLE')
+        // An unresolved start with no saved response can execute again with the original payload.
+        const retryableStart = kind === 'start' && previous.receipt.status === 'INDETERMINATE' && !previous.result;
+        const rolledBack = previous.result?.status === 503 && previous.result.body.message === 'TRIAL_QUOTA_STATE_UNAVAILABLE';
+        if (!retryableStart && !rolledBack)
           return previous.result ?? response(409, 'IDEMPOTENCY_REQUEST_IN_PROGRESS');
       }
       const mode = state[setting[kind]] ?? 'normal';
@@ -84,9 +87,10 @@ export function createTrialLifecyclePreview(state, execute) {
       };
       commands.set(scopedKey, command);
       if (mode === 'indeterminate') {
-        command.result = unavailable();
+        if (kind === 'start') state[setting[kind]] = 'normal';
+        else command.result = unavailable();
         delete command.run;
-        return command.result;
+        return unavailable();
       }
       if (mode === 'processing') return unavailable();
       const result = finish(command);

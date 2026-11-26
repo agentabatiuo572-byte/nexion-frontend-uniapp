@@ -25,6 +25,8 @@ export interface TrialConfig {
   trialOffsetCapUSD: number | null;
   /** Trial product id selected by the authoritative product policy. */
   trialProductId: TrialProductId;
+  /** Present when the backend can bind a new start to the published terms. */
+  trialTermsVersion?: string;
   /** Server-owned E1 display name for the selected product. */
   trialProductName: string;
   imageUrl?: string;
@@ -67,7 +69,7 @@ export function resolveTrialCheckoutProductId(productId: unknown): string | null
 
 export function resolveTrialDeviceName(productId: unknown, serverName?: unknown): string | null {
   const productNo = resolveTrialCheckoutProductId(productId);
-  if (!productNo) return null;
+  if (productId !== "" && !productNo) return null;
   if (serverName != null && typeof serverName !== "string") return null;
   const normalizedName = serverName?.trim();
   if (normalizedName) return normalizedName.length <= 128 ? normalizedName : null;
@@ -157,6 +159,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       discountCapUSD: cap("discountCapUSD"),
       trialOffsetCapUSD: cap("trialOffsetCapUSD"),
       trialProductId,
+      ...(typeof raw.trialTermsVersion === "string" ? { trialTermsVersion: raw.trialTermsVersion } : {}),
       trialProductName,
       imageUrl: productMediaUrl(raw.imageUrl),
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),

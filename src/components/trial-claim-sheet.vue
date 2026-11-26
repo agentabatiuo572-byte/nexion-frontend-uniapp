@@ -240,6 +240,7 @@ async function onClaim() {
   if (!config) return;
   const confirmedTerms = {
     trialProductId: config.trialProductId,
+    trialTermsVersion: config.trialTermsVersion,
     deviceName: trialView.deviceName.value,
     trialDays: config.trialDays,
     shadowDailyUSD: config.shadowDailyUSD,
