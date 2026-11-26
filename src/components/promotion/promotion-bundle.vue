@@ -95,6 +95,8 @@ import { isProductAvailable, productHasStock, productOutOfStock } from '@/store/
 import { isBundleHardwareAvailable } from '@/store/bundle-catalog-guard';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
+import { PROMOTION_CHECKOUT_TABLE,selectPromotionCheckoutRecord,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
+import { useUI } from '@/store/ui';
 import { productTaskLevelsText } from '@/lib/product-copy';
 import { checkoutQuoteBlockCopy,localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
@@ -212,13 +214,23 @@ const quotedTiers = computed(() => {
 const termsMissing = computed(() => quote.value?.expectedRewards.some(({ disclosure }) =>
   !disclosure || [disclosure.title, disclosure.terms, disclosure.refundTerms, disclosure.benefitDescription]
     .some(text => !text?.zh?.trim() || !text.en?.trim() || !text.vi?.trim())) ?? false);
-const inventoryPlacement = computed((): InventoryPlacement | null => {
+// count is the quote's inventory estimate (the server adds buyer gift devices); purchased says whether bought devices are
+// among them, which is when checkout is confirmed first (a gift alone keeps only the note).
+const inventoryPlacement = computed((): (InventoryPlacement & { purchased: boolean }) | null => {
   const current = quote.value;
   if (!current) return null;
   const slots = current.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
   const count = current.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, current.quantity - slots));
-  return count === 0 ? null : { count, full: slots === 0 };
+  return count === 0 ? null : { count, full: slots === 0, purchased: slots === null || current.quantity > slots };
 });
+const inventoryDialogOwner=`promotion-bundle-inventory:${Date.now()}:${Math.random()}`;
+// An unpaid original for this selection reopens in checkout, which asks nothing new (same record the checkout selects).
+function resumesOriginalCheckout(){
+  try{
+    const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:scopeId.value??'',items:selection.value});
+    return !!record?.pending||record?.order?.paymentStatus==='PENDING';
+  }catch{return false;}
+}
 const inventoryNote = computed(() => {
   const placement = inventoryPlacement.value;
   if (!placement) return '';
@@ -360,11 +372,11 @@ async function continueCheckout(){
   if(!canContinue.value)return;
   // Devices going to inventory (the tray note) need the user's confirmation before checkout (PRD §7.3).
   const placement=inventoryPlacement.value;
-  if(placement&&!await confirmInventoryPlacement(t.value,placement,'checkout'))return;
+  if(placement?.purchased&&!resumesOriginalCheckout()&&!await confirmInventoryPlacement(t.value,placement,'checkout',inventoryDialogOwner))return;
   if(!freshQuote()){expireQuote();return;}
   if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
 }
-onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;});
+onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;useUI().clearConfirmsBy(inventoryDialogOwner);});
 onShow(()=>{
   const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
   visible.value=true;invalidate(recheckCapacity);
@@ -375,7 +387,7 @@ watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQu
   capacityRecheckPending.value=false;
   void refreshQuote(true);
 },{flush:'post'});
-onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryTimer);});
+onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryTimer);useUI().clearConfirmsBy(inventoryDialogOwner);});
 </script>
 <style src="./promotion.css"></style>
 <style scoped>

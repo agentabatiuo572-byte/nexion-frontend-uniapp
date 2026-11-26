@@ -646,12 +646,14 @@ async function selectVoucher(id:string|null){
   if(voucherId.value!==id)quoteBlock.value=null;
   voucherId.value=id;voucherOpen.value=false;await loadQuote();
 }
-const inventoryPlacement = computed((): InventoryPlacement | null => {
+// count is the quote's inventory estimate (the server adds buyer gift devices); purchased says whether bought devices are
+// among them, which is when a new order is confirmed first (a gift alone keeps only the notice).
+const inventoryPlacement = computed((): (InventoryPlacement & { purchased: boolean }) | null => {
   const quote = displayQuote.value;
   if (!quote || order.value || openedOriginal || session.record.pending || unknown.value) return null;
   const slots = quote.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
   const quantity = quote.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, quote.quantity - slots));
-  return quantity === 0 ? null : { count: quantity, full: slots === 0 };
+  return quantity === 0 ? null : { count: quantity, full: slots === 0, purchased: slots === null || quote.quantity > slots };
 });
 const inventoryNotice = computed(() => {
   const placement = inventoryPlacement.value;
@@ -663,7 +665,7 @@ async function createOrder(){
   if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;
   // Devices going to inventory (the notice above) need the user's confirmation before the order is created (PRD §7.3).
   const placement=inventoryPlacement.value;
-  if(placement&&(!await confirmInventoryPlacement(t.value,placement,'order',paymentDialogOwner)||!current()||!visible.value||leaving.value||!canCreate.value))return;
+  if(placement?.purchased&&(!await confirmInventoryPlacement(t.value,placement,'order',paymentDialogOwner)||!current()||!visible.value||leaving.value||!canCreate.value))return;
   let orderRequested=false;
   await run(async()=>{
     createBlock.value=await session.create();
