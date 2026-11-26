@@ -963,6 +963,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         markAuthorityReadFailure("TRIAL_CONFIG_RESPONSE_INVALID");
         return { ok: false, reason: "read-failed" };
       }
+      const confirmedPayload: TrialStartPayload = {
+        deviceName,
+        ...(confirmedTerms?.trialTermsVersion && confirmedTerms.trialProductId ? {
+          trialProductId: confirmedTerms.trialProductId, trialTermsVersion: confirmedTerms.trialTermsVersion,
+        } : {}),
+      };
       let pending: PendingLifecycle | null;
       try {
         if (confirmedTerms) {
@@ -970,7 +976,10 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           const saved = readLifecycleCommand(boundKey, true);
           // A saved retry was refused before execution or explicitly NOT_SEEN.
           // A still-pending start may only be retried with its original key and payload.
-          if (saved?.kind === "start" && saved.state === "retry" && (changed || saved.deviceName !== deviceName)) {
+          if (saved?.kind === "start" && saved.state === "retry"
+              && (changed || saved.deviceName !== confirmedPayload.deviceName
+                || saved.trialProductId !== confirmedPayload.trialProductId
+                || saved.trialTermsVersion !== confirmedPayload.trialTermsVersion)) {
             if (!removeAccountRow(LIFECYCLE_COMMAND_KEY, boundKey)) return { ok: false, reason: "storage-unavailable" };
           }
           if (changed) {
@@ -979,10 +988,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
           }
         }
         pending = beginLifecycle({ kind: "start", key: commandKey("start"), state: "pending",
-          previousClaimNo: authorityClaimNo.value, deviceName,
-          ...(confirmedTerms?.trialTermsVersion && confirmedTerms.trialProductId ? {
-            trialProductId: confirmedTerms.trialProductId, trialTermsVersion: confirmedTerms.trialTermsVersion,
-          } : {}),
+          previousClaimNo: authorityClaimNo.value, ...confirmedPayload,
         });
       } catch { return { ok: false, reason: "storage-unavailable" }; }
       if (!pending || pending.command.kind !== "start") return { ok: false, reason: "confirming" };
