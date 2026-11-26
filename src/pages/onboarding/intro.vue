@@ -11,7 +11,7 @@
     <view
       v-for="(p, i) in positions"
       :key="i"
-      class="intro-node pulse-node"
+      class="intro-node"
       :style="{ top: p.top, left: p.left, transform: `scale(${p.scale})`, animationDelay: p.delay + 's' }"
     />
 
@@ -56,34 +56,26 @@
             <!-- 4 fixed satellites -->
             <g v-for="(s, i) in satellites" :key="`sat-${i}`">
               <circle :cx="s.x" :cy="s.y" r="6" fill="var(--v5-brand)" opacity="0.12" filter="url(#orb-soft)" />
-              <circle :cx="s.x" :cy="s.y" r="2.4" fill="var(--v5-brand)" opacity="0.75">
-                <animate v-if="motionAllowed" attributeName="opacity" values="0.75;0.3;0.75" :dur="`${2.2 + i * 0.4}s`" repeatCount="indefinite" />
-              </circle>
+              <circle :cx="s.x" :cy="s.y" r="2.4" fill="var(--v5-brand)" opacity="0.75" />
             </g>
 
-            <!-- Active orbiting node + comet halo -->
-            <g v-if="motionAllowed">
+            <!-- Orbiting node + comet halo: rests at the top of the orbit; on entry it travels the orbit once and
+                 stops back there (07: decoration plays once). The motion path is relative to that resting point. -->
+            <g transform="translate(120 12)">
               <circle r="7" fill="var(--v5-brand)" opacity="0.25">
-                <animateMotion dur="9s" repeatCount="indefinite" :path="orbitPath" rotate="auto" />
+                <animateMotion v-if="motionAllowed" begin="0.2s" dur="2.4s" fill="freeze" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.22 1 0.36 1" :path="orbitPath" />
               </circle>
               <circle r="3.4" fill="var(--v5-brand)">
-                <animateMotion dur="9s" repeatCount="indefinite" :path="orbitPath" rotate="auto" />
+                <animateMotion v-if="motionAllowed" begin="0.2s" dur="2.4s" fill="freeze" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.22 1 0.36 1" :path="orbitPath" />
               </circle>
             </g>
-            <g v-else transform="translate(120 12)">
-              <circle r="7" fill="var(--v5-brand)" opacity="0.25" />
-              <circle r="3.4" fill="var(--v5-brand)" />
-            </g>
 
-            <!-- Expanding pulse rings (2× staggered) -->
-            <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4">
-              <animate v-if="motionAllowed" attributeName="r" from="36" to="92" dur="2.6s" repeatCount="indefinite" />
-              <animate v-if="motionAllowed" attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4">
-              <animate v-if="motionAllowed" attributeName="r" from="36" to="92" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
-              <animate v-if="motionAllowed" attributeName="opacity" values="0.55;0;0" keyTimes="0;0.75;1" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
-            </circle>
+            <!-- Pulse ring: rests at r=36; on entry two rings burst out from it once (scale + opacity only) and fade. -->
+            <circle cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4" />
+            <template v-if="motionAllowed">
+              <circle class="intro-burst" cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+              <circle class="intro-burst intro-burst--late" cx="120" cy="120" r="36" fill="none" stroke="var(--v5-brand)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+            </template>
 
             <!-- Middle thin ring —— 此前写死一个深灰色号,浅色档就是那圈扎眼的黑环。
                  取 border(不是 border-strong):原值在黑底上几乎看不见,是「结构线」不是「装饰线」,
@@ -210,7 +202,7 @@ const positions = Array.from({ length: 18 }).map((_, i) => {
   return {
     top: `${(5 + rng() * 70).toFixed(2)}%`,
     left: `${(rng() * 95).toFixed(2)}%`,
-    delay: +(rng() * 2.5).toFixed(2),
+    delay: +(0.3 + rng()).toFixed(2),
     scale: +(0.6 + rng() * 1.2).toFixed(2),
   };
 });
@@ -222,7 +214,8 @@ const satellites = [
   { x: 120, y: 228 },
   { x: 12, y: 120 },
 ];
-const orbitPath = "M 120 12 A 108 108 0 1 1 119.999 12 Z";
+// One full orbit, starting and ending at the node's resting point (the top of the orbit).
+const orbitPath = "M 0 0 A 108 108 0 1 1 -0.001 0 Z";
 
 function goRegister() {
   navReset({ url: "/pages/register/register", fail: () => {} });
@@ -282,12 +275,24 @@ function goPrivacy() {
   background-image:
     radial-gradient(circle at center, color-mix(in srgb, var(--v5-brand) 14%, transparent) 1px, transparent 1.5px);
 }
+/* Floating nodes light up once on entry and then hold still (07: decoration plays once); the halo follows the theme colour. */
 .intro-node {
   position: absolute;
   width: 4px;
   height: 4px;
   border-radius: 9999px;
   background: var(--v5-brand);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--v5-brand) 55%, transparent), 0 0 12px color-mix(in srgb, var(--v5-brand) 25%, transparent);
+  animation: intro-node-in 0.8s ease-out both;
+}
+.intro-burst {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: intro-burst 2.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+.intro-burst--late {
+  animation-delay: 1.2s;
 }
 
 /* 中心 App 图标:双主题成对切换(html[data-theme] 由主题层维护,与 app-chassis header logo 同机制) */
@@ -491,7 +496,6 @@ function goPrivacy() {
   height: 6px;
   border-radius: 9999px;
   background: var(--v5-brand);
-  animation: intro-pulse 1.6s ease-in-out infinite;
 }
 .stat-num {
   font-family: var(--font-v5);
@@ -635,9 +639,13 @@ function goPrivacy() {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes intro-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes intro-node-in {
+  from { opacity: 0; }
+}
+@keyframes intro-burst {
+  from { opacity: 0.55; transform: scale(1); }
+  75% { opacity: 0; }
+  to { opacity: 0; transform: scale(2.56); }
 }
 @media (prefers-reduced-motion: reduce) {
   .intro-root :deep(*) { animation: none !important; transition: none !important; }
