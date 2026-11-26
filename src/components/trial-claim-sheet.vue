@@ -376,7 +376,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-read-state { display:flex;flex-direction:column;align-items:center;padding:64px 24px 48px;text-align:center; }
 .tcs-read-state__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-warning-ink);background:color-mix(in srgb,var(--v5-warning-ink) 14%,transparent); }
 .tcs-read-state__title { display:block;margin-top:12px;color:var(--v5-ink);font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:break-word; }
-.tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);overflow-wrap:break-word; }
+.tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:var(--ui-type-empty-note-weight) var(--ui-type-empty-note)/var(--ui-type-empty-note-lh) var(--font-v5);overflow-wrap:break-word; }
 .tcs-ctas { margin-top:16px;display:flex;flex-direction:column;gap:8px; }
 .tcs-dismiss { width:100%;min-height:44px;display:flex;align-items:center;justify-content:center; }
 .tcs-dismiss:active { opacity:.7; }

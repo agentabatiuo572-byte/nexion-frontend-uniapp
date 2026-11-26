@@ -1371,6 +1371,8 @@ uni-input .uni-input-placeholder {
   --ui-type-chip: 12px; --ui-type-chip-lh: 16px;
   --ui-type-text-link: 13px; --ui-type-text-link-lh: 18px;
   --ui-type-segment: 14px; --ui-type-segment-lh: 20px;
+  /* Empty-state note: the one sentence under an empty or no-content result's title, 13/18 in every band (10.1 正文类角色的边界). */
+  --ui-type-empty-note: 13px; --ui-type-empty-note-lh: 18px;
   /* Role weights: only 400 / 500 / 600, and at most 500 at 14px and below (DS-21). */
   --ui-type-page-title-weight: 600; --ui-type-display-title-weight: 600; --ui-type-nav-title-weight: 600;
   --ui-type-section-weight: 600; --ui-type-card-title-weight: 600; --ui-type-hero-title-weight: 600;
@@ -1381,7 +1383,7 @@ uni-input .uni-input-placeholder {
   --ui-type-description-weight: 400; --ui-type-note-weight: 400; --ui-type-list-subtitle-weight: 400;
   --ui-type-meta-weight: 400; --ui-type-message-preview-weight: 400; --ui-type-message-meta-weight: 400;
   --ui-type-input-weight: 400; --ui-type-wallet-amount-weight: 550; --ui-type-segment-weight: 500;
-  --ui-type-card-figure-weight: 500; --ui-type-inline-figure-weight: 500;
+  --ui-type-card-figure-weight: 500; --ui-type-inline-figure-weight: 500; --ui-type-empty-note-weight: 400;
   --ui-text-body: var(--ui-type-body);
 }
 @media (max-width: 339px) {
