@@ -143,7 +143,7 @@
         </view>
       </template>
       <view v-else class="ob-btn" :class="{ 'ob-btn--primary': view === 'detected' }" role="button" :tabindex="view === 'detected' ? 0 : -1" :aria-disabled="view !== 'detected'" :aria-busy="view !== 'detected'" data-system-chrome-primary @click="goConnect" @keydown.enter.prevent="goConnect" @keydown.space.prevent="goConnect">
-        <view v-if="view !== 'detected'" class="ob-spin" aria-hidden="true" /><text>{{ estimatePrimaryLabel }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <view v-if="view !== 'detected'" class="ob-spin" aria-hidden="true" /><text>{{ estimatePrimaryLabel }}</text><template v-if="!currentPhoneActive"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></template>
       </view>
     </view>
     <ToastHost />

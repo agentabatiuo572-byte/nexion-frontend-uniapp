@@ -542,7 +542,7 @@ type BarButton = { label: string; run: (event?: Event) => void; off?: boolean; b
 type Bar = { kind: "none" } | { kind: "status"; label: string } | { kind: "float"; primary: BarButton }
   | { kind: "tray"; primary: BarButton; secondary?: BarButton; note?: string };
 // The bar follows the source state and the action in flight: only the busy control spins, the others are locked (03 §3.1).
-const rawBar = computed<Bar>(() => {
+const bar = computed<Bar>(() => {
   const o = t.value.onboarding, busy = activationBusy.value;
   const later = (): BarButton | undefined => canDefer.value
     ? { label: o.iosActivateLater, run: onDefer, off: busy, busy: inFlight.value === "defer" } : undefined;
@@ -586,15 +586,6 @@ const rawBar = computed<Bar>(() => {
   if (action === "recalibrate" || iosPending.value || (!action && (failedAction.value === "calibration" || canonical.value?.calibrationStatus === "PENDING_VERIFICATION")))
     return pair(main(o.iosRecalibrate, retry));
   return pair(main(o.activationRetry, retry));
-});
-// Board S0: during the result entrance the final bar is still fading in, so until 1000ms its buttons are neither
-// clickable nor in the Tab order; the read-wait grey button underneath reads as the processing state.
-const enterLocked = ref(false);
-const bar = computed<Bar>(() => {
-  const b = rawBar.value;
-  if (!enterLocked.value || (b.kind !== "float" && b.kind !== "tray")) return b;
-  const lock = (button: BarButton): BarButton => ({ ...button, off: true, busy: false, run: () => {} });
-  return b.kind === "tray" ? { ...b, primary: lock(b.primary), secondary: b.secondary && lock(b.secondary) } : { ...b, primary: lock(b.primary) };
 });
 
 // Dial: measured once when it first shows (the box is the same in every dial phase); one ready starts the CSS entrance and
@@ -653,7 +644,6 @@ watch([dialMode, () => bar.value.kind, () => t.value.onboarding.iosActivateLater
 const entering = ref(false);
 const enterFrom = ref<"read" | "scan" | null>(null);
 let enterTimer: ReturnType<typeof setTimeout> | null = null;
-let unlockTimer: ReturnType<typeof setTimeout> | null = null;
 // The scan sweep turns once per SWEEP_MS from the moment the scan dial shows; at the hand-off its angle is read from that
 // clock (the page script has no DOM in the App), so the sweep freezes and the tick conversion starts where its head is.
 const SWEEP_MS = 1600;
@@ -663,18 +653,14 @@ watch(dialMode, (mode) => { if (mode === "scan") scanStartedAt = Date.now(); }, 
 const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 watch(phase, (next, previous) => {
   if (enterTimer) clearTimeout(enterTimer);
-  if (unlockTimer) clearTimeout(unlockTimer);
-  enterTimer = unlockTimer = null;
+  enterTimer = null;
   if (next === "result" && previous === "calibrating" && !reducedMotion()) {
     enterFrom.value = readOnlyWait.value ? "read" : "scan";
     if (enterFrom.value === "scan") sweepAt.value = Math.round((Date.now() - scanStartedAt) % SWEEP_MS / SWEEP_MS * 360);
     entering.value = true;
-    enterLocked.value = true;
-    unlockTimer = setTimeout(() => { enterLocked.value = false; }, 1000);
     enterTimer = setTimeout(() => { entering.value = false; enterFrom.value = null; }, 1400);
   } else {
     entering.value = false;
-    enterLocked.value = false;
     enterFrom.value = null;
   }
 });
@@ -1127,7 +1113,6 @@ onUnmounted(() => {
   useUI().clearConfirmsBy(confirmOwner);
   if (scoreTimer) clearInterval(scoreTimer);
   if (enterTimer) clearTimeout(enterTimer);
-  if (unlockTimer) clearTimeout(unlockTimer);
   requestGeneration += 1;
 });
 </script>
@@ -1256,21 +1241,26 @@ onUnmounted(() => {
 .cn-score--anim.cn-score--from-scan .cn-score__svg :deep(.cn-sweep) { opacity: 1; transform: rotate(var(--cn-sweep-at, 38deg)); animation: cn-out 160ms ease-out both; }
 /* Bars during the entrance: from the read-wait, the grey button stays under the final bar (spinner out 0–200ms, label
    recentred by (18 spinner + 8 gap) / 2), then the two cross-fade 1000–1300ms; a tray fades in after the grey button has
-   gone (different shapes). From the scan there is no bar yet, so the final bar rises in. */
+   gone (different shapes). From the scan there is no bar yet, so the final bar rises in.
+   Board S0: the entrance itself gates the final bar. Its keyframes hold visibility: hidden until the bar starts to show
+   (1000ms, the tray 1100ms), so until then it can't be tapped, focused or read; a discrete step, nothing is
+   interpolated but opacity and transform. Under reduced motion there is no entrance, so the bar is usable at once.
+   The view layer decides this; the App page script cannot read the reduced-motion setting. */
 .cn-bar-under { animation: cn-out 300ms ease-out 1000ms both; }
 .cn-bar-under--seq { animation: cn-out 150ms ease-out 1000ms both; }
 .cn-bar-under .ob-spin { animation: cn-out 200ms ease-out both; }
 .cn-bar-under__lbl { display: flex; align-items: center; gap: 8px; animation: cn-shift 250ms cubic-bezier(.16, 1, .3, 1) both; }
-.cn-bar--enter { animation: cn-fade 300ms ease-out 1000ms both; }
-.cn-bar--seq { animation: cn-fade 200ms ease-out 1100ms both; }
-.cn-bar--rise { animation: cn-rise8 300ms cubic-bezier(.16, 1, .3, 1) 1000ms both; }
+.cn-bar--enter { animation: cn-bar-in 300ms ease-out 1000ms both; }
+.cn-bar--seq { animation: cn-bar-in 200ms ease-out 1100ms both; }
+.cn-bar--rise { animation: cn-bar-rise 300ms cubic-bezier(.16, 1, .3, 1) 1000ms both; }
+@keyframes cn-bar-in { from { visibility: hidden; opacity: 0; } to { visibility: visible; opacity: 1; } }
+@keyframes cn-bar-rise { from { visibility: hidden; opacity: 0; transform: translateY(8px); } to { visibility: visible; opacity: 1; transform: none; } }
 @keyframes cn-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes cn-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes cn-lock { 0% { opacity: 0; transform: rotate(-20deg) scale(1.06); } 100% { opacity: 1; transform: none; } }
 @keyframes cn-burst { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.16); } }
 @keyframes cn-spin { to { transform: rotate(360deg); } }
 @keyframes cn-rise4 { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes cn-rise8 { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes cn-unoff { from { opacity: .5; } to { opacity: 1; } }
 @keyframes cn-shift { from { transform: none; } to { transform: translateX(-13px); } }
 /* Reduced motion: no entrance, no sweep; the final value at once. */
