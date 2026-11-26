@@ -1660,7 +1660,6 @@ progressLabel: "Progress",
     entryClaimCta: "Claim now",
     entryChecking: "Checking eligibility…",
     entryUnavailable: "Claim unavailable",
-    entryRetry: "Retry eligibility check",
     // /me TrialEntry — active state
     activeTitle: "Trial in progress · {state}",
     activeStateActive: "Active",
@@ -1738,9 +1737,9 @@ progressLabel: "Progress",
     // Lifecycle toasts + urgency pushes (App-layer poll; zero auto-charge)
     graceStartToast: "Trial ended · production stopped. Your credit stays usable until {time}",
     endedToast: "Trial credit and trial UVT are no longer valid.",
-    urgency24h: "Trial ends within 24 hours · Buy now and save up to ${amount}",
-    urgencyGrace24h: "The ${amount} trial credit and trial UVT expire within 24 hours.",
-    urgencyGrace1h: "The ${amount} trial credit and trial UVT expire within 1 hour.",
+    urgency24h: "Trial ends within 24 hours · Buy now and save up to {amount}\u00A0USDT",
+    urgencyGrace24h: "The {amount}\u00A0USDT trial credit and trial UVT expire within 24 hours.",
+    urgencyGrace1h: "The {amount}\u00A0USDT trial credit and trial UVT expire within 1 hour.",
   },
   myDevices: {
     // /me MyDevicesEntry — ported from v5 design draft

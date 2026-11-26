@@ -8,9 +8,11 @@
   title-testid puts an e2e hook on it. Pass :live="false" for a state the page already announces
   another way (e.g. a toast with the same words), so one change is read out once. The icon pops once when it mounts or changes; static under
   reduced motion. Extra content (amount, note) goes in the default slot, centred under the line.
+  size="sheet" is the same head inside a sheet (03 §3.5, 10.1): the title takes the overview role and the line the regular
+  short body, as a sheet's own title and body do; the sheet places it.
 -->
 <template>
-  <view class="nx-result-head" :class="`nx-result-head--${tone}`">
+  <view class="nx-result-head" :class="[`nx-result-head--${tone}`, { 'nx-result-head--sheet': size === 'sheet' }]">
     <view :key="glyph" class="nx-result-head__icon nx-viz-pop" aria-hidden="true">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path v-if="glyph === 'check'" d="M20 6 9 17l-5-5" />
@@ -34,7 +36,7 @@ import { computed, onMounted, ref } from "vue";
 
 type Tone = "success" | "warning" | "neutral" | "danger" | "brand";
 type Icon = "check" | "return" | "clock" | "shield" | "failed" | "alert";
-const props = withDefaults(defineProps<{ tone: Tone; title: string; description?: string; icon?: Icon; titleTestid?: string; live?: boolean }>(), { live: true });
+const props = withDefaults(defineProps<{ tone: Tone; title: string; description?: string; icon?: Icon; titleTestid?: string; live?: boolean; size?: "page" | "sheet" }>(), { live: true, size: "page" });
 const toneIcon: Record<Tone, Icon> = { success: "check", warning: "clock", neutral: "return", danger: "failed", brand: "check" };
 const glyph = computed(() => props.icon ?? toneIcon[props.tone]);
 // The region turns live after it is shown, so appearing (often next to a toast) is not read out; later changes are.
@@ -58,4 +60,10 @@ const speaks = computed(() => props.live && armed.value);
    the line still wraps (overflow-wrap) instead of overflowing. */
 :lang(zh) .nx-result-head__title { word-break: keep-all; overflow-wrap: break-word; }
 .nx-result-head__desc { display: block; max-width: 320px; margin-top: var(--v5-space-1); color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); text-wrap: pretty; }
+/* In a sheet: overview title (17–23px titles at -0.01em, Chinese 0; 01 §1.2), 12px under the icon; the line in the regular
+   short body role and body ink, filling its width. The sheet gives the head its own placement. */
+.nx-result-head--sheet { padding-top: 0; }
+.nx-result-head--sheet .nx-result-head__title { margin-top: var(--v5-space-3); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); letter-spacing: -.01em; }
+:lang(zh) .nx-result-head--sheet .nx-result-head__title { letter-spacing: 0; }
+.nx-result-head--sheet .nx-result-head__desc { color: var(--v5-ink-2); font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); text-wrap: wrap; }
 </style>

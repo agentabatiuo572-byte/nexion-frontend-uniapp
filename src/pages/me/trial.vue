@@ -127,9 +127,9 @@
         <view v-else-if="!usePurchaseOptions && !originalPurchase" class="trial-ticket trial-ticket__body trial-rise trial-rise--4" data-testid="trial-credit-summary">
           <view class="trial-sum__row">
             <text class="trial-row__label">{{ lifecycle.availableOffsetLabel }}</text>
-            <text class="trial-sum__discount">{{ visibility.mask(usd(trialOffset.offsetUSD)) }}</text>
+            <text class="trial-sum__discount">{{ visibility.mask(formatGroupedAmount(trialOffset.offsetUSD)) }}<text class="trial-unit-small trial-dim">&nbsp;USDT</text></text>
           </view>
-          <view class="trial-row trial-legacy-row"><text class="trial-row__label">{{ lifecycle.estimateTotalLabel }}</text><text class="trial-row__value">{{ estimatedOffsetUSD === null ? "—" : `≈ ${usd(estimatedOffsetUSD)}` }}</text></view>
+          <view class="trial-row trial-legacy-row"><text class="trial-row__label">{{ lifecycle.estimateTotalLabel }}</text><text class="trial-row__value">{{ estimatedOffsetUSD === null ? "—" : `≈ ${formatGroupedAmount(estimatedOffsetUSD)}` }}<text v-if="estimatedOffsetUSD !== null" class="trial-unit-small trial-dim">&nbsp;USDT</text></text></view>
           <text class="trial-legacy-note">{{ lifecycle.earlyPurchaseNote }}</text>
           <text v-if="trialOffset.remainderUSD > 0" class="trial-legacy-note">{{ offsetRemainderNote }}</text>
         </view>

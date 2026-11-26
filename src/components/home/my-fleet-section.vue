@@ -40,7 +40,7 @@
             <view class="hf-card__art"><view class="hf-card__floor" /><DeviceArt class="hf-card__image" :src="trialArt" /></view>
             <text class="hf-card__name">{{ fleet.trial.deviceName.value || '—' }}</text>
             <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialLeftShort }}</text><text class="hf-card__mono">{{ trialRemaining }}</text></view>
-            <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialCreditShort }}</text><text class="hf-card__mono">{{ trialCredit }}</text></view>
+            <view class="hf-card__kv"><text class="hf-card__key">{{ t.home.trialCreditShort }}</text><text class="hf-card__mono">{{ trialCreditValue === null ? "—" : visibility.mask(trialCreditValue) }}<text v-if="trialCreditValue !== null" class="hf-card__unit">&nbsp;USDT</text></text></view>
           </view>
         </LoopScope>
         <view v-if="fleet.countReady.value && fleet.freeSlots.value > 0" class="hf-reel__item" :style="{ '--i': fleet.occupied.value.length }">
@@ -113,7 +113,9 @@ const trialArt = computed(() => getProductMedia(fleet.trial.productId.value)?.sr
 const trialStatusText = computed(() => !fleet.trial.presentationReady.value ? trialCopy.value.statusUnknown
   : fleet.trialOnline.value ? t.value.earn.online : trialCopy.value.grace);
 const trialRemaining = computed(() => fleet.trial.remainingMs.value === null ? "—" : formatTrialCountdown(fleet.trial.remainingMs.value));
-const trialCredit = computed(() => visibility.mask(fleet.trial.offsetUSD.value === null ? "—" : `$${formatAmount(fleet.trial.offsetUSD.value)}`));
+// The trial credit with its unit USDT (01 §1.2, 03 §3.6.1); hidden statistics mask the figure, unknown is a bare 「—」.
+const trialCreditValue = computed(() => fleet.trial.offsetUSD.value === null ? null : formatAmount(fleet.trial.offsetUSD.value));
+const trialCredit = computed(() => trialCreditValue.value === null ? "—" : `${visibility.mask(trialCreditValue.value)}\u00A0USDT`);
 const trialLabel = computed(() => `${trialCopy.value.details}: ${fleet.trial.deviceName.value || "—"} · ${trialStatusText.value} · ${t.value.home.trialLeftShort} ${trialRemaining.value} · ${t.value.home.trialCreditShort} ${trialCredit.value}`);
 
 function slotKey(slot: FleetSlot, index: number) {
@@ -199,6 +201,7 @@ function addDevice() { useSlotActionSheet().openForSlot(); }
 .hf-card__kv { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }
 .hf-card__key { font: 400 12px/16px var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
 .hf-card__mono { font: 500 17px/22px var(--font-metric); color: var(--v5-ink); letter-spacing: -.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hf-card__unit { font: 500 12px/16px var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .hf-card--add { align-items: center; justify-content: center; gap: 10px; background: transparent; box-shadow: none; border: 1.5px dashed var(--v5-border-strong); text-align: center; }
 [data-theme="light"] .hf-card--add { box-shadow: none; }
 .hf-card__plus { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--v5-ink-3); }

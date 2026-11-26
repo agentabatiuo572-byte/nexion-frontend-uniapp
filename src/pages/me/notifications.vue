@@ -593,13 +593,24 @@ watch(filter, value => {
 .message-center .notification-title { overflow-wrap:break-word; }
 .message-center .notification-preview { margin-top:4px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
-.message-center .notification-time { font-size:12px; line-height:16px; }
+.message-center .notification-time { font-size:var(--ui-type-message-meta); line-height:var(--ui-type-message-meta-lh); }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }
 /* The expanded body starts on the title's text line (16 + 40 tile + 12); the action sits in the card footer (03 §3.1 P-67). */
 .message-center .notification-detail { padding:0 16px 14px 68px; }
 .message-center .notification-footer { margin-top:12px; }
-/* Expanded, the body follows the title 4px below (01 §1.1.1) instead of under the 40px tile; the card keeps the tile's height. */
-.message-center .notification-item--expanded .notification-row { padding-bottom:4px; }
+/* Expanded, the body follows the title 4px below (01 §1.3) instead of under the 40px tile; the card keeps the tile's height.
+   Neither the 44px row floor nor the time/unread column may stretch the title row: the column lies flat beside the time,
+   and the 44px touch area moves to ::after, which reaches from the card top over the body's first line. */
+.message-center .notification-card { position:relative; }
+.message-center .notification-item--expanded .notification-row { padding-bottom:4px; min-height:0; }
+.message-center .notification-item--expanded .notification-row::after { content:""; position:absolute; top:0; left:0; right:0; height:44px; }
+.message-center .notification-item--expanded .notification-meta { flex-direction:row; align-items:center; min-height:0; }
+/* Keyboard focus rings the whole card along its inner edge and corners: it holds the icon tile even where the expanded
+   tile reaches below the title row, and neighbouring cards or the scroll edge cannot cover or clip it. */
+.message-center .notification-row { border-radius:inherit; }
+.message-center .notification-row:focus-visible { outline:none; }
+.message-center .notification-row:focus-visible::before { content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 2px var(--v5-brand); pointer-events:none; }
+@media (forced-colors: active) { .message-center .notification-row:focus-visible::before { box-shadow:none; outline:2px solid Highlight; outline-offset:-2px; } }
 .message-center .notification-item--expanded .notification-tile { margin-bottom:-40px; }
 .message-center .notification-item--expanded .notification-card { min-height:68px; }
 /* Earnings credited row (04.5, 10.1): each amount is the card figure in Montserrat and the success colour, its unit the

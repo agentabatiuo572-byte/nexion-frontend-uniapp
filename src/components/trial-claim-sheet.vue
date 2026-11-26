@@ -1,5 +1,5 @@
 <template>
-  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="activated ? copy.activationSuccessTitle : copy.activateTitle">
+  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true" :aria-label="openedActivated ? copy.activationSuccessTitle : copy.activateTitle">
     <view class="tcs-backdrop" @click="hide" />
     <view class="nx-glass-sheet tcs-panel" @click.stop>
       <!-- The shared sheet close (as NxSheet): neutral glass M, round (03 §3.1 圆形关闭, 全站玻璃控件边缘). The wrapper only places it. -->
@@ -7,6 +7,11 @@
 
       <!-- Content scrolls under a pinned footer when it outgrows the screen, so the actions never leave it (03 §3.5 长内容). -->
       <view class="tcs-body" :class="{ 'tcs-body--alone': readFailView }">
+        <!-- Result head (03 §3.6.1, shared NxResultHead in its sheet size): 56px success circle, the overview-role title as a
+             heading, one body line. Said once, by one path: this status region stays mounted while the sheet is open and the
+             head is added to it when the claim is confirmed here. A sheet opened on an active trial is named by its title on
+             open instead, so the region then carries no live role. -->
+        <view class="tcs-result" :class="{ 'tcs-result--shown': activated }" :role="openedActivated ? undefined : 'status'"><NxResultHead v-if="activated" tone="success" size="sheet" :live="false" :title="copy.activationSuccessTitle" :description="copy.activationSuccessBody" /></view>
         <!-- Nothing to show at all: the result alone, recovering on its own (03 §3.5.2, 04.5); only the close stays. -->
         <view v-if="readFailView" class="tcs-read-state" role="status">
           <view class="tcs-read-state__icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg></view>
@@ -14,12 +19,6 @@
           <text class="tcs-read-state__hint">{{ copy.autoRetrying }}</text>
         </view>
         <template v-else>
-          <!-- Result head (03 §3.6.1): 56px success circle, the sheet title (overview role, 03 §3.9) and one body line. -->
-          <view v-if="activated" class="tcs-result" role="status" aria-live="polite">
-            <view class="tcs-result__icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6" /></svg></view>
-            <text class="tcs-result__title">{{ copy.activationSuccessTitle }}</text>
-            <text class="tcs-result__body">{{ copy.activationSuccessBody }}</text>
-          </view>
           <!-- What is claimed: field name, device name, trial length (01 §1.1.1 字段名; 03 §3.8 NxTag). The same block stays after activation. -->
           <view class="tcs-head" :class="{ 'tcs-head--sub': activated }">
             <text class="tcs-eyebrow">{{ copy.productLabel }}</text>
@@ -40,7 +39,7 @@
               </template>
               <template v-else>
                 <text class="tcs-plinth__label">{{ copy.estimateLabel }}</text>
-                <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount"><text class="tcs-amount__cur">$</text>{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
+                <view class="tcs-amount-row"><text v-if="estimateParts" class="tcs-amount">{{ estimateParts.int }}<text class="tcs-amount__dec">{{ estimateParts.dec }}</text><text class="tcs-amount__unit">&nbsp;USDT</text></text><text v-else-if="loadingView" class="tcs-skel tcs-skel--amount" aria-hidden="true" /><text v-else class="tcs-amount tcs-amount--unknown">—</text></view>
                 <text id="tcs-basis" class="tcs-estimate-note"><text v-for="(part, i) in estimateNoteParts" :key="i" :class="{ 'tcs-estimate-note__num': part.value }">{{ part.text }}</text></text>
               </template>
             </view>
@@ -77,11 +76,12 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { getProductMedia } from "@/lib/product-media";
 import { formatAmount } from "@/lib/amount-display";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
@@ -109,7 +109,7 @@ const loadingView = computed(() => trialView.config.value === null && !stateRead
 // The machine's placeholder disc shows until the catalog image is in (04 §4.1 中性占位).
 const imageReady = ref(false);
 const durationText = computed(() => trialView.config.value ? fmt(copy.value.durationDays, { days: trialView.config.value.trialDays }) : '—');
-// Sheet main amount (10 §10.2): the whole part stays, the $ and the decimals take the auxiliary ink; unknown is a whole 「—」.
+// Sheet main amount (10 §10.2): the whole part stays, the decimals and the USDT unit take the auxiliary ink; unknown is a whole 「—」.
 const estimateParts = computed(() => {
   if (trialView.estimatedOffsetUSD.value === null) return null;
   const [int, dec] = formatAmount(trialView.estimatedOffsetUSD.value).split('.');
@@ -118,15 +118,15 @@ const estimateParts = computed(() => {
 // An empty offset cap means no cap: drop the "up to" clause instead of printing "$-".
 // The estimate card holds catalog information only (03 §3.4); a failed refresh is said on the status line by the button.
 // The basis line under the amount sets its figures in 500 (10 §10.2), so the sentence is split around its placeholders;
-// a "$" written right before a placeholder belongs to the figure.
+// each figure's unit follows it in the copy after a U+00A0 (03 §3.6.1).
 const estimateNoteParts = computed<{ text: string; value: boolean }[]>(() => {
   const config = trialView.config.value;
   if (!config) return stateReadFailed.value ? [] : [{ text: copy.value.loading, value: false }];
   if (config.shadowDailyUSD === null) return [];
   const values: Record<string, string> = { rate: formatAmount(config.shadowDailyUSD), days: String(config.trialDays), cap: formatAmount(config.trialOffsetCapUSD) };
-  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\$?\{\w+\})/).filter(Boolean).map((part) => {
-    const match = /^(\$?)\{(\w+)\}$/.exec(part);
-    return match && match[2] in values ? { text: match[1] + values[match[2]], value: true } : { text: part, value: false };
+  return (config.trialOffsetCapUSD === null ? copy.value.estimateNoteNoCap : copy.value.estimateNote).split(/(\{\w+\})/).filter(Boolean).map((part) => {
+    const match = /^\{(\w+)\}$/.exec(part);
+    return match && match[1] in values ? { text: values[match[1]], value: true } : { text: part, value: false };
   });
 });
 const remainingText = computed(() => trialView.remainingMs.value === null ? '—' : formatTrialRemaining(trialView.remainingMs.value, copy.value.longRemaining));
@@ -136,6 +136,9 @@ const remainingText = computed(() => trialView.remainingMs.value === null ? '—
 // error with retry (spec ⑤: failure is never silent).
 const claiming = ref(false);
 const { activated } = storeToRefs(sheet);
+// Whether the sheet opened on an already active trial: then the dialog is named by the result and the head is not
+// announced again; otherwise the name stays as opened, so a claim confirmed here is said once, by the result region.
+const openedActivated = ref(sheet.open && activated.value);
 const claimError = ref(false);
 const claimErrorReason = ref<TrialStartFailure>();
 // View state only: the service's settled answer while the claim cannot go ahead. A refusal that a re-read did not lift, and the
@@ -289,6 +292,15 @@ watch(() => sheet.open, open => {
   claimError.value = false;
   claimErrorReason.value = undefined;
   activated.value = !claiming.value && !freeTrial.pendingStart && trialView.displayReady.value && trialView.active.value;
+  openedActivated.value = activated.value;
+});
+// A claim confirmed here swaps the primary for 「查看设备」: focus moves onto it once it is drawn, never back to the sheet
+// root (03 §3.5 焦点); the result itself is said only by the status region above.
+watch(activated, (now, was) => {
+  if (!now || was || !sheet.open || openedActivated.value) return;
+  // The App logic layer has no DOM (same guard as useDialogA11y).
+  if (typeof document === "undefined") return;
+  void nextTick(() => document.querySelector<HTMLElement>(".tcs-root .tcs-ctas .nx-button")?.focus());
 });
 // 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
 // 且没有 Esc、关掉后焦点也回不到触发它的控件。
@@ -311,12 +323,8 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-body--alone { padding-bottom:var(--nx-overlay-bottom); }
 .tcs-foot { flex:none;padding:0 16px var(--nx-overlay-bottom); }
 
-/* Result head after activation (03 §3.6.1 结果头): 56px circle, success 14% fill; title in the sheet-title role (03 §3.9). */
-.tcs-result { display:flex;flex-direction:column;align-items:center;padding:4px 44px 0;text-align:center; }
-.tcs-result__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-success-ink);background:color-mix(in srgb,var(--v5-success-ink) 14%,transparent); }
-.tcs-result__title { display:block;margin-top:12px;font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
-/* Sheet body copy (10 §10.1 常规短正文, body ink). */
-.tcs-result__body { display:block;margin-top:4px;font:var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);color:var(--v5-ink-2);overflow-wrap:break-word; }
+/* Places the result head after activation: 4px under the sheet top, clear of the close (44px each side); empty, it takes no room. */
+.tcs-result--shown { padding:4px 44px 0; }
 
 /* What is claimed, centred, clear of the close (52px each side). */
 .tcs-head { padding:0 52px;text-align:center; }
@@ -326,12 +334,12 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-name { display:block;min-height:var(--ui-type-hero-title-lh);margin-top:4px;font:var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5);letter-spacing:-.01em;color:var(--v5-ink);overflow-wrap:break-word; }
 /* Under the result head the device name is a card title (03 §3.9), so two 20px titles do not compete. */
 .tcs-head--sub .tcs-name { min-height:var(--ui-type-card-title-lh);font:var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5);letter-spacing:0; }
-.tcs-name:lang(zh),.tcs-result__title:lang(zh) { letter-spacing:0; }
+.tcs-name:lang(zh) { letter-spacing:0; }
 .tcs-tag-row { display:flex;justify-content:center;margin-top:8px; }
 .tcs-skel { display:inline-block;vertical-align:middle;border-radius:8px;background:color-mix(in srgb,var(--v5-ink) 9%,transparent); }
 .tcs-skel--name { width:148px;height:20px; }
 .tcs-skel--tag { width:104px;height:24px;border-radius:999px; }
-.tcs-skel--amount { width:104px;height:32px; }
+.tcs-skel--amount { width:136px;height:32px; }
 
 /* Stage: the machine stands on the plinth's upper edge. */
 .tcs-stage { position:relative;--tcs-mach:248px;margin-top:-34px; }
@@ -357,10 +365,11 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-plinth__label { display:block;font:var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);color:var(--v5-ink-3);overflow-wrap:break-word; }
 /* One amount-sized line: the skeleton sits on its middle like the figure would (board .amt). */
 .tcs-amount-row { display:block;height:var(--ui-type-wallet-amount-lh);margin-top:4px;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); }
-/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, $ and decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
+/* Sheet main amount (10 §10.2): the wallet-amount size, Montserrat 500, decimals auxiliary; the key figure in brand (01 §1.1.1 规则 4). */
 .tcs-amount { display:block;font:500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount);letter-spacing:-.02em;color:var(--v5-brand);font-variant-numeric:tabular-nums;white-space:nowrap; }
-/* line-height 1: the smaller symbol sits inside the figure's line instead of growing it. */
-.tcs-amount__cur { color:var(--v5-ink-3);font-size:max(12px,.55em);line-height:1; }
+/* Unit (01 §1.2): USDT after the figure at max(12px, .4em), 500, auxiliary; line-height 1 keeps it inside the figure's line,
+   and the U+00A0 before it keeps it on that line (03 §3.6.1). */
+.tcs-amount__unit { font:500 max(12px,.4em)/1 var(--font-v5);letter-spacing:0;color:var(--v5-ink-3); }
 .tcs-amount__dec { color:var(--v5-ink-3); }
 .tcs-amount--unknown { color:var(--v5-ink-3); }
 /* Basis line under the amount: auxiliary figure 12/16, its figures 500 (10 §10.2). */
@@ -381,7 +390,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 .tcs-read-state { display:flex;flex-direction:column;align-items:center;padding:64px 24px 48px;text-align:center; }
 .tcs-read-state__icon { display:grid;place-items:center;width:56px;height:56px;border-radius:50%;color:var(--v5-warning-ink);background:color-mix(in srgb,var(--v5-warning-ink) 14%,transparent); }
 .tcs-read-state__title { display:block;margin-top:12px;color:var(--v5-ink);font:var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5);overflow-wrap:break-word; }
-.tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:400 13px/18px var(--font-v5);overflow-wrap:break-word; }
+.tcs-read-state__hint { display:block;margin-top:4px;color:var(--v5-ink-3);font:var(--ui-type-empty-note-weight) var(--ui-type-empty-note)/var(--ui-type-empty-note-lh) var(--font-v5);overflow-wrap:break-word; }
 .tcs-ctas { margin-top:16px;display:flex;flex-direction:column;gap:8px; }
 .tcs-dismiss { width:100%;min-height:44px;display:flex;align-items:center;justify-content:center; }
 .tcs-dismiss:active { opacity:.7; }
@@ -390,9 +399,7 @@ useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 /* Entrance (07 §7.1): once, transform and opacity only. */
 .tcs-machine { animation:tcs-rise .6s .12s cubic-bezier(.16,1,.3,1) both; }
 .tcs-plinth__floor { animation:tcs-floor .6s .2s ease-out both; }
-.tcs-result__icon { animation:tcs-pop .42s .1s cubic-bezier(.34,1.56,.64,1) both; }
 @keyframes tcs-rise { from { opacity:0;transform:translateY(12px); } to { opacity:1;transform:none; } }
 @keyframes tcs-floor { from { opacity:0; } to { opacity:1; } }
-@keyframes tcs-pop { from { opacity:0;transform:scale(.6); } to { opacity:1;transform:none; } }
-@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-machine,.tcs-plinth__floor,.tcs-result__icon { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .tcs-panel,.tcs-backdrop,.tcs-machine,.tcs-plinth__floor { animation:none; } }
 </style>

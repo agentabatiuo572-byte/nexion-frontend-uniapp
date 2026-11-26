@@ -4,7 +4,7 @@
   soft-tint "Claim now" CTA (right), with generous top/bottom breathing so it reads
   as a light prompt amid the surrounding cards. No card chrome, no leading icon.
   The last confirmed promotion stays mounted during refresh, while claiming
-  requires current authority. A failed refresh offers a read-only retry.
+  requires current authority. A failed read shows no retry control (03 §3.5.2).
 
   Single source of truth for this card — used by both pages/index/index.vue and
   components/me/trial-entry.vue so design tweaks land in one place.
@@ -23,9 +23,6 @@
         <text>{{ claimLabel }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-    </view>
-    <view v-if="trial.authorityStatus === 'error'" role="button" tabindex="0" data-me-action="trial-retry" :aria-label="t.trial.entryRetry" @click="retryEligibility" @keydown.enter.prevent="retryEligibility" @keydown.space.prevent="retryEligibility">
-      <text>{{ t.trial.entryRetry }}</text>
     </view>
   </view>
 </template>
@@ -68,11 +65,6 @@ const offerDesc = computed(() => fmt(t.value.trial.entryDescription, { days: cfg
 function openClaim() {
   if (!canClaim.value) return;
   claimSheet.show();
-}
-
-function retryEligibility() {
-  if (trial.authorityStatus !== "error") return;
-  void trial.refreshEligibilityRemote();
 }
 
 // ── styles ──
