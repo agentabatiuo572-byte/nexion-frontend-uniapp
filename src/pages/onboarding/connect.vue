@@ -1,161 +1,116 @@
 <template>
-  <StandalonePageShell class="cn-root" :top-inset="24">
+  <StandalonePageShell class="cn-root" :top-inset="4">
     <!-- #ifdef APP-PLUS -->
     <NativeGpuObserver :request="gpuRequest" @observation="gpuReader.receive" />
     <!-- #endif -->
-    <!-- Progress (3/3 full) -->
-    <view class="cn-bars">
-      <view class="cn-back active:opacity-60" role="button" :tabindex="activationBusy || phase === 'calibrating' ? -1 : 0" :aria-disabled="activationBusy || phase === 'calibrating'" :aria-label="t.login.back" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+    <!-- Standalone (recalibrate / login): sub-page nav only. Guided: back, step track, step label. -->
+    <view v-if="standalone" class="ob-nav">
+      <view class="ob-back" role="button" :tabindex="backLocked ? -1 : 0" :aria-disabled="backLocked" :aria-label="t.login.back" :class="{ 'ob-back--off': backLocked, 'ob-back--enable': enterFrom === 'scan' }" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
+        <view class="ob-back__face nx-frosted-button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
       </view>
-      <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
-      <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
-      <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
+      <text class="ob-nav__t" role="heading" aria-level="1">{{ t.onboarding.calibrationTitle }}</text>
+      <view />
     </view>
+    <template v-else>
+      <view class="ob-hd">
+        <view class="ob-back" role="button" :tabindex="backLocked ? -1 : 0" :aria-disabled="backLocked" :aria-label="t.login.back" :class="{ 'ob-back--off': backLocked, 'ob-back--enable': enterFrom === 'scan' }" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
+          <view class="ob-back__face nx-frosted-button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
+        </view>
+        <view class="ob-track" role="img" :aria-label="t.onboarding.step3of3">
+          <view class="ob-track__seg ob-track__seg--done" /><view class="ob-track__seg ob-track__seg--done" /><view class="ob-track__seg ob-track__seg--cur" />
+        </view>
+      </view>
+      <text class="ob-eyebrow" aria-hidden="true">{{ t.onboarding.step3of3 }}</text>
+      <!-- Dial phases share one title cell (both titles laid out, one shown), so the dial below never moves. -->
+      <view v-if="dialMode" class="ob-title cn-swap" role="heading" aria-level="1">
+        <view class="cn-swap__t" :class="dialMode === 'result' ? (entering ? 'cn-swap__t--out' : 'cn-swap__t--hide') : ''" :aria-hidden="dialMode === 'result'"><text>{{ t.onboarding.calibrationTitle }}</text></view>
+        <view class="cn-swap__t" :class="dialMode !== 'result' ? 'cn-swap__t--hide' : entering ? 'cn-swap__t--in' : ''" :aria-hidden="dialMode !== 'result'">
+          <text>{{ t.onboarding.resultTitle }}</text>
+          <NxTag v-if="resultActive" tone="success">{{ t.onboarding.activeTag }}</NxTag>
+        </view>
+      </view>
+    </template>
 
-    <view>
-      <text class="cn-step">{{ stepText }}</text>
-      <text class="cn-title">{{ nativePhoneAvailable ? titleText : phoneActivationGuidance.title }}</text>
-      <text v-if="!nativePhoneAvailable || (phase !== 'result' && phase !== 'error')" class="cn-sub">{{ nativePhoneAvailable ? subText : phoneActivationGuidance.body }}</text>
-    </view>
-
-    <view v-if="nativePhoneAvailable" class="cn-main">
-      <!-- Phase: intro -->
-      <view v-if="phase === 'intro'" key="intro" class="cn-phase">
-        <view class="cn-why">
-          <text class="cn-why__h">{{ t.onboarding.calibrationWhyTitle }}</text>
-          <view class="cn-why__list">
-            <view v-for="(p, i) in whyPoints" :key="i" class="cn-point">
-              <view class="cn-point__ic">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="p.color" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path :d="p.icon" /></svg>
+    <view class="ob-content" :class="{ 'cn-content--nav': standalone }" :style="{ paddingBottom: (dialMode ? dialClearance : barClearance) + 'px' }">
+      <!-- One dial box for start, read-wait, scan and result (boards V1): position and size never change between them. -->
+      <template v-if="dialMode">
+        <view class="cn-dialwrap" :style="{ minHeight: dialGeo.min + 'px' }">
+          <view class="cn-score" :class="['cn-score--' + dialMode, { 'cn-score--ready': dialReady, 'cn-score--anim': entering && dialReady, 'cn-score--from-scan': enterFrom === 'scan' }]"
+            :role="dialMode === 'idle' ? undefined : 'img'" :aria-hidden="dialMode === 'idle'" :aria-label="dialMode === 'result' ? t.onboarding.resultTitle + ' ' + finalText + ' ' + t.onboarding.phoneComputeUnit : dialMode === 'scan' ? t.onboarding.detecting : undefined"
+            :style="{ width: dialSize + 'px', height: dialSize + 'px' }">
+            <view class="cn-score__glow" aria-hidden="true" />
+            <view class="cn-score__lens" aria-hidden="true" :style="{ width: dialGeo.inner * 2 + 'px', height: dialGeo.inner * 2 + 'px' }" />
+            <view class="cn-score__svg" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
+              <g class="cn-ticks-base"><line v-for="(tick, i) in dialFace.ticks" :key="'b' + i" :class="tick.major ? 'cn-tick-major' : 'cn-tick-minor'" :style="{ '--i': tickOrder(i) }" :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" /></g>
+              <g class="cn-ring-base"><path v-for="(arc, i) in dialFace.arcs" :key="'ba' + i" class="cn-arc" :d="arc" /><line v-for="(mark, i) in dialFace.marks" :key="'bm' + i" class="cn-mark" :x1="mark.x1" :y1="mark.y1" :x2="mark.x2" :y2="mark.y2" /><circle class="cn-inner" :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" /></g>
+              <g v-if="dialMode === 'scan' || enterFrom === 'scan'" class="cn-sweep"><path v-for="(arc, i) in dialFace.sweep" :key="'s' + i" class="cn-sweep__seg" :style="{ strokeOpacity: arc.o }" :d="arc.d" /></g>
+              <g v-if="dialMode === 'result'" class="cn-ticks"><line v-for="(tick, i) in dialFace.ticks" :key="'r' + i" :class="tick.major ? 'cn-tick-major' : 'cn-tick-minor'" :style="{ '--i': tickOrder(i) }" :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" /></g>
+              <g v-if="dialMode === 'result'" class="cn-ring"><path v-for="(arc, i) in dialFace.arcs" :key="'ra' + i" class="cn-arc" :d="arc" /><line v-for="(mark, i) in dialFace.marks" :key="'rm' + i" class="cn-mark" :x1="mark.x1" :y1="mark.y1" :x2="mark.x2" :y2="mark.y2" /><circle class="cn-inner" :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" /></g>
+              <g v-if="dialMode === 'result'" class="cn-burst"><circle :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" /></g>
+            </svg></view>
+            <view class="cn-score__ctr" aria-hidden="true">
+              <text v-if="dialMode === 'scan' || enterFrom === 'scan'" class="cn-score__scan-t">{{ t.onboarding.detecting }}</text>
+              <svg v-else width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></svg>
+            </view>
+            <!-- Count while the entrance runs; under reduced motion the final value shows at once. -->
+            <view v-if="dialMode === 'result'" class="cn-score__num" aria-hidden="true">
+              <view class="cn-score__value" :style="{ fontSize: dialNumberSize + 'px' }">
+                <text class="cn-score__v cn-score__v--count">{{ shownScore }}</text>
+                <text class="cn-score__v cn-score__v--final">{{ finalText }}</text>
               </view>
-              <text class="cn-point__t">{{ p.text }}</text>
+              <text class="cn-score__u" :style="{ fontSize: dialUnitSize + 'px', lineHeight: dialGeo.unitLh + 'px' }">{{ t.onboarding.phoneComputeUnit }}</text>
             </view>
           </view>
+          <!-- Standalone result: success tag under the dial, placed absolutely so the dial box does not move; the dial already reads 校准完成. -->
+          <NxTag v-if="standalone && dialMode === 'result'" tone="success" class="cn-dial-tag" :class="{ 'cn-dial-tag--anim': entering }" aria-hidden="true" :style="{ top: dialTagTop + 'px' }">
+            <svg class="cn-dial-tag__icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>{{ t.onboarding.detected }}
+          </NxTag>
         </view>
-        <view class="cn-go cn-go--glow active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="phase = 'calibrating'" @keydown.enter.prevent="phase = 'calibrating'" @keydown.space.prevent="phase = 'calibrating'">
-          <text class="cn-go__t">{{ t.onboarding.calibrationStart }}</text>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-      </view>
-
-      <!-- Phase: calibrating -->
-      <view v-else-if="phase === 'calibrating' && iosPhone" key="calibrating-ios" class="cn-phase">
-        <view class="cn-steps nx-glass-card" role="list">
-          <view v-for="step in iosSteps" :key="step.label" class="cn-steps__row" role="listitem">
-            <text class="cn-steps__label" :class="{ 'cn-steps__label--idle': !step.running }">{{ step.label }}</text>
-            <text class="cn-steps__state" :class="{ 'cn-steps__state--running': step.running }">{{ step.state }}</text>
+        <view class="cn-slot" :class="{ 'cn-slot--enter': entering }">
+          <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger. -->
+          <view v-if="dialMode === 'result'" class="cn-rules"><NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" /></view>
+          <view v-else-if="dialMode === 'scan' && iosPhone" class="cn-iostrack" role="list">
+            <view class="cn-iostrack__nd" role="listitem"><view class="cn-iostrack__dot cn-iostrack__dot--cur" /><text class="cn-iostrack__lb">{{ t.onboarding.iosStepIdentify }}</text></view>
+            <view class="cn-iostrack__nd" aria-hidden="true"><view class="cn-iostrack__dot" /></view>
+            <view class="cn-iostrack__nd" aria-hidden="true"><view class="cn-iostrack__dot" /></view>
           </view>
         </view>
-      </view>
-      <view v-else-if="phase === 'calibrating'" key="calibrating" class="cn-phase">
-        <view class="cn-prog-row">
-          <svg class="cn-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-          <text class="cn-prog-row__t">{{ t.onboarding.detecting }}</text>
-        </view>
+      </template>
 
-      </view>
-
-      <!-- Phase: result: the server score is the only public calibration figure. -->
-      <view v-else-if="phase === 'result' && iosPhone" key="result-ios" class="cn-phase anim-up">
-        <view class="cn-ios-card nx-glass-card nx-glass-hero" role="group" :aria-label="`${t.onboarding.iosComputeEstimate} ${finalScore} ${t.onboarding.phoneComputeUnit}`">
-          <text class="cn-ios-card__k">{{ t.onboarding.iosComputeEstimate }}</text>
-          <view class="cn-ios-card__value">
-            <text class="cn-ios-card__v">{{ shownScore }}</text>
-            <text class="cn-ios-card__u">{{ t.onboarding.phoneComputeUnit }}<template v-if="canonical?.tierName"> · {{ canonical.tierName }}</template></text>
-          </view>
-        </view>
-      </view>
-      <!-- Calibration dial: tick ring, four arcs and the inner ring in brand colour only. The inner ring and the number keep
-           their size; on a short screen only the outer dial moves in (down to dialGeo.min), then the page scrolls. -->
-      <view v-else-if="phase === 'result'" key="result" class="cn-phase cn-phase--dial" :style="{ minHeight: dialGeo.min + 'px' }">
-        <view class="cn-dial" :class="{ 'cn-dial--ready': dialReady }" role="img" :aria-label="`${t.onboarding.resultTitle} ${finalScore} ${t.onboarding.phoneComputeUnit}`"
-          :style="{ width: dialSize + 'px', height: dialSize + 'px' }">
-          <view class="cn-dial__glow" aria-hidden="true" />
-          <view class="cn-dial__lens" aria-hidden="true" :style="{ width: dialGeo.inner * 2 + 'px', height: dialGeo.inner * 2 + 'px' }" />
-          <view class="cn-dial__ticks" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
-            <line v-for="(tick, i) in dialFace.ticks" :key="i" :class="tick.major ? 'cn-dial__major' : 'cn-dial__minor'" :x1="tick.x1" :y1="tick.y1" :x2="tick.x2" :y2="tick.y2" />
-          </svg></view>
-          <view class="cn-dial__ring" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
-            <path v-for="(arc, i) in dialFace.arcs" :key="i" class="cn-dial__arc" fill="none" :d="arc" />
-            <line v-for="(mark, i) in dialFace.marks" :key="'m' + i" class="cn-dial__arc" :x1="mark.x1" :y1="mark.y1" :x2="mark.x2" :y2="mark.y2" />
-            <circle class="cn-dial__inner" fill="none" :cx="dialSize / 2" :cy="dialSize / 2" :r="dialGeo.inner" />
-          </svg></view>
-          <!-- The count is shown while it runs; under reduced motion the final value shows at once (also in the App, where
-               the count runs on a timer). The dial's name carries the one value screen readers hear. -->
-          <view class="cn-dial__num" aria-hidden="true">
-            <view class="cn-dial__value" :style="{ fontSize: dialNumberSize + 'px' }">
-              <text class="cn-dial__v cn-dial__v--count">{{ shownScore }}</text>
-              <text class="cn-dial__v cn-dial__v--final">{{ finalScore }}</text>
-            </view>
-            <text class="cn-dial__unit" :style="{ fontSize: dialUnitSize + 'px', lineHeight: dialGeo.unitLh + 'px' }">{{ t.onboarding.phoneComputeUnit }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- An iPhone waiting for verification: where to go next, never which model or rule was involved. -->
-      <view v-else-if="iosPending" key="error-ios" class="cn-phase anim-up">
-        <text class="cn-ios-body">{{ t.onboarding.phoneCalibrationPendingIosBody }}</text>
-        <view class="cn-ios-card nx-glass-card">
-          <text class="cn-ios-card__k">{{ t.onboarding.iosPendingHint }}</text>
-        </view>
-      </view>
-      <!-- A failed calibration is a real terminal state until the user retries. -->
-      <view v-else key="error" class="cn-phase anim-up">
-        <view class="cn-policy">
-          <view class="cn-policy__cap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-            <text class="cn-policy__cap-t">{{ failureTitle }}</text>
-          </view>
-          <text class="cn-policy__t">{{ failureDetail }}</text>
-          <text v-if="canDefer" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationDeferredHint }}</text>
-          <text v-if="activationOutcome !== 'active'" class="cn-policy__t cn-policy__t--spaced">{{ t.onboarding.activationRewardGate }}</text>
-        </view>
+      <!-- Result states: NxResultHead is the only title; links sit under it. -->
+      <view v-else class="ob-rh">
+        <NxResultHead :tone="head.tone" :icon="head.icon" :title="head.title" :description="head.body">
+          <view v-if="head.link === 'retry'" class="cn-link cn-link--brand" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="onActivate" @keydown.enter.prevent="onActivate" @keydown.space.prevent="onActivate"><text>{{ t.onboarding.activationRetry }}</text></view>
+          <view v-else-if="head.link === 'support'" class="cn-link" role="link" tabindex="0" @click="contactSupport" @keydown.enter.prevent="contactSupport" @keydown.space.prevent="contactSupport"><text>{{ t.onboarding.iosContactSupport }}</text><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></view>
+        </NxResultHead>
       </view>
     </view>
 
-    <view v-if="!nativePhoneAvailable" class="cn-cta">
-      <view class="cn-go cn-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
-        <text class="cn-go__t cn-go__t--on">{{ t.login.back }}</text>
+    <!-- Read-wait → result: the grey button under the final bar; spinner out, label recentred, then the skins cross-fade. -->
+    <view v-if="entering && enterFrom === 'read'" class="ob-bar nx-glass-bar cn-bar-under" :class="{ 'cn-bar-under--seq': bar.kind === 'tray' }" aria-hidden="true">
+      <view class="ob-btn" role="button" aria-disabled="true"><view class="ob-spin" /><view class="cn-bar-under__lbl"><text>{{ t.onboarding.activatePhone }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view></view>
+    </view>
+    <!-- Bottom bar (04 §4.0), by source state and the action in flight. -->
+    <view v-if="bar.kind !== 'none'" class="ob-bar nx-glass-bar" :class="{ 'cn-bar--enter': entering && enterFrom === 'read', 'cn-bar--seq': entering && enterFrom === 'read' && bar.kind === 'tray', 'cn-bar--rise': entering && enterFrom === 'scan' }">
+      <view v-if="bar.kind === 'status'" class="nx-tray-status" role="status"><text>{{ bar.label }}</text></view>
+      <template v-else-if="bar.kind === 'tray'">
+        <text v-if="bar.note" class="nx-tray-note">{{ bar.note }}</text>
+        <view class="ob-tray-row">
+          <view v-if="bar.secondary" class="ob-tray-text nx-tray-text" role="button" :tabindex="bar.secondary.off ? -1 : 0" :aria-disabled="bar.secondary.off" :aria-busy="bar.secondary.busy" @click="bar.secondary.run" @keydown.enter.prevent="bar.secondary.run" @keydown.space.prevent="bar.secondary.run">
+            <view v-if="bar.secondary.busy" class="ob-spin ob-spin--s" aria-hidden="true" /><text>{{ bar.secondary.label }}</text>
+          </view>
+          <view class="ob-btn" :class="{ 'ob-btn--primary': !bar.primary.off }" role="button" :tabindex="bar.primary.off ? -1 : 0" :aria-disabled="bar.primary.off" :aria-busy="bar.primary.busy" data-system-chrome-primary @click="bar.primary.run" @keydown.enter.prevent="bar.primary.run" @keydown.space.prevent="bar.primary.run">
+            <view v-if="bar.primary.busy" class="ob-spin" aria-hidden="true" /><text>{{ bar.primary.label }}</text><template v-if="bar.primary.arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></template>
+          </view>
+        </view>
+      </template>
+      <view v-else class="ob-btn" :class="{ 'ob-btn--primary': !bar.primary.off && !bar.primary.glass, 'ob-btn--glass nx-frosted-button': bar.primary.glass }" role="button" :tabindex="bar.primary.off ? -1 : 0" :aria-disabled="bar.primary.off" :aria-busy="bar.primary.busy" data-system-chrome-primary @click="bar.primary.run" @keydown.enter.prevent="bar.primary.run" @keydown.space.prevent="bar.primary.run">
+        <view v-if="bar.primary.busy" class="ob-spin" aria-hidden="true" /><text>{{ bar.primary.label }}</text><template v-if="bar.primary.arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></template>
       </view>
     </view>
-    <view v-if="nativePhoneAvailable" class="cn-cta">
-      <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger; the bubble closes on a second tap, a tap outside or a scroll. -->
-      <view v-if="phase === 'result'" class="cn-rules">
-        <NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" />
-      </view>
-      <view v-if="phase === 'result'" :class="{ 'cn-error-actions': iosPhone }">
-        <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
-          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : activateText }}</text>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-        <view v-if="iosPhone && canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
-          <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosActivateLater }}</text>
-        </view>
-      </view>
-      <view v-else-if="phase === 'error' && iosPending" class="cn-error-actions">
-        <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
-          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.iosRecalibrate }}</text>
-        </view>
-        <view class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="contactSupport" @keydown.enter.prevent="contactSupport" @keydown.space.prevent="contactSupport">
-          <text class="cn-go__t cn-go__t--secondary">{{ t.onboarding.iosContactSupport }}</text>
-        </view>
-        <!-- Onboarding must still be able to continue without a phone. -->
-        <view v-if="canDefer" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
-          <text class="cn-link__t">{{ t.onboarding.activationDefer }}</text>
-        </view>
-      </view>
-      <view v-else-if="phase === 'error'" class="cn-error-actions">
-        <view class="cn-go cn-go--on active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" data-system-chrome-primary @click="retryCalibration" @keydown.enter.prevent="retryCalibration" @keydown.space.prevent="retryCalibration">
-          <text class="cn-go__t cn-go__t--on" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : failureActionText }}</text>
-        </view>
-        <view v-if="failureFeedback?.action === 'devices' && canDefer" class="cn-link active:opacity-60" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="activate" @keydown.enter.prevent="activate" @keydown.space.prevent="activate">
-          <text class="cn-link__t">{{ t.onboarding.activationRetry }}</text>
-        </view>
-        <view v-if="canDefer" class="cn-go cn-go--secondary active:scale-[0.98]" role="button" :tabindex="activationBusy ? -1 : 0" :aria-disabled="activationBusy" @click="deferPhoneActivation" @keydown.enter.prevent="deferPhoneActivation" @keydown.space.prevent="deferPhoneActivation">
-          <text class="cn-go__t cn-go__t--secondary" aria-live="polite">{{ activationBusy ? t.onboarding.activationProcessing : t.onboarding.activationDefer }}</text>
-        </view>
-      </view>
+    <!-- Bar reservation for the dial phases: the tallest bar any of them can show here, the iOS result tray (it wraps on long languages). -->
+    <view class="ob-bar nx-glass-bar cn-probe" aria-hidden="true">
+      <view class="ob-tray-row"><view class="ob-tray-text nx-tray-text"><text>{{ t.onboarding.iosActivateLater }}</text></view><view class="ob-btn ob-btn--primary"><text>{{ t.onboarding.activatePhone }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view></view>
     </view>
     <GlobalUi />
   </StandalonePageShell>
@@ -164,7 +119,6 @@
 <script setup lang="ts">
 import { navReset, navTo } from "@/lib/route";
 import { hasNativeAndroidPhoneRuntime, hasNativePhoneRuntime, nativePhonePlatform } from "@/lib/native-phone-runtime";
-import { resolvePhoneActivationGuidance } from "@/lib/phone-activation-guidance";
 import { ref, computed, getCurrentInstance, nextTick, onMounted, onUnmounted, watch } from "vue";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { captureRuntimeRevision, isCurrentRuntimeRevision } from "@/api/order-api";
@@ -172,6 +126,8 @@ import { onLoad, onBackPress, onShow, onHide } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
@@ -222,7 +178,7 @@ const resumeDeferred = ref(false);
 type Phase = "intro" | "calibrating" | "result" | "error";
 type FailedAction = "calibration" | "activate" | "defer";
 const phase = ref<Phase>("intro");
-const shownScore = ref(0);
+const shownScore = ref("0");
 let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
 const failureCode = ref("");
@@ -275,60 +231,10 @@ watch(authenticatedAccountKey, (next, previous) => {
   failedAction.value = "calibration";
 });
 
-// Copy swaps: recalibrate vs first-time onboarding.
-const stepText = computed(() => (isRecal.value ? t.value.onboarding.recalStep : t.value.onboarding.step3of3));
-const titleText = computed(() => phase.value === "error" ? failureTitle.value
-  : iosPhone && phase.value === "calibrating" ? t.value.onboarding.iosCalibrationTitle
-  : iosPhone && phase.value === "result" ? t.value.onboarding.resultTitle
-  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckTitle
-  : isRecal.value ? t.value.onboarding.recalTitle : t.value.onboarding.calibrationTitle);
-const subText = computed(() => iosPhone && phase.value === "calibrating" ? t.value.onboarding.iosIdentifying
-  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingCheckBody
-  : isRecal.value ? t.value.onboarding.recalSubtitle : t.value.onboarding.calibrationSubtitle);
-const activateText = computed(() => (isRecal.value ? t.value.onboarding.recalActivate : t.value.onboarding.activatePhone));
 const iosPending = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION" && canonical.value.signals?.platform === "ios");
-const iosSteps = computed(() => [t.value.onboarding.iosStepIdentify, t.value.onboarding.iosStepResult, t.value.onboarding.iosStepActivate]
-  .map((label, index) => ({ label, running: index === 0, state: index === 0 ? t.value.onboarding.iosStepRunning : t.value.onboarding.iosStepWaiting })));
 function contactSupport() { if (!activationBusy.value) navTo("/pages/support/messages"); }
 const failureFeedback = computed(() => phoneActivationFeedback(failureCode.value));
 const supportRequired = computed(() => activationOutcome.value === "idle" && failureFeedback.value?.action === "support");
-const failureActionText = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncAction
-  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.activationRetry
-  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.activationRetry
-  : failureFeedback.value?.action === "devices" ? t.value.onboarding.phoneActivationManageDevices
-  : failureFeedback.value?.action === "login" ? t.value.onboarding.phoneActivationLoginAction
-  : failureFeedback.value?.action === "terms" ? t.value.onboarding.phoneActivationTermsAction
-  : failureFeedback.value?.action === "recalibrate" ? t.value.onboarding.iosRecalibrate
-  : supportRequired.value ? t.value.onboarding.iosContactSupport : t.value.onboarding.activationRetry);
-const failureDetail = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSync
-  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationUnconfirmed
-  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.phoneActivationEligibilityUnavailable
-  : failureFeedback.value ? t.value.onboarding[failureFeedback.value.detail]
-  : iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosBody
-  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION" ? t.value.onboarding.phoneCalibrationPendingBody
-  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableBody
-  : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailed
-  : failedAction.value === "calibration" ? t.value.onboarding.calibrationRetry
-  : t.value.onboarding.phoneActivationRejected);
-const failureTitle = computed(() => activationOutcome.value === "active" ? t.value.onboarding.phoneActivationSyncTitle
-  : activationOutcome.value === "unconfirmed" ? t.value.onboarding.phoneActivationUnconfirmedTitle
-  : activationOutcome.value === "preflight-unconfirmed" ? t.value.onboarding.phoneActivationEligibilityUnavailableTitle
-  : iosPending.value ? t.value.onboarding.phoneCalibrationPendingIosTitle
-  : canonical.value?.calibrationStatus === "PENDING_VERIFICATION" ? t.value.onboarding.phoneCalibrationPendingTitle
-  : loginCheckNeeded.value ? t.value.onboarding.phoneBindingReadUnavailableTitle
-  : failedAction.value === "calibration" ? t.value.onboarding.calibrationFailedTitle
-  : failedAction.value === "defer" ? t.value.onboarding.activationDeferFailedTitle
-  : t.value.onboarding.activationFailedTitle);
-
-// lucide paths
-const ICON = {
-  cpu: "M12 20v2M12 2v2M17 20v2M17 2v2M2 12h2M2 17h2M2 7h2M20 12h2M20 17h2M20 7h2M7 20v2M7 2v2",
-  cpu2: "M4 4h16v16H4zM9 9h6v6H9z",
-};
-
-const whyPoints = computed(() => [
-  { icon: ICON.cpu2, color: "var(--v5-brand)", text: t.value.onboarding.calibrationWhyLine1 },
-]);
 
 // Initial onboarding reuses the estimator's canonical result. Only an explicit
 // warehouse remeasurement/resume can replace an existing calibration.
@@ -336,7 +242,6 @@ const calibrationFlow = createPhoneCalibrationFlow({ api: onboardingCalibrationA
   collect: collectCalibrationSignals, key: () => `onboarding:${requireCryptoUuid()}` });
 const nativePhoneAvailable = hasNativePhoneRuntime();
 const iosPhone = nativePhonePlatform() === "ios";
-const phoneActivationGuidance = computed(() => resolvePhoneActivationGuidance(nativePhoneAvailable, t.value.myDevices));
 let activationIntent: { target: "ACTIVE" | "DEFERRED"; revision: number; idempotencyKey: string; versions?: PhoneActivationVersions; submitted?: boolean } | null = null;
 const activationBusy = ref(false);
 let activationCompleted = false;
@@ -386,8 +291,7 @@ async function startCalibration() {
   }
 }
 
-// The real API remains authoritative; animation only counts up to its confirmed score.
-// Calibration dial geometry (design B1–B8). The 375 and 390 tiers share the 300px dial; the unit uses the body role.
+// Calibration dial geometry (boards B1–B8, V1). The 375 and 390 tiers share the 300px dial; the unit uses the body role.
 const windowWidth = uni.getSystemInfoSync().windowWidth;
 const dialGeo = windowWidth >= 375
   ? { max: 300, inner: 105.9, base: 52, unit: windowWidth >= 390 ? 15 : 14, unitLh: windowWidth >= 390 ? 22 : 21, min: 250 }
@@ -397,12 +301,12 @@ const DIAL_CLEAR = 4; // text corners stay this far inside the inner ring
 const dialSize = ref(dialGeo.min);
 const dialReady = ref(false);
 const dialUnitSize = ref(dialGeo.unit);
-// The number is sized from the final string (dot included), never the shorter count. JetBrains Mono advances 0.6em, less
-// the −0.02em tracking: a string of n characters at size f is 0.58·n·f wide. The block (number at line-height 1, gap, unit
-// line) is centred, so its far corner sits at (0.29·n·f, f/2 + (gap + unit line)/2); solving that distance for the inner
-// ring less the clearance gives the largest size that stays inside, capped at the tier's 52/48.
+const dialTagTop = ref(0);
+const finalText = computed(() => String(finalScore.value));
+// The number is sized from the final string (dot included), never the shorter count: JetBrains Mono advances 0.58em with the
+// −0.02em tracking, the block (number, gap, unit line) is centred, and its far corner stays 4px inside the inner ring (10.2).
 const dialNumberSize = computed(() => {
-  const n = Math.max(1, String(finalScore.value).length), half = (DIAL_GAP + dialGeo.unitLh) / 2, r = dialGeo.inner - DIAL_CLEAR;
+  const n = Math.max(1, finalText.value.length), half = (DIAL_GAP + dialGeo.unitLh) / 2, r = dialGeo.inner - DIAL_CLEAR;
   const a = (0.29 * n) ** 2 + 0.25;
   return Math.min(dialGeo.base, Math.floor((-half + Math.sqrt(half * half - 4 * a * (half * half - r * r))) / (2 * a)));
 });
@@ -410,62 +314,215 @@ const dialFace = computed(() => {
   const d = dialSize.value, c = d / 2, margin = dialGeo.max * 0.03, rTick = c - margin, gap = rTick - dialGeo.inner;
   const rArc = dialGeo.inner + gap * 0.57, major = Math.min(dialGeo.max * 0.034, gap * 0.3);
   const at = (deg: number, r: number) => [c + Math.sin(deg * Math.PI / 180) * r, c - Math.cos(deg * Math.PI / 180) * r].map(v => +v.toFixed(2));
+  const arc = (from: number, to: number) => { const [sx, sy] = at(from, rArc), [ex, ey] = at(to, rArc); return `M${sx} ${sy} A${rArc.toFixed(2)} ${rArc.toFixed(2)} 0 0 1 ${ex} ${ey}`; };
   const ticks = Array.from({ length: 72 }, (_, i) => {
     const isMajor = i % 6 === 0, [x1, y1] = at(i * 5, rTick), [x2, y2] = at(i * 5, rTick - (isMajor ? major : major / 2));
     return { major: isMajor, x1, y1, x2, y2 };
   });
-  const arcs = [0, 1, 2, 3].map(k => {
-    const [sx, sy] = at(k * 90 + 14, rArc), [ex, ey] = at(k * 90 + 76, rArc);
-    return `M${sx} ${sy} A${rArc.toFixed(2)} ${rArc.toFixed(2)} 0 0 1 ${ex} ${ey}`;
-  });
+  const arcs = [0, 1, 2, 3].map(k => arc(k * 90 + 14, k * 90 + 76));
   const marks = [0, 1, 2, 3].map(k => {
     const [x1, y1] = at(k * 90, rArc - gap * 0.3), [x2, y2] = at(k * 90, rArc + gap * 0.16);
     return { x1, y1, x2, y2 };
   });
-  return { ticks, arcs, marks };
+  // Scan sweep: a short comet of four arc segments, rotated as one group.
+  const sweep = [[-48, -30, 0.12], [-32, -14, 0.3], [-16, 2, 0.6], [0, 16, 1]].map(([a0, a1, o]) => ({ d: arc(a0, a1), o }));
+  return { ticks, arcs, marks, sweep };
 });
-// The phase fills the height between the title and the rules row; the dial takes it, clamped to [min, max]. The unit
-// keeps one line where the inner ring's chord at its height allows it, and steps its size down where it does not.
+
+// ── Placeholders for the logic round (report table: placeholder → meaning → board). Defaults keep today's behaviour. ──
+/** C27: entering step 3 only reads the existing result (no collection): empty dial, back works, grey 「激活手机算力」 with a
+ *  spinner. While false, the calibrating phase is the scan (C03, back locked) as today. */
+const readOnlyWait = ref(false);
+/** C32: reading the existing result failed and is retried on its own: empty dial, tray note, grey button, no retry button. */
+const resultReadRecovering = ref(false);
+/** C28: the receipt read came back empty (no record of this activation) and the phone is confirmed not ACTIVE: offer
+ *  「重新激活」 with the original command. While false, an unconfirmed activation stays the read-only wait (C11). */
+const receiptNotFound = ref(false);
+/** C19 / C30: how the last 「稍后激活」 ended: 'rejected' (toast, page keeps its state), 'unknown' (status capsule while it is read back). */
+const deferOutcome = ref<"rejected" | "unknown" | null>(null);
+/** Which action the shared activationBusy belongs to, so only that control shows the spinner (03 §3.1). Set by the
+ *  controls before they call the existing handlers. */
+const busyAction = ref<"activate" | "defer" | null>(null);
+const inFlight = computed(() => activationBusy.value ? busyAction.value ?? "activate" : null);
+function onActivate() { if (activationBusy.value) return; busyAction.value = "activate"; void activate(); }
+function onDefer() { if (activationBusy.value) return; busyAction.value = "defer"; void deferPhoneActivation(); }
+/** 「重新校准」 from a failed 「稍后激活」 (C19): the same restart retryCalibration takes for a recalibrate reason. */
+function recalibrateNow() {
+  if (activationBusy.value) return;
+  activationIntent = null;
+  calibrationFlow.reset();
+  resumeDeferred.value = true;
+  phase.value = "calibrating";
+}
+
+const standalone = computed(() => isRecal.value || isLogin.value);
+type DialMode = "idle" | "scan" | "result";
+const dialMode = computed<DialMode | null>(() => !nativePhoneAvailable ? null
+  : resultReadRecovering.value ? "idle"
+  : phase.value === "intro" ? "idle"
+  : phase.value === "calibrating" ? (readOnlyWait.value ? "idle" : "scan")
+  : phase.value === "result" ? "result" : null);
+const resultActive = computed(() => phase.value === "result" && canonical.value?.activationStatus === "ACTIVE");
+const backLocked = computed(() => activationBusy.value || (phase.value === "calibrating" && !readOnlyWait.value));
+
+type HeadIcon = "check" | "return" | "clock" | "failed" | "alert";
+type Head = { tone: "success" | "warning" | "neutral" | "danger"; icon: HeadIcon; title: string; body?: string; link?: "retry" | "support" };
+const head = computed<Head>(() => {
+  const o = t.value.onboarding;
+  if (!nativePhoneAvailable) return { tone: "neutral", icon: "alert", title: o.nonNativeTitle };
+  if (activationOutcome.value === "active") return { tone: "success", icon: "check", title: o.phoneActivationSyncTitle, body: o.phoneActivationSync };
+  if (activationOutcome.value === "unconfirmed") return receiptNotFound.value
+    ? { tone: "warning", icon: "alert", title: o.reactivateTitle, body: o.reactivateBody }
+    : { tone: "warning", icon: "clock", title: o.phoneActivationUnconfirmedTitle, body: o.phoneActivationUnconfirmed };
+  if (activationOutcome.value === "preflight-unconfirmed") return { tone: "warning", icon: "alert", title: o.phoneActivationEligibilityUnavailableTitle, body: o.phoneActivationEligibilityUnavailable };
+  const feedback = failureFeedback.value;
+  if (feedback) {
+    // Lighter, truer titles per reason group (onb3 decision 5); the reason line says what happened and what to do.
+    const body = o[feedback.detail];
+    if (feedback.detail === "phoneCalibrationPendingBody") return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingTitle, body };
+    if (feedback.action === "devices") return { tone: "danger", icon: "failed", title: o.rejectTitleBlocked, body, link: canDefer.value ? "retry" : undefined };
+    if (feedback.action === "support") return { tone: "danger", icon: "failed", title: o.rejectTitleSupport, body };
+    if (feedback.action === "terms") return { tone: "danger", icon: "failed", title: o.rejectTitleTerms, body };
+    if (feedback.action === "login") return { tone: "warning", icon: "alert", title: o.rejectTitleLogin, body, link: "support" };
+    if (feedback.action === "recalibrate") return { tone: "warning", icon: "alert", title: o.rejectTitleRecal, body };
+    const title = feedback.detail === "phoneReplacementCooldown" ? o.rejectTitleBlocked
+      : feedback.detail === "phoneActivationConfirmationRequired" ? o.rejectTitleConfirm
+      : feedback.detail === "phoneActivationServiceUnavailable" || feedback.detail === "phoneReplacementPolicyUnavailable" ? o.rejectTitleBusy
+      : o.rejectTitleChanged;
+    return { tone: "warning", icon: "alert", title, body };
+  }
+  if (iosPending.value) return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingIosTitle, body: o.phoneCalibrationPendingIosBody, link: "support" };
+  if (canonical.value?.calibrationStatus === "PENDING_VERIFICATION") return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingTitle, body: o.phoneCalibrationPendingBody };
+  if (loginCheckNeeded.value) return { tone: "warning", icon: "alert", title: o.phoneBindingReadUnavailableTitle, body: o.phoneBindingReadUnavailableBody };
+  if (failedAction.value === "calibration" || failedAction.value === "defer") return { tone: "warning", icon: "alert", title: o.calibrationFailedTitle, body: o.activationLaterBody };
+  return { tone: "danger", icon: "failed", title: o.activationFailedTitle, body: o.phoneActivationRejected };
+});
+
+type BarButton = { label: string; run: () => void; off?: boolean; busy?: boolean; arrow?: boolean; glass?: boolean };
+type Bar = { kind: "none" } | { kind: "status"; label: string } | { kind: "float"; primary: BarButton }
+  | { kind: "tray"; primary: BarButton; secondary?: BarButton; note?: string };
+// The bar follows the source state and the action in flight: only the busy control spins, the others are locked (03 §3.1).
+const bar = computed<Bar>(() => {
+  const o = t.value.onboarding, busy = activationBusy.value;
+  const later = (): BarButton | undefined => canDefer.value
+    ? { label: o.iosActivateLater, run: onDefer, off: busy, busy: inFlight.value === "defer" } : undefined;
+  const main = (label: string, run: () => void, arrow = false): BarButton => ({ label, run, arrow, off: busy, busy: inFlight.value === "activate" });
+  const pair = (primary: BarButton): Bar => { const secondary = later(); return secondary ? { kind: "tray", primary, secondary } : { kind: "float", primary }; };
+  if (!nativePhoneAvailable) return { kind: "float", primary: { label: t.value.login.back, run: leaveConnect, glass: true } };
+  if (resultReadRecovering.value) return { kind: "tray", note: o.resultReadFailed, primary: { label: o.activatePhone, run: () => {}, off: true, arrow: true } };
+  if (phase.value === "intro") return { kind: "float", primary: { label: o.calibrationStart, run: () => { phase.value = "calibrating"; } } };
+  if (phase.value === "calibrating") return readOnlyWait.value
+    ? { kind: "float", primary: { label: o.activatePhone, run: () => {}, off: true, busy: true, arrow: true } } : { kind: "none" };
+  if (phase.value === "result") {
+    if (deferOutcome.value === "unknown") return { kind: "status", label: o.activationDeferUnknown };
+    if (canonical.value?.activationStatus === "ACTIVE") return { kind: "float", primary: main(t.value.ui.notFoundCta, onActivate) };
+    if (inFlight.value === "activate") return { kind: "float", primary: { label: o.activationProcessing, run: () => {}, off: true, busy: true } };
+    const primary = main(o.activatePhone, onActivate, true);
+    const secondary = iosPhone ? later() : undefined;
+    return secondary ? { kind: "tray", primary, secondary } : { kind: "float", primary };
+  }
+  if (activationOutcome.value === "active") return { kind: "float", primary: main(o.phoneActivationSyncAction, () => { void retryCalibration(); }) };
+  if (activationOutcome.value === "unconfirmed") return receiptNotFound.value ? { kind: "float", primary: main(o.reactivateAction, onActivate) } : { kind: "none" };
+  const retry = () => { if (!activationBusy.value) { busyAction.value = "activate"; void retryCalibration(); } };
+  if (activationOutcome.value === "preflight-unconfirmed") return pair(main(o.activationRetry, retry));
+  const action = failureFeedback.value?.action;
+  if (action === "devices") return pair(main(o.phoneActivationManageDevices, retry, true));
+  if (supportRequired.value) return pair(main(o.iosContactSupport, retry, true));
+  if (action === "terms") return pair(main(o.phoneActivationTermsAction, retry, true));
+  if (action === "login") return pair(main(o.phoneActivationLoginAction, retry, true));
+  if (action === "recalibrate" || iosPending.value || (!action && (failedAction.value === "calibration" || canonical.value?.calibrationStatus === "PENDING_VERIFICATION")))
+    return pair(main(o.iosRecalibrate, retry));
+  if (failedAction.value === "defer") return { kind: "tray", secondary: { label: o.iosActivateLater, run: retry, off: busy, busy: inFlight.value === "activate" }, primary: { label: o.iosRecalibrate, run: recalibrateNow, off: busy } };
+  return pair(main(o.activationRetry, retry));
+});
+
+// Dial: measured once when it first shows (the box is the same in every dial phase); one ready starts the CSS entrance and
+// the count on Android and iOS alike.
 const pageInstance = getCurrentInstance();
-function fitDial() {
+let dialMeasured = false;
+function measureDial() {
   if (!pageInstance?.proxy) { dialReady.value = true; return; }
   const query = uni.createSelectorQuery().in(pageInstance.proxy);
-  query.select(".cn-phase--dial").boundingClientRect();
-  query.select(".cn-dial__unit").boundingClientRect();
+  query.select(".cn-dialwrap").boundingClientRect();
+  query.select(".cn-probe").boundingClientRect();
   query.exec((boxes: (UniApp.NodeInfo | null)[]) => {
-    if (phase.value !== "result") return;
-    const [box, unit] = boxes;
-    if (box?.height) dialSize.value = Math.max(dialGeo.min, Math.min(dialGeo.max, Math.floor(box.height)));
-    if (unit?.width) {
-      const r = dialGeo.inner - DIAL_CLEAR, halfBlock = (dialNumberSize.value + DIAL_GAP + dialGeo.unitLh) / 2;
-      const chord = 2 * Math.sqrt(r * r - halfBlock * halfBlock);
-      if (unit.width > chord) dialUnitSize.value = Math.floor(dialGeo.unit * chord / unit.width);
-    }
-    dialReady.value = true;
+    const [wrap, probe] = boxes;
+    if (probe?.height) dialClearance.value = Math.ceil(probe.height) + 38;
+    void nextTick(() => {
+      uni.createSelectorQuery().in(pageInstance.proxy).select(".cn-dialwrap").boundingClientRect().exec((again: (UniApp.NodeInfo | null)[]) => {
+        const box = again[0] ?? wrap;
+        if (box?.height) {
+          dialSize.value = Math.max(dialGeo.min, Math.min(dialGeo.max, Math.floor(box.height)));
+          dialTagTop.value = Math.round((box.height + dialSize.value) / 2 + 12);
+        }
+        dialMeasured = true;
+        dialReady.value = true;
+      });
+    });
   });
 }
-watch(phase, next => {
-  dialReady.value = false;
-  dialUnitSize.value = dialGeo.unit;
-  if (next === "result" && !iosPhone) void nextTick(fitDial);
+// The unit keeps one line where the inner ring's chord at its height allows it, and steps its size down where it does not.
+function fitUnit() {
+  if (!pageInstance?.proxy) return;
+  uni.createSelectorQuery().in(pageInstance.proxy).select(".cn-score__u").boundingClientRect().exec((boxes: (UniApp.NodeInfo | null)[]) => {
+    const unit = boxes[0];
+    if (!unit?.width) return;
+    const r = dialGeo.inner - DIAL_CLEAR, halfBlock = (dialNumberSize.value + DIAL_GAP + dialGeo.unitLh) / 2;
+    const chord = 2 * Math.sqrt(r * r - halfBlock * halfBlock);
+    if (unit.width > chord) dialUnitSize.value = Math.floor(dialGeo.unit * chord / unit.width);
+  });
+}
+const dialClearance = ref(102);
+const barClearance = ref(24);
+function measureBar() {
+  if (!pageInstance?.proxy) return;
+  uni.createSelectorQuery().in(pageInstance.proxy).select(".ob-bar:not(.cn-probe):not(.cn-bar-under)").boundingClientRect().exec((boxes: (UniApp.NodeInfo | null)[]) => {
+    barClearance.value = boxes[0]?.height ? Math.ceil(boxes[0].height) + 38 : 24;
+  });
+}
+watch([dialMode, () => bar.value.kind, () => t.value.onboarding.iosActivateLater], ([mode]) => {
+  void nextTick(() => {
+    if (mode && !dialMeasured) measureDial();
+    if (!mode) measureBar();
+    if (mode === "result") { dialUnitSize.value = dialGeo.unit; void nextTick(fitUnit); }
+  });
+}, { immediate: true, flush: "post" });
+
+// Entrance (board S0): from the read-wait dial or from the live scan into the result, once; transform and opacity only.
+const entering = ref(false);
+const enterFrom = ref<"read" | "scan" | null>(null);
+let enterTimer: ReturnType<typeof setTimeout> | null = null;
+const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+watch(phase, (next, previous) => {
+  if (enterTimer) clearTimeout(enterTimer);
+  enterTimer = null;
+  if (next === "result" && previous === "calibrating" && !reducedMotion()) {
+    enterFrom.value = readOnlyWait.value ? "read" : "scan";
+    entering.value = true;
+    enterTimer = setTimeout(() => { entering.value = false; enterFrom.value = null; }, 1400);
+  } else {
+    entering.value = false;
+    enterFrom.value = null;
+  }
 });
-watch([phase, finalScore], ([next, score]) => {
+// The count runs 100–1000ms with ease-out and the final value's decimals; the server value is the only figure shown at rest.
+watch([phase, finalScore, entering, dialReady], ([next, score, running, ready]) => {
   if (scoreTimer) clearInterval(scoreTimer);
   scoreTimer = null;
-  shownScore.value = 0;
-  if (next !== "result") return;
-  const target = Math.max(0, score);
-  if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-    shownScore.value = target;
-    return;
-  }
+  if (next !== "result") { shownScore.value = "0"; return; }
+  const target = Math.max(0, score), places = (String(target).split(".")[1] ?? "").length;
+  if (!running || !ready) { shownScore.value = String(target); return; }
   const start = Date.now();
+  shownScore.value = (0).toFixed(places);
   scoreTimer = setInterval(() => {
-    const progress = Math.min(1, (Date.now() - start) / 900);
-    shownScore.value = progress === 1 ? target : Math.round(progress * target);
+    const progress = Math.max(0, Math.min(1, (Date.now() - start - 100) / 900));
+    shownScore.value = progress === 1 ? String(target) : (target * (1 - (1 - progress) ** 3)).toFixed(places);
     if (progress === 1 && scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
   }, 30);
 }, { immediate: true });
+// The sweep stops where it is and the tick conversion runs clockwise from its head (tick 11 at the frozen 55°).
+const SCAN_HEAD = 11;
+function tickOrder(i: number) { return enterFrom.value === "scan" ? (i - SCAN_HEAD + 72) % 72 : i; }
 const policyLines = computed(() => [
   t.value.onboarding.policyLine1,
   t.value.onboarding.policyLine2,
@@ -601,12 +658,12 @@ function recoverActivation(): Promise<void> {
       catch (cause) {
         failureCode.value = cause instanceof Error ? cause.message : "";
         failedAction.value = "activate"; phase.value = "error";
-        toast.error(failureTitle.value, failureDetail.value);
+        toast.error(head.value.title, head.value.body);
       }
     } else if (outcome.rejection) {
       activationIntent = null; activationOutcome.value = "idle";
       failureCode.value = outcome.rejection; failedAction.value = "activate"; phase.value = "error";
-      toast.error(failureTitle.value, failureDetail.value);
+      toast.error(head.value.title, head.value.body);
     }
   }).finally(() => {
     if (activationRead === read) { activationRead = null; readingActivation.value = false; }
@@ -756,7 +813,7 @@ async function deferPhoneActivation() {
       throw new Error("PHONE_DEFER_LOCAL_COMMIT_FAILED");
     }
     if (!completeOnboardingLocally()) throw new Error("ONBOARDING_LOCAL_COMMIT_FAILED");
-    toast.info(t.value.onboarding.activationDeferredToast);
+    toast.info(t.value.onboarding.activationDeferredToast, t.value.onboarding.activationDeferredToastBody);
     navReset({ url: isRecal.value ? "/pages/me/devices" : "/pages/index/index", fail: () => {} });
   } catch (cause) {
     if (scopeIsCurrent(requestScope)) {
@@ -766,13 +823,14 @@ async function deferPhoneActivation() {
       failureCode.value = cause instanceof Error ? cause.message : "";
       failedAction.value = "defer";
       phase.value = "error";
+      toast.warn(t.value.onboarding.activationDeferRejectedTitle);
     }
   } finally {
     if (isCurrentOnboardingCalibrationScope(requestScope, currentScope())) activationBusy.value = false;
   }
 }
 function leaveConnect() {
-  if (activationBusy.value || phase.value === "calibrating") return;
+  if (backLocked.value) return;
   requestGeneration += 1;
   // #ifdef H5
   navReset({ url: "/pages/index/index", fail: () => {} });
@@ -804,135 +862,155 @@ onUnmounted(() => {
   mounted = false;
   useUI().clearConfirmsBy(confirmOwner);
   if (scoreTimer) clearInterval(scoreTimer);
+  if (enterTimer) clearTimeout(enterTimer);
   requestGeneration += 1;
 });
 </script>
 
 <style scoped>
-.cn-root {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 24px 20px;
-  background: var(--v5-bg);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.cn-bars { min-height: 44px; display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
-.cn-back { width: 44px; height: 44px; margin-left: -12px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 9999px; }
-.cn-bar { flex: 1; height: 4px; border-radius: 9999px; background: var(--v5-surface); overflow: hidden; }
-.cn-bar__fill { height: 100%; width: 0; background: var(--v5-brand); }
-.cn-bar__fill--full { width: 100%; }
-.cn-step { display: block; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
-.cn-title { display: block; font-family: var(--font-v5); margin-top: 4px; font-size: 20px; font-weight: 600; line-height: 1.25; color: var(--v5-ink); }
-.cn-sub { display: block; margin-top: 4px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
-.cn-phase { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+.cn-root { position: fixed; inset: 0; display: flex; flex-direction: column; padding-right: 16px; padding-left: 16px; background: var(--v5-bg); overflow-x: hidden; overflow-y: auto; }
 
-.cn-why { background: var(--v5-surface); border-radius: 16px; padding: 16px; }
-.cn-why__h { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
-.cn-why__list { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
-.cn-point { display: flex; align-items: flex-start; gap: 10px; }
-.cn-point__ic { width: 24px; height: 24px; border-radius: 6px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
-.cn-point__t { flex: 1; font-size: var(--ui-type-list-subtitle); line-height: 1.375; color: var(--v5-ink); }
+/* Shared onboarding chrome (boards-onboarding; 03 §3.1, 04 §4.0, 10 §10.1). */
+.ob-hd { display: flex; align-items: center; gap: 10px; height: 44px; flex: none; }
+.ob-back { position: relative; width: 44px; height: 44px; margin-left: -2px; display: grid; place-items: center; flex: none; color: var(--v5-ink); }
+.ob-back__face { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; }
+.ob-back--off { opacity: .5; }
+.ob-track { flex: 1; display: flex; gap: 6px; padding-right: 4px; }
+/* Step track: done = brand, current = brand 40%, upcoming = ink 8%; one shape, three tones. */
+.ob-track__seg { flex: 1; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.ob-track__seg--done { background: var(--v5-brand); }
+.ob-track__seg--cur { background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
+.ob-eyebrow { display: block; margin-top: 16px; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-brand); white-space: nowrap; }
+.ob-title { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: var(--ui-type-page-title-weight) var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-v5); letter-spacing: -.02em; color: var(--v5-ink); }
+:lang(zh) .ob-title { letter-spacing: 0; }
+.ob-sub { display: block; margin-top: 4px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.ob-content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 20px; }
+.ob-rh { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 12px 24px; }
+.ob-skel { display: inline-block; vertical-align: middle; border-radius: 8px; background: color-mix(in srgb, var(--v5-ink) 9%, transparent); }
+.ob-spin { flex: none; width: 18px; height: 18px; box-sizing: border-box; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: ob-spin .8s linear infinite; }
+.ob-spin--s { width: 14px; height: 14px; border-width: 1.8px; }
+@keyframes ob-spin { to { transform: rotate(360deg); } }
+/* Bottom bar: position here; material, disabled grey glass and tray text come from the shared .nx-glass-bar layer. */
+.ob-bar { position: fixed; z-index: 30; display: flex; flex-direction: column; }
+.ob-tray-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 8px; }
+.nx-tray-note + .ob-tray-row { margin-top: 8px; }
+.ob-tray-row .ob-btn { flex: 1 0 auto; }
+.ob-btn { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 999px; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; color: var(--ui-tray-disabled-ink); }
+.ob-btn :deep(svg), .ob-tray-text :deep(svg) { flex: none; }
+.ob-btn--primary { background: var(--v5-brand); color: var(--v5-on-brand); }
+.ob-btn--primary:active { transform: scale(.98); }
+.ob-btn--glass { color: var(--v5-ink); }
+.ob-tray-text { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; flex: none; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); white-space: nowrap; }
+/* The busy secondary keeps full ink (03 §3.1 tray busy); the shared layer greys the disabled view itself, so set it on the children. */
+.ob-tray-text[aria-busy="true"] > * { color: var(--v5-ink); }
+.ob-btn :deep(text), .ob-tray-text :deep(text), .ob-btn :deep(uni-text), .ob-tray-text :deep(uni-text) { white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } .ob-btn--primary:active { transform: none; } }
 
-.cn-prog-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-.cn-prog-row__t { font-size: 12px; color: var(--v5-ink-3); }
-.cn-spin { animation: cn-spin 0.9s linear infinite; }
-@keyframes cn-spin { to { transform: rotate(360deg); } }
-.cn-test { border-radius: 12px; padding: 12px; background: var(--v5-surface); border: 1px solid var(--v5-border); }
-.cn-test__top { display: flex; align-items: center; gap: 10px; }
-.cn-test__ic { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.cn-test__body { flex: 1; min-width: 0; }
-.cn-test__title { display: block; font-size: 13px; font-weight: 600; color: var(--v5-ink); line-height: 1.25; }
-.cn-test__metric { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--v5-ink-3); margin-top: 2px; }
-.cn-test__track { margin-top: 10px; height: 4px; border-radius: 9999px; background: var(--v5-surface-2); overflow: hidden; }
-.cn-test__fill { height: 100%; border-radius: 9999px; transition: width 0.15s linear; }
-
-.cn-score__cap { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
-.cn-score__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.18em; color: var(--v5-brand); }
-.cn-score__tier { display: block; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--v5-ink); }
-.cn-score__yield { margin: 12px auto 0; display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); }
-.cn-score__yield-cap { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
-.cn-score__yield-v { font-family: var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-brand); font-size: 15px; font-weight: 600; }
-
-.cn-summary { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--v5-surface); }
-.cn-row { display: flex; align-items: center; gap: 10px; font-size: var(--ui-type-list-subtitle); }
-.cn-row__check { width: 24px; height: 24px; border-radius: 6px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.cn-row__label { color: var(--v5-ink-3); }
-.cn-row__val { margin-left: auto; font-family: var(--font-jet-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--v5-ink); font-weight: 600; }
-
-.cn-policy { border-radius: 16px; padding: 14px; background: color-mix(in oklab, var(--v5-warning) 8%, transparent); border: 1px solid color-mix(in oklab, var(--v5-warning) 22%, transparent); }
-.cn-policy__cap { display: flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-warning); }
-.cn-policy__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.16em; color: var(--v5-warning); }
-.cn-policy__list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-.cn-policy__line { display: flex; align-items: flex-start; gap: 6px; }
-.cn-policy__dot { flex-shrink: 0; margin-top: 6px; width: 4px; height: 4px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-warning) 55%, transparent); }
-.cn-policy__t { flex: 1; font-size: 12px; line-height: 1.375; color: var(--v5-ink-2); }
-.cn-policy__t--spaced { display: block; margin-top: 8px; }
-/* iPhone calibration: flat content card for steps, glass hero only for the key result. */
-.cn-steps { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
-.cn-steps__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.cn-steps__label { font-size: 14px; color: var(--v5-ink); }
-.cn-steps__label--idle, .cn-steps__state { color: var(--v5-ink-3); }
-.cn-steps__state { flex: none; font-size: 13px; }
-.cn-steps__state--running { color: var(--v5-brand); font-weight: 600; }
-.cn-ios-body { display: block; margin-bottom: 16px; font-size: var(--ui-type-list-subtitle); line-height: 1.5; color: var(--v5-ink-2); }
-.cn-ios-card { display: flex; flex-direction: column; gap: 6px; padding: 18px; }
-.cn-ios-card__k { display: block; font-size: 12px; color: var(--v5-ink-3); }
-.cn-ios-card__value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
-.cn-ios-card__v { font-family: var(--font-metric); font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 700; color: var(--v5-ink); }
-.cn-ios-card__u { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); }
-.cn-link { min-height: 44px; display: flex; align-items: center; justify-content: center; }
-.cn-link__t { font-size: 13px; color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 3px; }
-
-.cn-main { flex: 1 0 auto; display: flex; flex-direction: column; }
-.cn-cta { margin-top: auto; padding-top: 24px; }
-.cn-rules { display: flex; justify-content: center; margin-bottom: 4px; }
-.cn-go { width: 100%; height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--v5-brand); transition: transform 0.15s ease; }
-.cn-go--glow { box-shadow: 0 0 24px color-mix(in oklab, var(--v5-brand) 35%, transparent); }
-.cn-go__t { font-size: var(--ui-type-button); font-weight: var(--ui-type-button-weight); color: var(--v5-on-brand); }
-.cn-go__t--on { font-size: var(--ui-type-body); }
-.cn-error-actions { display: flex; flex-direction: column; gap: 10px; }
-.cn-go--secondary { background: var(--v5-surface); }
-.cn-go__t--secondary { color: var(--v5-ink); }
-
-.anim-up { animation: cn-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
-@keyframes cn-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Calibration dial (design B1–B8): brand colour only. The phase takes the free height (min = the smallest dial); the dial
-   sits in its middle at the size fitDial measured. Dark: a soft brand glow and a lens in the inner ring; light: the lens only. */
-.cn-phase--dial { flex: 1 0 0; position: relative; }
-.cn-dial { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); visibility: hidden; }
-.cn-dial--ready { visibility: visible; }
-.cn-dial__glow, .cn-dial__lens, .cn-dial__ticks, .cn-dial__ring, .cn-dial__num { position: absolute; }
-.cn-dial__glow { inset: -14%; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 24%, transparent), color-mix(in srgb, var(--v5-brand) 9%, transparent) 48%, transparent 100%); }
-[data-theme="light"] .cn-dial__glow { display: none; }
-.cn-dial__lens { left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent); }
-[data-theme="light"] .cn-dial__lens { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 6%, transparent), transparent); }
-.cn-dial__ticks, .cn-dial__ring { inset: 0; }
-.cn-dial__ticks :deep(svg), .cn-dial__ring :deep(svg) { display: block; overflow: visible; }
-.cn-dial__ticks :deep(.cn-dial__major) { stroke: var(--v5-brand); stroke-opacity: .6; stroke-width: 1.6; stroke-linecap: round; }
-.cn-dial__ticks :deep(.cn-dial__minor) { stroke: var(--v5-ink); stroke-opacity: .18; stroke-width: 1; stroke-linecap: round; }
-.cn-dial__ring :deep(.cn-dial__arc) { fill: none; stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
-.cn-dial__ring :deep(.cn-dial__inner) { fill: none; stroke: var(--v5-brand); stroke-opacity: .22; stroke-width: 1; }
-.cn-dial__num { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; }
-.cn-dial__value { display: grid; justify-items: center; }
-.cn-dial__v { grid-area: 1 / 1; font-family: var(--font-metric); font-variant-numeric: tabular-nums; font-size: inherit; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: var(--v5-brand); white-space: nowrap; }
-.cn-dial__v--final { visibility: hidden; }
-.cn-dial__unit { display: block; max-width: 100%; margin-top: 6px; font-family: var(--font-v5); font-weight: 400; color: var(--v5-ink-3); text-align: center; white-space: nowrap; }
-/* Entrance once (07 §7.1.1): ticks turn in, arcs lock, the glow fades in; transform and opacity only, no loop. */
-@media (prefers-reduced-motion: no-preference) {
-  .cn-dial--ready .cn-dial__glow { animation: cn-fade .6s ease-out both; }
-  .cn-dial--ready .cn-dial__ring { animation: cn-lock .9s cubic-bezier(.16, 1, .3, 1) both; }
-  .cn-dial--ready .cn-dial__ticks { animation: cn-dial-in 1.1s cubic-bezier(.16, 1, .3, 1) both; }
-}
-/* Reduced motion: no entrance, and the final value instead of the count. */
-@media (prefers-reduced-motion: reduce) {
-  .cn-dial__v--count { visibility: hidden; }
-  .cn-dial__v--final { visibility: visible; }
-}
+/* Standalone sub-page nav: back, centred nav title (10.1 子页导航标题, one line in nine languages at 360). */
+.ob-nav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 44px; flex: none; }
+.ob-nav__t { text-align: center; font: var(--ui-type-nav-title-weight) var(--ui-type-nav-title)/var(--ui-type-nav-title-lh) var(--font-v5); color: var(--v5-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cn-content--nav { margin-top: 8px; }
+.ob-back--enable { animation: cn-unoff 160ms ease-out both; }
+/* Title cell: both titles laid out in one grid cell, only one shown, so the row keeps the taller height in every phase. */
+.cn-swap { display: grid; }
+.cn-swap__t { grid-area: 1 / 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cn-swap__t--hide { visibility: hidden; }
+.cn-swap__t--out { animation: cn-out 150ms ease-out 800ms both; }
+.cn-swap__t--in { animation: cn-rise4 250ms cubic-bezier(.16, 1, .3, 1) 900ms both; }
+/* Dial box: fills the height between the title and the 52px slot; the same box in every dial phase. */
+.cn-dialwrap { position: relative; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; }
+.cn-slot { flex: none; height: 52px; display: flex; justify-content: center; align-items: flex-start; }
+.cn-slot--enter > * { animation: cn-rise4 300ms cubic-bezier(.16, 1, .3, 1) 950ms both; }
+.cn-rules { display: flex; justify-content: center; margin-top: 4px; }
+.cn-dial-tag { position: absolute; left: 50%; transform: translateX(-50%); }
+.cn-dial-tag__icon { flex: none; margin-right: 4px; }
+.cn-dial-tag--anim { animation: cn-fade 300ms ease-out 900ms both; }
+.cn-score { position: relative; flex: none; visibility: hidden; }
+.cn-score--ready { visibility: visible; }
+.cn-score__glow, .cn-score__lens, .cn-score__svg, .cn-score__ctr, .cn-score__num { position: absolute; }
+.cn-score__glow { inset: -14%; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 24%, transparent), color-mix(in srgb, var(--v5-brand) 9%, transparent) 48%, transparent 100%); }
+[data-theme="light"] .cn-score__glow { display: none; }
+.cn-score--idle .cn-score__glow, .cn-score--scan .cn-score__glow { display: none; }
+.cn-score__lens { left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 9%, transparent), transparent); }
+[data-theme="light"] .cn-score__lens { background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-brand) 6%, transparent), transparent); }
+.cn-score__svg { inset: 0; }
+.cn-score__svg :deep(svg) { display: block; overflow: visible; }
+/* Empty dial (start, read-wait, scan): ink ticks and arcs. Result: brand ticks, arcs and inner ring (B1–B8). */
+.cn-score__svg :deep(.cn-ticks-base .cn-tick-major) { stroke: var(--v5-ink); stroke-opacity: .3; stroke-width: 1.6; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ticks-base .cn-tick-minor) { stroke: var(--v5-ink); stroke-opacity: .14; stroke-width: 1; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ring-base .cn-arc) { fill: none; stroke: var(--v5-ink); stroke-opacity: .14; stroke-width: 2.4; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ring-base .cn-mark) { stroke: var(--v5-ink); stroke-opacity: .2; stroke-width: 2.4; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ring-base .cn-inner) { fill: none; stroke: var(--v5-ink); stroke-opacity: .12; stroke-width: 1; }
+.cn-score__svg :deep(.cn-ticks .cn-tick-major) { stroke: var(--v5-brand); stroke-opacity: .6; stroke-width: 1.6; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ticks .cn-tick-minor) { stroke: var(--v5-ink); stroke-opacity: .18; stroke-width: 1; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ring .cn-arc) { fill: none; stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ring .cn-mark) { stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-ring .cn-inner) { fill: none; stroke: var(--v5-brand); stroke-opacity: .22; stroke-width: 1; }
+.cn-score__svg :deep(.cn-sweep__seg) { fill: none; stroke: var(--v5-brand); stroke-width: 2.4; stroke-linecap: round; }
+.cn-score__svg :deep(.cn-burst circle) { fill: none; stroke: var(--v5-brand); stroke-width: 2; }
+.cn-score__svg :deep(.cn-ring), .cn-score__svg :deep(.cn-sweep), .cn-score__svg :deep(.cn-burst) { transform-origin: 50% 50%; transform-box: view-box; }
+.cn-score__svg :deep(.cn-burst) { opacity: 0; }
+.cn-score--result .cn-score__svg :deep(.cn-ticks-base), .cn-score--result .cn-score__svg :deep(.cn-ring-base), .cn-score--result .cn-score__ctr { opacity: 0; }
+.cn-score--result .cn-score__svg :deep(.cn-sweep) { opacity: 0; }
+.cn-score__ctr { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; color: var(--v5-ink-3); }
+.cn-score__scan-t { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+.cn-score__num { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; }
+.cn-score__value { display: grid; justify-items: center; }
+/* 10.2 校准结果主数字: JetBrains Mono 500, brand, line-height 1; size from the final string. */
+.cn-score__v { grid-area: 1 / 1; font-family: var(--font-metric); font-variant-numeric: tabular-nums; font-size: inherit; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: var(--v5-brand); white-space: nowrap; }
+.cn-score__v--final { visibility: hidden; }
+.cn-score__u { display: block; max-width: 100%; margin-top: 6px; font-family: var(--font-v5); font-weight: 400; color: var(--v5-ink-3); text-align: center; white-space: nowrap; }
+.cn-link { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 44px; margin-top: 8px; padding: 0 8px; font: var(--ui-type-text-link-weight) var(--ui-type-text-link)/var(--ui-type-text-link-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+.cn-link--brand { color: var(--v5-brand); }
+/* iOS scan: three-node track, only the current node is labelled (04 §4.0). */
+.cn-iostrack { display: flex; justify-content: center; margin-top: 8px; }
+.cn-iostrack__nd { position: relative; width: 96px; display: flex; flex-direction: column; align-items: center; }
+.cn-iostrack__nd::before { content: ""; position: absolute; top: 7px; left: 50%; width: 96px; height: 2px; background: color-mix(in srgb, var(--v5-ink) 10%, transparent); }
+.cn-iostrack__nd:last-child::before { display: none; }
+.cn-iostrack__dot { position: relative; width: 6px; height: 6px; margin: 5px 0; border-radius: 50%; background: var(--v5-ink-4); }
+.cn-iostrack__dot--cur { width: 16px; height: 16px; margin: 0; background: transparent; box-shadow: inset 0 0 0 2px var(--v5-brand); }
+.cn-iostrack__dot--cur::after { content: ""; position: absolute; left: 4px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand); }
+.cn-iostrack__lb { margin-top: 6px; font: var(--ui-type-chip-weight) var(--ui-type-chip)/var(--ui-type-chip-lh) var(--font-v5); color: var(--v5-brand); white-space: nowrap; }
+.cn-probe { visibility: hidden; pointer-events: none; }
+/* Scan: the sweep turns until the result returns (the only loop on this page). */
+.cn-score--scan .cn-score__svg :deep(.cn-sweep) { animation: cn-spin 1.6s linear infinite; }
+/* Result entrance (board S0, once): ink ticks cross-fade into result ticks one by one, the ink ring fades while the brand
+   ring turns in and locks, the centre icon fades, the number fades in and counts, the glow fades in, one lock pulse. */
+.cn-score--anim.cn-score--result .cn-score__svg :deep(.cn-ticks-base), .cn-score--anim.cn-score--result .cn-score__svg :deep(.cn-ring-base), .cn-score--anim.cn-score--result .cn-score__ctr { opacity: 1; }
+.cn-score--anim .cn-score__glow { animation: cn-fade 600ms ease-out both; }
+.cn-score--anim .cn-score__svg :deep(.cn-ticks line) { animation: cn-fade 160ms linear both; animation-delay: calc(var(--i) * 8ms); }
+.cn-score--anim .cn-score__svg :deep(.cn-ticks-base line) { animation: cn-out 160ms linear both; animation-delay: calc(var(--i) * 8ms); }
+.cn-score--anim .cn-score__svg :deep(.cn-ring) { animation: cn-lock 550ms cubic-bezier(.16, 1, .3, 1) 250ms both; }
+.cn-score--anim .cn-score__svg :deep(.cn-ring-base) { animation: cn-out 550ms ease-out 250ms both; }
+.cn-score--anim .cn-score__ctr { animation: cn-out 120ms ease-out both; }
+.cn-score--anim .cn-score__svg :deep(.cn-burst) { animation: cn-burst 450ms ease-out 900ms forwards; }
+.cn-score--anim .cn-score__num { animation: cn-fade 250ms ease-out 80ms both; }
+.cn-score--anim.cn-score--from-scan .cn-score__svg :deep(.cn-sweep) { opacity: 1; transform: rotate(38deg); animation: cn-out 160ms ease-out both; }
+/* Bars during the entrance: from the read-wait, the grey button stays under the final bar (spinner out 0–200ms, label
+   recentred by (18 spinner + 8 gap) / 2), then the two cross-fade 1000–1300ms; a tray fades in after the grey button has
+   gone (different shapes). From the scan there is no bar yet, so the final bar rises in. */
+.cn-bar-under { animation: cn-out 300ms ease-out 1000ms both; }
+.cn-bar-under--seq { animation: cn-out 150ms ease-out 1000ms both; }
+.cn-bar-under .ob-spin { animation: cn-out 200ms ease-out both; }
+.cn-bar-under__lbl { display: flex; align-items: center; gap: 8px; animation: cn-shift 250ms cubic-bezier(.16, 1, .3, 1) both; }
+.cn-bar--enter { animation: cn-fade 300ms ease-out 1000ms both; }
+.cn-bar--seq { animation: cn-fade 200ms ease-out 1100ms both; }
+.cn-bar--rise { animation: cn-rise8 300ms cubic-bezier(.16, 1, .3, 1) 1000ms both; }
 @keyframes cn-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes cn-lock { from { opacity: 0; transform: scale(1.14); } to { opacity: 1; transform: none; } }
-@keyframes cn-dial-in { from { opacity: 0; transform: rotate(-36deg); } to { opacity: 1; transform: none; } }
+@keyframes cn-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes cn-lock { 0% { opacity: 0; transform: rotate(-20deg) scale(1.06); } 100% { opacity: 1; transform: none; } }
+@keyframes cn-burst { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.16); } }
+@keyframes cn-spin { to { transform: rotate(360deg); } }
+@keyframes cn-rise4 { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes cn-rise8 { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes cn-unoff { from { opacity: .5; } to { opacity: 1; } }
+@keyframes cn-shift { from { transform: none; } to { transform: translateX(-13px); } }
+/* Reduced motion: no entrance, no sweep; the final value at once. */
+@media (prefers-reduced-motion: reduce) {
+  .cn-score__v--count { visibility: hidden; }
+  .cn-score__v--final { visibility: visible; }
+  .cn-score--scan .cn-score__svg :deep(.cn-sweep) { animation: none; }
+  .cn-swap__t--out, .cn-bar-under { display: none; }
+  .cn-swap__t--in, .cn-slot--enter > *, .cn-bar--enter, .cn-bar--seq, .cn-bar--rise, .ob-back--enable, .cn-dial-tag--anim { animation: none; }
+}
 </style>
