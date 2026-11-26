@@ -7,7 +7,7 @@ import { canControlDevice } from "@/lib/device-control-platform";
 import { useApp } from "@/store/app";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { PRODUCTS } from "@/mock/products";
-import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { computeTradeInCredit, getTradeinSourcePrice, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -157,16 +157,16 @@ export function useTradeinStrip(enabled: () => boolean = () => true) {
       };
     }
     if (!DEFAULT_TRADEIN_CONFIG.enabled) return {};
-    const paid = d.paidPriceUsdt ?? 0;
-    if (paid <= 0 || d.kind === "cloud-share") return {};
+    const sourcePrice = getTradeinSourcePrice(d);
+    if (sourcePrice <= 0) return {};
     const targets = PRODUCTS.filter(
       (p) =>
-        p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+        p.productType === "DEVICE" && (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > sourcePrice) &&
         isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
     );
     if (targets.length === 0) return {};
     const credit = computeTradeInCredit(
-      paid,
+      sourcePrice,
       Math.max(0, d.cumulativeEarningsUsdt ?? 0),
       Math.min(...targets.map((p) => p.price)),
     );

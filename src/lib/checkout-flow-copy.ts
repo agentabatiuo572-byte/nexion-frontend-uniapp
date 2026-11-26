@@ -1,6 +1,9 @@
 import { uiLocale, type LocaleCode, type UiLocale } from '@/i18n';
 
 const zh = {
+  rejectTradeinPriceChanged: "请重新核对置换价格。本次未扣款，请重新选择置换目标。",
+  rejectTradeinPriceChangedTitle: "请重新核对置换价格",
+  rejectTradeinPriceChangedBody: "本次未扣款，请重新选择置换目标。",
   paymentMethod: '选择支付方式', paymentTotal: '支付总额', wallet: '钱包', walletBalance: 'USDT 余额',
   selected: '已选择', paymentHint: '下一步验证支付密码。',
   confirmPayment: '确认支付', paying: '正在处理…', balanceUnavailable: '暂时无法读取余额，请重试。',
@@ -34,6 +37,9 @@ const zh = {
 };
 type CheckoutFlowCopy = typeof zh;
 const en: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Check your trade-in price again. You were not charged. Choose your trade-in target again.",
+  rejectTradeinPriceChangedTitle: "Check your trade-in price again",
+  rejectTradeinPriceChangedBody: "You were not charged. Choose your trade-in target again.",
   paymentMethod: 'Payment method', paymentTotal: 'Payment total', wallet: 'Wallet', walletBalance: 'USDT balance',
   selected: 'Selected', paymentHint: 'Next, verify your payment PIN.',
   confirmPayment: 'Confirm payment', paying: 'Processing…', balanceUnavailable: 'Your balance could not be loaded. Please try again.',
@@ -66,6 +72,9 @@ const en: CheckoutFlowCopy = {
   otherOrderTitle: 'Showing another order in progress', otherOrderBody: 'Your original order can\'t be paid until this one is completed or closed.', viewOriginalOrder: 'View original order',
 };
 const vi: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Kiểm tra lại giá đổi thiết bị. Bạn chưa bị trừ tiền. Hãy chọn lại thiết bị muốn đổi sang.",
+  rejectTradeinPriceChangedTitle: "Kiểm tra lại giá đổi thiết bị",
+  rejectTradeinPriceChangedBody: "Bạn chưa bị trừ tiền. Hãy chọn lại thiết bị muốn đổi sang.",
   paymentMethod: 'Phương thức thanh toán', paymentTotal: 'Tổng tiền thanh toán', wallet: 'Ví', walletBalance: 'Số dư USDT',
   selected: 'Đã chọn', paymentHint: 'Tiếp theo, xác minh mã PIN thanh toán.',
   confirmPayment: 'Xác nhận thanh toán', paying: 'Đang xử lý…', balanceUnavailable: 'Chưa thể tải số dư. Vui lòng thử lại.',
@@ -98,6 +107,9 @@ const vi: CheckoutFlowCopy = {
   otherOrderTitle: 'Đang hiển thị một đơn khác đang xử lý', otherOrderBody: 'Chưa thể thanh toán đơn ban đầu cho đến khi đơn này hoàn tất hoặc kết thúc.', viewOriginalOrder: 'Xem đơn ban đầu',
 };
 const id: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Periksa ulang harga tukar tambah. Dana tidak dipotong. Pilih kembali perangkat tujuan tukar tambah.",
+  rejectTradeinPriceChangedTitle: "Periksa ulang harga tukar tambah",
+  rejectTradeinPriceChangedBody: "Dana tidak dipotong. Pilih kembali perangkat tujuan tukar tambah.",
   paymentMethod: 'Metode pembayaran', paymentTotal: 'Total pembayaran', wallet: 'Dompet', walletBalance: 'Saldo USDT',
   selected: 'Dipilih', paymentHint: 'Berikutnya, verifikasi PIN pembayaran Anda.',
   confirmPayment: 'Konfirmasi pembayaran', paying: 'Memproses…', balanceUnavailable: 'Saldo Anda gagal dimuat. Coba lagi.',
@@ -130,6 +142,9 @@ const id: CheckoutFlowCopy = {
   otherOrderTitle: 'Menampilkan pesanan lain yang sedang diproses', otherOrderBody: 'Pesanan awal belum bisa dibayar sampai pesanan ini selesai atau ditutup.', viewOriginalOrder: 'Lihat pesanan awal',
 };
 const ms: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Semak semula harga tukar beli. Tiada caj dikenakan. Pilih semula peranti yang ingin dibeli.",
+  rejectTradeinPriceChangedTitle: "Semak semula harga tukar beli",
+  rejectTradeinPriceChangedBody: "Tiada caj dikenakan. Pilih semula peranti yang ingin dibeli.",
   paymentMethod: 'Kaedah pembayaran', paymentTotal: 'Jumlah bayaran', wallet: 'Dompet', walletBalance: 'Baki USDT',
   selected: 'Dipilih', paymentHint: 'Seterusnya, sahkan PIN pembayaran anda.',
   confirmPayment: 'Sahkan bayaran', paying: 'Memproses…', balanceUnavailable: 'Baki anda gagal dimuatkan. Sila cuba lagi.',
@@ -162,6 +177,9 @@ const ms: CheckoutFlowCopy = {
   otherOrderTitle: 'Memaparkan pesanan lain yang sedang diproses', otherOrderBody: 'Pesanan asal belum boleh dibayar sehingga pesanan ini selesai atau ditutup.', viewOriginalOrder: 'Lihat pesanan asal',
 };
 const fil: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Suriin muli ang presyo ng trade-in. Walang kinaltas sa iyo. Piliin muli ang device na gusto mong ipalit.",
+  rejectTradeinPriceChangedTitle: "Suriin muli ang presyo ng trade-in",
+  rejectTradeinPriceChangedBody: "Walang kinaltas sa iyo. Piliin muli ang device na gusto mong ipalit.",
   paymentMethod: 'Paraan ng pagbabayad', paymentTotal: 'Kabuuang bayad', wallet: 'Wallet', walletBalance: 'Balanseng USDT',
   selected: 'Napili', paymentHint: 'Susunod, i-verify ang PIN mo sa pagbabayad.',
   confirmPayment: 'Kumpirmahin ang bayad', paying: 'Pinoproseso…', balanceUnavailable: 'Hindi ma-load ang balanse mo. Subukan ulit.',
@@ -194,6 +212,9 @@ const fil: CheckoutFlowCopy = {
   otherOrderTitle: 'Ipinapakita ang ibang order na pinoproseso', otherOrderBody: 'Hindi pa mababayaran ang orihinal na order hangga’t hindi natatapos o nagsasara ang order na ito.', viewOriginalOrder: 'Tingnan ang orihinal na order',
 };
 const ru: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Проверьте цену трейд-ина ещё раз. Деньги не списаны. Выберите новое устройство заново.",
+  rejectTradeinPriceChangedTitle: "Проверьте цену трейд-ина ещё раз",
+  rejectTradeinPriceChangedBody: "Деньги не списаны. Выберите новое устройство заново.",
   paymentMethod: 'Способ оплаты', paymentTotal: 'Итого к оплате', wallet: 'Кошелёк', walletBalance: 'Баланс USDT',
   selected: 'Выбрано', paymentHint: 'Далее введите платёжный PIN-код.',
   confirmPayment: 'Подтвердить оплату', paying: 'Обработка…', balanceUnavailable: 'Не удалось загрузить баланс. Повторите попытку.',
@@ -226,6 +247,9 @@ const ru: CheckoutFlowCopy = {
   otherOrderTitle: 'Показан другой заказ в обработке', otherOrderBody: 'Исходный заказ можно оплатить, когда этот завершится или закроется.', viewOriginalOrder: 'Открыть исходный заказ',
 };
 const kk: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Айырбастау бағасын қайта тексеріңіз. Ақша алынған жоқ. Жаңа құрылғыны қайта таңдаңыз.",
+  rejectTradeinPriceChangedTitle: "Айырбастау бағасын қайта тексеріңіз",
+  rejectTradeinPriceChangedBody: "Ақша алынған жоқ. Жаңа құрылғыны қайта таңдаңыз.",
   paymentMethod: 'Төлем әдісі', paymentTotal: 'Жалпы төлем', wallet: 'Әмиян', walletBalance: 'USDT балансы',
   selected: 'Таңдалды', paymentHint: 'Келесі қадамда төлем PIN-кодын растайсыз.',
   confirmPayment: 'Төлемді растау', paying: 'Өңделуде…', balanceUnavailable: 'Балансыңыз жүктелмеді. Қайталап көріңіз.',
@@ -258,6 +282,9 @@ const kk: CheckoutFlowCopy = {
   otherOrderTitle: 'Басқа тапсырыс өңделуде', otherOrderBody: 'Бұл тапсырыс аяқталғанша немесе жабылғанша бастапқы тапсырысты төлеу мүмкін емес.', viewOriginalOrder: 'Бастапқы тапсырысты ашу',
 };
 const uz: CheckoutFlowCopy = {
+  rejectTradeinPriceChanged: "Almashtirish narxini qayta tekshiring. Mablagʻ yechilmadi. Yangi qurilmani qayta tanlang.",
+  rejectTradeinPriceChangedTitle: "Almashtirish narxini qayta tekshiring",
+  rejectTradeinPriceChangedBody: "Mablagʻ yechilmadi. Yangi qurilmani qayta tanlang.",
   paymentMethod: 'Toʻlov usuli', paymentTotal: 'Toʻlov summasi', wallet: 'Hamyon', walletBalance: 'USDT balansi',
   selected: 'Tanlangan', paymentHint: 'Keyin toʻlov PIN-kodini tasdiqlaysiz.',
   confirmPayment: 'Toʻlovni tasdiqlash', paying: 'Bajarilmoqda…', balanceUnavailable: 'Balansingizni yuklab boʻlmadi. Qayta urinib koʻring.',

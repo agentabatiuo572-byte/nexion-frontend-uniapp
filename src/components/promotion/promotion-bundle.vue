@@ -95,10 +95,13 @@ import { isProductAvailable, productHasStock, productOutOfStock } from '@/store/
 import { isBundleHardwareAvailable } from '@/store/bundle-catalog-guard';
 import { usePromotionContext } from '@/composables/use-promotion-context';
 import { readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
+import { PROMOTION_CHECKOUT_TABLE,selectPromotionCheckoutRecord,type PromotionCheckoutRecord } from '@/lib/promotion-checkout-session';
+import { useUI } from '@/store/ui';
 import { productTaskLevelsText } from '@/lib/product-copy';
 import { checkoutQuoteBlockCopy,localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
+import { confirmInventoryPlacement,type InventoryPlacement } from '@/lib/inventory-placement-confirm';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
 
 import PromotionTerms from './promotion-terms.vue';
@@ -211,14 +214,28 @@ const quotedTiers = computed(() => {
 const termsMissing = computed(() => quote.value?.expectedRewards.some(({ disclosure }) =>
   !disclosure || [disclosure.title, disclosure.terms, disclosure.refundTerms, disclosure.benefitDescription]
     .some(text => !text?.zh?.trim() || !text.en?.trim() || !text.vi?.trim())) ?? false);
-const inventoryNote = computed(() => {
+// count is the quote's inventory estimate (the server adds buyer gift devices); purchased says whether bought devices are
+// among them, which is when checkout is confirmed first (a gift alone keeps only the note).
+const inventoryPlacement = computed((): (InventoryPlacement & { purchased: boolean }) | null => {
   const current = quote.value;
-  if (!current) return '';
+  if (!current) return null;
   const slots = current.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
   const count = current.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, current.quantity - slots));
-  if (count === 0) return '';
-  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
-    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count });
+  return count === 0 ? null : { count, full: slots === 0, purchased: slots === null || current.quantity > slots };
+});
+const inventoryDialogOwner=`promotion-bundle-inventory:${Date.now()}:${Math.random()}`;
+// An unpaid original for this selection reopens in checkout, which asks nothing new (same record the checkout selects).
+function resumesOriginalCheckout(){
+  try{
+    const {record}=selectPromotionCheckoutRecord(readAccountRow<Record<string,PromotionCheckoutRecord>>(PROMOTION_CHECKOUT_TABLE,app.accountKey,true)??{},{activityId:scopeId.value??'',items:selection.value});
+    return !!record?.pending||record?.order?.paymentStatus==='PENDING';
+  }catch{return false;}
+}
+const inventoryNote = computed(() => {
+  const placement = inventoryPlacement.value;
+  if (!placement) return '';
+  return placement.full ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: placement.count });
 });
 // The dashed 「添加」 tile scrolls to 「继续添加」 and moves focus there (same in-page jump as the rule guides' directory).
 function jumpToSuggestions(){
@@ -330,14 +347,17 @@ const footerNote = computed(() => {
   return signedIn.value && !quote.value ? t.value.promotion.loading : '';
 });
 // The page renders these states and actions in its existing tray.
+// An unpaid original for this selection stays reachable here even when the activity or quote no longer allows a new purchase.
+const originalRead=ref(0);
+const originalCheckout=computed(()=>{void originalRead.value;return signedIn.value&&selection.value.length>0&&resumesOriginalCheckout();});
 const footer=computed(()=>singleActivityProduct.value||(scopeId.value&&!activity.value)?null:{
-  note:footerNote.value,
-  signedIn:signedIn.value,canContinue:canOpenDevices.value||canContinue.value,
-  continueLabel:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
-  showTotal:selection.value.length>=2,
-  total:quote.value&&quoteStatus.value==='ready'?quote.value.amountUsdt:null,
-  saved:quote.value&&quoteStatus.value==='ready'&&Number(quote.value.discountUsdt)>0?quote.value.discountUsdt:null,
-  devices:canOpenDevices.value,
+  note:originalCheckout.value?'':footerNote.value,
+  signedIn:signedIn.value,canContinue:originalCheckout.value||canOpenDevices.value||canContinue.value,
+  continueLabel:originalCheckout.value?t.value.promotion.resume:canOpenDevices.value?t.value.myDevices.inventoryTitle:t.value.bundle.checkout,
+  showTotal:selection.value.length>=2&&!originalCheckout.value,
+  total:!originalCheckout.value&&quote.value&&quoteStatus.value==='ready'?quote.value.amountUsdt:null,
+  saved:!originalCheckout.value&&quote.value&&quoteStatus.value==='ready'&&Number(quote.value.discountUsdt)>0?quote.value.discountUsdt:null,
+  devices:!originalCheckout.value&&canOpenDevices.value,
   continue:continueCheckout,signIn,
 });
 // The single-model action for the page's bottom bar (same handler as before).
@@ -348,16 +368,22 @@ function expireQuote(){
   invalidate();
   quoteExpired.value=true;
 }
-function continueCheckout(){
+async function continueCheckout(){
+  if(resumesOriginalCheckout()){void navTo(promotionCheckoutHref(selection.value,scopeId.value));return;}
   if(canOpenDevices.value){void navTo('/pages/me/devices');return;}
   if(!quote.value)return;
   if(!freshQuote()){expireQuote();return;}
+  if(!canContinue.value)return;
+  // Devices going to inventory (the tray note) need the user's confirmation before checkout (PRD §7.3).
+  const placement=inventoryPlacement.value;
+  if(placement?.purchased&&!await confirmInventoryPlacement(t.value,placement,'checkout',inventoryDialogOwner))return;
+  if(!freshQuote()){expireQuote();return;}
   if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
 }
-onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;});
+onHide(()=>{visible.value=false;capacityRecheckPending.value=false;invalidate(true);termsOpen.value=false;useUI().clearConfirmsBy(inventoryDialogOwner);});
 onShow(()=>{
   const recheckCapacity=!visible.value&&quoteBlock.value==='capacity';
-  visible.value=true;invalidate(recheckCapacity);
+  visible.value=true;invalidate(recheckCapacity);originalRead.value++;
   if(recheckCapacity)capacityRecheckPending.value=true;
 });
 watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQuote.value,ready=>{
@@ -365,7 +391,7 @@ watch(()=>capacityRecheckPending.value&&quoteBlock.value==='capacity'&&canReadQu
   capacityRecheckPending.value=false;
   void refreshQuote(true);
 },{flush:'post'});
-onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryTimer);});
+onBeforeUnmount(()=>{visible.value=false;fence.invalidate();clearTimeout(expiryTimer);useUI().clearConfirmsBy(inventoryDialogOwner);});
 </script>
 <style src="./promotion.css"></style>
 <style scoped>

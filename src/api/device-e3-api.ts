@@ -133,6 +133,7 @@ export interface CanonicalTradeinQuote {
   targetProductNo: string;
   targetProductName: string;
   sourceActualPaidUsdt: number;
+  sourceCurrentPriceUsdt: number;
   cumulativeOutputUsdt: number;
   outputRatioPct: number;
   creditRatePct: number;
@@ -443,8 +444,9 @@ function quote(value: unknown): CanonicalTradeinQuote {
     targetProductNo: string(source.targetProductNo),
     targetProductName: string(source.targetProductName),
     sourceActualPaidUsdt: number(source.sourceActualPaidUsdt),
+    sourceCurrentPriceUsdt: number(source.sourceCurrentPriceUsdt),
     cumulativeOutputUsdt: number(source.cumulativeOutputUsdt),
-    // Lifetime output can exceed the original purchase price.
+    // Lifetime output can exceed the current catalog price.
     outputRatioPct: number(source.outputRatioPct),
     creditRatePct: number(source.creditRatePct),
     discountUsdt: number(source.discountUsdt),
@@ -457,7 +459,9 @@ function quote(value: unknown): CanonicalTradeinQuote {
     pricingSource: string(source.pricingSource),
   };
   if (
-    result.discountUsdt > result.targetPriceUsdt
+    result.sourceCurrentPriceUsdt <= 0
+    || result.discountUsdt > result.targetPriceUsdt
+    || result.discountUsdt > result.sourceCurrentPriceUsdt
     || result.creditRatePct > 100
     || Math.abs((result.targetPriceUsdt - result.discountUsdt) - result.payableUsdt) > 0.00001
     || Math.abs(result.walletShortfallUsdt - Math.max(0, result.payableUsdt - result.walletBalanceUsdt)) > 0.00001
@@ -535,7 +539,7 @@ function eligibility(value: unknown): CanonicalTradeinEligibility {
     "TARGET_NOT_ACTIVE", "TARGET_OUT_OF_STOCK", "TARGET_NOT_RELEASED",
   ]);
   const sourceReasonCodes = new Set([
-    "OK", "SOURCE_PAID_PRICE_UNAVAILABLE", "TARGET_MUST_DIFFER", "HIGHER_PRICE_REQUIRED",
+    "OK", "SOURCE_PAID_PRICE_UNAVAILABLE", "SOURCE_CURRENT_PRICE_UNAVAILABLE", "TARGET_MUST_DIFFER", "HIGHER_PRICE_REQUIRED",
   ]);
   const decisionCode = string(source.decisionCode);
   if (!decisionCodes.has(decisionCode)) return invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID");

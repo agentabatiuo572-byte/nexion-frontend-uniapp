@@ -399,7 +399,7 @@ import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, type Product } from "@/mock/products";
-import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG, getTradeinSourcePrice } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { getMonthsSince, tradeInEarlyWindowOk } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -434,6 +434,7 @@ import { navReplace, navReset, navBack, navTo } from "@/lib/route";
 import { clearTrialTopup, originalTrialCheckoutHref, readTrialTopup, rememberTrialTopup } from "@/lib/trial-topup-return";
 import type { DeviceKind } from "@/store/types";
 import { confirm, toast, useUI } from "@/store/ui";
+import { confirmInventoryPlacement } from "@/lib/inventory-placement-confirm";
 import { deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError, asApiError, isAmbiguousEnvelopeOutcome, isApiRefusal } from "@/api/errors";
 import { executeSelectedPurchase } from "@/lib/selected-purchase-payment";
@@ -1611,7 +1612,7 @@ const appliedTradeinView = computed(() => {
   if (remoteApiEnabled && (!quote || quote.sourceDeviceId !== Number(device.id)
       || quote.targetProductNo !== p.id)) return null;
   const credit = quote?.discountUsdt ?? computeTradeInCredit(
-      device.paidPriceUsdt ?? 0,
+      getTradeinSourcePrice(device),
       Math.max(0, device.cumulativeEarningsUsdt ?? 0),
       p.price,
     );
@@ -1625,7 +1626,7 @@ function resolveQuotedTradeIn(): { device: (typeof app.devices)[number]; credit:
   if (!quotedTradeIn || !p || trialConversionMode.value) return null;
   const device = app.devices.find((d) => d.id === quotedTradeIn!.deviceId);
   if (!device || (!remoteApiEnabled && isDeviceTaskBlocked(device))) return null;
-  const credit = computeTradeInCredit(device.paidPriceUsdt ?? 0, Math.max(0, device.cumulativeEarningsUsdt ?? 0), p.price);
+  const credit = computeTradeInCredit(getTradeinSourcePrice(device), Math.max(0, device.cumulativeEarningsUsdt ?? 0), p.price);
   return credit > 0 ? { device, credit } : null;
 }
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
@@ -2870,6 +2871,18 @@ async function onConfirmPay() {
     if (checkoutCapacityBlocked.value) {
       step.value = "select-payment";
       return;
+    }
+    // The device goes to inventory at the capacity just re-read (the full-slots note): the user confirms before the
+    // order is created (PRD §7.3), and the total must still be the one they tapped.
+    if (checkoutFullSlots.value) {
+      const accepted = await confirmInventoryPlacement(t.value, { count: 1, full: true }, "order", dialogOwner);
+      if (!accepted || !isCurrentCheckoutRoute(recoveryScope) || step.value !== "confirm") { confirming = false; return; }
+      if (!totalStillConfirmed(confirmedAmount)) {
+        confirming = false;
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
     }
     await submitRemoteOrder();
     return;

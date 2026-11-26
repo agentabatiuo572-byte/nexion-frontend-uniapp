@@ -120,7 +120,7 @@ import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import type { DeviceKind } from "@/store/types";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
-import { computeTradeInCredit } from "@/mock/tradein-config";
+import { computeTradeInCredit, getTradeinSourcePrice } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
@@ -176,7 +176,7 @@ const { tradeInSources: cardTradeinDevices } = useDeviceEligibility(props.produc
 const bestTradeinCredit = computed(() => {
   const d = cardTradeinDevices.value[0];
   if (!d) return 0;
-  return computeTradeInCredit(d.paidPriceUsdt ?? 0, d.cumulativeEarningsUsdt ?? 0, props.product.price);
+  return computeTradeInCredit(getTradeinSourcePrice(d), d.cumulativeEarningsUsdt ?? 0, props.product.price);
 });
 const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value > 0);
 

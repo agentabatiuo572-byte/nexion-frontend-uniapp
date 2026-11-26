@@ -1242,10 +1242,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       return device.deactivatedAt==null&&['ACTIVE','ONLINE','BUSY','RUNNING','OFFLINE'].includes(device.status);
     return ['INACTIVE','INVENTORY','DEACTIVATED','PENDING_ACTIVATION'].includes(device.status);
   };
+  const tradeinSourcePrice=device=>products.find(product=>product.id===device.productCode.toLowerCase())?.price??0;
   const tradeinSourceReason=(device,product)=>{
     if(!(device.actualPaidUsdt>0))return 'SOURCE_PAID_PRICE_UNAVAILABLE';
     if(device.productCode.toLowerCase()===product.id)return 'TARGET_MUST_DIFFER';
-    return product.price>device.actualPaidUsdt?'OK':'HIGHER_PRICE_REQUIRED';
+    const sourcePrice=tradeinSourcePrice(device);
+    if(sourcePrice<=0)return 'SOURCE_CURRENT_PRICE_UNAVAILABLE';
+    return product.price>sourcePrice?'OK':'HIGHER_PRICE_REQUIRED';
   };
   const tradeinTargetReason=product=>{
     if(!product||product.productType!=='DEVICE')return 'TARGET_NOT_ACTIVE';
@@ -1287,9 +1290,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(reason!=='OK'&&reason!=='HIGHER_PRICE_REQUIRED')refuse('TRADEIN_'+reason);
     requireTradeinE1(product);
     if(reason==='HIGHER_PRICE_REQUIRED')refuse('TRADEIN_'+reason);
-    const ratio=Math.min(100,Math.round(device.cumulativeOutputUsdt/device.actualPaidUsdt*10000)/100),band=tradeinCuts.filter(cut=>ratio>=cut).length;
-    const discount=Math.min(product.price,Math.round(device.actualPaidUsdt*tradeinRates[band])/100),payable=Math.round((product.price-discount)*100)/100,wallet=state.walletBalance??52800.64;
-    return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
+    const sourcePrice=tradeinSourcePrice(device);
+    const ratio=Math.round(device.cumulativeOutputUsdt/sourcePrice*100*1e6)/1e6,band=tradeinCuts.filter(cut=>ratio>=cut).length;
+    const discount=Math.min(product.price,Math.round(sourcePrice*tradeinRates[band]/100*1e6)/1e6),payable=Math.round((product.price-discount)*1e6)/1e6,wallet=state.walletBalance??52800.64;
+    return {sourceDeviceId:device.id,sourceRowVersion:device.rowVersion,targetDeviceStatus:device.activatedAt?'ACTIVE':'INACTIVE',sourceProductName:device.name,targetProductId:products.indexOf(product)+1,targetProductNo:product.id,targetProductName:product.name,sourceActualPaidUsdt:device.actualPaidUsdt,sourceCurrentPriceUsdt:sourcePrice,cumulativeOutputUsdt:device.cumulativeOutputUsdt,outputRatioPct:ratio,creditRatePct:tradeinRates[band],discountUsdt:discount,targetPriceUsdt:product.price,payableUsdt:payable,walletBalanceUsdt:wallet,walletShortfallUsdt:Math.max(0,payable-wallet),sufficientFunds:wallet>=payable,discountToWallet:false,pricingSource:'server'};
   };
   const checkReplacementSource=(sourceDeviceId,external)=>{
     const source=demoFleetFacts(url,locale,state).devices.find(device=>device.id===sourceDeviceId);
