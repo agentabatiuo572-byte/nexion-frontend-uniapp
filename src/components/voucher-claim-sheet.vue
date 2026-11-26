@@ -39,11 +39,12 @@
             <text class="vcs-name">{{ v.name }}</text>
             <text class="vcs-scope">{{ scopeText(v) }}</text>
             <text class="vcs-expiry">{{ expiryText(v) }}</text>
-            <!-- The voucher card is a tinted card, so its action is a brand text action, never glass (03 §3.1 P-67): 「立即领取」
-                 acts in place; once claimed, 「去使用」 carries a trailing arrow into the next page. The same node stays,
+            <!-- One control whose role follows the voucher (03 §3.1, 3.9; ticket-material voucher cards keep brand glass for 领取,
+                 04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
+                 text action with a trailing arrow into the next page. The same node stays,
                  so focus stays on it when the claim lands. The slot keeps the 44px row in both states. -->
             <view class="vcs-cta">
-              <NxButton variant="text" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
