@@ -6,7 +6,8 @@
     <!-- Guided header: back, the three-step track (done / current / upcoming), the step label. -->
     <view class="ob-hd">
       <view class="ob-back" role="button" :tabindex="deferBusy ? -1 : 0" :aria-disabled="deferBusy" :aria-label="t.login.back" :class="{ 'ob-back--off': deferBusy }" @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator">
-        <view class="ob-back__face nx-frosted-button">
+        <view class="ob-back__face nx-design-glass">
+          <LiquidGlass :radius="20" tone="navigation" :blur="8" />
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
         </view>
       </view>
@@ -46,18 +47,18 @@
               </view>
             </template>
             <template v-else-if="view === 'read-failed'">
-              <view class="est-amt est-amt--unknown" :aria-label="'— USDT' + t.onboarding.perDay"><text>—</text><text class="est-amt__u">{{ ' USDT' + t.onboarding.perDay }}</text></view>
-              <view class="est-amt2" :aria-label="'— UVT' + t.onboarding.perDay"><text>—</text><text class="est-amt2__u">{{ ' UVT' + t.onboarding.perDay }}</text></view>
-              <text class="est-basis"><text class="est-basis__v est-basis__v--unknown">—</text> {{ t.onboarding.phoneComputeUnit }}</text>
+              <view class="est-amt est-amt--unknown" :aria-label="'—' + usdtPerDay"><text>—</text><text class="est-amt__u">{{ usdtPerDay }}</text></view>
+              <view class="est-amt2" :aria-label="'—' + uvtPerDay"><text>—</text><text class="est-amt2__u">{{ uvtPerDay }}</text></view>
+              <text class="est-basis"><text class="est-basis__v est-basis__v--unknown">—</text>{{ '\u00A0' + t.onboarding.phoneComputeUnit }}</text>
             </template>
             <template v-else>
-              <view class="est-amt" :aria-label="phoneUsdtLabel + ' USDT' + t.onboarding.perDay">
-                <text class="est-amt__int" aria-hidden="true">{{ phoneUsdtParts.int }}</text><text v-if="phoneUsdtParts.dec" class="est-amt__dec" aria-hidden="true">{{ phoneUsdtParts.dec }}</text><text class="est-amt__u" aria-hidden="true">{{ ' USDT' + t.onboarding.perDay }}</text>
+              <view class="est-amt" :aria-label="phoneUsdtLabel + usdtPerDay">
+                <text class="est-amt__int" aria-hidden="true">{{ phoneUsdtParts.int }}</text><text v-if="phoneUsdtParts.dec" class="est-amt__dec" aria-hidden="true">{{ phoneUsdtParts.dec }}</text><text class="est-amt__u" aria-hidden="true">{{ usdtPerDay }}</text>
               </view>
-              <view class="est-amt2" :aria-label="phoneUvtLabel + ' UVT' + t.onboarding.perDay">
-                <text aria-hidden="true">{{ phoneUvtLabel }}</text><text class="est-amt2__u" aria-hidden="true">{{ ' UVT' + t.onboarding.perDay }}</text>
+              <view class="est-amt2" :aria-label="phoneUvtLabel + uvtPerDay">
+                <text aria-hidden="true">{{ phoneUvtLabel }}</text><text class="est-amt2__u" aria-hidden="true">{{ uvtPerDay }}</text>
               </view>
-              <text class="est-basis"><text class="est-basis__v">{{ calibration?.computeValue ?? '—' }}</text> {{ t.onboarding.phoneComputeUnit }}</text>
+              <text class="est-basis"><text class="est-basis__v">{{ calibration?.computeValue ?? '—' }}</text>{{ '\u00A0' + t.onboarding.phoneComputeUnit }}</text>
             </template>
           </view>
         </view>
@@ -68,7 +69,7 @@
           <view class="est-list" :class="{ 'anim-up-delay': view === 'detected' }" :role="view === 'detected' ? 'list' : undefined">
             <view class="est-list__head" aria-hidden="true"><text>{{ t.onboarding.colModel }}</text><text>{{ 'USDT' + t.onboarding.perDay }}</text></view>
             <template v-if="view === 'detected'">
-              <view v-for="row in compareRows" :key="row.key" class="est-row" role="listitem" :aria-label="row.label + ', ' + row.times + ', ' + row.value + ' USDT' + t.onboarding.perDay">
+              <view v-for="row in compareRows" :key="row.key" class="est-row" role="listitem" :aria-label="row.label + ', ' + row.times + ', ' + row.value + usdtPerDay">
                 <view class="est-row__t" aria-hidden="true">
                   <text class="est-row__n">{{ row.label }}</text>
                   <text class="est-row__s">{{ row.times }}</text>
@@ -101,6 +102,13 @@
       <template v-if="view === 'nonnative'">
         <view class="ob-btn ob-btn--glass nx-frosted-button" role="button" tabindex="0" data-system-chrome-primary @click="leaveEstimator" @keydown.enter.prevent="leaveEstimator" @keydown.space.prevent="leaveEstimator"><text>{{ t.login.back }}</text></view>
       </template>
+      <!-- A write the server never confirmed, after three read-backs: the same command can be sent again (03 §3.5.2). -->
+      <template v-else-if="deferResendAvailable">
+        <text class="nx-tray-note">{{ t.onboarding.activationDeferResendBody }}</text>
+        <view class="ob-tray-row">
+          <view class="ob-btn ob-btn--primary" role="button" tabindex="0" data-system-chrome-primary @click="resendDeferral" @keydown.enter.prevent="resendDeferral" @keydown.space.prevent="resendDeferral"><text>{{ t.onboarding.iosActivateLater }}</text></view>
+        </view>
+      </template>
       <view v-else-if="deferOutcome === 'unknown'" class="nx-tray-status" role="status"><text>{{ t.onboarding.activationDeferUnknown }}</text></view>
       <template v-else-if="view === 'deferred'">
         <view class="ob-tray-row">
@@ -128,6 +136,12 @@
           <view class="ob-btn" role="button" tabindex="-1" aria-disabled="true"><text>{{ t.onboarding.startEarning }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view>
         </view>
       </template>
+      <template v-else-if="calibrationResendAvailable">
+        <text class="nx-tray-note">{{ t.onboarding.calibrationResendBody }}</text>
+        <view class="ob-tray-row">
+          <view class="ob-btn ob-btn--primary" role="button" tabindex="0" data-system-chrome-primary @click="resendCalibration" @keydown.enter.prevent="resendCalibration" @keydown.space.prevent="resendCalibration"><text>{{ t.onboarding.calibrationResendAction }}</text></view>
+        </view>
+      </template>
       <view v-else class="ob-btn" :class="{ 'ob-btn--primary': view === 'detected' }" role="button" :tabindex="view === 'detected' ? 0 : -1" :aria-disabled="view !== 'detected'" :aria-busy="view !== 'detected'" data-system-chrome-primary @click="goConnect" @keydown.enter.prevent="goConnect" @keydown.space.prevent="goConnect">
         <view v-if="view !== 'detected'" class="ob-spin" aria-hidden="true" /><text>{{ estimatePrimaryLabel }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -141,6 +155,7 @@ import { toast } from "@/store/ui";
 import ToastHost from "@/components/toast-host.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import { formatEstimate } from "@/lib/estimate-display";
 import { navReset } from "@/lib/route";
 import { onBackPress, onHide, onLoad, onShow } from "@dcloudio/uni-app";
@@ -203,6 +218,9 @@ const phoneUvt = computed(() => calibration.value?.baseRateNex ?? phone.value?.d
 const phoneUsdtLabel = computed(() => phoneRate.value === null ? "—" : formatEstimate(phoneRate.value));
 const phoneUsdtParts = computed(() => { const [int, dec] = phoneUsdtLabel.value.split("."); return { int, dec: dec ? `.${dec}` : "" }; });
 const phoneUvtLabel = computed(() => phoneUvt.value === null ? "—" : formatEstimate(phoneUvt.value));
+// Number and unit never part (03 §3.6.1): the unit is joined with a no-break space, on screen and in the spoken label.
+const usdtPerDay = computed(() => "\u00A0USDT" + t.value.onboarding.perDay);
+const uvtPerDay = computed(() => "\u00A0UVT" + t.value.onboarding.perDay);
 const compareRows = computed(() => {
   const rows = [s1.value, pro.value].filter((row): row is NonNullable<typeof row> => row !== null);
   const max = Math.max(0, ...rows.map((row) => row.dailyUsdt));
@@ -258,7 +276,8 @@ const unavailableTitle = computed(() => pendingKind.value === "ios" ? t.value.on
   : pendingKind.value === "android" ? t.value.onboarding.phoneCalibrationPendingTitle : t.value.onboarding.calibrationFailedTitle);
 const unavailableBody = computed(() => pendingKind.value === "ios" ? t.value.onboarding.phoneCalibrationPendingIosBody
   : pendingKind.value === "android" ? t.value.onboarding.phoneCalibrationPendingBody : t.value.onboarding.activationLaterBody);
-const barIsTray = computed(() => deferOutcome.value !== "unknown" && (view.value === "deferred" || view.value === "unavailable" || view.value === "read-failed"));
+const barIsTray = computed(() => deferResendAvailable.value || calibrationResendAvailable.value
+  || (deferOutcome.value !== "unknown" && (view.value === "deferred" || view.value === "unavailable" || view.value === "read-failed")));
 // Content keeps clear of the bar: its measured height + 22 off the bottom + 16 (04 §4.0); the tray wraps on long languages.
 const barClearance = ref(86);
 const pageInstance = getCurrentInstance();
@@ -269,7 +288,7 @@ function measureBar() {
     if (height) barClearance.value = Math.ceil(height) + 38;
   });
 }
-watch([view, deferOutcome, () => t.value.onboarding.iosActivateLater], () => { void nextTick(measureBar); }, { flush: "post" });
+watch([view, deferOutcome, calibrationResendAvailable, deferResendAvailable, () => t.value.onboarding.iosActivateLater], () => { void nextTick(measureBar); }, { flush: "post" });
 
 function scopePair(): { estimator: EstimatorScope; remote: RemoteAccountRequest } {
   return {
@@ -616,7 +635,11 @@ async function deferPhoneActivation(resend: boolean | Event = false) {
 /* Shared onboarding chrome (boards-onboarding; 03 §3.1, 04 §4.0, 10 §10.1). */
 .ob-hd { display: flex; align-items: center; gap: 10px; height: 44px; flex: none; }
 .ob-back { position: relative; width: 44px; height: 44px; margin-left: -2px; display: grid; place-items: center; flex: none; color: var(--v5-ink); }
-.ob-back__face { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; }
+/* 03 §3.1 顶部图标动作: its own Liquid Glass round face, as on every sub-page back (SubPageHeader); 40 face, 44 target. */
+.ob-back__face { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; transition: transform 100ms cubic-bezier(.2, .8, .2, 1); }
+.ob-back__face > svg, .ob-back__face > .nx-native-svg { position: relative; z-index: 1; }
+[data-theme="light"] .ob-back__face { --ui-control-shadow: var(--v5-glass-shadow); }
+.ob-back:active .ob-back__face { transform: scale(.92); }
 .ob-back--off { opacity: .5; }
 .ob-track { flex: 1; display: flex; gap: 6px; padding-right: 4px; }
 /* Step track: done = brand, current = brand 40%, upcoming = ink 8%; one shape, three tones. */
@@ -646,7 +669,7 @@ async function deferPhoneActivation(resend: boolean | Event = false) {
 /* The busy secondary keeps full ink (03 §3.1 tray busy); the shared layer greys the disabled view itself, so set it on the children. */
 .ob-tray-text[aria-busy="true"] > * { color: var(--v5-ink); }
 .ob-btn :deep(text), .ob-tray-text :deep(text), .ob-btn :deep(uni-text), .ob-tray-text :deep(uni-text) { white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } .ob-btn--primary:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } .ob-btn--primary:active, .ob-back:active .ob-back__face { transform: none; } }
 
 /* Focal card (01 §1.1.2 soft glass, no blur): phone art left, five fixed-height rows right. */
 .est-hero { position: relative; flex: none; display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: var(--ui-radius-surface, 22px); overflow: hidden; }
@@ -661,15 +684,17 @@ async function deferPhoneActivation(resend: boolean | Event = false) {
 .est-hero__tag--skel { background: color-mix(in srgb, var(--v5-ink) 9%, transparent); color: transparent; }
 .est-hero__tag--skel .est-hero__tag-icon, .est-hero__tag--ghost { visibility: hidden; }
 .est-hero__k { display: block; margin-top: 12px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
-/* Main amount (01 §1.2, 10.2 弹层主金额 size): Montserrat 500, integer brand (the card's one key figure), decimals and unit ink-3. */
-.est-amt { display: flex; align-items: baseline; height: var(--ui-type-wallet-amount-lh); margin-top: 4px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; color: var(--v5-brand); white-space: nowrap; }
+/* Main amount (01 §1.2, 10.2 弹层主金额 size): Montserrat 500, decimals and unit ink-3. The integer is the card's one brand key
+   figure (01 §1.1.1 rule 4), the same composition as the trial claim card's 预计收益 (04.1 主金额字体、主题色; 01 §1.2 同一指标跨页同一组成). */
+.est-amt { display: flex; align-items: baseline; height: var(--ui-type-wallet-amount-lh); margin-top: 4px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; color: var(--v5-brand); }
 .est-amt__dec { color: var(--v5-ink-3); }
-.est-amt__u { font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); white-space: pre; }
+.est-amt__u { font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; color: var(--v5-ink-3); }
 .est-amt--unknown { color: var(--v5-ink-3); }
-.est-amt2 { display: flex; align-items: baseline; height: var(--ui-type-subheading-lh); margin-top: 2px; font: 500 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-amount); color: var(--v5-ink-3); white-space: nowrap; }
-.est-amt2__u { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); white-space: pre; }
+.est-amt2 { display: flex; align-items: baseline; height: var(--ui-type-subheading-lh); margin-top: 2px; font: 500 var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-amount); color: var(--v5-ink-3); }
+.est-amt2__u { font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .est-basis { display: block; height: var(--ui-type-description-lh); margin-top: 4px; white-space: nowrap; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
-.est-basis__v { font-weight: 500; color: var(--v5-ink); }
+/* 10.1 行内数值: a non-amount metric inline, JetBrains Mono 500 (01 §1.2); the row keeps its line height so all states stay level. */
+.est-basis__v { font-family: var(--font-metric); font-size: var(--ui-type-inline-figure); font-weight: var(--ui-type-inline-figure-weight); font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 .est-basis__v--unknown { color: var(--v5-ink-3); }
 .est-basis--status { display: flex; align-items: center; gap: 8px; color: var(--v5-ink-2); }
 .est-basis__spin { color: var(--v5-brand); }
@@ -685,7 +710,7 @@ async function deferPhoneActivation(resend: boolean | Event = false) {
 .est-row__n { display: block; font: 500 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); color: var(--v5-ink); overflow-wrap: break-word; }
 .est-row__s { display: block; margin-top: 2px; font: var(--ui-type-list-subtitle-weight, 400) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .est-row--skel .est-row__n, .est-row--skel .est-row__s, .est-row--skel .est-row__v { white-space: nowrap; }
-.est-row__v { justify-self: end; align-self: start; font: var(--ui-type-card-figure-weight, 500) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; color: var(--v5-ink); white-space: nowrap; }
+.est-row__v { justify-self: end; align-self: start; font: var(--ui-type-card-figure-weight, 500) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; color: var(--v5-ink); }
 .est-row__bar { grid-column: 1 / 3; margin: 1px 0; --nx-progress-hue: var(--v5-tech-cyan); }
 /* entrance, once */
 .anim-up { animation: est-up .32s cubic-bezier(.16, 1, .3, 1) both; }

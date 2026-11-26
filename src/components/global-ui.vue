@@ -24,6 +24,20 @@
       </view>
       <text class="nx-modal__title">{{ topConfirm.title }}</text>
       <text v-if="topConfirm.message" class="nx-modal__msg">{{ topConfirm.message }}</text>
+      <!-- Device decision (03 §3.5): the device block replaces the sentence; the consequence is one line under it (10.2). -->
+      <view v-if="topConfirm.devices?.length" class="nx-modal__devices">
+        <view v-for="(device, i) in topConfirm.devices" :key="i" class="nx-modal__device">
+          <DeviceArt class="nx-modal__device-art" :src="device.image" />
+          <view class="nx-modal__device-meta">
+            <text class="nx-modal__device-name">{{ device.name }}</text>
+            <view class="nx-modal__device-sub"><NxCodeValue v-if="device.code" class="nx-modal__device-code" :value="device.code" :label="device.name" :copyable="false" /><text class="nx-modal__device-fate">{{ device.code ? '· ' : '' }}{{ device.fate }}</text></view>
+          </view>
+        </view>
+      </view>
+      <view v-if="topConfirm.note" class="nx-modal__hint">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+        <text class="nx-modal__hint-t">{{ topConfirm.note }}</text>
+      </view>
       <!-- Detail layout (e.g. withdrawal): a recessed list of what will happen, the last row the amount received. -->
       <view v-if="topConfirm.rows?.length" class="nx-modal__rows">
         <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount }">
@@ -79,6 +93,8 @@
 import { useVisiblePageRoute } from "@/composables/use-visible-page-route";
 import { computed } from "vue";
 import ToastHost from "@/components/toast-host.vue";
+import DeviceArt from "@/components/device-art.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import { useUI } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import MilestoneCelebration from "@/components/milestone-celebration.vue";
@@ -210,6 +226,20 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
 .nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
+/* Device block (03 §3.5): one surface-2 block, a row per device (art, name, number · where it goes), as the devices page. */
+.nx-modal__devices { margin-top: 16px; padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); text-align: left; }
+.nx-modal__device { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 6px; }
+.nx-modal__device + .nx-modal__device { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.nx-modal__device-art { flex: none; width: 48px; height: 48px; margin: -4px 0; }
+.nx-modal__device-meta { flex: 1 1 auto; min-width: 0; }
+.nx-modal__device-name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.nx-modal__device-sub { display: flex; align-items: baseline; column-gap: 6px; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.nx-modal__device-code { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-list-subtitle-lh) var(--font-metric); letter-spacing: 0; }
+.nx-modal__device-fate { flex: 0 0 auto; max-width: calc(100% - 11ch - 6px); overflow-wrap: break-word; }
+/* 10.2 提示行: 16px warning icon, ink text at the 辅助说明 size, left-aligned under the block. */
+.nx-modal__hint { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; text-align: left; }
+.nx-modal__hint > svg, .nx-modal__hint > .nx-native-svg { flex: none; margin-top: calc((var(--ui-type-description-lh) - 16px) / 2); color: var(--v5-warning); }
+.nx-modal__hint-t { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-btn__label {
   min-width: 0;
   font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5);

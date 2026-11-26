@@ -34,6 +34,11 @@ export interface ConfirmOptions {
   rows?: { label: string; value: string; amount?: boolean }[];
   /** Badge above the title in the detail layout. */
   glyph?: "withdraw";
+  /** 03 §3.5: when the confirmed object is a device, this block stands in for the message, one row per device with its
+   *  art, name, number and where it goes. */
+  devices?: { name: string; code?: string; fate: string; image?: string | null }[];
+  /** One consequence line under the device block (10.2 弹层提示行: warning icon, ink text). */
+  note?: string;
 }
 
 interface ConfirmInternal extends ConfirmOptions {

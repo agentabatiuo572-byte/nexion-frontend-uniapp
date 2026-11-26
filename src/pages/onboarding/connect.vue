@@ -6,7 +6,7 @@
     <!-- Standalone (recalibrate / login): sub-page nav only. Guided: back, step track, step label. -->
     <view v-if="standalone" class="ob-nav">
       <view class="ob-back" role="button" :tabindex="backLocked ? -1 : 0" :aria-disabled="backLocked" :aria-label="t.login.back" :class="{ 'ob-back--off': backLocked, 'ob-back--enable': enterFrom === 'scan' }" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
-        <view class="ob-back__face nx-frosted-button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
+        <view class="ob-back__face nx-design-glass"><LiquidGlass :radius="20" tone="navigation" :blur="8" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
       </view>
       <text class="ob-nav__t" role="heading" aria-level="1">{{ t.onboarding.calibrationTitle }}</text>
       <view />
@@ -14,7 +14,7 @@
     <template v-else>
       <view class="ob-hd">
         <view class="ob-back" role="button" :tabindex="backLocked ? -1 : 0" :aria-disabled="backLocked" :aria-label="t.login.back" :class="{ 'ob-back--off': backLocked, 'ob-back--enable': enterFrom === 'scan' }" @click="leaveConnect" @keydown.enter.prevent="leaveConnect" @keydown.space.prevent="leaveConnect">
-          <view class="ob-back__face nx-frosted-button"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
+          <view class="ob-back__face nx-design-glass"><LiquidGlass :radius="20" tone="navigation" :blur="8" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
         </view>
         <view class="ob-track" role="img" :aria-label="t.onboarding.step3of3">
           <view class="ob-track__seg ob-track__seg--done" /><view class="ob-track__seg ob-track__seg--done" /><view class="ob-track__seg ob-track__seg--cur" />
@@ -37,7 +37,7 @@
         <view class="cn-dialwrap" :style="{ minHeight: dialGeo.min + 'px' }">
           <view class="cn-score" :class="['cn-score--' + dialMode, { 'cn-score--ready': dialReady, 'cn-score--anim': entering && dialReady, 'cn-score--from-scan': enterFrom === 'scan' }]"
             :role="dialMode === 'idle' ? undefined : 'img'" :aria-hidden="dialMode === 'idle'" :aria-label="dialMode === 'result' ? t.onboarding.resultTitle + ' ' + finalText + ' ' + t.onboarding.phoneComputeUnit : dialMode === 'scan' ? t.onboarding.detecting : undefined"
-            :style="{ width: dialSize + 'px', height: dialSize + 'px' }">
+            :style="{ width: dialSize + 'px', height: dialSize + 'px', '--cn-sweep-at': sweepAt + 'deg' }">
             <view class="cn-score__glow" aria-hidden="true" />
             <view class="cn-score__lens" aria-hidden="true" :style="{ width: dialGeo.inner * 2 + 'px', height: dialGeo.inner * 2 + 'px' }" />
             <view class="cn-score__svg" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
@@ -68,7 +68,9 @@
         </view>
         <view class="cn-slot" :class="{ 'cn-slot--enter': entering }">
           <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger. -->
-          <view v-if="dialMode === 'result'" class="cn-rules"><NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" /></view>
+          <!-- A tray with a note above its button is taller than the bar this slot reserves, so the rules row steps aside for it
+               (the dial keeps its box). -->
+          <view v-if="dialMode === 'result' && !(bar.kind === 'tray' && bar.note)" class="cn-rules"><NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" /></view>
           <view v-else-if="dialMode === 'scan' && iosPhone" class="cn-iostrack" role="list">
             <view class="cn-iostrack__nd" role="listitem"><view class="cn-iostrack__dot cn-iostrack__dot--cur" /><text class="cn-iostrack__lb">{{ t.onboarding.iosStepIdentify }}</text></view>
             <view class="cn-iostrack__nd" aria-hidden="true"><view class="cn-iostrack__dot" /></view>
@@ -128,6 +130,7 @@ import GlobalUi from "@/components/global-ui.vue";
 import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import { useDialogBackHeld } from "@/composables/use-dialog-a11y";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
@@ -263,6 +266,8 @@ const calibrationReadback = createPhoneWriteReadback();
 const deferReadback = createPhoneWriteReadback();
 const replacementSource = ref<Awaited<ReturnType<typeof readReplacementSourceDevice>>>(null);
 const replacementSourceDevice = computed(() => replacementSource.value);
+// A phone in the fleet is drawn with the phone artwork (use-device-product-image).
+const PHONE_ART = "/static/img/home-glass-20260928/phone.webp";
 const activationBusy = ref(false);
 let activationCompleted = false;
 
@@ -517,7 +522,7 @@ const head = computed<Head>(() => {
     if (feedback.detail === "phoneCalibrationPendingBody") return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingTitle, body };
     if (feedback.action === "devices") return { tone: "danger", icon: "failed", title: o.rejectTitleBlocked, body, link: canDefer.value ? "retry" : undefined };
     if (feedback.action === "support") return { tone: "danger", icon: "failed", title: o.rejectTitleSupport, body };
-    if (feedback.action === "terms") return { tone: "danger", icon: "failed", title: o.rejectTitleTerms, body };
+    if (feedback.action === "terms") return { tone: "warning", icon: "alert", title: o.rejectTitleTerms, body, link: "support" };
     if (feedback.action === "login") return { tone: "warning", icon: "alert", title: o.rejectTitleLogin, body, link: "support" };
     if (feedback.action === "recalibrate") return { tone: "warning", icon: "alert", title: o.rejectTitleRecal, body };
     const title = feedback.detail === "phoneReplacementCooldown" ? o.rejectTitleBlocked
@@ -537,17 +542,20 @@ type BarButton = { label: string; run: (event?: Event) => void; off?: boolean; b
 type Bar = { kind: "none" } | { kind: "status"; label: string } | { kind: "float"; primary: BarButton }
   | { kind: "tray"; primary: BarButton; secondary?: BarButton; note?: string };
 // The bar follows the source state and the action in flight: only the busy control spins, the others are locked (03 §3.1).
-const bar = computed<Bar>(() => {
+const rawBar = computed<Bar>(() => {
   const o = t.value.onboarding, busy = activationBusy.value;
   const later = (): BarButton | undefined => canDefer.value
     ? { label: o.iosActivateLater, run: onDefer, off: busy, busy: inFlight.value === "defer" } : undefined;
   const main = (label: string, run: BarButton["run"], arrow = false): BarButton => ({ label, run, arrow, off: busy, busy: inFlight.value === "activate" });
   const pair = (primary: BarButton): Bar => { const secondary = later(); return secondary ? { kind: "tray", primary, secondary } : { kind: "float", primary }; };
   if (!nativePhoneAvailable) return { kind: "float", primary: { label: t.value.login.back, run: leaveConnect, glass: true } };
+  // A write the server never confirmed, after three read-backs: the user may send the same command again (03 §3.5.2).
+  if (deferResendAvailable.value) return { kind: "tray", note: o.activationDeferResendBody, primary: { label: o.iosActivateLater, run: resendDeferral } };
   if (deferOutcome.value === "unknown") return { kind: "status", label: o.activationDeferUnknown };
   if (deferSyncPending.value) return { kind: "float", primary: main(o.phoneActivationSyncAction, () => { void deferRecovery.retry(); }) };
   if (deferOutcome.value === "rejected" && deferNeedsCalibration.value)
     return pair(main(o.iosRecalibrate, recalibrateNow));
+  if (calibrationResendAvailable.value) return { kind: "tray", note: o.calibrationResendBody, primary: { label: o.calibrationResendAction, run: resendCalibration } };
   if (resultReadRecovering.value) return { kind: "tray", note: o.resultReadFailed, primary: { label: o.activatePhone, run: () => {}, off: true, arrow: true } };
   if (phase.value === "intro") return { kind: "float", primary: { label: o.calibrationStart, run: () => { phase.value = "calibrating"; } } };
   if (phase.value === "calibrating") return readOnlyWait.value
@@ -573,6 +581,15 @@ const bar = computed<Bar>(() => {
   if (action === "recalibrate" || iosPending.value || (!action && (failedAction.value === "calibration" || canonical.value?.calibrationStatus === "PENDING_VERIFICATION")))
     return pair(main(o.iosRecalibrate, retry));
   return pair(main(o.activationRetry, retry));
+});
+// Board S0: during the result entrance the final bar is still fading in, so until 1000ms its buttons are neither
+// clickable nor in the Tab order; the read-wait grey button underneath reads as the processing state.
+const enterLocked = ref(false);
+const bar = computed<Bar>(() => {
+  const b = rawBar.value;
+  if (!enterLocked.value || (b.kind !== "float" && b.kind !== "tray")) return b;
+  const lock = (button: BarButton): BarButton => ({ ...button, off: true, busy: false, run: () => {} });
+  return b.kind === "tray" ? { ...b, primary: lock(b.primary), secondary: b.secondary && lock(b.secondary) } : { ...b, primary: lock(b.primary) };
 });
 
 // Dial: measured once when it first shows (the box is the same in every dial phase); one ready starts the CSS entrance and
@@ -631,16 +648,28 @@ watch([dialMode, () => bar.value.kind, () => t.value.onboarding.iosActivateLater
 const entering = ref(false);
 const enterFrom = ref<"read" | "scan" | null>(null);
 let enterTimer: ReturnType<typeof setTimeout> | null = null;
+let unlockTimer: ReturnType<typeof setTimeout> | null = null;
+// The scan sweep turns once per SWEEP_MS from the moment the scan dial shows; at the hand-off its angle is read from that
+// clock (the page script has no DOM in the App), so the sweep freezes and the tick conversion starts where its head is.
+const SWEEP_MS = 1600;
+let scanStartedAt = 0;
+const sweepAt = ref(38);
+watch(dialMode, (mode) => { if (mode === "scan") scanStartedAt = Date.now(); }, { flush: "post" });
 const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 watch(phase, (next, previous) => {
   if (enterTimer) clearTimeout(enterTimer);
-  enterTimer = null;
+  if (unlockTimer) clearTimeout(unlockTimer);
+  enterTimer = unlockTimer = null;
   if (next === "result" && previous === "calibrating" && !reducedMotion()) {
     enterFrom.value = readOnlyWait.value ? "read" : "scan";
+    if (enterFrom.value === "scan") sweepAt.value = Math.round((Date.now() - scanStartedAt) % SWEEP_MS / SWEEP_MS * 360);
     entering.value = true;
+    enterLocked.value = true;
+    unlockTimer = setTimeout(() => { enterLocked.value = false; }, 1000);
     enterTimer = setTimeout(() => { entering.value = false; enterFrom.value = null; }, 1400);
   } else {
     entering.value = false;
+    enterLocked.value = false;
     enterFrom.value = null;
   }
 });
@@ -659,9 +688,9 @@ watch([phase, finalScore, entering, dialReady], ([next, score, running, ready]) 
     if (progress === 1 && scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
   }, 30);
 }, { immediate: true });
-// The sweep stops where it is and the tick conversion runs clockwise from its head (tick 11 at the frozen 55°).
-const SCAN_HEAD = 11;
-function tickOrder(i: number) { return enterFrom.value === "scan" ? (i - SCAN_HEAD + 72) % 72 : i; }
+// The tick conversion runs clockwise from the tick under the sweep's head (the brightest segment ends 16° past the rotation).
+const scanHead = computed(() => Math.round((sweepAt.value + 16) / 5) % 72);
+function tickOrder(i: number) { return enterFrom.value === "scan" ? (i - scanHead.value + 72) % 72 : i; }
 const policyLines = computed(() => [
   t.value.onboarding.policyLine1,
   t.value.onboarding.policyLine2,
@@ -873,9 +902,14 @@ async function activate(event?: Event) {
       if (replacing) {
         replacementSource.value = await readReplacementSourceDevice(eligibility.binding?.userDeviceId ?? null);
         if (!scopeIsCurrent(scope)) return;
-        const confirmed = await uiConfirm({ title: t.value.onboarding.replacementConfirmTitle,
-          message: t.value.onboarding.replacementConfirmBody, confirmLabel: t.value.onboarding.replacementConfirmAction,
-          owner: confirmOwner });
+        // 03 §3.5: with the bound phone's own facts the sentence becomes its device row (art, name, number, where it goes)
+        // and the cancelled jobs a consequence line; without them the general sentence stays.
+        const source = replacementSource.value, o = t.value.onboarding;
+        const confirmed = await uiConfirm({ title: o.replacementConfirmTitle, icon: "warn",
+          ...(source
+            ? { devices: [{ name: source.name, code: source.instanceNo, fate: o.replacementSourceStopsTasks, image: PHONE_ART }], note: o.replacementJobsCancelled }
+            : { message: o.replacementConfirmBody }),
+          confirmLabel: o.replacementConfirmAction, owner: confirmOwner });
         if (!scopeIsCurrent(scope)) return;
         replacementSource.value = null;
         if (!confirmed) {
@@ -1080,6 +1114,7 @@ onUnmounted(() => {
   useUI().clearConfirmsBy(confirmOwner);
   if (scoreTimer) clearInterval(scoreTimer);
   if (enterTimer) clearTimeout(enterTimer);
+  if (unlockTimer) clearTimeout(unlockTimer);
   requestGeneration += 1;
 });
 </script>
@@ -1090,7 +1125,11 @@ onUnmounted(() => {
 /* Shared onboarding chrome (boards-onboarding; 03 §3.1, 04 §4.0, 10 §10.1). */
 .ob-hd { display: flex; align-items: center; gap: 10px; height: 44px; flex: none; }
 .ob-back { position: relative; width: 44px; height: 44px; margin-left: -2px; display: grid; place-items: center; flex: none; color: var(--v5-ink); }
-.ob-back__face { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; }
+/* 03 §3.1 顶部图标动作: its own Liquid Glass round face, as on every sub-page back (SubPageHeader); 40 face, 44 target. */
+.ob-back__face { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; transition: transform 100ms cubic-bezier(.2, .8, .2, 1); }
+.ob-back__face > svg, .ob-back__face > .nx-native-svg { position: relative; z-index: 1; }
+[data-theme="light"] .ob-back__face { --ui-control-shadow: var(--v5-glass-shadow); }
+.ob-back:active .ob-back__face { transform: scale(.92); }
 .ob-back--off { opacity: .5; }
 .ob-track { flex: 1; display: flex; gap: 6px; padding-right: 4px; }
 /* Step track: done = brand, current = brand 40%, upcoming = ink 8%; one shape, three tones. */
@@ -1120,7 +1159,7 @@ onUnmounted(() => {
 /* The busy secondary keeps full ink (03 §3.1 tray busy); the shared layer greys the disabled view itself, so set it on the children. */
 .ob-tray-text[aria-busy="true"] > * { color: var(--v5-ink); }
 .ob-btn :deep(text), .ob-tray-text :deep(text), .ob-btn :deep(uni-text), .ob-tray-text :deep(uni-text) { white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } .ob-btn--primary:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ob-spin { animation: none; } .ob-btn--primary:active, .ob-back:active .ob-back__face { transform: none; } }
 
 /* Standalone sub-page nav: back, centred nav title (10.1 子页导航标题, one line in nine languages at 360). */
 .ob-nav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 44px; flex: none; }
@@ -1201,7 +1240,7 @@ onUnmounted(() => {
 .cn-score--anim .cn-score__ctr { animation: cn-out 120ms ease-out both; }
 .cn-score--anim .cn-score__svg :deep(.cn-burst) { animation: cn-burst 450ms ease-out 900ms forwards; }
 .cn-score--anim .cn-score__num { animation: cn-fade 250ms ease-out 80ms both; }
-.cn-score--anim.cn-score--from-scan .cn-score__svg :deep(.cn-sweep) { opacity: 1; transform: rotate(38deg); animation: cn-out 160ms ease-out both; }
+.cn-score--anim.cn-score--from-scan .cn-score__svg :deep(.cn-sweep) { opacity: 1; transform: rotate(var(--cn-sweep-at, 38deg)); animation: cn-out 160ms ease-out both; }
 /* Bars during the entrance: from the read-wait, the grey button stays under the final bar (spinner out 0–200ms, label
    recentred by (18 spinner + 8 gap) / 2), then the two cross-fade 1000–1300ms; a tray fades in after the grey button has
    gone (different shapes). From the scan there is no bar yet, so the final bar rises in. */
