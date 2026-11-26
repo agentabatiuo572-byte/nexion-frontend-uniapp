@@ -99,6 +99,7 @@ import { productTaskLevelsText } from '@/lib/product-copy';
 import { checkoutQuoteBlockCopy,localized,displayDeadline,rewardSummary } from '@/lib/promotion-display';
 import { navTo } from '@/lib/route';
 import { fmt } from '@/i18n/format';
+import { confirmInventoryPlacement,type InventoryPlacement } from '@/lib/inventory-placement-confirm';
 import { createPromotionReadFence,isEntryQuoteFresh,restoreEntrySelection,promotionBundleHref,promotionCheckoutHref,promotionDetailHref,promotionDisclosures,promotionStoreHref,validEntryItems,type EntryItem,type EntrySelectionDraft } from '@/lib/promotion-entry';
 
 import PromotionTerms from './promotion-terms.vue';
@@ -211,14 +212,18 @@ const quotedTiers = computed(() => {
 const termsMissing = computed(() => quote.value?.expectedRewards.some(({ disclosure }) =>
   !disclosure || [disclosure.title, disclosure.terms, disclosure.refundTerms, disclosure.benefitDescription]
     .some(text => !text?.zh?.trim() || !text.en?.trim() || !text.vi?.trim())) ?? false);
-const inventoryNote = computed(() => {
+const inventoryPlacement = computed((): InventoryPlacement | null => {
   const current = quote.value;
-  if (!current) return '';
+  if (!current) return null;
   const slots = current.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
   const count = current.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, current.quantity - slots));
-  if (count === 0) return '';
-  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
-    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count });
+  return count === 0 ? null : { count, full: slots === 0 };
+});
+const inventoryNote = computed(() => {
+  const placement = inventoryPlacement.value;
+  if (!placement) return '';
+  return placement.full ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: placement.count });
 });
 // The dashed 「添加」 tile scrolls to 「继续添加」 and moves focus there (same in-page jump as the rule guides' directory).
 function jumpToSuggestions(){
@@ -348,9 +353,14 @@ function expireQuote(){
   invalidate();
   quoteExpired.value=true;
 }
-function continueCheckout(){
+async function continueCheckout(){
   if(canOpenDevices.value){void navTo('/pages/me/devices');return;}
   if(!quote.value)return;
+  if(!freshQuote()){expireQuote();return;}
+  if(!canContinue.value)return;
+  // Devices going to inventory (the tray note) need the user's confirmation before checkout (PRD §7.3).
+  const placement=inventoryPlacement.value;
+  if(placement&&!await confirmInventoryPlacement(t.value,placement,'checkout'))return;
   if(!freshQuote()){expireQuote();return;}
   if(canContinue.value)void navTo(promotionCheckoutHref(selection.value,scopeId.value));
 }

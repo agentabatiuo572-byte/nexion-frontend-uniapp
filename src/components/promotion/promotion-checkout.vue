@@ -197,6 +197,7 @@ import { ApiError,asApiError,isApiRefusal } from '@/api/errors';
 import { getProduct as readProduct } from '@/mock/products';import { refreshProductCatalog,settleProductCatalogRefresh,productCatalogState,productCatalogPresentation } from '@/store/product-catalog';
 import { navTo,navBack,navReplace,navReset } from '@/lib/route';import { confirm,useUI } from '@/store/ui';
 import { fmt } from '@/i18n/format';
+import { confirmInventoryPlacement,type InventoryPlacement } from '@/lib/inventory-placement-confirm';
 import { PromotionCheckoutSession,selectPromotionCheckoutRecord,type PromotionCheckoutRecord,PROMOTION_CHECKOUT_TABLE } from '@/lib/promotion-checkout-session';
 import { acquireAccountCommandKey,releaseAccountCommandKey,readAccountRow,writeAccountRow } from '@/store/account-scoped-storage';
 import { registerCheckoutLeaveGuard } from '@/lib/promotion-leave-guard';
@@ -645,17 +646,24 @@ async function selectVoucher(id:string|null){
   if(voucherId.value!==id)quoteBlock.value=null;
   voucherId.value=id;voucherOpen.value=false;await loadQuote();
 }
-const inventoryNotice = computed(() => {
+const inventoryPlacement = computed((): InventoryPlacement | null => {
   const quote = displayQuote.value;
-  if (!quote || order.value || openedOriginal || session.record.pending || unknown.value) return "";
+  if (!quote || order.value || openedOriginal || session.record.pending || unknown.value) return null;
   const slots = quote.assignableSlots ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed));
   const quantity = quote.inventoryQuantity ?? (slots === null ? 0 : Math.max(0, quote.quantity - slots));
-  if (quantity === 0) return "";
-  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
-    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: quantity });
+  return quantity === 0 ? null : { count: quantity, full: slots === 0 };
+});
+const inventoryNotice = computed(() => {
+  const placement = inventoryPlacement.value;
+  if (!placement) return "";
+  return placement.full ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: placement.count });
 });
 async function createOrder(){
   if(!current()||!visible.value||leaving.value||recoverKeepBeforeNewPurchase(true)||!canCreate.value)return;
+  // Devices going to inventory (the notice above) need the user's confirmation before the order is created (PRD §7.3).
+  const placement=inventoryPlacement.value;
+  if(placement&&(!await confirmInventoryPlacement(t.value,placement,'order',paymentDialogOwner)||!current()||!visible.value||leaving.value||!canCreate.value))return;
   let orderRequested=false;
   await run(async()=>{
     createBlock.value=await session.create();

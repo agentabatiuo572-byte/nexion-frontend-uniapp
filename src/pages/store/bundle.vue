@@ -146,6 +146,7 @@ import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { isProductAvailable, productHasStock, productOutOfStock } from "@/store/product-availability";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { confirm, toast } from "@/store/ui";
+import { confirmInventoryPlacement, type InventoryPlacement } from "@/lib/inventory-placement-confirm";
 import { bundleDiscountApi, bundleOrderApi, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { matchesBundleQuote, normalizeBundleExpectedAmountUsdt } from "@/api/bundle-order-api";
 import { quoteBundleAmountUsdt } from "@/api/bundle-quote";
@@ -415,15 +416,19 @@ function checkoutBlock(list: Product[], target: BundleReviewTarget): string {
   if (entries.some((entry) => entry.status !== "ready")) return t.value.store.purchaseEligibilityLoading;
   return entries.some((entry) => !entry.eligible) ? t.value.store.purchaseEligibilityIneligible : "";
 }
+const bundleInventoryPlacement = computed((): InventoryPlacement | null => {
+  if (!remoteApiEnabled || products.value.length < 2 || app.remoteSlotsUsed === null) return null;
+  const slots = Math.max(0, app.slotCap - app.remoteSlotsUsed);
+  const inventory = products.value.length - slots;
+  return inventory <= 0 ? null : { count: inventory, full: slots === 0 };
+});
 const bundleTrayNote = computed(() => {
   const reason = checkoutBlock(products.value, reviewTarget.value) || catalogNote.value;
   if (reason) return reason;
-  if (!remoteApiEnabled || products.value.length < 2 || app.remoteSlotsUsed === null) return "";
-  const slots = Math.max(0, app.slotCap - app.remoteSlotsUsed);
-  const inventory = products.value.length - slots;
-  if (inventory <= 0) return "";
-  return slots === 0 ? t.value.tradein.fullSlotsInventoryNotice
-    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: inventory });
+  const placement = bundleInventoryPlacement.value;
+  if (!placement) return "";
+  return placement.full ? t.value.tradein.fullSlotsInventoryNotice
+    : fmt(t.value.tradein.partialSlotsInventoryNotice, { count: placement.count });
 });
 const BUNDLE_RECEIPT_RECOVERY_KEY = "nexgrid-bundle-receipt-recovery-v1";
 type BundleReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderIds: string[] };
@@ -601,6 +606,9 @@ async function onCheckout() {
   const target = bundleReviewTarget(list);
   if (submitting.value || (walletRefreshing.value && !isRecoveryTarget(target)) || checkoutBlock(list, target)) return;
   if (!isRecoveryTarget(target) && !validEntryItems(list.map(p => ({ productNo: p.id, quantity: 1 })), 2)) return;
+  // Devices going to inventory (the tray note) need the user's confirmation before checkout (PRD §7.3).
+  const placement = isRecoveryTarget(target) ? null : bundleInventoryPlacement.value;
+  if (placement && (!await confirmInventoryPlacement(t.value, placement, "checkout") || submitting.value || checkoutBlock(list, target))) return;
   if (remoteApiEnabled) {
     if(await openBundleReview(list, target))return;
     const submissionScope = captureAccountScope();
