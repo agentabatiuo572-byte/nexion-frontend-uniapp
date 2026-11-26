@@ -164,8 +164,11 @@ const claimFromRetry = ref(false);
 const heldReasonText = ref("");
 const heldStatusLine = ref(false);
 const retryHeld = computed(() => claiming.value && claimFromRetry.value);
+const checkingEligibility = computed(() => !activated.value && !claiming.value && !claimError.value && !startNotRun.value
+  && freeTrial.authorityStatus === "loading" && freeTrial.canOpenClaim());
 // The line's icon and ink follow the text it shows, so a held reason keeps its own kind while the retry runs.
-const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value);
+const lineIsStatus = computed(() => retryHeld.value ? heldStatusLine.value
+  : !!freeTrial.pendingStart && !startNotRun.value || staleRead.value || checkingEligibility.value);
 const showRetry = computed(() => claiming.value ? claimFromRetry.value : claimRetryable.value);
 // A refresh that failed over the shown data holds the claim: that is why 「免费激活」 is off, said as a status line beside it
 // while recovery reads again on its own (03 §3.1 禁用要有原因, §3.5.2).
@@ -176,7 +179,7 @@ const staleRead = computed(() => freeTrial.transientReadFailure && trialView.dis
 const eligibilityUnknown = computed(() => !activated.value && !claiming.value && !freeTrial.pendingStart && !claimError.value && !staleRead.value
   && freeTrial.authorityStatus === "ready" && !freeTrial.canStart() && freeTrial.eligibility().reason === "unknown");
 const reasonLine = computed(() => !!freeTrial.pendingStart || startNotRun.value || claimError.value || retryHeld.value || !!standingReason.value || staleRead.value
-  || eligibilityUnknown.value);
+  || checkingEligibility.value || eligibilityUnknown.value);
 // Only a failed read with nothing to show leaves the result block alone; a reason or status line keeps its state (A09 order).
 const readFailView = computed(() => !reasonLine.value && !activated.value && !claiming.value && stateReadFailed.value);
 // Nothing left to decide once the claim is refused for now: the exit closes the sheet instead of 「我再想想」.
@@ -207,6 +210,7 @@ const claimErrorText = computed(() => termsChanged.value && !confirmingStart.val
   : startNotRun.value ? t.value.trial.claimNotStartedInline
   : freeTrial.pendingStart ? t.value.trial.claimUnknownInline
   : staleRead.value ? t.value.exchange.staleSnapshot
+  : checkingEligibility.value ? t.value.trial.entryChecking
   : eligibilityUnknown.value ? t.value.trial.eligReasonUnknown
   : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   : shownReason.value === "terms-required" ? t.value.trial.claimTermsRequired
