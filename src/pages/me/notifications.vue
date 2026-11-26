@@ -588,7 +588,7 @@ watch(filter, value => {
 .message-center .notification-title { overflow-wrap:break-word; }
 .message-center .notification-preview { margin-top:4px; font-size:var(--ui-type-message-preview); line-height:var(--ui-type-message-preview-lh); }
 .message-center .notification-meta { flex-direction:column; align-items:flex-end; gap:var(--v5-space-2); margin:0; }
-.message-center .notification-time { font-size:12px; line-height:16px; }
+.message-center .notification-time { font-size:var(--ui-type-message-meta); line-height:var(--ui-type-message-meta-lh); }
 .message-center .notification-meta .message-status-dot { width:8px; height:8px; }
 /* The expanded body starts on the title's text line (16 + 40 tile + 12); the action sits in the card footer (03 §3.1 P-67). */
 .message-center .notification-detail { padding:0 16px 14px 68px; }
