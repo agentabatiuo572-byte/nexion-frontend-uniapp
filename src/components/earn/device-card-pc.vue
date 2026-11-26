@@ -832,8 +832,9 @@ import JobGauge from "@/components/earn/job-gauge.vue";
 </script>
 
 <style scoped>
-/* Section labels (01 §1.2): Latin all-caps at +0.04em; Chinese takes no tracking. */
-.nx-device-section-label { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--v5-ink-3); }
+/* Section labels: single-line field labels in the auxiliary-figure role (10.1 辅助数值 12/16, 400, auxiliary ink).
+   Latin all-caps at +0.04em; Chinese takes no tracking (01 §1.2). */
+.nx-device-section-label { font-size: var(--ui-type-meta); line-height: var(--ui-type-meta-lh); font-weight: var(--ui-type-meta-weight); letter-spacing: 0.04em; text-transform: uppercase; color: var(--v5-ink-3); }
 .nx-device-section-label:lang(zh) { letter-spacing: 0; }
 .nx-action-sheet { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px var(--nx-overlay-bottom); border-radius: var(--nx-glass-radius) var(--nx-glass-radius) 0 0; max-height: calc(100vh - var(--nx-overlay-top)); overflow-y: auto; overscroll-behavior: contain; font-family: var(--font-v5); }
 .nx-action-sheet__handle { width: 36px; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 18%, transparent); align-self: center; }
