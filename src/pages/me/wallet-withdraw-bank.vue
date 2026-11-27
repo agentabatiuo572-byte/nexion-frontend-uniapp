@@ -14,7 +14,7 @@
 
       <template v-if="order">
         <NxResultHead class="result-head" :tone="resultTone" :icon="outcome === 'held' ? 'shield' : undefined" :title="statusLabel" :description="c.resultNotes[outcome]" title-testid="bank-order-status" :live="!terminal" />
-        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">VND</text></text></view>
+        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">{{ '\u00A0' }}VND</text></text></view>
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
@@ -42,7 +42,7 @@
             <view class="bcard__top">
               <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
               <text class="bcard__nm">{{ c.recipientSubtitle }}</text>
-              <view class="bcard__tag" :class="{ warn: !displayConfig.enabled || !displayConfig.beneficiary?.canWithdraw }" data-testid="bank-account-status" role="status"><text>{{ !displayConfig.enabled ? c.unavailable : !displayConfig.beneficiary ? c.unbound : displayConfig.beneficiary.canWithdraw ? c.available : accountStatus }}</text></view>
+              <view class="bcard__tag" :class="{ warn: cardTag !== c.available }" data-testid="bank-account-status" role="status"><text>{{ cardTag }}</text></view>
             </view>
             <view class="bcard__bot">
               <view><text class="vh">{{ c.recipientTitle }}</text><text class="bcard__lb">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="bcard__no">{{ recipient ? dots(recipient.maskedAccount) : "—" }}</text></view>
@@ -130,7 +130,6 @@
             <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity?.dailyRemainingCount ?? "—", total: displayConfig.capacity?.dailyLimitCount ?? "—" }) }}</text>
             <view v-if="displayConfig.policy && displayConfig.capacity" class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
           </view>
-          <view v-if="displayConfig.capacity?.dailyRemainingCount === 0" class="notice" role="status"><text>{{ c.dailyExhausted }} {{ displayDate(displayConfig.capacity.dailyCountResetAt) }}</text></view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
           <view class="action text-link" role="button" tabindex="0" :aria-disabled="busy" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
@@ -195,7 +194,7 @@
 <script setup lang="ts">
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
+import { formatTruncatedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { toast, type RuleItem } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -284,6 +283,12 @@ const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value &&
   && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
 const displayIntents = computed(() => displayConfig.value?.unresolvedIntent?.state === "MULTIPLE" ? displayConfig.value.unresolvedIntent.intents : []);
+const cardTag = computed(() => {
+  const shown = displayConfig.value;
+  if (!shown?.enabled || shown.capacity?.withdrawalEnabled === false) return c.value.unavailable;
+  if (!shown.beneficiary) return c.value.unbound;
+  return bankBeneficiaryReady(shown.beneficiary) ? c.value.available : accountStatus.value;
+});
 const accountStatus = computed(() => displayConfig.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(displayConfig.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));

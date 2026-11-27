@@ -102,7 +102,7 @@
           </view>
           <view class="nx-bank-sum">
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--big">{{ fmtVnd(intent.vndAmount) }}</text></view>
-            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) }} USDT</text></view>
+            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) + '\u00A0USDT' }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.fx.rateLabel }}</text><text class="nx-bank-sum__v">1 USDT ≈ {{ fmtVnd(intent.fxRate) }}</text></view>
           </view>
           <view v-if="!hostedRejected" class="nx-bank-hint">
@@ -210,7 +210,7 @@
       <view class="nx-bank-done nx-step-in" role="status">
         <view class="nx-bank-done__medal"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5" /></svg></view>
         <text class="nx-bank-done__title">{{ t.bankPane.successTitle }}</text>
-        <text class="nx-bank-done__amt">+{{ formatAmount(creditedUsdt) }}<text class="nx-bank-done__unit">USDT</text></text>
+        <text class="nx-bank-done__amt">+{{ formatAmount(creditedUsdt) }}<text class="nx-bank-done__unit">{{ '\u00A0' }}USDT</text></text>
         <text class="nx-bank-done__line">{{ fmt(t.bankPane.successLine, { rate: fmtVnd(intent.fxRate) }) }}</text>
       </view>
       <view class="nx-bank-sum nx-bank-sum--done">
@@ -245,7 +245,7 @@
         @keydown.enter.prevent="selectExistingPayment(choice)"
         @keydown.space.prevent="selectExistingPayment(choice)"
       >
-        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) }} USDT</text>
+        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) + '\u00A0USDT' }}</text>
       </view>
     </template>
 
@@ -496,7 +496,7 @@ const inRange = computed(() =>
 function usdtLabel(value: number): string {
   return `${formatAmount(value)}\u00A0USDT`;
 }
-function fmtVnd(value: number): string { return `${formatAmount(value, "VND")} ₫`; }
+function fmtVnd(value: number): string { return `${formatAmount(value, "VND")}\u00A0₫`; }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 // Facts well under the amount: unknown values stay "—", never a fabricated 0.
@@ -506,7 +506,7 @@ const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemain
 const feeFact = computed(() => {
   if (!fx.configReady) return "—";
   if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
-  return `${formatAmount(Math.max(fx.feeUsdt, 0))} USDT`;
+  return `${formatAmount(Math.max(fx.feeUsdt, 0))}\u00A0USDT`;
 });
 // Whole numbers for presets and the limit range ("1,000"), keeping cents only when present; the USDT unit is said
 // once, by the amount field and after the range (03 §3.6.1).
