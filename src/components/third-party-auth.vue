@@ -6,21 +6,19 @@
     <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
       <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
+      <!-- The security sheet is not a short sign-in flow, so the field keeps a visible label (03 §3.3). -->
+      <text v-if="verified && intent === 'LINK'" class="oauth-label">{{ t.security.currentPassword }}</text>
       <input v-if="verified && intent === 'LINK'" v-model="password" password :maxlength="128"
-        :placeholder="t.security.currentPassword" :aria-label="t.security.currentPassword" class="oauth-input" />
+        :aria-label="t.security.currentPassword" class="oauth-input" />
       <view v-if="challengeNo">
         <text class="oauth-copy">{{ t.thirdParty.codePrompt }} {{ deliveryHint }}</text>
         <input v-model="code" type="number" :maxlength="6" :placeholder="t.thirdParty.codeLabel"
           :aria-label="t.thirdParty.codeLabel" class="oauth-input" />
       </view>
-      <view v-if="verified" class="oauth-button" role="button" tabindex="0" :aria-label="confirmLabel"
-        :aria-disabled="completionDisabled" @click="complete()" @keydown.enter.prevent="complete()" @keydown.space.prevent="complete()">
-        <text>{{ submitting ? "…" : confirmLabel }}</text>
-      </view>
-      <view class="oauth-button oauth-secondary" role="button" tabindex="0" :aria-label="t.ui.cancel"
-        :aria-disabled="submitting" @click="cancelFromUser" @keydown.enter.prevent="cancelFromUser" @keydown.space.prevent="cancelFromUser">
-        <text>{{ t.ui.cancel }}</text>
-      </view>
+      <!-- 03 §3.1: confirm is the primary L action, cancel is neutral glass L; busy shows NxButton's spinner. -->
+      <NxButton v-if="verified" class="oauth-action" variant="primary" :label="confirmLabel" :busy="submitting"
+        :disabled="completionDisabled" @click="complete()" />
+      <NxButton class="oauth-action" variant="secondary" :label="t.ui.cancel" :disabled="submitting" @click="cancelFromUser" />
     </component>
     <!-- The host page owns recovery of an unknown sign-in result. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
@@ -31,6 +29,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
@@ -298,15 +297,19 @@ onUnmounted(() => {
 <style scoped>
 .third-party-auth { margin: var(--v5-space-5) 0; color: var(--v5-ink); }
 .oauth-title { display: block; font-size: var(--ui-type-subheading); font-weight: var(--ui-type-subheading-weight); margin-bottom: var(--v5-space-3); }
-.oauth-copy { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.6; color: var(--v5-ink-2); margin: 10px 0; overflow-wrap: break-word; }
-.oauth-panel { padding: 14px; margin-top: var(--v5-space-3); border-radius:var(--v5-radius-m); background: var(--v5-surface); }
-.oauth-identity { display: block; overflow-wrap: break-word; font-weight: 600; margin: var(--v5-space-3) 0; }
-.oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px; border-radius: 10px; color: var(--v5-ink); background: var(--v5-surface-2); margin: var(--v5-space-3) 0; }
-.oauth-button { min-height: 44px; display: flex; align-items: center; justify-content: center; margin-top: 10px; border-radius:var(--ui-radius-icon); background: var(--v5-brand); color: white; font-size: var(--ui-type-button); }
-.oauth-button:active { opacity: 0.8; }
-.oauth-button:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.oauth-button[aria-disabled="true"] { opacity: 0.5; }
-.oauth-secondary { background: var(--v5-surface-2); color: var(--v5-ink); }
+/* Card and sheet descriptions use the description role (10 §10.1); the sheet body is dialog body copy. */
+.oauth-copy { display: block; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); margin: var(--v5-space-2) 0; overflow-wrap: break-word; }
+.oauth-panel-sheet .oauth-copy { font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
+/* A plain card (01 §1.1.2): surface fill, 16px inset, default card radius, light shadow in the light theme only.
+   Rendered through <component :is="'view'">, which on H5 is a raw inline element, so the card needs display: block. */
+.oauth-panel { display: block; padding: var(--v5-space-4); margin-top: var(--v5-space-3); border-radius: var(--ui-radius-surface); background: var(--v5-surface); }
+:global([data-theme="light"] .oauth-panel) { box-shadow: var(--v5-glass-shadow); }
+.oauth-identity { display: block; overflow-wrap: break-word; font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); margin: var(--v5-space-3) 0; }
+.oauth-label { display: block; margin-top: var(--v5-space-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px 12px; border-radius: var(--ui-radius-icon); color: var(--v5-ink); background: var(--v5-surface-3); font: var(--ui-type-input-weight) var(--ui-type-input)/var(--ui-type-input-lh) var(--font-v5); margin: var(--v5-space-3) 0; }
+.oauth-label + .oauth-input { margin-top: 4px; }
+.oauth-action { display: flex; width: 100%; margin-top: var(--v5-space-3); }
+.oauth-action + .oauth-action { margin-top: var(--v5-space-2); }
 </style>
 
 <style scoped>
