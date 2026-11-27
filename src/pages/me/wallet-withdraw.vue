@@ -323,7 +323,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { createAbortController } from "@/lib/abort-controller-compat";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
-import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
+import { normalizeReviewWindowDays, normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
 import { financialFactState, shouldRequestWithdrawalEligibility, withdrawalFactsActionsFresh } from "@/lib/withdrawal-facts-state";
@@ -943,14 +943,22 @@ const complianceHoldEnabled = computed(() =>
   !pendingAttempt.value
   && (remoteEligibility.value?.complianceReviewRequired ?? withdrawalPolicy.value?.complianceHoldEnabled === true),
 );
-const holdBody = computed(() => {
+// An extra compliance wait is said before submit (06 §6.5), as days only: the server's decision for this amount when read,
+// else the policy guidance; the same applies-test the page used before.
+const complianceHoldDays = computed(() => {
   const policy = withdrawalPolicy.value;
-  if (!policy || amountNum.value <= 0) return t.value.walletV3.complianceReviewBody;
-  // This is policy-based guidance until the server returns this amount's decision.
-  // Submission continues to require a fresh eligibility response.
-  const applies = remoteEligibility.value?.complianceHoldApplies
-    ?? amountNum.value > policy.complianceReviewThresholdUsdt;
-  const days = remoteEligibility.value?.complianceHoldDays ?? (applies ? policy.cooldownDays : 0);
+  if (!complianceHoldEnabled.value || !policy || amountNum.value <= 0) return 0;
+  const applies = remoteEligibility.value?.complianceHoldApplies ?? amountNum.value > policy.complianceReviewThresholdUsdt;
+  return normalizeReviewWindowDays(remoteEligibility.value?.complianceHoldDays ?? (applies ? policy.cooldownDays : 0));
+});
+const reviewNoticeText = computed(() => complianceHoldDays.value > 0
+  // A full-width stop needs no space before the next sentence; Latin and Cyrillic sentences do.
+  ? [t.value.walletV3.withdrawReviewNotice, fmt(t.value.walletV3.withdrawHoldNotice, { days: complianceHoldDays.value })]
+    .join(t.value.walletV3.withdrawReviewNotice.endsWith("。") ? "" : " ")
+  : t.value.walletV3.withdrawReviewNotice);
+const holdBody = computed(() => {
+  if (!withdrawalPolicy.value || amountNum.value <= 0) return t.value.walletV3.complianceReviewBody;
+  const days = complianceHoldDays.value;
   return days > 0
     ? fmt(t.value.walletV3.complianceHoldBody, { days })
     : t.value.walletV3.complianceReviewNoHoldBody;
@@ -1251,7 +1259,7 @@ function withdrawRulesItems(net: CryptoNetwork, networkFee: number): RuleItem[] 
   const usdt = (value: number) => `${formatGroupedAmount(value, "full")}\u00A0USDT`;
   const label = ALL_NETWORKS.find((nw) => nw.id === net)!.label;
   return [
-    { title: r.amountTitle, body: r.amountBody, figures: { min: usdt(minWithdrawable.value), max: usdt(USDT_WITHDRAWAL_DISPLAY_MAX) } },
+    { title: r.amountTitle, body: r.amountBody, figures: { range: `${formatGroupedAmount(minWithdrawable.value, "full")}–${formatGroupedAmount(USDT_WITHDRAWAL_DISPLAY_MAX, "full")}\u00A0USDT` } },
     { title: r.etaTitle, body: r.etaBody },
     formatGroupedAmount(networkFee, "full") === "0"
       ? { title: r.feeTitle, body: r.feeFreeBody, values: { network: label } }
