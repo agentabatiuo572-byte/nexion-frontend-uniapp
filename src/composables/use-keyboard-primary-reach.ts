@@ -3,17 +3,17 @@ import { computed, getCurrentInstance, nextTick, onScopeDispose, ref, watch } fr
 const GAP = 12;
 
 /**
- * Keeps an auth form's primary button reachable while the system keyboard is up (07 §7.2).
+ * Keeps a primary button and its optional description reachable while the system keyboard is up (07 §7.2).
  *
  * App: on focus the system pans the page until the focused input clears the keyboard (adjustPan); an input's
- * cursor-spacing stretches that region down to the primary button's bottom + 12px. The logic layer has no DOM, so the
- * distance is read from the page whenever `layout` (what can change between the inputs and the button) changes. An
+ * cursor-spacing stretches that region down to the target's bottom + 12px. The logic layer has no DOM, so the
+ * distance is read from the page whenever `layout` (what can change between the inputs and the target) changes. An
  * input focused as it mounts (OTP digits) reads its spacing before that read returns, so each input starts from its
  * `seed`: the distance measured on the default layout.
  *
  * H5: the fixed page does not shrink with the keyboard and is no taller than the screen, so nothing scrolls. While an
  * input inside `form` is focused and the keyboard is up, `inset` (a spacer after the form) makes the page as much
- * taller as the keyboard hides, and the page scrolls the button to 12px above the keyboard on focus, on keyboard
+ * taller as the keyboard hides, and the page scrolls the target to 12px above the keyboard on focus, on keyboard
  * changes (the visual viewport resizing or panning) and on `layout` changes. With no keyboard nothing scrolls, and the
  * spacer goes when the keyboard does, so the closed page is unchanged.
  */
@@ -21,9 +21,11 @@ export function useKeyboardPrimaryReach(options: {
   root: string;
   form: string;
   primary: string;
+  primaryDescription?: string;
   inputs: Record<string, { selector: string; seed: number }>;
   layout: () => unknown;
 }) {
+  const { primary, primaryDescription } = options;
   const measured = ref<Record<string, number>>({});
   const inset = ref(0);
   // #ifdef APP-PLUS
@@ -32,15 +34,18 @@ export function useKeyboardPrimaryReach(options: {
     await nextTick();
     const keys = Object.keys(options.inputs);
     const query = uni.createSelectorQuery().in(instance?.proxy);
-    query.select(options.primary).boundingClientRect();
+    query.select(primary).boundingClientRect();
+    if (primaryDescription) query.select(primaryDescription).boundingClientRect();
     for (const key of keys) query.select(options.inputs[key].selector).boundingClientRect();
     query.exec((rects: (UniApp.NodeInfo | null)[]) => {
-      const button = rects[0]?.bottom;
-      if (button === undefined) return;
+      const descriptionBottom = primaryDescription ? rects[1]?.bottom : undefined;
+      const targetBottom = descriptionBottom ?? rects[0]?.bottom;
+      if (targetBottom === undefined) return;
+      const inputStart = primaryDescription ? 2 : 1;
       const next: Record<string, number> = {};
       keys.forEach((key, i) => {
-        const bottom = rects[i + 1]?.bottom;
-        if (bottom !== undefined) next[key] = Math.max(0, Math.ceil(button - bottom) + GAP);
+        const bottom = rects[i + inputStart]?.bottom;
+        if (bottom !== undefined) next[key] = Math.max(0, Math.ceil(targetBottom - bottom) + GAP);
       });
       measured.value = next;
     });
@@ -65,11 +70,12 @@ export function useKeyboardPrimaryReach(options: {
     if (!form || !scroller) return;
     inset.value = hidden;
     void nextTick(() => {
-      const button = form.querySelector(options.primary)?.getBoundingClientRect();
-      if (!button) return;
+      const description = primaryDescription ? form.querySelector(primaryDescription) : null;
+      const target = (description ?? form.querySelector(primary))?.getBoundingClientRect();
+      if (!target) return;
       const top = viewport.offsetTop + (parseFloat(getComputedStyle(scroller).paddingTop) || 0);
-      // Never scroll the focused input out of view to reach the button.
-      const shift = Math.min(button.bottom + GAP - (viewport.offsetTop + viewport.height), field.getBoundingClientRect().top - GAP - top);
+      // Never scroll the focused input out of view to reach the target.
+      const shift = Math.min(target.bottom + GAP - (viewport.offsetTop + viewport.height), field.getBoundingClientRect().top - GAP - top);
       if (shift > 0) scroller.scrollTop += shift;
     });
   }
