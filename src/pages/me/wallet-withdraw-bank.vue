@@ -308,7 +308,8 @@ const cardTag = computed(() => {
   if (!shown?.enabled) return { tone: "warning", label: c0.tagUnavailable } as const;
   if (!shown.beneficiary) return { tone: "warning", label: c0.unbound } as const;
   if (!bankBeneficiaryReady(shown.beneficiary)) return { tone: "warning", label: bankAccountNotice(shown.beneficiary) === "unverified" ? c0.tagUnverified : c0.tagUnavailable } as const;
-  if (busy.value || configBlockReason.value) return { tone: "warning", label: c0.tagUnavailable } as const;
+  // While a read is in flight the tray says 加载中 above the grey button; the tag only follows real blockers, so it does not flash.
+  if (configBlockReason.value) return { tone: "warning", label: c0.tagUnavailable } as const;
   return { tone: "success", label: c0.available } as const;
 });
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
