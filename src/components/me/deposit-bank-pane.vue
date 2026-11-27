@@ -1030,8 +1030,9 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-sum--done { margin-top: 24px; }
 /* Result-state entries to the next layer: the shared text link (03 §3.9), centred under the head, 44px target row. */
 .nx-bank-link-row { display: flex; justify-content: center; align-items: center; min-height: 44px; margin-top: 6px; }
-/* Mismatch expected/received values: the 10.1 行内数值 role (as the withdrawal quote rows). */
-.nx-bank-fig { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+/* Mismatch expected/received values: the 10.1 行内数值 size, line height and weight; amounts in a label/value row keep the
+   interface face (01.2 plain figures). */
+.nx-bank-fig { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-v5); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 /* Credited details: the same role, in the interface face (01.2 plain figures). */
 .nx-bank-sum--done .nx-bank-sum__v { font-family: var(--font-v5); }
 @media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring :deep(.nx-bank-ring__value) { transition: none; } }
