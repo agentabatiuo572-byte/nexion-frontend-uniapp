@@ -14,7 +14,7 @@ const minWithdrawal = 3; // D5 launch minimum (B142), shared by policy and eligi
 // HdPayHostedDepositService / AppVietQrIntentService: hosted capacity is unknown, not a manual bank pool.
 const bankConfig={enabled:true,paymentMode:'hosted',dailyCapacityKnown:false,minDepositUsdt:5,maxDepositUsdt:5000,todayRemainingDepositUsdt:0,todayRemainingVnd:0,toleranceVnd:1000,graceMinutes:10,version:1,feeVnd:0,feeUsdt:0};
 const bankFx={baseRateVndPerUsdt:25000,buySpreadPct:0,quoteRateVndPerUsdt:25000,lockWindowMinutes:15,version:1};
-const refuse=(status,message)=>{throw Object.assign(new Error(message),{status});};
+const refuse=(status,message,data)=>{throw Object.assign(new Error(message),{status,data});};
 export const demoUsdtWithdrawalNetworks = ["USDT-BEP20", "USDT-ERC20"];
 export const demoWithdrawalNetworks = state => ({ "bep20-erc20": demoUsdtWithdrawalNetworks, bep20: ["USDT-BEP20"], erc20: ["USDT-ERC20"], closed: [] }[state.withdrawNetworksState] ?? demoUsdtWithdrawalNetworks);
 export const demoPayoutAddressDelayHours = 24;
@@ -225,7 +225,11 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/withdrawals/policy") return demoWithdrawalPolicy(state, facts);
   if (p === "/api/withdrawals/eligibility") {
     const input = method === 'GET' ? Object.fromEntries(url.searchParams) : request.postDataJSON();
-    return demoWithdrawalEligibility(state, input, now, facts, demoWithdrawalPolicy(state, facts)).view;
+    const policy = demoWithdrawalPolicy(state, facts);
+    if (typeof input?.policyVersion !== 'string' || input.policyVersion.trim() !== policy.policyVersion) {
+      refuse(409, 'WITHDRAWAL_POLICY_VERSION_CONFLICT', { policyVersion: policy.policyVersion });
+    }
+    return demoWithdrawalEligibility(state, input, now, facts, policy).view;
   }
   if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: demoPayoutAddressCooldownDays, effectiveDelayHours: demoPayoutAddressDelayHours, inFlightWithdrawalBlocked: true };
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig, enabled: state.topupChannels !== "bank-off" } };

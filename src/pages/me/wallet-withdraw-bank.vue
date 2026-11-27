@@ -55,7 +55,7 @@
           <view class="acct__ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
           <view class="acct__grow"><text class="k">{{ c.recipientTitle }}</text><text class="acct__no">{{ dots(recipient.maskedAccount) }}</text></view>
           <!-- Changing the account is offered before a quote exists; a live quote is left with "重新填写金额" first. -->
-          <view v-if="!quote" class="acct__change nx-frosted-button" role="button" tabindex="0" :aria-disabled="busy" :aria-label="c.changeAccount" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.change }}</text></view>
+          <view v-if="!quote" class="acct__change nx-frosted-button" role="button" tabindex="0" :aria-disabled="navigationLocked" :aria-label="c.changeAccount" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.change }}</text></view>
         </view>
         <view v-if="(formStep === 'amount' && displayConfig.beneficiary && !hasVerifiedBankIdentity(displayConfig.beneficiary)) || (quote && !hasVerifiedBankIdentity(quote))" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
 
@@ -122,7 +122,7 @@
                 <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: displayConfig.capacity ? usdt2(displayConfig.capacity.maxWithdrawableUsdt) : "—" }) }}</text>
                 <text v-if="displayConfig.policy" data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
               </view>
-              <text v-if="amountError" class="error-text" role="alert">{{ amountError }}</text>
+              <text v-if="quoteReason && quoteReason !== c.amountErrors.daily" class="error-text" role="alert">{{ quoteReason }}</text>
             </view>
           </view>
           <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
@@ -132,7 +132,7 @@
           </view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
-          <view class="action text-link" role="button" tabindex="0" :aria-disabled="busy" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
+          <view class="action text-link" role="button" tabindex="0" :aria-disabled="navigationLocked" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
         </template>
         <view v-if="error || (!quote && displayConfig.enabled && (!displayConfig.policy || !displayConfig.capacity))" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
@@ -167,10 +167,10 @@
           <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="confirmSubmit" @keydown.enter.prevent="confirmSubmit" @keydown.space.prevent="confirmSubmit"><text>{{ c.confirm }}</text></view>
         </template>
         <template v-else-if="formStep === 'account'">
-          <view class="action secondary nx-tray-text" role="button" tabindex="0" :aria-disabled="busy" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ displayConfig.beneficiary ? c.changeAccount : c.addAccount }}</text></view>
+          <view class="action secondary nx-tray-text" role="button" tabindex="0" :aria-disabled="navigationLocked" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ displayConfig.beneficiary ? c.changeAccount : c.addAccount }}</text></view>
           <view v-if="displayConfig.beneficiary" class="action primary" role="button" tabindex="0" data-testid="bank-continue" :aria-disabled="busy || !canContinue" @click="continueWithdrawal" @keydown.enter.prevent="continueWithdrawal" @keydown.space.prevent="continueWithdrawal"><text>{{ c.continueWithdrawal }}</text></view>
         </template>
-        <view v-else class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="busy || !canContinue || !!amountProblem" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
+        <view v-else class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="quoteDisabled" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
       </view>
     </template>
     <!-- 提现说明:只读时一个「确认」;确认提现时同一个弹窗,「确认提现」按原流程提交,「取消」回到报价(勾选保留)。
@@ -249,6 +249,8 @@ const quote = ref<BankQuote | null>(null);
 const order = ref<BankOrder | null>(null);
 const busy = ref(false);
 const silentRead = ref(false);
+const readingLimits = ref(false);
+const navigationLocked = computed(() => busy.value && !readingLimits.value);
 const error = ref("");
 const configPresentation = ref<{ owner: string; epoch: number; value: BankConfig } | null>(null);
 const displayConfig = computed(() => {
@@ -298,6 +300,7 @@ const resultTone = computed(() => outcome.value === "paid" ? "success" : outcome
 const recipient = computed(() => order.value?.bank ?? quote.value ?? displayConfig.value?.beneficiary);
 const canContinue = computed(() => newWithdrawalAllowed.value && bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
 const amountProblem = computed(() => bankAmountError(amount.value, config.value));
+const quoteDisabled = computed(() => busy.value || !canContinue.value || !!amountProblem.value);
 const maxAmount = computed(() => bankMaximumAmount(config.value));
 // Card/row tail as "•••• 1234"; the masked prefix comes from the server.
 function dots(masked: string): string { return masked.replace(/^[*•]+/, "•••• "); }
@@ -312,24 +315,26 @@ const quoteRatio = computed(() => {
 const secondsLeft = computed(() => Math.max(0, Math.ceil(((parseServerTimestamp(quote.value?.expiresAt) ?? 0) - now.value) / 1000)));
 const title = computed(() => quote.value ? c.value.confirmTitle : formStep.value === "amount" ? c.value.amountTitle : c.value.recipientTitle);
 const feeNote = computed(() => displayConfig.value?.policy ? format(c.value.feeNote, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
-// Why 「获取报价」 is grey. A silent re-read keeps the values on screen; any other read shows no reason until it ends.
-const amountError = computed(() => {
-  if (busy.value && !silentRead.value) return "";
-  const problem = silentRead.value ? bankAmountError(amount.value, displayConfig.value) : amountProblem.value;
-  if (!problem) return "";
-  // Missing limits are a read the system is retrying; a closed channel is not.
-  if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
-  return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
-});
-// Show the first bank configuration blocker on the account step.
-const continueReason = computed(() => {
+const configBlockReason = computed(() => {
   const shown = displayConfig.value;
-  if ((busy.value && !silentRead.value) || !shown) return "";
+  if (!shown) return "";
   if (!shown.enabled) return c.value.unavailable;
   if (shown.beneficiary && !bankBeneficiaryReady(shown.beneficiary)) return accountStatus.value;
   if (shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
   return shown.capacity && !shown.capacity.withdrawalEnabled ? c.value.unavailable : "";
 });
+const quoteReason = computed(() => {
+  if (!quoteDisabled.value) return "";
+  if (configBlockReason.value) return configBlockReason.value;
+  if (displayConfig.value && !displayConfig.value.beneficiary) return c.value.unboundNotice;
+  const problem = bankAmountError(amount.value, displayConfig.value);
+  if (!problem || problem === "unavailable") return busy.value ? c.value.loading : "";
+  return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
+});
+const continueReason = computed(() => busy.value && !silentRead.value ? "" : configBlockReason.value);
+// Daily exhaustion includes the next eligible time.
+const quoteNote = computed(() => quoteReason.value === c.value.amountErrors.daily && displayConfig.value?.capacity
+  ? `${c.value.dailyExhausted} ${displayDate(displayConfig.value.capacity.dailyCountResetAt)}` : quoteReason.value);
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
 const rulesMode = ref<"read" | "submit" | null>(null);
@@ -370,7 +375,7 @@ function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.v
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }
 function goBack() {
-  if (busy.value) return;
+  if (navigationLocked.value) return;
   // The quote reference is saved, so leaving is safe; the result is read again on return.
   if (uncertain.value) { navBack("/pages/me/wallet-withdraw-method"); return; }
   if (quote.value) { void abandon(); return; }
@@ -394,28 +399,40 @@ async function run(action: (current: () => boolean) => Promise<void>, quietRead 
   if (!canReadVisibleBankPage()) return;
   if (busy.value) return;
   const current = scope(); busy.value = true; silentRead.value = quietRead; error.value = "";
-  try { await action(current); } catch (err) { if (current()) report(err); }
-  finally { if (current()) { busy.value = false; silentRead.value = false; } }
+  try { await action(current); } catch (err) {
+    if (current()) {
+      if (readingLimits.value) throw err;
+      report(err);
+    }
+  } finally {
+    if (current()) { readingLimits.value = false; busy.value = false; silentRead.value = false; }
+  }
 }
-async function load() {
+function load() { return loadConfig(false); }
+async function loadConfig(recoverLimits: boolean) {
   await run(async current => {
     const owner = app.accountKey, epoch = app.accountBindingEpoch;
-    config.value = null; accepted.value = false;
-    if (requestedOrder !== null || order.value) {
+    const readingReceipt = requestedOrder !== null || !!order.value;
+    const pending = readingReceipt ? null : readPendingQuoteNo();
+    readingLimits.value = recoverLimits && !readingReceipt && !pending;
+    if (!readingLimits.value) { config.value = null; accepted.value = false; }
+    if (readingReceipt) {
       const orderNo = requestedOrder ?? order.value!.withdrawalNo;
       if (!/^WD-[A-Z0-9]+$/.test(orderNo)) throw new Error("BANK_ORDER_ROUTE_INVALID");
       const loadedOrder = await api.get(orderNo);
       if (current()) { order.value = loadedOrder; uncertain.value = false; }
       return;
     }
-    const pending = readPendingQuoteNo();
     if (pending) {
       uncertain.value = true; pendingQuoteNo.value = pending;
       const recovered = await api.recover(pending); if (!current()) return;
       applyRecovery(recovered, pending);
       if (recovered.state === "COMMITTED" || uncertain.value) return;
     }
-    const loaded = await api.config(); if (!current()) return; config.value = loaded;
+    const loaded = await api.config();
+    if (!current() || (readingLimits.value && !canReadVisibleBankPage())) return;
+    readingLimits.value = false;
+    config.value = loaded;
     configPresentation.value = { owner, epoch, value: loaded };
     if (loaded.unresolvedIntent?.state === "MULTIPLE") { quote.value = null; uncertain.value = true; return; }
     const intent = loaded.unresolvedIntent?.intents[0];
@@ -496,16 +513,17 @@ useAutoRecovery({
 // Limits (single limit, balance, daily count) that came back missing are re-read by the system (03 §3.5.2).
 // Orders, unknown results and quotes have the reader above, and load() would clear a quote's consent, so they are left out.
 const limitsMissing = computed(() => !!config.value?.enabled && !!config.value.beneficiary && (!config.value.policy || !config.value.capacity));
+const canRereadLimits = () => limitsMissing.value && !order.value && !uncertain.value && !quote.value;
 useAutoRecovery({
-  failed: () => canReadVisibleBankPage() && limitsMissing.value && !busy.value && !order.value && !uncertain.value && !quote.value,
-  retry: load,
+  failed: () => canReadVisibleBankPage() && canRereadLimits() && !busy.value,
+  retry: () => loadConfig(true),
   repeatMs: 30_000,
 });
 
 watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenticated], ([isVisible, allowed, sessionReady, authenticated], [wasVisible]) => {
   if (!isVisible || !allowed || !sessionReady || !authenticated) return;
   // Orders and unknown results have one read owner; load() would reset consent.
-  if (order.value || uncertain.value) return;
+  if (order.value || uncertain.value || canRereadLimits()) return;
   if (!wasVisible || (!config.value && !quote.value)) void load();
 });
 
@@ -540,7 +558,7 @@ async function openIntent(intent: BankIntent) {
     applyRecovery(recovered, intent.quoteNo);
   });
 }
-function manageBank() { if (!busy.value && !quote.value && !uncertain.value && !multipleIntents.value.length) navTo("/pages/me/wallet-cards-new?returnTo=%2Fpages%2Fme%2Fwallet-withdraw-bank"); }
+function manageBank() { if (!navigationLocked.value && !quote.value && !uncertain.value && !multipleIntents.value.length) navTo("/pages/me/wallet-cards-new?returnTo=%2Fpages%2Fme%2Fwallet-withdraw-bank"); }
 async function getQuote() {
   refreshPendingAttempt();
   if (!canContinue.value || amountProblem.value || uncertain.value || quote.value) return;
@@ -617,7 +635,7 @@ function startNew() {
 }
 function clearScope() {
   pendingQuoteNo.value = null; orderReadGeneration++;
-  revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; error.value = ""; uncertain.value = false;
+  revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingLimits.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }
 function invalidate() {
