@@ -6,6 +6,11 @@ import { changeDemoPassword, demoAccountPasswordMatches, demoSecurityAccount } f
 import { createSignInDemo, demoExistingUser as existing, findDemoSignInUser } from './prototype-demo-sign-in.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
+export const oauthProviderOptions = [
+  ['normal', '默认授权'],
+  ['apple-start-failure', 'Apple 登录开始失败'],
+  ['apple-new-identity', 'Apple 新身份开户'],
+];
 const recoverPath = /^\/auth\/users\/login\/attempts\/([^/]+)\/recover$/;
 const registrationReceipt = {
   sponsorCode: null, sponsorDisplayName: null, sourceEnvironment: 'PRODUCTION',
@@ -19,8 +24,13 @@ const resetRoot = '/auth/users/password-reset/otp';
 const providerRoot = '/auth/users/oauth/provider';
 const resetPaths = [resetRoot + '/send', resetRoot + '/verify', resetRoot + '/complete'];
 export const demoAuthorizePrefix = 'https://127.0.0.1/auth/users/oauth/provider/authorize/';
-const loginIdentities = { GOOGLE: existing, TELEGRAM: demoReferralBuyer.user };
+const demoProviderIdentities = [
+  { provider: 'GOOGLE', subject: String(existing.userId), user: existing, requiresCode: true },
+  { provider: 'TELEGRAM', subject: String(demoReferralBuyer.user.userId), user: demoReferralBuyer.user, requiresCode: true },
+];
 const linkableProviders = ['GOOGLE', 'APPLE', 'TELEGRAM'];
+const newAppleSubject = 'new-apple';
+const newAppleUser = { userId: 583920418, countryCode: '', phone: '', nickname: 'Apple Preview', onboardingComplete: false };
 
 export function createAuthDemo(state) {
   let saved = null;
@@ -29,12 +39,13 @@ export function createAuthDemo(state) {
   const resetChallenges = new Map();
   const providerFlows = new Map();
 
-  function linksFor(accountId) {
-    const accounts = state.oauthDemoLinksByAccount ??= {};
-    return accounts[accountId] ??= Object.entries(loginIdentities)
-      .filter(([, user]) => String(user.userId) === accountId)
-      .map(([provider]) => provider);
-  }
+  const identities = () => state.oauthDemoProviderIdentities ??= structuredClone(demoProviderIdentities);
+  const identityFor = (provider, subject) =>
+    identities().find(identity => identity.provider === provider && identity.subject === subject);
+  const linksFor = accountId => identities()
+    .filter(({ user }) => String(user.userId) === accountId)
+    .map(({ provider }) => provider);
+  const activeUser = () => state.authUser ?? (state.promotionBuyer === 'sponsored-new' ? demoReferralBuyer.user : existing);
 
   function passwordReset(path, body) {
     const user = findDemoSignInUser(body.countryCode, body.phone);
@@ -65,13 +76,20 @@ export function createAuthDemo(state) {
 
   function startProvider(body, headers) {
     const { intent, provider } = body;
+    if (!linkableProviders.includes(provider) || !['LINK', 'LOGIN'].includes(intent))
+      return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
     const accountId = intent === 'LINK' ? previewAccountId(state, headers) : null;
-    const user = Object.hasOwn(loginIdentities, provider) ? loginIdentities[provider] : null;
     if (intent === 'LINK') {
       if (!accountId) return failure(401, 'AUTH_REQUIRED');
-      if (!linkableProviders.includes(provider)) return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
       if (linksFor(accountId).includes(provider)) return failure(409, 'OAUTH_PROVIDER_ALREADY_LINKED');
-    } else if (intent !== 'LOGIN' || !user) return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
+    } else if (provider === 'APPLE' && state.oauthProviderScenario === 'apple-start-failure') {
+      return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
+    }
+
+    const latestBinding = identities().findLast(identity => identity.provider === provider && identity.subject !== newAppleSubject);
+    const newApple = provider === 'APPLE' && state.oauthProviderScenario === 'apple-new-identity';
+    const subject = accountId ?? (newApple ? newAppleSubject : latestBinding?.subject ?? newAppleSubject);
+    const displayName = accountId ? activeUser().nickname : identityFor(provider, subject)?.user.nickname ?? newAppleUser.nickname;
 
     const now = Date.now();
     for (const [id, flow] of providerFlows) if (flow.expiresAt <= now) providerFlows.delete(id);
@@ -79,8 +97,7 @@ export function createAuthDemo(state) {
     const flowId = 'OIDC-' + randomBytes(16).toString('hex');
     const flowKey = randomBytes(32).toString('base64url');
     const authorizeKey = randomBytes(32).toString('base64url');
-    const displayName = intent === 'LINK' ? state.authUser?.nickname ?? 'Alex' : user.nickname;
-    providerFlows.set(flowId, { flowId, flowKey, authorizeKey, intent, provider, accountId, user, displayName,
+    providerFlows.set(flowId, { flowId, flowKey, authorizeKey, intent, provider, accountId, subject, displayName,
       expiresAt: now + expiresInSec * 1000 });
     return success({ flowId, flowKey, expiresInSec, authorizationUrl: demoAuthorizePrefix + authorizeKey });
   }
@@ -100,26 +117,34 @@ export function createAuthDemo(state) {
       const accountId = previewAccountId(state, headers);
       if (flow.intent !== 'LINK' || !accountId || accountId !== flow.accountId) return failure(403, 'AUTH_REQUIRED');
       if (!demoAccountPasswordMatches(state, body.password, accountId)) return failure(403, 'OAUTH_LINK_PASSWORD_INVALID');
-      const linked = linksFor(accountId);
-      if (linked.includes(flow.provider)) return failure(409, 'OAUTH_PROVIDER_ALREADY_LINKED');
-      linked.push(flow.provider);
+      if (linksFor(accountId).includes(flow.provider)) return failure(409, 'OAUTH_PROVIDER_ALREADY_LINKED');
+      identities().push({ provider: flow.provider, subject: flow.subject, user: activeUser() });
       flow.consumed = true;
       return success(null);
     }
 
     if (flow.intent !== 'LOGIN' || body.provider !== flow.provider) return failure(403, 'OAUTH_ACCOUNT_LINK_REQUIRED');
-    const { user } = flow;
-    if (!linksFor(String(user.userId)).includes(flow.provider)) return failure(403, 'OAUTH_ACCOUNT_LINK_REQUIRED');
-    if (!body.challengeNo && !body.code) {
-      const deliveryHint = '****' + user.phone.slice(-4);
-      flow.challengeNo ??= 'OTP-' + randomBytes(16).toString('hex');
-      return failure(428, 'USER_TWO_FACTOR_VERIFICATION_REQUIRED', {
-        accessToken: null, refreshToken: null, tokenType: 'Challenge',
-        user: { ...user, phone: deliveryHint }, challengeNo: flow.challengeNo, deliveryHint,
-      });
+    const identity = identityFor(flow.provider, flow.subject);
+    if (!identity) {
+      if (state.registrationState === 'device-limit') return failure(409, 'USER_REGISTRATION_DEVICE_LIMIT');
+      identities().push({ provider: flow.provider, subject: flow.subject, user: { ...newAppleUser } });
+      flow.consumed = true;
+      return issueLogin({ ...session({ ...newAppleUser }), registrationReceipt }, body.deviceName);
     }
-    if (!flow.challengeNo || body.challengeNo !== flow.challengeNo || body.code !== '123456')
-      return failure(422, 'USER_TWO_FACTOR_CHALLENGE_INVALID');
+
+    const { user } = identity;
+    if (identity.requiresCode || demoSecurityAccount(state, user.userId).twoFactorEnabled) {
+      if (!body.challengeNo && !body.code) {
+        const deliveryHint = '****' + user.phone.slice(-4);
+        flow.challengeNo ??= 'OTP-' + randomBytes(16).toString('hex');
+        return failure(428, 'USER_TWO_FACTOR_VERIFICATION_REQUIRED', {
+          accessToken: null, refreshToken: null, tokenType: 'Challenge',
+          user: { ...user, phone: deliveryHint }, challengeNo: flow.challengeNo, deliveryHint,
+        });
+      }
+      if (!flow.challengeNo || body.challengeNo !== flow.challengeNo || body.code !== '123456')
+        return failure(422, 'USER_TWO_FACTOR_CHALLENGE_INVALID');
+    }
     flow.consumed = true;
     return issueLogin(session(user), body.deviceName);
   }
@@ -204,7 +229,7 @@ export function createAuthDemo(state) {
       if (path === '/auth/users/refresh') {
         return state.sessionState === 'signed-out' || headers.authorization && !previewAccountId(state, headers)
           ? failure(401, 'AUTH_REQUIRED')
-          : issue(session(state.authUser ?? (state.promotionBuyer === 'sponsored-new' ? demoReferralBuyer.user : existing)));
+          : issue(session(activeUser()));
       }
       if (path === '/auth/users/register/otp/send') {
         const challengeNo = 'REG-' + randomBytes(16).toString('hex');
