@@ -14,6 +14,7 @@ import type { WithdrawalRiskRoute } from "@/store/config-types";
 import { decideFromStores, isDailyLimitReached, nextDayResetAt } from "@/store/withdrawal-eligibility-core";
 import { usePayoutAddress } from "@/store/payout-address";
 import { remoteApiEnabled, withdrawalApi } from "@/api/runtime";
+import type { WithdrawalQuote } from "@/api/withdrawal-api";
 import {
   fromWithdrawNetwork,
   NEW_ADDRESS_AGE_DAYS,
@@ -53,6 +54,7 @@ export interface WithdrawalEligibility {
   /** FEAT-WD01b:下次可提时间(明日 0 点),用于文案插值 */
   dailyCountResetAt: number;
   configVersion: string;
+  quote?: WithdrawalQuote | null;
 }
 
 // ROUTE_SEVERITY / worse() 已迁到 withdrawal-eligibility-core.ts —— 判定逻辑单源在那边,
@@ -180,6 +182,7 @@ export function requestWithdrawalEligibility(
   daily: WithdrawalDailyFacts,
   requestedUsdt: number | undefined,
   policyVersion: string,
+  useNexFeeOffset: boolean,
 ): Promise<WithdrawalEligibility> {
   if (network === "BANK-VND") return Promise.reject(new Error("BANK_WITHDRAWAL_QUOTE_REQUIRED"));
   if (remoteApiEnabled) {
@@ -188,20 +191,8 @@ export function requestWithdrawalEligibility(
       chain: network,
       address,
       policyVersion,
-    }).then((snapshot) => ({
-      canSubmit: snapshot.canSubmit,
-      maxWithdrawableUsdt: snapshot.maxWithdrawableUsdt,
-      route: snapshot.route,
-      riskReasons: snapshot.riskReasons,
-      fastLaneApplied: snapshot.fastLaneApplied,
-      complianceReviewRequired: snapshot.complianceReviewRequired,
-      complianceHoldApplies: snapshot.complianceHoldApplies,
-      complianceHoldDays: snapshot.complianceHoldDays,
-      waivedGates: snapshot.waivedGates,
-      dailyLimitReached: snapshot.dailyLimitReached,
-      dailyCountResetAt: snapshot.dailyCountResetAt,
-      configVersion: snapshot.configVersion,
-    }));
+      useNexFeeOffset,
+    });
   }
   return new Promise((resolve, reject) => {
     setTimeout(() => {

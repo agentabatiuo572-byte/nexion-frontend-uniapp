@@ -7,6 +7,21 @@ import type { WithdrawalRiskRoute } from "../store/config-types";
 
 export type SupportedWithdrawalNetwork = "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
 
+/** Wire values are preserved as sent by the server for confirmation and replay. */
+export interface WithdrawalQuote {
+  networkFee: string;
+  nexBurned: string;
+  netReceive: string;
+}
+
+const QUOTE_CHANGED = "WITHDRAWAL_QUOTE_CHANGED";
+
+export class WithdrawalQuoteChangedError extends ApiError {
+  constructor(readonly policyVersion: string | null, readonly quote: WithdrawalQuote | null) {
+    super({ kind: "http", status: 409, code: 409, message: QUOTE_CHANGED });
+  }
+}
+
 export interface WithdrawalSubmission {
   withdrawalNo: string;
   targetAddress?: string;
@@ -114,6 +129,7 @@ export interface WithdrawalApi {
     chain: SupportedWithdrawalNetwork;
     address: string;
     policyVersion: string;
+    useNexFeeOffset: boolean;
   }): Promise<WithdrawalEligibilitySnapshot>;
   get(withdrawalNo: string): Promise<WithdrawalDetailSnapshot>;
   readAttempt(idempotencyKey: string, signal?: AbortSignal): Promise<WithdrawalAttemptReadResult>;
@@ -125,6 +141,7 @@ export interface WithdrawalApi {
     policyVersion: string,
     useNexFeeOffset: boolean,
     idempotencyKey: string,
+    confirmedQuote?: WithdrawalQuote,
   ): Promise<WithdrawalSubmission>;
 }
 
@@ -135,6 +152,7 @@ export interface WithdrawalAttemptAbandonInput {
   address: string;
   policyVersion: string;
   useNexFeeOffset: boolean;
+  confirmedQuote?: WithdrawalQuote;
 }
 
 export type WithdrawalAttemptAbandonResult =
@@ -160,12 +178,21 @@ export interface WithdrawalEligibilitySnapshot {
   dailyLimitReached: boolean;
   dailyCountResetAt: number;
   configVersion: string;
+  quote: WithdrawalQuote | null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+export function parseWithdrawalQuote(value: unknown): WithdrawalQuote | null {
+  const { networkFee, nexBurned, netReceive } = record(value) ?? {};
+  const unsigned = (field: unknown): field is string => typeof field === "string" && /^\d{1,12}\.\d{6}$/.test(field);
+  if (!unsigned(networkFee) || !unsigned(nexBurned)
+      || typeof netReceive !== "string" || !/^-?\d{1,12}\.\d{6}$/.test(netReceive)) return null;
+  return { networkFee, nexBurned, netReceive };
 }
 
 function parseAttemptRead(value: unknown, status: number): WithdrawalAttemptReadResult {
@@ -405,6 +432,7 @@ function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
   const max = number(row?.maxWithdrawableUsdt);
   const reset = number(row?.dailyCountResetAt, 1);
   const configVersion = text(row?.configVersion);
+  const quote = parseWithdrawalQuote(row?.quote);
   const complianceHoldDays = typeof row?.complianceHoldDays === "number"
     ? number(row.complianceHoldDays) : null;
   if (!row || typeof row.canSubmit !== "boolean" || max === null
@@ -417,7 +445,8 @@ function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
       || (!row.complianceHoldApplies && complianceHoldDays !== 0)
       || (!row.complianceReviewRequired && row.complianceHoldApplies)
       || (row.complianceReviewRequired && row.fastLaneApplied)
-      || reset === null || !configVersion) {
+      || reset === null || !configVersion
+      || (!quote && (row.quote != null || route !== "reject" || !reasons.includes("network-disabled")))) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_ELIGIBILITY_RESPONSE_INVALID" });
   }
   return {
@@ -427,7 +456,7 @@ function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
     complianceHoldApplies: row.complianceHoldApplies,
     complianceHoldDays,
     waivedGates: waived as string[], dailyLimitReached: row.dailyLimitReached,
-    dailyCountResetAt: reset, configVersion,
+    dailyCountResetAt: reset, configVersion, quote,
   };
 }
 
@@ -830,17 +859,26 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
           address: input.address,
           policyVersion: input.policyVersion,
           useNexFeeOffset: input.useNexFeeOffset,
+          confirmedQuote: input.confirmedQuote,
         },
         timeoutMs: 30_000,
       }));
     },
-    submit: async (amount, chain, targetAddress, policyVersion, useNexFeeOffset, idempotencyKey) =>
-      parseSubmission(await client.request({
+    submit: (amount, chain, targetAddress, policyVersion, useNexFeeOffset, idempotencyKey, confirmedQuote) =>
+      client.request<WithdrawalSubmission>({
         method: "POST",
         path: "/api/withdrawals",
-        body: { amount, chain, address: targetAddress, policyVersion, useNexFeeOffset },
+        body: { amount, chain, address: targetAddress, policyVersion, useNexFeeOffset, confirmedQuote },
         idempotencyKey,
         timeoutMs: 30_000,
-      })),
+        acceptedResponses: [{ status: 409, code: 409, message: QUOTE_CHANGED }],
+        parseResponseData: (data, status) => {
+          if (status === 409) {
+            const replacement = record(data);
+            throw new WithdrawalQuoteChangedError(text(replacement?.policyVersion), parseWithdrawalQuote(replacement?.quote));
+          }
+          return parseSubmission(data);
+        },
+      }),
   };
 }

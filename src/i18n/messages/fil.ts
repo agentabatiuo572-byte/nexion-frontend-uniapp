@@ -4483,6 +4483,7 @@ export const fil: Messages = {
   },
   walletV3: {
     withdrawFeeStale: "Na-update ang fee rate — subukan ulit",
+    withdrawQuoteChanged: "Nagbago ang quote. Pakisuri at kumpirmahin muli.",
     withdrawContextStale: "Nagbago ang account o payout address mo — isumite ulit",
     withdrawHandledElsewhere: "Naproseso na ang orihinal na request ng withdrawal sa ibang page. Tingnan ang history ng withdrawal mo.",
     withdrawEarlierOutcome: "Naunang request: {outcome}",

@@ -4483,6 +4483,7 @@ export const id: Messages = {
   },
   walletV3: {
     withdrawFeeStale: "Tarif biaya telah diperbarui — coba lagi",
+    withdrawQuoteChanged: "Penawaran telah berubah. Silakan periksa dan konfirmasi lagi.",
     withdrawContextStale: "Akun atau alamat penerima Anda berubah — kirim ulang",
     withdrawHandledElsewhere: "Permintaan penarikan awal telah ditangani di halaman lain. Periksa riwayat penarikan Anda.",
     withdrawEarlierOutcome: "Permintaan sebelumnya: {outcome}",

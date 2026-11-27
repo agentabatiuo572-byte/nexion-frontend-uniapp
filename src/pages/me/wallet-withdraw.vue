@@ -7,12 +7,9 @@
   StakeAlternativeCard (configured minimum) → NEX offset toggle (default OFF) → sticky submit.
 
   Gates: 该网络已设提现地址(payout-address store 单源), 换址冻结窗口 (submit greyed),
-  amount within configured withdrawable limits. Fee model (FEAT-WD02):
-  fee = withdrawRules.networkConfirmFeeUsd[network] — fixed per withdrawal, admin D5
-  configurable ([0,25], seed TRC20/BEP20 $1 · ERC20 $5). NEX offset is OPT-IN
-  (offsetWithNex, default off): on → burn min(userNex, ceil(fee/offsetRate)), pay the
-  remainder; off → NEX is never burned. Submit freezes quote + toggle + amount, then goes
-  through POST /api/withdrawals — the server is sole authority for the debit, the NEX burn and
+  amount within configured withdrawable limits. Eligibility quotes the fee, optional UVT offset
+  and amount received. Confirmation freezes that quote with the request and idempotency key.
+  POST /api/withdrawals is authoritative for the debit, the UVT burn and
   its own ledger, so this page never touches balances (D5). It only writes the local
   bill rows (postReceiptForAccount, numbers taken from the server receipt), because the
   bills store is still the app's only user-facing ledger.
@@ -186,7 +183,7 @@
         <text class="wd-line">{{ t.walletV3.feeDetailPlaceholder }}</text>
       </view>
       <!-- 🔴 金额超出可提范围:**给原因,不给报价**(2026-08-01 走查 P0-3)。报价必须只对真能提交的金额出。 -->
-      <view v-else-if="quoteBlocked" class="wd-fee__msg">
+      <view v-else-if="quoteBlocked || !activeQuote" class="wd-fee__msg">
         <text v-if="withdrawalActionsFresh" class="wd-warn">{{ submitDisabledReason }}</text>
       </view>
       <!-- FEAT-WD02:单行网络确认费(每笔固定;$0 显示 $0.00 不藏行)。「?」打开费用说明半屏。 -->
@@ -210,7 +207,7 @@
             class="nx-fee-offset-switch grid place-items-center shrink-0"
             role="switch"
             :aria-checked="offsetWithNex ? 'true' : 'false'"
-            :aria-disabled="inputsLocked || offsetToggleDisabled ? 'true' : 'false'"
+            :aria-disabled="inputsLocked || (offsetToggleDisabled && !offsetWithNex) ? 'true' : 'false'"
             :aria-label="t.walletV3.feeOffsetToggle"
             tabindex="0"
             :style="switchHitStyle"
@@ -312,7 +309,7 @@ import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
+import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt, type WithdrawAttempt } from "@/lib/withdraw-attempt";
 import { createAbortController } from "@/lib/abort-controller-compat";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { normalizeReviewWindowDays, normalizeSlaHours } from "@/store/withdrawal-arrival-core";
@@ -336,16 +333,15 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
 import { evaluateWithdrawal, requestWithdrawalEligibility, type WithdrawalEligibility } from "@/store/withdrawal-eligibility";
-import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { confirm as uiConfirm, toast, type RuleItem } from "@/store/ui";
-import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
+import type { Withdrawal } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 
 // Submission failures share the exact refusal and original-attempt policy below.
 import { ApiError } from "@/api/errors";
 import { triageWithdrawFailure } from "@/lib/withdraw-failure-triage";
-import type { WithdrawalAttemptReadResult, WithdrawalPolicy } from "@/api/withdrawal-api";
+import { WithdrawalQuoteChangedError, type WithdrawalAttemptReadResult, type WithdrawalPolicy, type WithdrawalQuote } from "@/api/withdrawal-api";
 
 const ALL_NETWORKS: { id: CryptoNetwork; label: string }[] = [
   { id: "USDT-TRC20", label: "TRC20" },
@@ -500,6 +496,7 @@ async function abandonPendingAttempt() {
         address: pending.address,
         policyVersion: pending.policyVersion,
         useNexFeeOffset: pending.offset,
+        confirmedQuote: pending.confirmedQuote,
       });
       if (!scopeIsCurrent()) return;
       forgetWithdrawAttempt(accountKey, pending.key);
@@ -839,46 +836,6 @@ const remoteEligibility = ref<WithdrawalEligibility | null>(null);
 const remoteEligibilityFailed = ref(false);
 let refreshedConflictVersion = "";
 let remoteEligibilityEpoch = 0;
-watch([amountNum, network, boundAddress, pendingAttempt, maxWithdrawable, dailyFacts, withdrawalActionsFresh, () => app.accountKey, () => withdrawalPolicy.value?.policyVersion], async () => {
-  // A changed amount/network/address invalidates the previous server decision
-  // immediately. Keeping the old accepted decision visible until the next
-  // request settles can briefly re-enable submit for inputs the server has
-  // never approved.
-  const epoch = ++remoteEligibilityEpoch;
-  const requestedAccountKey = app.accountKey;
-  const requestedAccountBindingEpoch = app.accountBindingEpoch;
-  const runScope = captureRuntimeRevision();
-  remoteEligibility.value = null;
-  remoteEligibilityFailed.value = false;
-  const policyVersion = withdrawalPolicy.value?.policyVersion;
-  if (pendingAttempt.value || !policyVersion || networkClosed.value || !shouldRequestWithdrawalEligibility({
-    remote: remoteApiEnabled,
-    factsFresh: withdrawalActionsFresh.value,
-    policyVersion,
-    amount: amountNum.value,
-    addressLength: boundAddress.value.length,
-  })) {
-    return;
-  }
-  try {
-    const snapshot = await requestWithdrawalEligibility(requestedAccountKey, network.value, boundAddress.value,
-      maxWithdrawable.value, dailyFacts.value, amountNum.value, policyVersion);
-    if (isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteEligibilityEpoch)) {
-      remoteEligibility.value = snapshot;
-    }
-  } catch (cause) {
-    if (!isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteEligibilityEpoch)) return;
-    remoteEligibilityFailed.value = true;
-    // Refresh once for a rejected version. A new version reruns this watcher;
-    // an unchanged version must not create an endless retry loop.
-    if (cause instanceof ApiError && cause.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT"
-      && refreshedConflictVersion !== policyVersion) {
-      refreshedConflictVersion = policyVersion;
-      await loadWithdrawalPolicy();
-      if (!isCurrentWithdrawalFactsScope(requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, epoch, remoteEligibilityEpoch)) return;
-    }
-  }
-}, { immediate: true });
 
 // ── 地址管理入口 + 换址后 24h 冻结(RM01a ⑤)──────────────────────
 // 管理入口常开:在途单 / 频控拦截由地址管理页与 store 的**同一个**判据呈现
@@ -947,19 +904,15 @@ const reviewNoticeText = computed(() => complianceHoldDays.value > 0
   ? [t.value.walletV3.withdrawReviewNotice, fmt(t.value.walletV3.withdrawHoldNotice, { days: complianceHoldDays.value })]
     .join(t.value.walletV3.withdrawReviewNotice.endsWith("。") ? "" : " ")
   : t.value.walletV3.withdrawReviewNotice);
-// ── Fee model (FEAT-WD02): fixed per-network confirm fee + OPT-IN NEX offset ──
-// fee = withdrawRules.networkConfirmFeeUsd[network](后台 D5 单源,[0,25]);
-// 开关 offsetWithNex 默认关 —— 关着一枚 NEX 都不烧;开着烧 min(userNex, ceil(fee/offsetRate))。
-// offsetRate 走 phase 派发(§13.4 权威,全档 $0.40)。配置读不到时不允许回退写死值 —— 见 feeConfigUsable 门。
-// 提交期间连 NEX 余额一起冻:开关 hint 与抵扣行都从费用链渲染,
-// 扣完 NEX 立刻重算会让页面在 spinner 期间自己改价(对抗证伪实测)。
-// 冻结面必须覆盖**同一条数据链上的全部渲染点**。
-/** 提交期间冻结的 NEX 余额(与报价同一时刻)。 */
+// Keep the balance hint stable while the service quote is being confirmed.
 const submittingNexBalance = ref<number | null>(null);
 const nexBalance = computed(() => submittingNexBalance.value ?? app.user.nexBalance);
-const nexFeeOffsetRate = computed(() => withdrawalPolicy.value?.nexFeeOffsetRate ?? 0);
-/** FEAT-WD02:NEX 抵扣开关(规格 ③:默认关;server 侧无此意图永不烧 NEX)。 */
 const offsetWithNex = ref(pendingAttempt.value?.offset ?? false);
+function restoreWithdrawInputs(attempt: WithdrawAttempt) {
+  selectedNetwork.value = attempt.network;
+  amount.value = attempt.amount.toFixed(2);
+  offsetWithNex.value = attempt.offset;
+}
 watch(pendingAttempt, (pending, previous) => {
   if (pending) {
     amount.value = pending.amount.toFixed(2);
@@ -970,41 +923,12 @@ watch(pendingAttempt, (pending, previous) => {
   }
 }, { flush: "sync" });
 /** 按当前绑定网络取网络确认费键(网络派生自 pairing 响应式 —— 换绑回本页即时刷新)。 */
-const NETWORK_FEE_KEY: Record<CryptoNetwork, WithdrawNetworkKey> = {
+const NETWORK_FEE_KEY = {
   "USDT-TRC20": "trc20",
   "USDT-BEP20": "bep20",
   "USDT-ERC20": "erc20",
-};
-const networkConfirmFee = computed(
-  () => withdrawalPolicy.value?.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]] ?? 0,
-);
-const feeCalc = computed(() =>
-  computeWithdrawFee(
-    amountNum.value,
-    nexBalance.value,
-    offsetWithNex.value,
-    nexFeeOffsetRate.value,
-    networkConfirmFee.value,
-  ),
-);
-/**
- * 冻结报价对**当前**权威值是否仍成立 —— 与 app.ts 提交边界同一个纯函数、同一组入参
- * (5 参:含网络键与权威费率 map,fail-closed)。
- *
- * 🔴 这里读活值(nexFeeOffsetRate / currentNetworkConfirmFeeUsd)是**故意**的:
- * 它就是「确认后校验」那一步 —— 拿冻结件去问权威值还认不认。与「await 之后一律用快照」
- * 不冲突:快照供扣款,活值只供判「要不要拒单」。反过来用冻结费率复验冻结报价,
- * 等式恒成立、判据恒为真 = 这道门等于没有。
- */
-function quoteStillValid(fee: WithdrawalFeeSnapshot, offset: boolean, net: CryptoNetwork): boolean {
-  return isWithdrawalFeeSnapshotValid(
-    fee,
-    offset,
-    nexFeeOffsetRate.value,
-    NETWORK_FEE_KEY[net],
-    withdrawalPolicy.value?.networkConfirmFeeUsd ?? null,
-  );
-}
+} as const;
+
 // 🔴 费率可用性是**两个合取项**,少一个就等于回退写死值:
 //   ① 配置真拉到了(!syncFailed)—— 拉取失败时 store 仍保留 DEFAULT_PLATFORM_CONFIG 种子,
 //      光看值是「合法」的,只查值 = 按写死的 mock seed 算费并放行下单,正是规格禁止的回退。
@@ -1031,31 +955,30 @@ async function retryFeeConfig() {
 // 骨架条:形状对齐真实明细行(标签窄、数值宽),非通用转圈。
 const feeSkeletonLabelStyle = "width: 72px; height: 12px; border-radius: 4px; background: var(--v5-surface-2)";
 const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-2)";
-// 🔴 提交期间**冻结报价**。feeCalc 依赖 nexBalance,而提交链的第一步就是扣 NEX ——
-// 扣完之后整条链立刻重算,抵扣消失、费用跳回原价。两个后果:
-//  ① 页面在用户盯着 spinner 的这 ~1 秒里自己改价(明细两行消失、到账数字掉下来);
-//  ② 更严重的是拿重算后的值去下单(见 handleSubmit 里的 snap.quote)。
-// 报价一旦要展示给用户确认就必须定死,直到本次提交结束 —— 冻结点在**确认弹窗打开之前**,
-// 弹窗文案、页面明细、扣款入参共用同一份 snap.quote(R2 P1-B:确认 A 报价被扣 B 报价)。
-const submittingQuote = ref<ReturnType<typeof computeWithdrawFee> | null>(null);
-const activeFee = computed(() => submittingQuote.value ?? feeCalc.value);
-const networkConfirmUsd = computed(() => activeFee.value.networkConfirmUsd);
-const nexBurned = computed(() => activeFee.value.nexBurned);
-const feeWaived = computed(() => activeFee.value.feeWaived);
-const fee = computed(() => activeFee.value.actualFee);
-const receive = computed(() => activeFee.value.netReceive);
+const submittingQuote = ref<WithdrawalQuote | null>(null);
+const activeQuote = computed(() => submittingQuote.value ?? (pendingAttempt.value
+  ? pendingAttempt.value.confirmedQuote
+  : remoteEligibility.value?.quote));
+const networkConfirmUsd = computed(() => Number(activeQuote.value?.networkFee ?? 0));
+const nexBurned = computed(() => Number(activeQuote.value?.nexBurned ?? 0));
+const receive = computed(() => activeQuote.value?.netReceive);
+const fee = computed(() => Number((amountNum.value - Number(receive.value ?? 0)).toFixed(6)));
+const feeWaived = computed(() => Number((networkConfirmUsd.value - fee.value).toFixed(6)));
 /** 开关置灰判据:没有 NEX 可抵(NEX=0 → 置灰 + 去赚 NEX 入口,规格 ② 异常1)。 */
 const offsetToggleDisabled = computed(() => nexBalance.value <= 0);
 function toggleOffset() {
   // 提交期间输入面全冻结(与金额输入 :disabled 同纪律 —— 开关也是报价的输入)。
   if (inputsLocked.value) return;
   // 置灰不可开:原因就写在下方 hint(NEX=0),旁边是去赚 NEX 出口。
-  if (offsetToggleDisabled.value) return;
+  if (offsetToggleDisabled.value && !offsetWithNex.value) return;
   offsetWithNex.value = !offsetWithNex.value;
 }
 /** 开关下方的状态行:置灰原因 / 免费网络 / 关态说明 / 开态消耗数(全额或部分)。 */
 const offsetHintText = computed(() => {
   if (offsetToggleDisabled.value) return t.value.walletV3.feeOffsetNoNex;
+  if (!activeQuote.value) {
+    return offsetWithNex.value ? "" : fmt(t.value.walletV3.feeOffsetOffHint, { n: fmtNex(nexBalance.value) });
+  }
   if (networkConfirmUsd.value <= 0) return t.value.walletV3.feeOffsetFreeNetwork;
   if (!offsetWithNex.value) return fmt(t.value.walletV3.feeOffsetOffHint, { n: fmtNex(nexBalance.value) });
   if (fee.value <= 0.0001) return fmt(t.value.walletV3.feeOffsetOnFull, { nex: fmtNex(nexBurned.value) });
@@ -1149,7 +1072,8 @@ watch([
 
   async function poll(): Promise<void> {
     try {
-      if (!stillStored()) return;
+      const attempt = pendingAttempt.value;
+      if (!attempt || !stillStored()) return;
       const result = await withdrawalApi.readAttempt(attemptKey, controller.signal);
       if (!stillStored()) return;
       if (result.state === "COMMITTED") {
@@ -1172,6 +1096,11 @@ watch([
         if (result.state === "REJECTED") {
           forgetWithdrawAttempt(accountKey, attemptKey);
           refreshPendingAttempt();
+          if (result.reasonCode === 409 && result.reason === "WITHDRAWAL_QUOTE_CHANGED" && !pendingAttempt.value) {
+            recoveryResult.value = null;
+            restoreWithdrawInputs(attempt);
+            toast.info(t.value.walletV3.withdrawQuoteChanged);
+          }
           return;
         }
       }
@@ -1213,24 +1142,17 @@ function amountParts(text: string): [string, string] {
 // 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案;码表单源 lib/risk-reason-text)。
 // ── 🔴 小额免审快车道的**双向告知**(走查:能力在跑,但一个字都没告诉用户)──
 /** 小额线(后台 D5 可配,禁写死 —— 运营调了这里必须跟着变)。 */
-/**
- * 🔴 报价是对「你提交后会发生什么」的承诺 —— **提交不了就没有会发生什么**。
- * 判据直接取页面统一的拦截单源,不另起一套:另起必然漂移成「明细区说能提、按钮说不能提」。
- * 覆盖低于最低额 / 超过可提余额 / 今日笔数用完 / 换绑冻结 / 费率不可用等全部原因。
- * (金额为空由前一个分支的占位说明接管,不走这里。)
- */
-// A background revalidation invalidates the action gate, never the already
-// confirmed display quote. The next submit still requires fresh facts and a
-// server eligibility round-trip below. Initial/failed reads have no readable
-// snapshot and therefore remain blocked from numeric quote rendering.
+// Keep the server quote readable during background revalidation. An insufficient
+// net amount is still a quote, and the user can adjust the amount or offset.
 const quoteDisplayBlocked = computed(() =>
   !pendingAttempt.value && amountNum.value > 0
   && !withdrawalQuoteRefreshing.value
-  && submitDisabledReason.value !== "",
+  && submitDisabledReason.value !== ""
+  && submitDisabledReason.value !== t.value.help.loadingMore
+  && submitDisabledReason.value !== t.value.walletV3.withdrawRecoveryReasonAmount,
 );
-// The fee detail rows (confirm fee + receive) show only for an amount that can actually be quoted.
 const feeDetailReady = computed(() => !feeConfigLoading.value && (pendingAttempt.value || NETWORKS.value.length > 0)
-  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value);
+  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && !!activeQuote.value);
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
@@ -1307,7 +1229,9 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   if (amount > decision.maxWithdrawableUsdt) {
     return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatTruncatedAmount(decision.maxWithdrawableUsdt) });
   }
+  if (decision.quote && Number(decision.quote.netReceive) <= 0) return t.value.walletV3.withdrawRecoveryReasonAmount;
   if (!decision.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
+  if (remoteApiEnabled && !decision.quote) return t.value.walletV3.submitReasonServiceUnavailable;
   return "";
 }
 const submitDisabledReason = computed(() => disabledReasonFor(amountNum.value, eligibility.value));
@@ -1382,6 +1306,53 @@ async function handleResetAddresses() {
   }
 }
 
+async function readRemoteEligibility(): Promise<void> {
+  const policyVersion = withdrawalPolicy.value?.policyVersion;
+  if (withdrawalCommandBusy.value || pendingAttempt.value || !policyVersion || networkClosed.value
+    || !withdrawalPageVisible.value || !foregroundReadAllowed() || !shouldRequestWithdrawalEligibility({
+      remote: remoteApiEnabled, factsFresh: withdrawalActionsFresh.value, policyVersion,
+      amount: amountNum.value, addressLength: boundAddress.value.length,
+    })) return;
+
+  const epoch = ++remoteEligibilityEpoch;
+  const account = app.accountKey;
+  const binding = app.accountBindingEpoch;
+  const scope = captureRuntimeRevision();
+  const isCurrent = () => isCurrentWithdrawalFactsScope(account, binding, scope.epoch, epoch, remoteEligibilityEpoch);
+  try {
+    const snapshot = await requestWithdrawalEligibility(account, network.value, boundAddress.value,
+      maxWithdrawable.value, dailyFacts.value, amountNum.value, policyVersion, offsetWithNex.value);
+    if (!isCurrent()) return;
+    remoteEligibility.value = snapshot;
+    remoteEligibilityFailed.value = false;
+  } catch (cause) {
+    if (!isCurrent()) return;
+    remoteEligibility.value = null;
+    remoteEligibilityFailed.value = true;
+    // A changed version starts a new read. Do not keep reloading an unchanged policy.
+    if (cause instanceof ApiError && cause.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT"
+      && refreshedConflictVersion !== policyVersion) {
+      refreshedConflictVersion = policyVersion;
+      await loadWithdrawalPolicy();
+    }
+  }
+}
+
+const quoteInputs = computed(() => [amountNum.value, network.value, boundAddress.value, offsetWithNex.value,
+  pendingAttempt.value?.key, app.accountBindingEpoch, withdrawalPolicy.value?.policyVersion] as const);
+watch([quoteInputs, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdrawalPageVisible, foregroundReadAllowed],
+  ([inputs], [previousInputs], onCleanup) => {
+    remoteEligibilityEpoch += 1;
+    // Only a refresh of the same inputs can retain the last quote on screen.
+    if (inputs !== previousInputs) {
+      remoteEligibility.value = null;
+      remoteEligibilityFailed.value = false;
+    }
+    const timer = setTimeout(() => void readRemoteEligibility(), 250);
+    onCleanup(() => clearTimeout(timer));
+  }, { immediate: true });
+useAutoRecovery({ failed: () => remoteEligibilityFailed.value, retry: readRemoteEligibility });
+
 async function handleSubmit() {
   if (!remoteSessionReady.value || withdrawalCommandBusy.value) return;
   // 🔴 **上一次没确认结果的提交,必须先收口,才允许开始新的一笔**(2026-08-11 独立审计 P0)。
@@ -1404,138 +1375,94 @@ async function handleSubmit() {
     amount.value = pending.amount.toFixed(2);
     offsetWithNex.value = pending.offset;
   }
-  // 🔴 **一份提交快照收全族**(2026-08-04 R2 三条 P1 同一个根:跨 await 的状态漂移)。
-  //
-  // 参与这次提交的每一个输入 —— 账号 / 网络 / 收款地址 / 金额 / 可提上限 / 抵扣开关 / 报价 ——
-  // 在**第一个 await 之前**一次冻结;弹窗文案、扣款、建单、账单、拒单归因全部只读这一份。
-  // 此前只冻了金额,报价与账号却取在 `await uiConfirm` **之后**:
-  //  · 报价:feeCalc 依赖费率 / 网络确认费 / NEX 余额,而这些由后台配置同步、算力 tick、
-  //    阶段换档在任意时刻改写 —— 遮罩只挡用户的手,挡不住后台数据流。用户确认的是 A 报价,
-  //    实际扣的是 B 报价(R2 P1-B);
-  //  · 账号:确认期间换号 → 账单会落到新账号,弹窗展示的却是旧账号的数字(R2 P1-C)。
-  // 不变量:首个 await 之后一律读 snap,不再读任何活值;活值只在下面「确认后校验」里
-  // 用来判「快照过期了没有」,判完不符即拒,绝不静默按新值扣款。
-  // 存在未收口尝试时,快照的每一项都取冻结件(而不是活值)—— 重放必须与首次逐字节相同,
-  // 否则撞上服务端「同 key + 异 body → 409 + 安全事件」。policyVersion 尤其:
-  // 它由后台发布节奏改写,用户看不见,却是 body 的一部分。
-  const q = feeCalc.value;
+  // Freeze the request inputs before the asynchronous eligibility check. A replay
+  // uses the stored inputs and quote, and bypasses today's eligibility entirely.
   const snap = {
     account: app.accountKey,
+    binding: app.accountBindingEpoch,
     network: pending?.network ?? network.value,
     address: pending?.address ?? boundAddress.value,
     amount: pending?.amount ?? amountNum.value,
-    maxWithdrawable: maxWithdrawable.value,
     offset: pending?.offset ?? offsetWithNex.value,
     policyVersion: pending?.policyVersion ?? withdrawalPolicy.value!.policyVersion,
     idempotencyKey: pending?.key ?? newWithdrawKey(),
-    quote: q,
-    // 🔴 日限事实**也进快照**,与 account 同源同刻。曾经这里刻意取活值,理由写的是
-    // 「确认弹窗期间另一个标签页提交成功,冻住的快照看不见它」—— 那句话是错的:
-    // 提现单列表是内存状态,别的标签页的写入根本不进本标签页(全仓没有任何 storage 事件
-    // 重新水合 store),活值与快照在跨标签页这件事上一样瞎。取活值买不到它声称的东西,
-    // 却引入了真问题:弹窗期间切账号,会拿**新账号的单据**去判**旧账号的额度**,
-    // 弹出一句对这个账号纯属虚假的「今日已用完」(R1 三份独立审计各自抓到)。
-    // 同标签页内输入面已锁、列表不会新增行,冻结无损失,还把「await 后只读 snap」这条
-    // 不变量恢复成没有例外。跨标签页并发由服务端事务兜底,本来就不该客户端管。
+    maxWithdrawable: maxWithdrawable.value,
     daily: dailyFacts.value,
-    // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
-    fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
   };
-  // 页面显示也钉在同一份快照上(弹窗 = 页面 = 扣款,一份)。遮罩后面的费用明细若还跟着活值走,
-  // 用户点完确认抬头就会看到与刚才弹窗不一样的数。
-  submittingQuote.value = snap.quote;
-  submittingNexBalance.value = app.user.nexBalance;
-  // FEAT-WD02 ⑥「提交提现 → 现有确认弹窗」:金额 / 单行网络确认费 / NEX 抵扣消耗(开了才显)
-  // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。
-  // 新提现和重放都用明细行(ConfirmOptions.rows);重放另有一句只发这一笔。
-  // The same frozen quote as rows: amount, network fee, UVT offset (only when used), network, address, received.
-  // Amounts show two decimals cut off, never rounded; the address is shown whole to be checked (03 §3.6.1).
-  const amountRow = { label: t.value.walletV3.withdrawRowAmount, value: `${formatTruncatedAmount(snap.amount)}\u00A0USDT` };
-  const networkRow = { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label };
-  const addressRow = { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address };
-  const confirmRows = [
-    amountRow,
-    { label: t.value.walletV3.feeConfirmRow, value: `−${formatTruncatedAmount(snap.quote.networkConfirmUsd)}\u00A0USDT` },
-    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+${formatTruncatedAmount(snap.quote.feeWaived)}\u00A0USDT · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
-    networkRow,
-    addressRow,
-    { label: t.value.wallet.receiveLabel, value: `${formatTruncatedAmount(snap.quote.netReceive)}\u00A0USDT`, amount: true },
-  ];
-  // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
-  // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,
-  // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。地址整行显示供核对,同新提交的 code 行(03 §3.6.1)。
-  const resendRows = [amountRow, networkRow, addressRow];
-  confirmingSubmit.value = true;
-  let confirmed = false;
-  try {
-    confirmed = await uiConfirm({
-      title: pending ? t.value.walletV3.withdrawResendTitle : t.value.walletV3.withdrawConfirmTitle,
-      // A new withdrawal shows the frozen quote as a detail list (P-45); the replay lists only its amount, network and
-      // address, under one sentence that only this withdrawal is sent.
-      message: pending ? t.value.walletV3.withdrawResendBody : undefined,
-      rows: pending ? resendRows : confirmRows,
-      glyph: "withdraw",
-      // A new withdrawal carries the withdrawal rules under its rows, from the same frozen network and fee; the replay does not.
-      rules: pending ? undefined : { title: t.value.walletV3.withdrawRules.title, items: withdrawRulesItems(snap.network, snap.quote.networkConfirmUsd) },
-      confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
-    });
-  } finally {
-    confirmingSubmit.value = false;
-  }
-  if (!confirmed || (pending && !canRetryPendingAttempt.value)) {
-    clearSubmitFreeze();
-    return;
-  }
-  submitting.value = true;
-  // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
-  // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
-  // 🔴 重放**不进**前置评估:它是给「新的一笔」用的前置过滤(判当前额度/风控放不放行),
-  // 而重放要送的那笔可能**已经在服务端落库了** —— 拿今天的额度去否掉它,并不能把它撤回来,
-  // 只会让未收口的那笔永远收不了口(实景实测:可提额跌到冻结金额以下,重放每次都被这里挡住)。
-  // 重放的权威是服务端的幂等记录:真不该放行,服务端会明确拒绝,那才是定局、才退役键。
+  const ownsRequest = () => remoteSessionReady.value && app.accountKey === snap.account
+    && app.accountBindingEpoch === snap.binding;
   let fresh: WithdrawalEligibility | null = null;
-  if (!pending) {
-    try {
-      fresh = await requestWithdrawalEligibility(
-        snap.account,
-        snap.network,
-        snap.address,
-        snap.maxWithdrawable,
-        snap.daily,
-        snap.amount,
-        snap.policyVersion,
-      );
-    } catch (err) {
-      clearSubmitFreeze();
-      if (err instanceof ApiError && err.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT") {
-        remoteEligibilityEpoch += 1;
-        remoteEligibility.value = null;
-        remoteEligibilityFailed.value = true;
-        await loadWithdrawalPolicy();
-        toast.info(t.value.walletV3.withdrawFeeStale);
+  let confirmedQuote = pending?.confirmedQuote;
+
+  confirmingSubmit.value = true;
+  try {
+    if (!pending) {
+      remoteEligibilityEpoch += 1;
+      submitting.value = true;
+      try {
+        fresh = await requestWithdrawalEligibility(snap.account, snap.network, snap.address,
+          snap.maxWithdrawable, snap.daily, snap.amount, snap.policyVersion, snap.offset);
+      } catch (err) {
+        if (!ownsRequest()) return;
+        if (err instanceof ApiError && err.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT") {
+          remoteEligibility.value = null;
+          remoteEligibilityFailed.value = true;
+          await loadWithdrawalPolicy();
+          toast.info(t.value.walletV3.withdrawFeeStale);
+        } else {
+          const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
+          if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+          else toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
+        }
+        return;
+      } finally {
+        submitting.value = false;
+      }
+      if (!ownsRequest() || network.value !== snap.network || boundAddress.value !== snap.address) {
+        toast.error(t.value.walletV3.withdrawContextStale);
         return;
       }
-      // The eligibility call is the one server round-trip on this path, so a region
-      // refusal surfaces here as a rejection. Translate it; `null` = not a region
-      // refusal, so keep the existing timeout message rather than mislabelling a
-      // genuine timeout as a region block.
-      const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
-      // 钱路径上被拦,先说钱的下落 —— 用户第一个念头是「我那笔钱呢」,不是「哪些功能开了」。
-      if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
-      else toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
-      return;
+      remoteEligibility.value = fresh;
+      remoteEligibilityFailed.value = false;
+      if (fresh.route === "reject" || !fresh.canSubmit || snap.amount > fresh.maxWithdrawableUsdt
+        || !fresh.quote || Number(fresh.quote.netReceive) <= 0) {
+        toast.error(disabledReasonFor(snap.amount, fresh) || t.value.walletV3.submitReasonReviewBlocked);
+        return;
+      }
+      confirmedQuote = fresh.quote;
+      snap.policyVersion = fresh.configVersion;
     }
-    if (fresh.route === "reject" || !fresh.canSubmit || snap.amount > fresh.maxWithdrawableUsdt) {
-      clearSubmitFreeze();
-      // 拦截必须给原因 + 下一步。并发场景下这条分支最常见的成因是「另一个标签页刚把
-      // 今日额度用掉了」——笼统的「暂不能提交」既没原因也没下一步(验收实测三标签页
-      // 下 7/10 都落到这句)。额度用完是可判定的,就说清楚它。
-      toast.error(fresh.dailyLimitReached ? dailyLimitReachedText.value : t.value.walletV3.submitReasonReviewBlocked);
-      return;
-    }
+
+    submittingQuote.value = confirmedQuote ?? null;
+    submittingNexBalance.value = app.user.nexBalance;
+    const usdt = (value: string | number) => formatTruncatedAmount(value) + "\u00A0USDT";
+    const amountRow = { label: t.value.walletV3.withdrawRowAmount, value: usdt(snap.amount) };
+    const networkRow = { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label };
+    const addressRow = { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address };
+    const confirmRows = !pending && confirmedQuote ? [
+      amountRow,
+      { label: t.value.walletV3.feeConfirmRow, value: "−" + usdt(confirmedQuote.networkFee) },
+      ...(nexBurned.value > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: "+" + usdt(feeWaived.value) + " · " + fmtNex(nexBurned.value) + "\u00A0UVT" }] : []),
+      networkRow,
+      addressRow,
+      { label: t.value.wallet.receiveLabel, value: usdt(confirmedQuote.netReceive), amount: true },
+    ] : [amountRow, networkRow, addressRow];
+    const confirmed = await uiConfirm({
+      title: pending ? t.value.walletV3.withdrawResendTitle : t.value.walletV3.withdrawConfirmTitle,
+      message: pending ? t.value.walletV3.withdrawResendBody : undefined,
+      rows: confirmRows,
+      glyph: "withdraw",
+      rules: pending ? undefined : { title: t.value.walletV3.withdrawRules.title, items: withdrawRulesItems(snap.network, networkConfirmUsd.value) },
+      confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
+    });
+    if (!confirmed || (pending && !canRetryPendingAttempt.value)) return;
+    submitting.value = true;
+  } finally {
+    confirmingSubmit.value = false;
+    if (!submitting.value) clearSubmitFreeze();
   }
   // Check account ownership before adopting anything from its storage row.
-  if (app.accountKey !== snap.account) {
+  if (!ownsRequest()) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawContextStale);
     return;
@@ -1562,17 +1489,6 @@ async function handleSubmit() {
     toast.error(t.value.walletV3.withdrawContextStale);
     return;
   }
-  //  ② 报价。用与 store 提交边界同一个纯函数复验冻结报价;不成立就走既有「费率已更新,请重试」
-  //     分支 —— 重试会按新费率重新报价,由用户重新确认。放在 debitNex **之前**:
-  //     让 store 拒单后再回滚 NEX 也能对上账,但那条路多烧一次余额写盘,能不进就不进。
-  //     重放不进这道门:冻结件的权威是它自己那份 policyVersion(服务端按它定价并按原键
-  //     返回原结果),拿**今天**的费率去复验**上一次**的报价,费率一变就恒不成立 ——
-  //     那不是拦住一笔错价单,是让未收口的那笔永远收不了口。
-  if (!pending && !quoteStillValid(snap.fee, snap.offset, snap.network)) {
-    clearSubmitFreeze();
-    toast.error(t.value.walletV3.withdrawFeeStale);
-    return;
-  }
   // Real D5 submit. The server is the sole authority for wallet reservation,
   // fee calculation, optional NEX burn, release-bucket checks and ledger writes.
   // No local balance/bill mutation is allowed before or after this call.
@@ -1588,6 +1504,7 @@ async function handleSubmit() {
     address: snap.address,
     policyVersion: snap.policyVersion,
     offset: snap.offset,
+    confirmedQuote,
   })) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawNotSentTitle, t.value.walletV3.withdrawNotSentBody);
@@ -1599,16 +1516,10 @@ async function handleSubmit() {
       snap.amount,
       snap.network,
       snap.address,
-      snap.fee,
       snap.offset,
       snap.policyVersion,
       snap.idempotencyKey,
-      // 重放没有本次前置评估(见上),这四项退回默认值。它们只喂本地留痕,
-      // 不进 POST body —— 换句话说重放的 body 仍与首次逐字节相同(app.ts submitWithdrawal)。
-      fresh?.route ?? "pass",
-      fresh?.riskReasons ?? [],
-      fresh?.fastLaneApplied ?? false,
-      fresh?.waivedGates ?? [],
+      confirmedQuote,
     );
     forgetWithdrawAttempt(snap.account, snap.idempotencyKey);
     refreshPendingAttempt();
@@ -1631,8 +1542,7 @@ async function handleSubmit() {
     //
     // 🔴 分录形状由 `withdrawalBillDrafts(wd)` **单源**构造 —— 同一组分录还有第二个生产点
     // (App.vue 对账的自愈补写),两处各拼一份必然漂移(z4 R2)。
-    // 每个数字都取自服务端回执 `wd.*`,不取本地报价 snap.quote / 本地预检 fresh.route:
-    // 服务端会按 policyVersion 重新定价、也会给出自己的风控裁决,与客户端预检可以不同。
+    // 账单金额和风控结论取自服务端回执。
     // 写失败必须让用户知道:钱已经在服务端动了,台账却没这一笔 —— 静默吞掉等于让用户
     // 在账单页查不到自己的钱去哪了。收口点**有意不弹**通用提示(见它的头注):这里给的是
     // 带下一步的提现专属文案,两条一起弹正是 2026-08-04 修过的同型缺陷。不阻断跳转。
@@ -1679,6 +1589,21 @@ async function handleSubmit() {
     // 刷完再重放 = 同 key 异 body → 409 + 安全事件。
     if (verdict.refreshPolicy) await loadWithdrawalPolicy();
     switch (verdict.kind) {
+      case "quote-changed":
+        if (ownsRequest() && !pendingAttempt.value) {
+          if (pending) restoreWithdrawInputs(pending);
+          if (err instanceof WithdrawalQuoteChangedError && err.quote && err.policyVersion === snap.policyVersion
+            && network.value === snap.network && boundAddress.value === snap.address && fresh) {
+            remoteEligibilityEpoch += 1;
+            remoteEligibility.value = { ...fresh, quote: err.quote, canSubmit: Number(err.quote.netReceive) > 0 };
+            remoteEligibilityFailed.value = false;
+          } else {
+            remoteEligibility.value = null;
+            void readRemoteEligibility();
+          }
+        }
+        showWithdrawReceipt("info", snap.idempotencyKey, t.value.walletV3.withdrawQuoteChanged);
+        return;
       case "daily-limit":
         showWithdrawReceipt("error", snap.idempotencyKey, verdict.fate === "keep" ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
         return;

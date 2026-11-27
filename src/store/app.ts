@@ -4,7 +4,7 @@ import { captureTabSnapshotWrite, saveTabSnapshot, invalidateTabSnapshots } from
 import { runForegroundStoreRead, runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import type { Device, CurrentTask, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
+import type { Device, CurrentTask, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
 import { TASK_CATEGORY_LABEL } from "./types";
 import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
@@ -41,7 +41,7 @@ import { recordAttestation } from "@/store/risk-identity";
 import { commitWithdrawal } from "@/store/withdrawal-eligibility";
 import { advanceArrival, occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
 import { mockServerNow } from "@/store/server-time";
-import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
+import type { OnlineBonus } from "@/store/config-types";
 import { useReceipts } from "./receipts";
 import { generateReceipt } from "@/mock/receipt";
 import {
@@ -63,7 +63,7 @@ import {
 } from "@/api/runtime";
 import type { AppHomeOverview } from "@/api/app-home-api";
 import type { ApiRuntimeConfig } from "@/api/runtime-config";
-import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
+import { toCanonicalWithdrawal, type WithdrawalQuote } from "@/api/withdrawal-api";
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments } from "@/api/task-assignment-api";
 import { ApiError, asApiError } from "@/api/errors";
@@ -2339,27 +2339,11 @@ export const useApp = defineStore("app", () => {
     amount: number,
     network: Withdrawal["network"],
     address: string,
-    fee: WithdrawalFeeSnapshot,
     offsetWithNex: boolean,
     policyVersion: string,
-    // 🔴 幂等键由**调用方**传入,不在这里现造(合并裁决,资金安全级)。
-    // 远端线把这个参数删了、改在函数内用 lib/funds-mutation-key 的生产侧工厂现造一把 ——
-    // 那个工厂每调一次就 randomUUID 一次,于是「超时重试」在服务端眼里是一次**全新请求**,
-    // 第二笔真出账。页面按「一笔提现意图」只 mint 一次并跨重试复用
-    // (wallet-withdraw.vue `currentIdempotencyKey`),只有拿到确定性结局才换键。
-    // 沙箱轨例外:走远端线的持久注册表(见下方 `mutation`),它跨重载/跨标签页更强。
+    // The page persists the key with the original request before sending it.
     idempotencyKey: string,
-    riskRoute: WithdrawalRiskRoute = "pass",
-    riskReasons: string[] = [],
-    // FEAT-WD01a:快车道留痕随单落盘 —— 只算不存的话,事后审计与客服都还原不出
-    // 「这单当时免了哪几道闸」,等于没做。与 riskReasons 同源同去处。
-    fastLaneApplied = false,
-    waivedGates: string[] = [],
-    // 🔴 返回**整张单**而不是单号:调用方要按服务端真实回执记账 —— 手续费实际烧了多少 NEX
-    // 由服务端定(submission.nexBurned),本地报价只是预览。回单号的话调用方只能拿本地
-    // 报价去写账单 = 账本上那个数字指不到单源(本仓禁令),或者回头去 app.withdrawals 里
-    // 按 id 反查 —— 而那个列表会被 bindAccount 整体换掉,换号那一刻正好查空。
-    // 🔴 不返回 null:拒单路径全在服务端,失败一律**抛** ApiError 冒泡给页面分诊。
+    confirmedQuote?: WithdrawalQuote,
   ): Promise<Withdrawal> {
     // 🔴 入口冻结账号(z4 R1 独立审计 P0)。本函数跨一个最长 30s 的 await,期间跨标签页
     // 登出 / 运营吊销 / 重新登录都会 `bindAccount`,把 `accountKey.value` 与
@@ -2382,6 +2366,7 @@ export const useApp = defineStore("app", () => {
       policyVersion,
       offsetWithNex,
       idempotencyKey,
+      confirmedQuote,
     );
     const canonical = toCanonicalWithdrawal(submission, address);
     // Submission is a committed server-side wallet mutation. Do not let the

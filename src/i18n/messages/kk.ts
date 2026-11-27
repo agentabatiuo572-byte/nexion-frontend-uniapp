@@ -4483,6 +4483,7 @@ export const kk: Messages = {
   },
   walletV3: {
     withdrawFeeStale: "Комиссия мөлшерлемесі жаңартылды — қайталап көріңіз",
+    withdrawQuoteChanged: "Есеп өзгерді. Тексеріп, қайта растаңыз.",
     withdrawContextStale: "Аккаунт немесе төлем мекенжайы өзгерді — қайта жіберіңіз",
     withdrawHandledElsewhere: "Бастапқы ақша шығару сұрауы басқа бетте өңделді. Ақша шығару тарихын тексеріңіз.",
     withdrawEarlierOutcome: "Алдыңғы сұрау: {outcome}",

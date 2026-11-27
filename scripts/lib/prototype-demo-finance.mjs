@@ -91,19 +91,38 @@ function demoWithdrawalEligibility(state, input, now, facts, policy) {
     else if (!(amount >= policy.minAmount)) rejection = 'WITHDRAWAL_MIN_AMOUNT_NOT_MET';
     else if (amount > facts.maxWithdrawableUsdt || amount > facts.walletUsdt) rejection = 'WITHDRAWAL_BALANCE_LIMIT_EXCEEDED';
   }
-  return { rejection, view: { ...base, complianceReviewRequired, complianceHoldApplies, complianceHoldDays, canSubmit: !rejection,
+  const quote = typeof input?.useNexFeeOffset === 'boolean'
+    ? wireWithdrawalQuote(withdrawalFeeBreakdown({ amount, network: chain, offset: input.useNexFeeOffset }, policy,
+      demoWithdrawalQuoteNex(state, now))) : undefined;
+  return { rejection, view: { ...base, complianceReviewRequired, complianceHoldApplies, complianceHoldDays,
+    canSubmit: !rejection && (!quote || Number(quote.netReceive) > 0), quote,
     maxWithdrawableUsdt: facts.maxWithdrawableUsdt, route: fastLaneApplied ? 'pass' : 'manual', riskReasons,
     fastLaneApplied, waivedGates: fastLaneApplied ? ['first-withdrawal-review'] : [], dailyLimitReached,
   } };
 }
 
-function createWithdrawalReceipt(frozen, policy, createdAt, nexAvailable, withdrawalNo) {
-  const { amount, network: chain, policyVersion, offset: useNexFeeOffset } = frozen;
-  const feeKey = chain.split('-')[1].toLowerCase();
+function demoWithdrawalQuoteNex(state, now) {
+  const balance = demoWalletNex(state, now);
+  // This option simulates a quote read before an external UVT credit is visible to the submit path.
+  return state.withdrawQuoteState === 'change-once' && !state.withdrawQuoteChangeConsumed ? Math.min(balance, 1) : balance;
+}
+
+function withdrawalFeeBreakdown({ amount, network, offset }, policy, nexAvailable) {
+  const feeKey = network.split('-')[1].toLowerCase();
   const networkFee = policy.networkConfirmFeeUsd[feeKey];
-  const nexBurned = useNexFeeOffset ? Math.min(nexAvailable, Math.ceil(networkFee / policy.nexFeeOffsetRate)) : 0;
-  const feeWaived = Math.floor(nexBurned * policy.nexFeeOffsetRate * 1e6) / 1e6;
+  const nexBurned = offset ? Math.min(nexAvailable, Math.ceil(networkFee / policy.nexFeeOffsetRate)) : 0;
+  const feeWaived = Math.min(networkFee, Math.floor(Math.round(nexBurned * 1e6) * policy.nexFeeOffsetRate) / 1e6);
   const actualFee = money(networkFee - feeWaived);
+  return { networkFee, nexBurned, feeWaived, actualFee, netReceive: money(amount - actualFee) };
+}
+
+function wireWithdrawalQuote({ networkFee, nexBurned, netReceive }) {
+  return { networkFee: networkFee.toFixed(6), nexBurned: nexBurned.toFixed(6), netReceive: netReceive.toFixed(6) };
+}
+
+function createWithdrawalReceipt(frozen, policy, createdAt, fees, withdrawalNo) {
+  const { amount, network: chain, policyVersion, offset: useNexFeeOffset } = frozen;
+  const { networkFee, nexBurned, feeWaived, actualFee, netReceive } = fees;
   const { fastLaneApplied, strongReview, ...risk } = demoWithdrawalRisk(policy, chain, amount);
   const holdAt = createdAt + risk.complianceHoldDays * day;
   return {
@@ -113,7 +132,7 @@ function createWithdrawalReceipt(frozen, policy, createdAt, nexAvailable, withdr
     payoutDueAt: new Date(holdAt + policy.payoutSlaHours * 3600000).toISOString(),
     networkConfirmUsd: networkFee, networkFee, penaltyFeeRate: 0, penaltyFee: 0, grossFee: networkFee,
     nexBurned, feeWaived, penaltyFeeWaived: 0, networkFeeWaived: feeWaived,
-    actualPenaltyFee: 0, actualNetworkFee: actualFee, actualFee, netReceive: money(amount - actualFee),
+    actualPenaltyFee: 0, actualNetworkFee: actualFee, actualFee, netReceive,
     policyVersion, useNexFeeOffset, ...risk, strongReview, strongReviewRequired: strongReview,
     riskRoute: fastLaneApplied ? 'fast-pass' : strongReview ? 'strong-review' : 'manual',
     k3RiskRoute: 'pass', k4Priority: 'low', riskRuleId: null, idSource: 'server',
@@ -141,7 +160,7 @@ function reserve(state, receipt, at) {
 
 export function seedDemoConfirmedWithdrawal(state, user, frozen, policy, now, withdrawalNo) {
   const createdAt = now - 2 * day;
-  const receipt = createWithdrawalReceipt(frozen, policy, createdAt, 0, withdrawalNo);
+  const receipt = createWithdrawalReceipt(frozen, policy, createdAt, withdrawalFeeBreakdown(frozen, policy, 0), withdrawalNo);
   recordWithdrawal(state, user, receipt, frozen.address, createdAt,
     new Date(Date.parse(receipt.holdUntil) + 3600000).toISOString());
   return receipt;
@@ -165,8 +184,14 @@ export function submitDemoWithdrawal(state, user, frozen) {
   }, now, facts, policy);
   if (rejection) return reject(rejection === 'WITHDRAWAL_MIN_AMOUNT_NOT_MET' ? 422 : 409, rejection);
 
-  const receipt = createWithdrawalReceipt(frozen, policy, now, demoWalletNex(state, now), 'WD-B34-DEMO-' + randomUUID());
-  if (receipt.netReceive <= 0) return reject(422, 'WITHDRAWAL_NET_AMOUNT_INVALID');
+  const fees = withdrawalFeeBreakdown(frozen, policy, demoWalletNex(state, now));
+  const quote = wireWithdrawalQuote(fees);
+  if (frozen.confirmedQuote && Object.keys(quote).some(field => quote[field] !== frozen.confirmedQuote[field])) {
+    if (state.withdrawQuoteState === 'change-once') state.withdrawQuoteChangeConsumed = true;
+    return reject(409, 'WITHDRAWAL_QUOTE_CHANGED', { policyVersion: policy.policyVersion, quote });
+  }
+  if (fees.netReceive <= 0) return reject(422, 'WITHDRAWAL_NET_AMOUNT_INVALID');
+  const receipt = createWithdrawalReceipt(frozen, policy, now, fees, 'WD-B34-DEMO-' + randomUUID());
   reserve(state, receipt, now);
   recordWithdrawal(state, user, receipt, frozen.address, now);
   return { status: 200, receipt };

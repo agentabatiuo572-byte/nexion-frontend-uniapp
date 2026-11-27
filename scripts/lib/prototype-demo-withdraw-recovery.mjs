@@ -114,7 +114,16 @@ export function withdrawalRecoveryResponse(state, path, method, headers, body) {
   const policyVersion = typeof body.policyVersion === 'string' ? body.policyVersion.trim() : '';
   const offset = body.useNexFeeOffset === true;
   const frozen = { key, amount, network, address, policyVersion, offset };
-  if (attempt && Object.keys(frozen).some(field => frozen[field] !== attempt.frozen[field])) {
+  if (body.confirmedQuote != null) {
+    const { networkFee, nexBurned, netReceive } = body.confirmedQuote;
+    const isQuoteAmount = field => typeof field === 'string' && /^\d{1,12}\.\d{6}$/.test(field);
+    if (![networkFee, nexBurned, netReceive].every(isQuoteAmount) || Number(netReceive) <= 0) {
+      return fail(422, 'WITHDRAWAL_CONFIRMED_QUOTE_INVALID');
+    }
+    frozen.confirmedQuote = { networkFee, nexBurned, netReceive };
+  }
+  if (attempt && (['amount', 'network', 'address', 'policyVersion', 'offset'].some(field => frozen[field] !== attempt.frozen[field])
+    || JSON.stringify(frozen.confirmedQuote) !== JSON.stringify(attempt.frozen.confirmedQuote))) {
     return fail(409, 'WITHDRAWAL_ATTEMPT_PAYLOAD_CONFLICT');
   }
   if (route?.[2]) {

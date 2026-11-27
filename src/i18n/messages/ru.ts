@@ -4483,6 +4483,7 @@ export const ru: Messages = {
   },
   walletV3: {
     withdrawFeeStale: "Комиссия изменилась — повторите попытку",
+    withdrawQuoteChanged: "Расчёт изменился. Проверьте и подтвердите ещё раз.",
     withdrawContextStale: "Аккаунт или адрес для выплат изменились — отправьте заново",
     withdrawHandledElsewhere: "Исходный запрос на вывод обработан на другой странице. Проверьте историю вывода средств.",
     withdrawEarlierOutcome: "Предыдущий запрос: {outcome}",

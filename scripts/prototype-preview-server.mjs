@@ -324,6 +324,7 @@ const server=http.createServer(async(req,res)=>{
         }
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
         Object.assign(state,optionChanges);
+        if('withdrawQuoteState' in optionChanges)state.withdrawQuoteChangeConsumed=false;
         if(update.reset||dayOneSelection||'scopeState' in optionChanges)selectDemoDayOneAccount(state,now);
         if(optionChanges.weekEndState)delete state.weekEndingAt;
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);

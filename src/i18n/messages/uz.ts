@@ -4483,6 +4483,7 @@ export const uz: Messages = {
   },
   walletV3: {
     withdrawFeeStale: "Komissiya stavkasi yangilandi — qayta urining",
+    withdrawQuoteChanged: "Hisob-kitob oʻzgardi. Tekshirib, qayta tasdiqlang.",
     withdrawContextStale: "Akkaunt yoki qabul manzili oʻzgardi — qayta yuboring",
     withdrawHandledElsewhere: "Asl pul yechish soʻrovi boshqa sahifada koʻrib chiqildi. Pul yechish tarixini tekshiring.",
     withdrawEarlierOutcome: "Avvalgi soʻrov: {outcome}",
