@@ -743,6 +743,7 @@ export const uz: Messages = {
     errorTooFrequent: "Juda tez-tez — {s} son.dan keyin urining",
     errorOtpInvalid: "Kod notoʻgʻri — qolgan urinishlar: {n}",
     errorOtpExpired: "Kod eskirdi — yangisini soʻrang",
+    codeExpiredSubtitle: "Oldingi kodning muddati tugadi",
     errorOtpExhausted: "Kod bekor qilindi — yangisini soʻrang",
     errorOtpNotFound: "Avval tasdiqlash kodini soʻrang",
     errorOtpSendUnavailable: "Tasdiqlash kodi yuborilmadi. Keyinroq qayta urinib koʻring.",
@@ -780,7 +781,6 @@ export const uz: Messages = {
   login: {
     recoverAttempt: "Kirish natijasini tekshirish",
     retryOriginal: "Qayta kirish",
-    retryOriginalHint: "Bu kirish uchun parol yoki tasdiqlash kodini qayta kiriting.",
     retryCode: "Tasdiqlash kodi",
     unknownAttempt: "Kirish yakunlanmadi. Qayta urining.",
     verificationPending: "Kirishni yakunlash uchun tasdiqlash kerak.",
@@ -1869,6 +1869,9 @@ export const uz: Messages = {
     recoveryCheckingNote: "Qayta toʻlamang. Sahifa avtomatik yangilanadi.",
     recoveryNoReorder: "Yangi buyurtma bermang.",
     recoveryLater: "Keyinroq",
+    recoverySourceFate: "Almashtirish uchun topshiriladi",
+    recoveryTargetActiveFate: "Uning slotini egallab, faollashadi",
+    recoveryTargetInventoryFate: "Omborga tushadi",
     recoveryUnreadableTitle: "Oldingi xarid soʻrovini hali tasdiqlab boʻlmadi",
     recoveryUnreadableNote: "Ikki marta toʻlamaslik uchun bu sahifada toʻlov vaqtincha toʻxtatildi.",
     recoveryUnreadableBody: "Ikki marta toʻlamaslik uchun avval buyurtmalaringizni tekshiring.",
@@ -2289,6 +2292,7 @@ export const uz: Messages = {
     condMin: "Eng kam buyurtma: ${min}",
     condCap: "Koʻpi bilan ${cap}",
     scopeSingle: "Faqat {name} uchun",
+    scopeSingleUnnamed: "Faqat belgilangan mahsulot uchun",
     scopeAll: "Hamma qurilmalar",
     noExpiry: "Muddatsiz",
     expiryLabel: "Amal qilish muddati: {date}",
@@ -2514,30 +2518,30 @@ export const uz: Messages = {
     releaseComingToast: "Bu model tez orada sotuvga chiqadi — kuzatib boring",
     taskLevelLabels: {"1":"boshlangʻich","2":"oʻrta","3":"yuqori","4":"flagman"},
     taskLevelsLine: "AI vazifalari darajalari: {levels}",
+    productBadges: {
+      trending: "Ommabop",
+      upgradePick: "Yangilash uchun",
+      flagship: "Flagman",
+      lowBarrier: "Oson boshlash",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Toʻliq xizmat koʻrsatiladigan qurilma",
-        badge: "Xit",
       },
       "stellarbox-pro": {
         tagline: "GPU xususiyatlari va taxminiy daromadni solishtiring.",
-        badge: "Ommabop",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5× S1 unumdorligi",
-        badge: "Yangilash uchun",
       },
       "stellarrack-p1": {
         tagline: "Jiddiy operatorlar uchun maʼlumotlar markazi darajasidagi A100 stoyka.",
-        badge: "Flagman",
       },
       "stellarrack-p2": {
         tagline: "Maʼlumotlar markazi uchun H100 stoyka — eng yuqori quvvat.",
-        badge: "Flagman",
       },
       "cloud-share": {
         tagline: "Qurilma shart emas — tarmoq quvvatidan ulush oling.",
-        badge: "Oson boshlash",
       },
     },
     tradeinUpgrade: {

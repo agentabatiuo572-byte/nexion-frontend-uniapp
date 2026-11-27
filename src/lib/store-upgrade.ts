@@ -1,3 +1,4 @@
+import type { Product, ProductSeriesCode } from "@/mock/products";
 import type { Device, DeviceKind } from "@/store/types";
 import { getLifecycleSummary } from "@/store/device-lifecycle";
 
@@ -5,7 +6,14 @@ const HARDWARE: readonly DeviceKind[] = ["stellarbox-s1", "stellarbox-pro", "ste
 /** `kind` stays the stable DeviceKind (never a stored display string) so callers
  *  can resolve the localized name at render time — see lib/device-copy.ts. */
 type OwnedDevice = Device;
-interface OfferedProduct { id: string; name: string; dailyEarn: number; dailyEarnNEX: number }
+type OfferedProduct = Pick<Product, "id" | "name" | "dailyEarn" | "dailyEarnNEX" | "seriesCode" | "seriesRepresentative">;
+const UPGRADE_SERIES: Partial<Record<DeviceKind, ProductSeriesCode>> = {
+  "stellarbox-s1": "S1",
+  "stellarbox-pro": "PRO",
+  "stellarbox-pro-v2": "PRO_V2",
+  "stellarrack-p1": "RACK_P1",
+  "stellarrack-p2": "RACK_P2",
+};
 export function activePhoneDailyRate(devices: readonly OwnedDevice[]): number {
   const phone = devices.find((device) => device.kind === "phone" && device.activatedAt !== null);
   return phone && Number.isFinite(phone.baseRate) && phone.baseRate > 0 ? phone.baseRate : 0;
@@ -24,7 +32,7 @@ export function storeUpgrade<T extends OfferedProduct>(products: readonly T[], d
   const baseDaily = getLifecycleSummary(base).dailyRateNow;
   if (baseDaily <= 0) return null;
   const target = HARDWARE.slice(HARDWARE.indexOf(base.kind) + 1)
-    .map((id) => products.find((p) => p.id === id)).find((p) => p && Number.isFinite(p.dailyEarn)
+    .map((kind) => products.find((p) => p.seriesCode === UPGRADE_SERIES[kind] && p.seriesRepresentative)).find((p) => p && Number.isFinite(p.dailyEarn)
       && p.dailyEarn > baseDaily && Number.isFinite(p.dailyEarnNEX) && p.dailyEarnNEX >= 0);
   if (!target) return null;
   return { base, target, multiplier: storeYieldMultiplier(target.dailyEarn, baseDaily) };

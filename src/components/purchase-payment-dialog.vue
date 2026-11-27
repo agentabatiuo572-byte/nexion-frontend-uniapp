@@ -38,7 +38,7 @@
           <view class="pp-prod">
             <image v-if="s.image" class="pp-prod__img" :src="s.image" mode="aspectFit" aria-hidden="true" />
             <view class="pp-prod__text"><text class="pp-prod__name">{{ s.summary }}</text><text v-if="s.orderNo" class="pp-prod__meta">{{ copy.orderNo }} <text class="pp-mono">{{ s.orderNo }}</text></text></view>
-            <CheckoutAmount class="pp-prod__amt" :value="s.amount" currency="USD" />
+            <CheckoutAmount class="pp-prod__amt" :value="s.amount" currency="USD" :precision="s.kind === 'TRADE_IN' ? 6 : 2" />
           </view>
           <text class="pp-label">{{ copy.methodLabel }}</text>
           <view class="pp-opts" role="radiogroup" :aria-label="copy.methodLabel" @keydown.down.prevent="moveFocus(1)" @keydown.right.prevent="moveFocus(1)" @keydown.up.prevent="moveFocus(-1)" @keydown.left.prevent="moveFocus(-1)">
@@ -95,7 +95,7 @@
           <text class="pp-total__k">{{ orderTopupNet ? copy.payable : copy.total }}</text>
           <!-- Bank card amounts use $; USDT only on the wallet and USDT paths. -->
           <!-- The order top-up network step shows the exact amount due, as the top-up and confirm pages do (review F08). -->
-          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' || orderTopupNet ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" :precision="orderTopupNet ? 'full' : 2" />
+          <CheckoutAmount class="pp-total__v" :value="s.step === 'methods' || orderTopupNet ? s.amount : s.quote?.totalUsdt ?? null" :currency="s.step === 'bank' ? 'USD' : 'USDT'" :precision="orderTopupNet ? 'full' : s.step === 'methods' && s.kind === 'TRADE_IN' ? 6 : 2" />
         </view>
         <!-- An ordinary order's USDT goes to the balance first: no quote, fees or confirmation here (plan C.4). -->
         <text v-if="orderTopupNet" class="pp-note">{{ copy.topupNetNote }}</text>

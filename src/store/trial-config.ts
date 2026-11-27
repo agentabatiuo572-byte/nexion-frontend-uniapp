@@ -44,25 +44,13 @@ export interface TrialConfig {
   autoPushMaxPerSession: number;
 }
 
-/** Display-name compatibility for older responses with no name. */
-export const TRIAL_PRODUCT_DEVICE_NAMES = {
-  "stellarbox-s1": "UVELBox S1",
-  "device-trial-standard": "UVELBox S1",
-} as const;
-
 export type TrialProductId = string;
 
-/**
- * H2 historically stores `device-trial-standard` as a policy alias, while the
- * commerce catalog and `/api/trial/convert` use the real SKU `stellarbox-s1`.
- * Keep that translation explicit so an alias can never be sent to checkout as
- * a dangling product id.
- */
 export function resolveTrialCheckoutProductId(productId: unknown): string | null {
   if (typeof productId !== "string") return null;
   const normalized = productId.trim();
   if (!/^[A-Za-z0-9._-]{2,64}$/.test(normalized)) return null;
-  return normalized === "device-trial-standard" ? "stellarbox-s1" : normalized;
+  return normalized;
 }
 
 export function resolveTrialDeviceName(productId: unknown, serverName?: unknown): string | null {
@@ -71,7 +59,7 @@ export function resolveTrialDeviceName(productId: unknown, serverName?: unknown)
   if (serverName != null && typeof serverName !== "string") return null;
   const normalizedName = serverName?.trim();
   if (normalizedName) return normalizedName.length <= 128 ? normalizedName : null;
-  return productNo === "stellarbox-s1" ? TRIAL_PRODUCT_DEVICE_NAMES[productNo] : null;
+  return null;
 }
 
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
@@ -80,8 +68,8 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
   discountRate: 0.15,
   discountCapUSD: 20,
   trialOffsetCapUSD: 50,
-  trialProductId: "stellarbox-s1",
-  trialProductName: "UVELBox S1",
+  trialProductId: "",
+  trialProductName: "",
   trialPriceUSD: 649,
   shadowDailyUSD: 7,
   shadowDailyNEX: 40,
@@ -125,7 +113,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
     config.value = { ...config.value, ...patch };
     persist();
   }
-  function applyAuthoritative(raw: Record<string, TrialConfigValue>) {
+  function applyAuthoritative(raw: Record<string, TrialConfigValue>, productUnavailable: boolean) {
     if (!remoteAuthority) return;
     const number = (key: string, min = 0) => {
       const value = Number(raw[key]);
@@ -147,7 +135,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
     const shadowDailyNEX = raw.shadowDailyNEX === null ? null : number("shadowDailyNEX");
     const trialProductId = typeof raw.trialProductId === "string" ? raw.trialProductId.trim() : "";
     const trialProductName = resolveTrialDeviceName(trialProductId, raw.trialProductName);
-    if (discountRate > 1 || !trialProductName) {
+    if (discountRate > 1 || (!productUnavailable && (!trialProductId || !trialProductName))) {
       throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
     }
     config.value = {
@@ -158,7 +146,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
       trialOffsetCapUSD: cap("trialOffsetCapUSD"),
       trialProductId,
       ...(typeof raw.trialTermsVersion === "string" ? { trialTermsVersion: raw.trialTermsVersion } : {}),
-      trialProductName,
+      trialProductName: trialProductName ?? "",
       trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
       shadowDailyUSD,
       shadowDailyNEX,

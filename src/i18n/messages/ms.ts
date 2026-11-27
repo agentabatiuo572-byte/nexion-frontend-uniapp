@@ -743,6 +743,7 @@ export const ms: Messages = {
     errorTooFrequent: "Terlalu kerap — cuba lagi dalam {s}s",
     errorOtpInvalid: "Kod salah — baki percubaan: {n}",
     errorOtpExpired: "Kod tamat tempoh — minta kod baharu",
+    codeExpiredSubtitle: "Kod sebelumnya telah tamat tempoh",
     errorOtpExhausted: "Kod tidak sah lagi — minta kod baharu",
     errorOtpNotFound: "Minta kod pengesahan dahulu",
     errorOtpSendUnavailable: "Kod pengesahan belum dihantar. Sila cuba lagi nanti.",
@@ -780,7 +781,6 @@ export const ms: Messages = {
   login: {
     recoverAttempt: "Semak keputusan log masuk",
     retryOriginal: "Cuba log masuk lagi",
-    retryOriginalHint: "Masukkan semula kata laluan atau kod pengesahan untuk log masuk ini.",
     retryCode: "Kod pengesahan",
     unknownAttempt: "Log masuk tidak lengkap. Sila cuba lagi.",
     verificationPending: "Pengesahan diperlukan untuk melengkapkan log masuk.",
@@ -1869,6 +1869,9 @@ export const ms: Messages = {
     recoveryCheckingNote: "Jangan bayar lagi. Halaman ini akan dikemas kini secara automatik.",
     recoveryNoReorder: "Jangan buat pesanan baharu.",
     recoveryLater: "Nanti dulu",
+    recoverySourceFate: "Diambil untuk tukar beli",
+    recoveryTargetActiveFate: "Ambil alih slotnya dan aktif automatik",
+    recoveryTargetInventoryFate: "Masuk ke inventori",
     recoveryUnreadableTitle: "Permintaan pembelian sebelumnya belum dapat disahkan",
     recoveryUnreadableNote: "Untuk mengelakkan bayaran berganda, pembayaran di halaman ini dihentikan sementara.",
     recoveryUnreadableBody: "Untuk mengelakkan bayaran berganda, semak pesanan anda dahulu.",
@@ -2289,6 +2292,7 @@ export const ms: Messages = {
     condMin: "Minimum pesanan ${min}",
     condCap: "Diskaun maks. ${cap}",
     scopeSingle: "Untuk {name}",
+    scopeSingleUnnamed: "Untuk produk tertentu sahaja",
     scopeAll: "Semua peranti",
     noExpiry: "Tiada had masa",
     expiryLabel: "Sah sehingga {date}",
@@ -2514,30 +2518,30 @@ export const ms: Messages = {
     releaseComingToast: "Model ini akan tiba tidak lama lagi — nantikan",
     taskLevelLabels: {"1":"asas","2":"pertengahan","3":"lanjutan","4":"utama"},
     taskLevelsLine: "Peringkat tugasan AI: {levels}",
+    productBadges: {
+      trending: "Sohor kini",
+      upgradePick: "Pilihan naik taraf",
+      flagship: "Perdana",
+      lowBarrier: "Mudah dimulakan",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Peranti diurus sepenuhnya",
-        badge: "Terlaris",
       },
       "stellarbox-pro": {
         tagline: "Bandingkan spesifikasi GPU dan anggaran pendapatan.",
-        badge: "Sohor kini",
       },
       "stellarbox-pro-v2": {
         tagline: "Daya pemprosesan 2.5× S1",
-        badge: "Pilihan naik taraf",
       },
       "stellarrack-p1": {
         tagline: "Rak A100 gred pusat data untuk pengendali serius.",
-        badge: "Perdana",
       },
       "stellarrack-p2": {
         tagline: "Rak H100 pusat data — peringkat pengkomputeran tertinggi.",
-        badge: "Perdana",
       },
       "cloud-share": {
         tagline: "Tanpa beli perkakasan — beli bahagian pengkomputeran rangkaian.",
-        badge: "Mudah dimulakan",
       },
     },
     tradeinUpgrade: {

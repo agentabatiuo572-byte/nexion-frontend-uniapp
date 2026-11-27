@@ -743,6 +743,7 @@ export const fil: Messages = {
     errorTooFrequent: "Masyadong madalas — subukan ulit sa {s}s",
     errorOtpInvalid: "Mali ang code — {n} subok na lang",
     errorOtpExpired: "Nag-expire ang code — humiling ng bago",
+    codeExpiredSubtitle: "Nag-expire na ang naunang code",
     errorOtpExhausted: "Hindi na valid ang code — humiling ng bago",
     errorOtpNotFound: "Humiling muna ng code sa pag-verify",
     errorOtpSendUnavailable: "Hindi pa naipadala ang code sa pag-verify. Subukan ulit mamaya.",
@@ -780,7 +781,6 @@ export const fil: Messages = {
   login: {
     recoverAttempt: "Suriin ang resulta ng pag-log in",
     retryOriginal: "Mag-log in ulit",
-    retryOriginalHint: "Ilagay ulit ang password o code sa pag-verify para sa pag-log in na ito.",
     retryCode: "Code sa pag-verify",
     unknownAttempt: "Hindi natapos ang pag-log in. Subukan ulit.",
     verificationPending: "Kailangan ng verification para matapos ang pag-log in.",
@@ -1869,6 +1869,9 @@ export const fil: Messages = {
     recoveryCheckingNote: "Huwag magbayad ulit. Kusang mag-a-update ang page na ito.",
     recoveryNoReorder: "Huwag nang gumawa ng bagong order.",
     recoveryLater: "Mamaya na",
+    recoverySourceFate: "Ite-trade in bilang bawas",
+    recoveryTargetActiveFate: "Kukunin ang slot at maa-activate",
+    recoveryTargetInventoryFate: "Mapupunta sa inventory",
     recoveryUnreadableTitle: "Hindi pa makumpirma ang naunang request sa pagbili",
     recoveryUnreadableNote: "Para hindi ka makapagbayad nang dalawang beses, naka-pause muna ang pagbabayad sa page na ito.",
     recoveryUnreadableBody: "Para hindi ka makapagbayad nang dalawang beses, tingnan muna ang mga order mo.",
@@ -2289,6 +2292,7 @@ export const fil: Messages = {
     condMin: "Sa order na ${min} pataas",
     condCap: "Hanggang ${cap} off",
     scopeSingle: "Para sa {name}",
+    scopeSingleUnnamed: "Para sa piling produkto lang",
     scopeAll: "Lahat ng device",
     noExpiry: "Walang expiry",
     expiryLabel: "Valid hanggang {date}",
@@ -2514,30 +2518,30 @@ export const fil: Messages = {
     releaseComingToast: "Malapit nang dumating ang model na ito — abangan",
     taskLevelLabels: {"1":"panimula","2":"katamtaman","3":"mataas","4":"pangunahing"},
     taskLevelsLine: "Antas ng gawaing AI: {levels}",
+    productBadges: {
+      trending: "Trending",
+      upgradePick: "Pang-upgrade",
+      flagship: "Flagship",
+      lowBarrier: "Mababang entry",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Device na ganap na pinamamahalaan",
-        badge: "Pinakamabenta",
       },
       "stellarbox-pro": {
         tagline: "Ikumpara ang GPU specs at tinatayang kita.",
-        badge: "Trending",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5× throughput ng S1",
-        badge: "Pang-upgrade",
       },
       "stellarrack-p1": {
         tagline: "Datacenter-grade na A100 rack para sa seryosong operator.",
-        badge: "Flagship",
       },
       "stellarrack-p2": {
         tagline: "Datacenter H100 rack — ang pinakamataas na compute tier.",
-        badge: "Flagship",
       },
       "cloud-share": {
         tagline: "Walang hardware na kailangan — bumili ng bahagi ng network.",
-        badge: "Mababang entry",
       },
     },
     tradeinUpgrade: {

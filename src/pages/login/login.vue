@@ -4,10 +4,10 @@
       <!-- Top bar -->
       <view class="lg-top">
         <view v-if="!loginRecoveryPending && (step > 1 || mode === 'reset')" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          <view class="lg-iconbtn__face nx-design-glass"><LiquidGlass :radius="20" tone="navigation" :blur="8" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
         </view>
         <view v-else class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.close" @click="close" @keydown.enter.prevent="close" @keydown.space.prevent="close">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          <view class="lg-iconbtn__face nx-design-glass"><LiquidGlass :radius="20" tone="navigation" :blur="8" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></view>
         </view>
         <view class="lg-brand">
           <BrandLockup :height="40" />
@@ -22,20 +22,19 @@
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
-      <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
-        <text class="lg-mode-badge__t">{{ modeLabel }}</text>
-      </view>
-      <view v-if="sessionEndNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
+      <NxTag v-if="modeLabel" class="lg-mode-badge" tone="warning" data-testid="auth-runtime-label">{{ modeLabel }}</NxTag>
+      <view v-if="sessionEndNotice" class="lg-recovery-notice nx-tint" role="status" data-qa="server-session-reload-notice">
         <text class="lg-recovery-notice__t">{{ sessionEndNotice }}</text>
       </view>
       <!-- #ifdef H5 -->
-      <view v-if="browserUnsupportedNotice" class="lg-recovery-notice" role="status" data-qa="secure-browser-unsupported-notice">
+      <view v-if="browserUnsupportedNotice" class="lg-recovery-notice nx-tint" role="status" data-qa="secure-browser-unsupported-notice">
         <text class="lg-recovery-notice__t">{{ t.session.secureBrowserUnsupported }}</text>
       </view>
       <!-- #endif -->
       <template v-if="!loginRecoveryPending">
         <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
         <text v-else-if="step === 1 && remoteApiEnabled" class="lg-sub">{{ t.login.takeoverHint }}</text>
+        <text v-else-if="step === 2 && otpChallengeMissing" class="lg-sub">{{ t.authOtp.codeExpiredSubtitle }}</text>
         <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
         <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
       </template>
@@ -44,10 +43,13 @@
       <view v-if="loginRecoveryPending" class="lg-body lg-col" data-testid="login-recovery">
         <text class="lg-sub" role="status" aria-live="polite">{{ loading ? t.login.signingIn : loginResultUnknown ? t.login.unknownAttempt : t.login.verificationPending }}</text>
         <text v-if="retryContext?.context.phone" class="lg-phone lg-recovery__account">{{ retryContext?.context.countryCode }} {{ retryContext?.context.phone }}</text>
-        <text v-if="retryNeedsPassword || retryNeedsCode" class="lg-sub">{{ t.login.retryOriginalHint }}</text>
         <input id="lg-retry-password" class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" :cursor-spacing="keyboardSpacing.retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
         <input id="lg-retry-code" class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" :cursor-spacing="keyboardSpacing.retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
-        <view class="lg-cta lg-recovery__action" :class="canRetryOriginal || loading ? 'lg-cta--on' : ''" role="button" :tabindex="canRetryOriginal ? 0 : -1" :aria-disabled="!canRetryOriginal" data-system-chrome-primary @click="retryOriginalLogin()" @keydown.enter.prevent="retryOriginalLogin()" @keydown.space.prevent="retryOriginalLogin()"><text class="lg-cta__t" :class="canRetryOriginal || loading ? 'lg-cta__t--on' : ''">{{ loading ? t.login.signingIn : t.login.retryOriginal }}</text></view>
+        <view class="lg-recovery__cta">
+          <NxButton class="lg-cta lg-recovery__action" data-system-chrome-primary variant="primary" :label="t.login.retryOriginal" :busy="loading" :busy-label="t.login.signingIn" :disabled="!canRetryOriginal" :aria-describedby="!canRetryOriginal && !loading ? 'lg-retry-reason' : undefined" @click="retryOriginalLogin()" />
+          <!-- 03 §3.1: the credential still missing, in the same reserved line under the button as the form's reason line. -->
+          <text v-if="retryNeedsPassword || retryNeedsCode" id="lg-retry-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': canRetryOriginal || loading }" :aria-hidden="canRetryOriginal || loading ? 'true' : undefined">{{ retryDisabledReason }}</text>
+        </view>
         <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
       </view>
       <view v-if="!loginRecoveryPending" class="lg-body">
@@ -58,15 +60,15 @@
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
-            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :cursor-spacing="keyboardSpacing.phone" :placeholder="t.login.phonePlaceholder" :aria-label="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @blur="phoneTouched = true" @confirm="onPhoneConfirm" />
+            <input class="lg-phone__in" type="number" inputmode="numeric" maxlength="15" :cursor-spacing="keyboardSpacing.phone" :placeholder="t.login.phonePlaceholder" :aria-label="t.login.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="login-phone-format" :confirm-type="mode === 'password' ? 'next' : 'done'" @input="onPhone" @confirm="onPhoneConfirm" />
           </view>
           <text id="login-phone-format" data-testid="auth-phone-hint" class="lg-phone-hint" :class="{ 'lg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
               <input id="lg-password" class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" :cursor-spacing="keyboardSpacing.password" :focus="passwordFocused" confirm-type="done" @input="onPwd" @blur="passwordFocused = false" @confirm="onPrimary" />
               <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
-                <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+                <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
               </view>
             </view>
             <view class="lg-forgot-row">
@@ -82,9 +84,9 @@
             <text class="lg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
           </view>
           <view class="lg-resend">
-            <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
+            <NxButton variant="text" size="small" :label="t.login.changeNumber" @click="back" />
             <text v-if="!remoteTwoFactorChallenge && resendLeft > 0" class="lg-resend__count">{{ resendInText }}</text>
-            <text v-else-if="!remoteTwoFactorChallenge" class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter.prevent="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
+            <NxButton v-else-if="!remoteTwoFactorChallenge" variant="text" size="small" :label="t.login.resend" @click="resend" />
           </view>
         </view>
 
@@ -93,8 +95,8 @@
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': newPassword && !newPwdOk }">
             <input id="lg-new-password" class="lg-field--flex" :cursor-spacing="keyboardSpacing.newPassword" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :aria-label="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" confirm-type="next" @input="onNewPwd" @confirm="focusResetConfirmation" />
             <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
-              <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+              <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
           </view>
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': confirmPwd && newPassword !== confirmPwd }">
@@ -104,27 +106,27 @@
       </view>
 
       <!-- Error -->
-      <view v-if="error && !(loginRecoveryPending && error === t.login.unknownAttempt)" class="lg-error" role="alert" aria-live="assertive">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+      <view v-if="error && !(loginRecoveryPending && error === t.login.unknownAttempt)" id="lg-error" class="lg-error" role="alert" aria-live="assertive">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="lg-error__t">{{ error }}</text>
       </view>
 
       <!-- Primary CTA -->
-      <view v-if="!loginRecoveryPending" class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading && (phoneTouched || submitAttempted) ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
-        <text v-if="loading" class="lg-cta__t lg-cta__t--on">···</text>
-        <text v-else class="lg-cta__t" :class="canPrimary ? 'lg-cta__t--on' : ''">{{ primaryText }}</text>
-      </view>
-      <!-- 简报 #211:空白表单首次展示必须中性 —— 只在用户已与手机号字段交互或尝试提交后
-           才给出禁用原因。此前它从首帧起就存在(空表单天然 canPrimary=false),而 sr-only
-           的 clip 裁不住 uni-app 内部的 <span>,导致文本提取/自动化会读到用户从未触发的错误。 -->
-      <text v-if="!loginRecoveryPending && !canPrimary && !loading && (phoneTouched || submitAttempted)" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
+      <!-- Incomplete fields still allow a tap to show their reason. A missing challenge disables the CTA.
+           Busy shows NxButton's spinner and takes no taps. -->
+      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :disabled="otpChallengeMissing" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
+      <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
+           directly above is showing, that line carries the reason and the button points to it instead. The recovery view
+           has the same line under its own button (lg-retry-reason). The line keeps its height when it has
+           nothing to say, hidden from view and from screen readers, so nothing below jumps. -->
+      <text v-if="!loginRecoveryPending" id="lg-cta-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': canPrimary || loading || !!error }" :aria-hidden="canPrimary || loading || error ? 'true' : undefined">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
       <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
         <text class="lg-switch__t">{{ mode === 'password' ? t.login.useCodeInstead : t.login.usePasswordInstead }}</text>
       </view>
 
-      <ThirdPartyAuth v-if="!loginRecoveryPending && remoteApiEnabled && step === 1 && mode !== 'reset'" :disabled="loading || loginRecoveryPending" :return-to="returnParam" :sponsor-code="refOnLogin" @busy="oauthBusy = $event; syncLoginRecovery()" />
+      <ThirdPartyAuth v-if="!loginRecoveryPending && remoteApiEnabled && step === 1 && mode !== 'reset'" :disabled="loading || loginRecoveryPending" :return-to="returnParam" :sponsor-code="refOnLogin" @busy="onOauthBusy" />
       <!-- OAuth (step 1, not reset) -->
       <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset' && !remoteApiEnabled" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
@@ -161,8 +163,12 @@ import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import OtpCodeInput from "@/components/otp-code-input.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
+import { useOtpResend } from "@/composables/use-otp-resend";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -226,20 +232,7 @@ const code = ref<string[]>(["", "", "", "", "", ""]);
 const codeFocus = ref(true);
 const showPwd = ref(false);
 const error = ref<string | null>(null);
-/**
- * 简报 #211:空白表单首次展示必须保持中性 —— 只有用户与手机号字段交互过(输入/失焦),
- * 或尝试提交过,才给出「请输入有效的手机号」这类校验原因。
- *
- * 此前该原因只挂在 `!canPrimary` 上,而空表单天然不满足 canPrimary,于是它从首帧起
- * 就存在于 DOM。它虽然带 .lg-sr-only,但 uni-app 会把内容包进内部 <span>,而
- * clip: rect(0,0,0,0) 只裁剪定位元素自身、裁不住这个子盒 —— 实测该 span 的布局盒是
- * 329×20 且被 document.body.innerText 计入,于是读屏之外,文本提取与自动化也会读到
- * 一句用户从未触发过的错误。根因是「不该存在的内容被裁起来」,所以按验收要求直接
- * 不渲染,而不是继续靠样式藏。
- */
-const phoneTouched = ref(false);
-const submitAttempted = ref(false);
-const resendLeft = ref(0);
+const { resendLeft, refreshResend, startResend, clearResend } = useOtpResend();
 const oauthBusy = ref(false);
 const localLoading = ref(false);
 const loading = computed({ get: () => localLoading.value || oauthBusy.value, set: (value: boolean) => { localLoading.value = value; } });
@@ -255,11 +248,23 @@ const retryNeedsCode = computed(() => ["OTP", "TWO_FACTOR", "REGISTRATION"].incl
 const canRetryOriginal = computed(() => !loading.value && (!retryContext.value || (replayAvailable.value
   && (!retryNeedsPassword.value || !!retryPassword.value)
   && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)))));
+// The first credential still missing, in field order.
+const retryDisabledReason = computed(() => {
+  if (retryNeedsPassword.value && !retryPassword.value) return t.value.login.errorInvalidPassword;
+  if (retryNeedsCode.value && !/^\d{6}$/.test(retryCode.value)) return t.value.login.errorInvalidCode;
+  return "";
+});
 function syncLoginRecovery() {
   retryContext.value = authApi.pendingLoginContext();
   loginResultUnknown.value = authApi.pendingLogin();
-  loginRecoveryPending.value = loginResultUnknown.value || !!retryContext.value;
+  // While this page owns the password challenge, only an unknown result needs recovery.
+  loginRecoveryPending.value = loginResultUnknown.value || (!!retryContext.value && !remoteTwoFactorChallenge.value);
   replayAvailable.value = !!retryContext.value;
+}
+function onOauthBusy(busy: boolean) {
+  if (oauthBusy.value === busy) return;
+  oauthBusy.value = busy;
+  if (!busy) syncLoginRecovery();
 }
 // One read when an unresolved attempt first reaches this page. Further reads
 // belong to an explicit retry; a failed read must never start a polling loop.
@@ -335,6 +340,7 @@ const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
+let verifiedResetCode: string | null = null;
 const remoteTwoFactorChallenge = ref<string | null>(null);
 const serverSessionReloadNotice = ref(false);
 const sessionEndNotice = computed(() => sessionEndReason.value === "APP_REPLACED" ? t.value.login.sessionReplacedNotice
@@ -346,7 +352,6 @@ const browserUnsupportedNotice = ref(false);
 const passwordFocused = ref(false);
 const confirmPasswordFocused = ref(false);
 
-let resendTimer: ReturnType<typeof setInterval> | undefined;
 let signInTimer: ReturnType<typeof setTimeout> | undefined;
 let otpFlowVersion = 0;
 let mounted = true;
@@ -379,6 +384,7 @@ const phoneFormatMessage = computed(() => {
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const otpScene = computed<OtpScene>(() => (mode.value === "reset" ? "reset" : "login"));
 const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
+const otpChallengeMissing = computed(() => step.value === 2 && !otpRequestId.value && !remoteTwoFactorChallenge.value);
 // Login mode accepts any non-empty password (existing users may have shorter
 // passwords from before the strength rule) — mirrors prototype `pwdOk`.
 const pwdOk = computed(() => password.value.length > 0);
@@ -406,21 +412,6 @@ const developmentOtpEnabled = computed(() =>
   apiRuntimeConfig.environment === "dev"
   && /^\d{6}$/.test(developmentOtpCode)
 );
-// Seeds: primary button bottom − input bottom + 12, measured on each step's default layout (same at 360 and 390).
-const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
-  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta",
-  inputs: {
-    phone: { selector: ".lg-phone__in", seed: 243 },
-    password: { selector: "#lg-password", seed: 149 },
-    otp: { selector: ".lg-otp", seed: 120 },
-    newPassword: { selector: "#lg-new-password", seed: 161 },
-    confirmPassword: { selector: "#lg-confirm-password", seed: 93 },
-    retryPassword: { selector: "#lg-retry-password", seed: 172 },
-    retryCode: { selector: "#lg-retry-code", seed: 104 },
-  },
-  layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
-    error.value, phoneFormatMessage.value, developmentOtpEnabled.value],
-});
 const primaryText = computed(() => {
   if (step.value === 1) return mode.value === "password" ? t.value.login.signIn : t.value.login.sendCode;
   if (step.value === 2) return t.value.login.verify;
@@ -428,18 +419,40 @@ const primaryText = computed(() => {
 });
 const canPrimary = computed(() => {
   if (step.value === 1) return mode.value === "password" ? (phoneOk.value && pwdOk.value && !loading.value) : (phoneOk.value && !loading.value);
-  if (step.value === 2) return codeOk.value && !loading.value;
+  if (step.value === 2) return !otpChallengeMissing.value && codeOk.value && !loading.value;
   return pwdMatch.value && !loading.value;
 });
 const primaryDisabledReason = computed(() => {
   if (step.value === 1) {
-    if (!phoneOk.value) return invalidPhoneMessage.value;
+    // Shown from the first frame, so it reads as a next step, not a format error (the hint under the field says that).
+    if (!phoneOk.value) return t.value.register.ctaDisabledPhone;
     if (mode.value === "password" && !pwdOk.value) return t.value.login.errorInvalidPassword;
   }
-  if (step.value === 2 && !codeOk.value) return t.value.login.errorInvalidCode;
-  if (step.value === 3 && !newPwdOk.value) return t.value.login.errorWeakPassword;
-  if (step.value === 3 && !pwdMatch.value) return t.value.login.passwordMismatch;
+  if (step.value === 2) {
+    if (otpChallengeMissing.value) return resendLeft.value > 0 ? resendInText.value : t.value.authOtp.errorOtpExpired;
+    if (!codeOk.value) return t.value.login.errorInvalidCode;
+  }
+  if (step.value === 3) {
+    if (!newPwdOk.value) return t.value.login.errorWeakPassword;
+    if (!confirmPwd.value) return t.value.login.confirmPasswordPlaceholder;
+    if (!pwdMatch.value) return t.value.login.passwordMismatch;
+  }
   return "";
+});
+// Seeds include the reason line's 28px slot below the button, on the form and in recovery (one of the two is rendered).
+const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
+  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta", primaryDescription: ".lg-cta-reason",
+  inputs: {
+    phone: { selector: ".lg-phone__in", seed: 263 },
+    password: { selector: "#lg-password", seed: 169 },
+    otp: { selector: ".lg-otp", seed: 144 },
+    newPassword: { selector: "#lg-new-password", seed: 181 },
+    confirmPassword: { selector: "#lg-confirm-password", seed: 113 },
+    retryPassword: { selector: "#lg-retry-password", seed: 192 },
+    retryCode: { selector: "#lg-retry-code", seed: 124 },
+  },
+  layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
+    error.value, primaryDisabledReason.value, phoneFormatMessage.value, developmentOtpEnabled.value],
 });
 const resendInText = computed(() => (t.value.login.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 function showOauthUnavailable(provider: string) {
@@ -504,9 +517,9 @@ function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onPhone(e: Event) {
-  invalidateOtpFlow();
-  phoneTouched.value = true;
-  phone.value = sanitizePhoneInput(inputVal(e));
+  const next = sanitizePhoneInput(inputVal(e));
+  if (phone.value !== next) invalidateOtpFlow();
+  phone.value = next;
   error.value = null;
 }
 function focusPassword() {
@@ -529,6 +542,7 @@ function onNewPwd(e: Event) { newPassword.value = inputVal(e); error.value = nul
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
 function onCode(value: string) {
   code.value = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
+  if (otpChallengeMissing.value) return;
   error.value = null;
   if (codeOk.value) verifyCode();
 }
@@ -539,7 +553,7 @@ function focusCode() {
 }
 function pickCountry(c: string) {
   if (!isSelectablePhoneDialCode(c)) return;
-  invalidateOtpFlow();
+  if (country.value !== c) invalidateOtpFlow();
   country.value = c;
   error.value = null;
   showCountries.value = false;
@@ -550,12 +564,20 @@ function clearSignIn() {
   loading.value = false;
 }
 
-/** 换号、返回或切换认证方式后，旧发码/验码/登录回包不得写回当前页面。 */
-function invalidateOtpFlow() {
-  otpFlowVersion += 1;
-  clearSignIn();
+function clearSmsChallenge() {
   otpRequestId.value = null;
   otpVerifyToken.value = null;
+  verifiedResetCode = null;
+}
+
+/** 换号、返回或切换认证方式后，旧发码/验码/登录回包不得写回当前页面。 */
+function invalidateOtpFlow(preserveSmsChallenge = false) {
+  otpFlowVersion += 1;
+  clearSignIn();
+  if (!preserveSmsChallenge) {
+    clearSmsChallenge();
+    clearResend();
+  }
   remoteTwoFactorChallenge.value = null;
 }
 
@@ -660,18 +682,19 @@ function finishVerifiedOtpSignIn(verifyToken: string, context: OtpFlowContext) {
   finishSignIn(exchange, context);
 }
 
-function startResend(sec: number) {
-  resendLeft.value = sec;
-  if (resendTimer) clearInterval(resendTimer);
-  resendTimer = setInterval(() => {
-    resendLeft.value = Math.max(0, resendLeft.value - 1);
-    if (resendLeft.value <= 0 && resendTimer) clearInterval(resendTimer);
-  }, 1000);
-}
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块)。倒计时以 server 返回的
 // resendAfterSec 为准,client 不再持有 60s 业务常量。
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
+  if (step.value === 1 && refreshResend() > 0) {
+    if (!otpRequestId.value) {
+      toast.info(fmt(t.value.authOtp.errorTooFrequent, { s: resendLeft.value }));
+      return;
+    }
+    focusCode();
+    step.value = 2;
+    return;
+  }
   const phoneAtRequest = fullPhone.value;
   const sceneAtRequest = otpScene.value;
   const stepAtRequest = step.value;
@@ -686,6 +709,7 @@ async function requestCode(captchaTicket?: string) {
       loading.value = false;
       otpRequestId.value = res.challengeNo;
       otpVerifyToken.value = null;
+      verifiedResetCode = null;
       code.value = ["", "", "", "", "", ""];
       focusCode();
       step.value = 2;
@@ -741,7 +765,7 @@ function onCaptchaOk(ticket: string) {
   void requestCode(ticket);
 }
 function resend() {
-  if (resendLeft.value > 0) return;
+  if (refreshResend() > 0) return;
   error.value = null;
   void requestCode();
 }
@@ -869,7 +893,7 @@ async function verifyRemoteTwoFactor() {
   }
 }
 async function verifyCode() {
-  if (loading.value || signInTimer) return;
+  if (loading.value || signInTimer || otpChallengeMissing.value) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
   if (remoteTwoFactorChallenge.value) { await verifyRemoteTwoFactor(); return; }
@@ -895,13 +919,17 @@ async function verifyCode() {
         if (!isCurrentOtpFlow(context)) return;
         loading.value = false;
         if (code.value.join("") !== codeAtVerify) return;
+        verifiedResetCode = codeAtVerify;
         step.value = 3;
       } catch (cause) {
         if (!isCurrentOtpFlow(context)) return;
         loading.value = false;
         if (code.value.join("") !== codeAtVerify) return;
         const message = cause instanceof ApiError ? cause.message : "";
-        error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
+        const invalidOtp = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID";
+        // The API uses the same refusal for wrong digits and an inactive challenge.
+        if (invalidOtp && codeAtVerify === verifiedResetCode) clearSmsChallenge();
+        error.value = invalidOtp
           ? t.value.authOtp.errorOtpInvalidOrExpired
           : t.value.authOtp.errorServiceUnavailable;
       }
@@ -973,8 +1001,7 @@ async function verifyCode() {
 async function finishReset() {
   if (loading.value || signInTimer) return;
   error.value = null;
-  if (!newPwdOk.value) { error.value = t.value.login.errorWeakPassword; return; }
-  if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
+  if (!pwdMatch.value) { error.value = primaryDisabledReason.value; return; }
   const challengeNo = otpRequestId.value;
   if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
   const resetAttempt: PasswordResetAttemptContext = {
@@ -996,11 +1023,18 @@ async function finishReset() {
     if (!isCurrentPasswordResetAttempt(resetAttempt)) return;
     loading.value = false;
     const message = cause instanceof ApiError ? cause.message : "";
-    error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
-      ? t.value.authOtp.errorOtpInvalidOrExpired
-      : message === "USER_NEW_PASSWORD_MUST_DIFFER"
-        ? t.value.login.errorPasswordUnchanged
-        : t.value.authOtp.errorServiceUnavailable;
+    const invalidOtp = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID";
+    if (invalidOtp) {
+      clearSmsChallenge();
+      code.value = ["", "", "", "", "", ""];
+      refreshResend();
+      step.value = 2;
+      focusCode();
+      return;
+    }
+    error.value = message === "USER_NEW_PASSWORD_MUST_DIFFER"
+      ? t.value.login.errorPasswordUnchanged
+      : t.value.authOtp.errorServiceUnavailable;
     return;
   }
   loading.value = false;
@@ -1015,7 +1049,10 @@ async function finishReset() {
 
 function onPrimary() {
   if (authApi.pendingLogin()) { loginRecoveryPending.value = true; void recoverLoginResult(); return; }
-  submitAttempted.value = true;
+  if (step.value === 1 && !phoneOk.value) {
+    error.value = primaryDisabledReason.value;
+    return;
+  }
   if (step.value === 1) { if (mode.value === "password") signInWithPassword(); else goSendCode(); }
   else if (step.value === 2) verifyCode();
   else finishReset();
@@ -1026,10 +1063,6 @@ function toggleMode() {
   password.value = ""; newPassword.value = ""; confirmPwd.value = "";
   showPwd.value = false; showCountries.value = false;
   code.value = ["", "", "", "", "", ""];
-  otpRequestId.value = null;
-  otpVerifyToken.value = null;
-  remoteTwoFactorChallenge.value = null;
-  resendLeft.value = 0;
   step.value = 1;
   mode.value = mode.value === "password" ? "otp" : "password";
 }
@@ -1039,25 +1072,32 @@ function goReset() {
   password.value = ""; newPassword.value = ""; confirmPwd.value = "";
   showPwd.value = false; showCountries.value = false;
   code.value = ["", "", "", "", "", ""];
-  otpRequestId.value = null;
-  otpVerifyToken.value = null;
-  resendLeft.value = 0;
   step.value = 1;
   mode.value = "reset";
 }
+function cancelOwnedPasswordChallenge() {
+  if (!remoteTwoFactorChallenge.value) return;
+  const attempt = authApi.pendingLoginContext();
+  if (attempt && !attempt.pending && attempt.context.challengeNo === remoteTwoFactorChallenge.value) {
+    authApi.cancelLoginChallenge();
+  }
+}
 function back() {
-  invalidateOtpFlow();
+  cancelOwnedPasswordChallenge();
+  const preserveSmsChallenge = mode.value !== "password" && step.value > 1;
+  invalidateOtpFlow(preserveSmsChallenge);
   error.value = null;
+  code.value = ["", "", "", "", "", ""];
   if (mode.value === "reset" && step.value === 1) {
-    code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
     mode.value = "password"; return;
   }
   if (mode.value === "reset" && step.value === 3) {
     newPassword.value = ""; confirmPwd.value = ""; showPwd.value = false;
-    code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
+    if (!remoteApiEnabled) clearSmsChallenge();
+    refreshResend();
     step.value = 2; return;
   }
-  code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0; focusCode();
+  focusCode();
   step.value = 1;
 }
 function close() {
@@ -1073,9 +1113,9 @@ function goRegister() {
 }
 
 function cleanup() {
+  cancelOwnedPasswordChallenge();
   mounted = false;
   invalidateOtpFlow();
-  if (resendTimer) clearInterval(resendTimer);
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());
@@ -1085,62 +1125,70 @@ onUnmounted(() => cleanup());
 .lg-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
 .lg-wrap { display: flex; flex-direction: column; padding: 16px 24px 0; min-height: 100%; box-sizing: border-box; }
 .lg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-.lg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; transition: opacity 0.15s; }
+.lg-iconbtn { position: relative; width: 44px; height: 44px; margin-left: -2px; display: grid; place-items: center; justify-self: start; }
+/* 03 §3.1 顶部图标动作: its own Liquid Glass round face, as on SubPageHeader and the onboarding back; 40 face, 44 target. */
+.lg-iconbtn__face { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; transition: transform 100ms cubic-bezier(.2, .8, .2, 1); }
+.lg-iconbtn__face > svg, .lg-iconbtn__face > .nx-native-svg { position: relative; z-index: 1; }
+[data-theme="light"] .lg-iconbtn__face { --ui-control-shadow: var(--v5-glass-shadow); }
+.lg-iconbtn:active .lg-iconbtn__face { transform: scale(.92); }
+@media (prefers-reduced-motion: reduce) { .lg-iconbtn__face { transition: none; } .lg-iconbtn:active .lg-iconbtn__face { transform: none; } }
 /* 《08》§2 按下反馈 —— 本页六个可点控件原先按下去零视觉变化(CDP forcePseudoState 实测) */
-.lg-iconbtn:active, .lg-phone__cc:active, .lg-eye:active, .lg-forgot:active, .lg-switch:active { opacity: 0.6; }
+.lg-phone__cc:active, .lg-eye:active, .lg-forgot:active, .lg-switch:active { opacity: 0.6; }
 .lg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .lg-dots { margin-top: 28px; display: flex; align-items: center; gap: 6px; }
-.lg-dot { height: 4px; width: 16px; border-radius: 9999px; background: var(--v5-surface-2); transition: all 0.3s; }
+/* Upcoming step: foreground 8%, the step-track tone of 04 (onboarding track), so it reads on both page floors. */
+.lg-dot { height: 4px; width: 16px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .lg-dot--active { width: 32px; background: var(--v5-brand); }
 .lg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
-.lg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
-.lg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
-.lg-recovery-notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 12%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 34%, transparent); }
+.lg-mode-badge { align-self: flex-start; margin-top: 8px; }
+/* 01 §1.1.2 整体底色: the shared .nx-tint (brand hue over surface, soft inner rim), no hard stroke. */
+.lg-recovery-notice { --nx-tint: var(--v5-brand); margin-top: 12px; padding: 8px 12px; border-radius: 12px; }
 .lg-recovery__account { box-sizing: border-box; padding: 0 16px; font-size: var(--ui-type-input); color: var(--v5-ink); }
 .lg-recovery__input { box-sizing: border-box; height: 56px; padding: 0 16px; border-radius: 16px; background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); }
+.lg-recovery__cta { display: flex; flex-direction: column; }
 .lg-recovery__action { margin-top: 12px; }
-.lg-recovery__secondary { min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: var(--ui-type-body); color: var(--v5-brand); }
+.lg-recovery__secondary { min-height: 44px; display: flex; align-items: center; justify-content: center; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); color: var(--v5-brand); }
 .lg-recovery__secondary[aria-disabled="true"] { opacity: .5; }
-.lg-recovery-notice__t { display: block; font-size: var(--ui-type-list-subtitle); line-height: 1.5; color: var(--v5-ink-2); }
+.lg-recovery-notice__t { display: block; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); }
 .lg-sub { display: block; margin-top: 8px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 .lg-sub__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .lg-body { margin-top: 28px; }
 .lg-col { display: flex; flex-direction: column; gap: 12px; }
 .lg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
-.lg-phone--err { border-color: color-mix(in srgb, var(--v5-brand-2) 55%, transparent); }
+.lg-phone--err { border-color: color-mix(in srgb, var(--v5-danger) 55%, transparent); }
 .lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
 .lg-phone__cc-t { font-size: var(--ui-type-body); color: var(--v5-ink); }
 .lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); color: var(--v5-ink); }
-.lg-phone-hint { display: block; margin-top: -4px; padding: 0 4px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); }
-.lg-phone-hint--err { color: var(--v5-brand-2); }
+.lg-phone-hint { display: block; margin-top: -4px; padding: 0 4px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lg-phone-hint--err { color: var(--v5-danger); }
 .lg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
-.lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
+.lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-danger) 45%, transparent); }
 .lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); color: var(--v5-ink); }
 /* 《07》tap≥44:三处热区实测 24×30 / 65×36 / 342×18。热区靠 min-* 撑开,
    图标与文字靠 flex 居中 + 负 margin 抵消,视觉位置与原先一致(只有热区变大)。 */
 .lg-eye { min-width: 44px; min-height: 44px; margin-right: -10px; display: flex; align-items: center; justify-content: center; }
 .lg-forgot-row { display: flex; justify-content: flex-end; }
 .lg-forgot { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
-.lg-development-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
-.lg-development-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
-.lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: var(--ui-type-list-subtitle); }
-.lg-resend__change { color: var(--v5-ink-3); }
-.lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
-.lg-resend__btn { color: var(--v5-brand); font-weight: 500; }
-.lg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border-radius: 8px; padding: 8px 12px; }
+.lg-development-otp { padding: 8px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
+.lg-development-otp__t { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-warning-ink); }
+/* 更换手机号 / 重新发送 are NxButton text S (13/18, brand) whose 44px target reaches 13px past the row: 4px more than the
+   column gap keeps that target off the code field above. */
+.lg-resend { margin-top: 4px; display: flex; align-items: center; justify-content: space-between; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); }
+.lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
+.lg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-danger); background: var(--v5-danger-soft); border-radius: 12px; padding: 8px 12px; }
 .lg-error__t { flex: 1; }
-.lg-cta { margin-top: 24px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
-.lg-cta--on { background: var(--v5-brand); }
-.lg-cta__t { font-size: var(--ui-type-button); font-weight: 600; color: var(--v5-ink-4); }
-.lg-cta__t--on { color: var(--v5-on-brand); }
-.lg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.lg-cta { margin-top: 24px; }
+.lg-cta--off { opacity: .5; }
+/* 03 §3.1 禁用: the greyed CTA names its reason in one neutral line right under it (description role, ink-3). */
+.lg-cta-reason { display: block; min-height: var(--ui-type-description-lh); margin-top: 8px; text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lg-cta-reason--off { visibility: hidden; }
 /* min-height 18→44 会多占 26px,margin-top 12→4 抵消一半,视觉间距 12→17px 基本不变 */
 .lg-switch { margin-top: 4px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .lg-switch__t { font-size: var(--ui-type-list-subtitle); color: var(--v5-brand); font-weight: 500; }
-.lg-divider { display: flex; align-items: center; margin: 28px 0; }
-.lg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
-.lg-divider__t { padding: 0 12px; font-size: 12px; color: var(--v5-ink-3); }
+.lg-divider { display: flex; align-items: center; margin: 24px 0; }
+.lg-divider__line { flex: 1; height: 1px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.lg-divider__t { padding: 0 12px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .lg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .lg-footer__acc { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 /* 句中行内链接:WCAG 2.5.8 对 inline 目标豁免 44pt(强撑高会拆掉整句行高),

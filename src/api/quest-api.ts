@@ -109,18 +109,20 @@ function parseQuest(value: unknown): CanonicalQuest {
       || rewardNex === null
       || !["PENDING", "COMPLETED", "CLAIMABLE", "CLAIMED", "EXPIRED"].includes(status)
       || !["wallet", "explore", "recommend", "identity", "social"].includes(category)
-      || !rawActionRoute || !instanceKey || !eligibleFrom || !eligibleUntil || eligible === null
+      || !instanceKey || !eligibleFrom || !eligibleUntil || eligible === null
       || Date.parse(eligibleUntil) <= Date.parse(eligibleFrom)
       || (layer === "DAY_ONE" ? !instanceKey.startsWith("DAY_ONE:") : !instanceKey.startsWith("WEEK:"))
       || (status === "EXPIRED" && eligible)
       || (!eligible && !["EXPIRED", "CLAIMED"].includes(status))) {
     return invalid();
   }
-  let actionRoute: string;
-  try {
-    actionRoute = normalizeQuestActionRoute(rawActionRoute);
-  } catch {
-    return invalid();
+  let actionRoute = "";
+  if (rawActionRoute) {
+    try {
+      actionRoute = normalizeQuestActionRoute(rawActionRoute);
+    } catch {
+      // Preserve the task and reward snapshot. Only its navigation is unavailable.
+    }
   }
   return { questCode, name, layer, rewardNex, status, category, actionRoute,
     instanceKey, eligibleFrom, eligibleUntil, eligible };

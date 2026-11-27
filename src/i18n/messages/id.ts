@@ -743,6 +743,7 @@ export const id: Messages = {
     errorTooFrequent: "Terlalu sering — coba lagi dalam {s} dtk",
     errorOtpInvalid: "Kode salah — sisa {n} percobaan",
     errorOtpExpired: "Kode kedaluwarsa — minta kode baru",
+    codeExpiredSubtitle: "Kode sebelumnya sudah kedaluwarsa",
     errorOtpExhausted: "Kode tidak berlaku — minta kode baru",
     errorOtpNotFound: "Minta kode verifikasi terlebih dahulu",
     errorOtpSendUnavailable: "Kode verifikasi belum terkirim. Coba lagi nanti.",
@@ -780,7 +781,6 @@ export const id: Messages = {
   login: {
     recoverAttempt: "Cek hasil masuk",
     retryOriginal: "Coba masuk lagi",
-    retryOriginalHint: "Masukkan lagi kata sandi atau kode verifikasi untuk proses masuk ini.",
     retryCode: "Kode verifikasi",
     unknownAttempt: "Proses masuk belum selesai. Coba lagi.",
     verificationPending: "Selesaikan verifikasi untuk masuk.",
@@ -1869,6 +1869,9 @@ export const id: Messages = {
     recoveryCheckingNote: "Jangan membayar lagi. Halaman ini akan diperbarui otomatis.",
     recoveryNoReorder: "Jangan buat pesanan baru.",
     recoveryLater: "Nanti saja",
+    recoverySourceFate: "Ditarik untuk tukar tambah",
+    recoveryTargetActiveFate: "Mengambil slotnya dan aktif otomatis",
+    recoveryTargetInventoryFate: "Masuk ke inventaris",
     recoveryUnreadableTitle: "Permintaan pembelian sebelumnya belum dapat dipastikan",
     recoveryUnreadableNote: "Agar tidak membayar dua kali, pembayaran di halaman ini dijeda.",
     recoveryUnreadableBody: "Agar tidak membayar dua kali, cek pesanan Anda dulu.",
@@ -2289,6 +2292,7 @@ export const id: Messages = {
     condMin: "Min. belanja ${min}",
     condCap: "Maks. potongan ${cap}",
     scopeSingle: "Khusus {name}",
+    scopeSingleUnnamed: "Khusus produk tertentu",
     scopeAll: "Semua perangkat",
     noExpiry: "Tanpa batas waktu",
     expiryLabel: "Berlaku hingga {date}",
@@ -2514,30 +2518,30 @@ export const id: Messages = {
     releaseComingToast: "Model ini segera hadir — nantikan",
     taskLevelLabels: {"1":"dasar","2":"menengah","3":"lanjutan","4":"unggulan"},
     taskLevelsLine: "Tingkat tugas AI: {levels}",
+    productBadges: {
+      trending: "Naik daun",
+      upgradePick: "Pilihan upgrade",
+      flagship: "Unggulan",
+      lowBarrier: "Mudah mulai",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Perangkat yang dikelola penuh",
-        badge: "Terlaris",
       },
       "stellarbox-pro": {
         tagline: "Bandingkan spesifikasi GPU dan perkiraan pendapatan.",
-        badge: "Naik daun",
       },
       "stellarbox-pro-v2": {
         tagline: "Throughput 2.5× S1",
-        badge: "Pilihan upgrade",
       },
       "stellarrack-p1": {
         tagline: "Rak A100 kelas pusat data untuk operator serius.",
-        badge: "Unggulan",
       },
       "stellarrack-p2": {
         tagline: "Rak H100 pusat data — tingkat komputasi tertinggi.",
-        badge: "Unggulan",
       },
       "cloud-share": {
         tagline: "Tanpa perangkat keras — beli sebagian daya jaringan.",
-        badge: "Mudah mulai",
       },
     },
     tradeinUpgrade: {

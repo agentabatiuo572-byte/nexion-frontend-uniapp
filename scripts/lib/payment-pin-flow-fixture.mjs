@@ -1,5 +1,5 @@
 // Frontend acceptance fixture only. Never imported by src or shipped in the production bundle.
-import { fixture as reviewFixture, previewCapacity } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity, previewDeviceProduct } from './design-review-fixture.mjs';
 import { applyDemoPromotionDiscounts, applyDemoQuotePricing, demoBundlePricing, demoOrderDelivery, demoPaymentDeadline, demoPurchasedOrderDevices, demoQuoteDeadline, validateDemoOrderItems } from './prototype-demo-data.mjs';
 
 // Synthetic SMS code for the local harness only; it is never included in an API response or product UI.
@@ -45,7 +45,7 @@ export function createPaymentPinFlowFixture({ now = Date.now } = {}) {
     const serverNow = now();
     const seedDevices = fleet.devices.map(device => ({ ...device, ...previewCapacity(device, fleet.capacitySchedule, serverNow) }));
     const purchasedDevices = purchased.map(device => {
-      const product = products.find(row => row.id.toUpperCase() === device.productCode);
+      const product = previewDeviceProduct(products, device.productCode);
       const capacity = previewCapacity(device, fleet.capacitySchedule, serverNow);
       return { ...device, ...capacity, imageUrl: new URL(new URL(product.imageUrl).pathname, url.origin).href,
         gpuModel: product.gpu, vramTotalGb: Number.parseInt(product.vram, 10), basePowerW: Number.parseInt(product.power, 10),

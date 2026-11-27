@@ -743,6 +743,7 @@ export const ru: Messages = {
     errorTooFrequent: "Слишком часто — повтор через {s} с",
     errorOtpInvalid: "Неверный код. Осталось попыток: {n}",
     errorOtpExpired: "Срок действия кода истёк — запросите новый",
+    codeExpiredSubtitle: "Предыдущий код истёк",
     errorOtpExhausted: "Код недействителен — запросите новый",
     errorOtpNotFound: "Сначала запросите код",
     errorOtpSendUnavailable: "Код подтверждения не отправлен. Повторите попытку позже.",
@@ -780,7 +781,6 @@ export const ru: Messages = {
   login: {
     recoverAttempt: "Проверить результат входа",
     retryOriginal: "Повторить вход",
-    retryOriginalHint: "Введите заново пароль или код подтверждения для этого входа.",
     retryCode: "Код подтверждения",
     unknownAttempt: "Вход не завершён. Повторите попытку.",
     verificationPending: "Чтобы войти, пройдите проверку.",
@@ -1869,6 +1869,9 @@ export const ru: Messages = {
     recoveryCheckingNote: "Не оплачивайте повторно. Страница обновится автоматически.",
     recoveryNoReorder: "Не оформляйте новый заказ.",
     recoveryLater: "Не сейчас",
+    recoverySourceFate: "Сдаётся в трейд-ин",
+    recoveryTargetActiveFate: "Займёт его слот и активируется",
+    recoveryTargetInventoryFate: "Попадёт на склад",
     recoveryUnreadableTitle: "Не удаётся подтвердить прошлый запрос на покупку",
     recoveryUnreadableNote: "Чтобы не оплатить дважды, оплата на этой странице приостановлена.",
     recoveryUnreadableBody: "Чтобы не оплатить дважды, сначала проверьте заказы.",
@@ -2289,6 +2292,7 @@ export const ru: Messages = {
     condMin: "При заказе от ${min}",
     condCap: "Скидка до ${cap}",
     scopeSingle: "Для {name}",
+    scopeSingleUnnamed: "Только для указанного товара",
     scopeAll: "Все устройства",
     noExpiry: "Долгосрочно",
     expiryLabel: "Действует до {date}",
@@ -2514,30 +2518,30 @@ export const ru: Messages = {
     releaseComingToast: "Модель скоро появится в продаже — следите за новостями",
     taskLevelLabels: {"1":"начальный","2":"средний","3":"продвинутый","4":"флагманский"},
     taskLevelsLine: "Уровни задач ИИ: {levels}",
+    productBadges: {
+      trending: "В тренде",
+      upgradePick: "Для улучшения",
+      flagship: "Флагман",
+      lowBarrier: "Лёгкий старт",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Устройство с полным обслуживанием",
-        badge: "Хит продаж",
       },
       "stellarbox-pro": {
         tagline: "Сравните конфигурации GPU и ожидаемый доход.",
-        badge: "В тренде",
       },
       "stellarbox-pro-v2": {
         tagline: "В 2,5 раза выше пропускная способность, чем у S1",
-        badge: "Для улучшения",
       },
       "stellarrack-p1": {
         tagline: "Стойка A100 уровня дата-центра для серьёзных задач.",
-        badge: "Флагман",
       },
       "stellarrack-p2": {
         tagline: "Стойка H100 уровня дата-центра — максимальная мощность.",
-        badge: "Флагман",
       },
       "cloud-share": {
         tagline: "Без оборудования — купите долю мощности сети.",
-        badge: "Лёгкий старт",
       },
     },
     tradeinUpgrade: {

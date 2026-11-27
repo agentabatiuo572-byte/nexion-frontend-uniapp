@@ -10,6 +10,7 @@ export interface DayOneObservationIdentity {
 export interface DayOneObservationRequest extends DayOneObservationIdentity,
   Omit<AuthenticatedPageObservation<{ recorded: boolean }>, "subject" | "accepted" | "rejected"> {
   currentInstance(): string | undefined;
+  onRecorded?(): void;
 }
 export function createDayOneObservationRecovery(reporter = createAuthenticatedPageObservationReporter()) {
   const failures = reactive(new Set<string>());
@@ -31,7 +32,10 @@ export function createDayOneObservationRecovery(reporter = createAuthenticatedPa
       ...input, subject: subject(input),
       isCurrent: () => current(),
       accepted(result) {
-        if (current() && result.recorded) failures.delete(key(input));
+        if (current() && result.recorded) {
+          failures.delete(key(input));
+          input.onRecorded?.();
+        }
         return result.recorded;
       },
       rejected() { if (current()) failures.add(key(input)); },

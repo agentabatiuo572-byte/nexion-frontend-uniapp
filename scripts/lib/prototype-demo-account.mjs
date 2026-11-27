@@ -16,8 +16,18 @@ export function demoSecurityAccount(state, accountId) {
   };
 }
 
-export function demoAccountPasswordMatches(_state, password) {
-  return password === 'Local404Pass!';
+// Every demo account starts with the shared preview password. A preview password reset replaces it for that account
+// only; a state reset recreates the security record and so restores the starting password.
+const changedDemoPasswords = new WeakMap();
+
+export function demoAccountPasswordMatches(state, password, accountId) {
+  return password === (changedDemoPasswords.get(demoSecurityAccount(state, accountId)) ?? 'Local404Pass!');
+}
+
+export function changeDemoPassword(state, accountId, newPassword) {
+  const security = demoSecurityAccount(state, accountId);
+  changedDemoPasswords.set(security, newPassword);
+  security.passwordChangedAt = new Date().toISOString();
 }
 
 const browserNames = ['Safari · iOS', 'Safari · macOS', 'Chrome · Windows'];
@@ -162,7 +172,7 @@ export function accountDemo(url, locale, state, request) {
     if (input.confirmation !== 'DELETE') reject('ACCOUNT_DELETION_CONFIRMATION_REQUIRED', 422);
     const originalReason = javaHasText(input.reason) ? javaTrim(input.reason) : null;
     if (originalReason !== null && originalReason.length > 255) reject('ACCOUNT_DELETION_REASON_INVALID', 422);
-    if (input.currentPassword !== 'Local404Pass!') reject('CURRENT_PASSWORD_INVALID', 401);
+    if (!demoAccountPasswordMatches(state, input.currentPassword, previewAccountId(state, request.headers()) ?? demoAccountId)) reject('CURRENT_PASSWORD_INVALID', 401);
     const retained = history.requests.find(row => row.requestNo === history.commands[key]);
     if (retained) return retained;
     if (current && ['REQUESTED', 'IN_REVIEW', 'BLOCKED', 'COMPLETED'].includes(current.status)) return current;

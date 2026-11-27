@@ -302,13 +302,25 @@
     </view>
   </view>
   <!-- The last trade-in's payment result is not confirmed: continuing it is a 决定 (03 §3.5.1), so a centred confirm with the
-       device pair and the amount still due, the same anatomy as the capacity resume below. Back / Esc take 稍后再说. -->
+       device block (03 §3.5: one row per device, art, name, its device number and where it goes) and the amount still due.
+       The target is not delivered yet, so its row has the product name and no number. Back / Esc take 稍后再说. -->
   <NxNoticeDialog :open="recoveryNoticeOpen" icon="clock" tone="warning" :title="t.tradein.recoveryPending"
     :primary="purchaseActionText" :secondary="t.tradein.recoveryLater" @primary="onConfirmTradein" @secondary="hide">
-    <view v-if="recoveryNotice" class="tis-dlg-pair" role="img" :aria-label="recoveryNotice.pairLabel">
-      <view class="tis-dlg-pair__side" aria-hidden="true"><DeviceArt class="tis-dlg-pair__art tis-dlg-pair__art--src" :device="recoveryNotice.oldDevice" /><text class="tis-dlg-pair__name">{{ recoveryNotice.oldName }}</text></view>
-      <svg class="tis-dlg-pair__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
-      <view class="tis-dlg-pair__side" aria-hidden="true"><CatalogMachineImage class="tis-dlg-pair__art" :sku="recoveryNotice.newKind" :image-url="recoveryNotice.newImageUrl" scope-key="tradein-target" /><text class="tis-dlg-pair__name tis-dlg-pair__name--dst">{{ recoveryNotice.newName }}</text></view>
+    <view v-if="recoveryNotice" class="tis-dlg-fate">
+      <view class="tis-dlg-fate__row">
+        <DeviceArt class="tis-dlg-fate__art" :device="recoveryNotice.oldDevice" />
+        <view class="tis-dlg-fate__meta">
+          <text class="tis-dlg-fate__name">{{ recoveryNotice.oldName }}</text>
+          <view class="tis-dlg-fate__sub"><NxCodeValue v-if="recoveryNotice.oldDevice?.instanceNo" class="tis-dlg-fate__code" :value="recoveryNotice.oldDevice.instanceNo" :label="recoveryNotice.oldName" :copyable="false" /><text class="tis-dlg-fate__text">{{ recoveryNotice.oldDevice?.instanceNo ? '· ' : '' }}{{ t.tradein.recoverySourceFate }}</text></view>
+        </view>
+      </view>
+      <view class="tis-dlg-fate__row">
+        <CatalogMachineImage class="tis-dlg-fate__art" :sku="recoveryNotice.newKind" :image-url="recoveryNotice.newImageUrl" scope-key="tradein-target" />
+        <view class="tis-dlg-fate__meta">
+          <text class="tis-dlg-fate__name">{{ recoveryNotice.newName }}</text>
+          <view class="tis-dlg-fate__sub"><text class="tis-dlg-fate__text">{{ recoveryNotice.newFate }}</text></view>
+        </view>
+      </view>
     </view>
     <view v-if="recoveryNotice" class="tis-dlg-due">
       <text class="tis-dlg-due__label">{{ t.tradein.recoveryDueLabel }}</text>
@@ -345,6 +357,7 @@ import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import DeviceArt from "@/components/device-art.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { capacityCheckoutHref, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
@@ -365,6 +378,7 @@ import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
+import { productDisplayName } from "@/lib/product-display-name";
 import { fmt } from "@/i18n/format";
 import { apiClient, apiRuntimeConfig, deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
@@ -755,14 +769,16 @@ onMounted(() => {
 
 // ───────────────────────── helpers ─────────────────────────
 
-/** Product catalog label for any DeviceKind. `phone` isn't in the store catalog
- *  (user-owned hardware), so fall back to the device spec name, then the raw
- *  kind — never a bare literal, never a missing i18n key. */
 function kindLabel(kind: DeviceKind): string {
-  // SKU name first (brand mark). Kinds with no store listing — phone, pc-gpu —
-  // fall back to the localized device name, not the English DEVICE_SPECS one:
-  // the user's own phone can be the traded-in / replaced device here.
-  return getProduct(kind)?.name ?? deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
+  return deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
+}
+
+function sourceDeviceLabel(device: Device | null | undefined, quoteName?: string): string {
+  return quoteName?.trim() || (device ? deviceName(t.value, device).trim() || kindLabel(device.kind) : "—");
+}
+
+function targetProductLabel(productNo: string, quoteName?: string): string {
+  return productDisplayName(productNo, t.value.headerTitles.storeProduct, quoteName);
 }
 
 /** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
@@ -808,7 +824,7 @@ const choiceReadKey = computed(() => {
   return JSON.stringify([app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl,
     current.targetKind, choiceSources.value.map(device => [device.id, device.rowVersion])]);
 });
-const choiceQuotes = ref(new Map<string, Pick<CanonicalTradeinQuote, "discountUsdt" | "payableUsdt"> | null>());
+const choiceQuotes = ref(new Map<string, Pick<CanonicalTradeinQuote, "discountUsdt" | "payableUsdt" | "sourceProductName"> | null>());
 let choiceReadGeneration = 0;
 
 async function loadChoiceQuotes(sources: Device[]) {
@@ -828,7 +844,8 @@ async function loadChoiceQuotes(sources: Device[]) {
       const quote = await deviceE3Api.quote(id, target);
       if (!current()) return;
       const matches = quote.sourceDeviceId === id && quote.sourceRowVersion === version && quote.targetProductNo === target;
-      choiceQuotes.value.set(device.id, matches ? { discountUsdt: quote.discountUsdt, payableUsdt: quote.payableUsdt } : null);
+      const { discountUsdt, payableUsdt, sourceProductName } = quote;
+      choiceQuotes.value.set(device.id, matches ? { discountUsdt, payableUsdt, sourceProductName } : null);
     } catch {
       if (current()) choiceQuotes.value.set(device.id, null);
     }
@@ -858,7 +875,7 @@ const choiceView = computed(() => {
     const quote = choiceQuotes.value.get(d.id);
     const credit = remoteApiEnabled ? quote?.discountUsdt ?? null : previewCredit(d, s.newPrice);
     const net = remoteApiEnabled ? quote?.payableUsdt ?? null : Math.max(0, +(s.newPrice - (credit ?? 0)).toFixed(2));
-    const name = deviceName(t.value, d);
+    const name = sourceDeviceLabel(d, quote?.sourceProductName);
     const creditText = credit == null ? "—" : `$${formatGroupedAmount(credit)}`;
     const netText = net == null ? "—" : `$${formatGroupedAmount(net)}`;
     return { id: d.id, device: d, name, credit: creditText, net: net == null ? null : amountParts(net),
@@ -1065,7 +1082,7 @@ watch([remoteRetireLoadKey, state], () => {
 }, { immediate: true, flush: "sync" });
 
 // Display parts of an amount: the main-amount figure keeps its whole part in the main ink, the decimals muted (01 §1.2).
-// precision 6 keeps an original record's full amount (at least two decimals) instead of rounding it to cents (03 §3.6).
+// Six decimal places keep the full quoted amount with at least two displayed decimals (03 §3.6).
 function amountParts(value: number, precision: 2 | 6 = 2): { int: string; dec: string } {
   const [int, dec] = formatGroupedAmount(value, precision).split(".");
   return { int, dec: dec === undefined ? "" : `.${dec}` };
@@ -1090,7 +1107,7 @@ const retireView = computed(() => {
     // While reading, the source stays named (03 §3.4); a failed read is one status line that says it retries itself (03 §3.5.2).
     return {
       source: failed ? null : device,
-      subtitle: device ? fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }) : "",
+      subtitle: device ? fmt(t.value.tradein.retireSubtitle, { name: sourceDeviceLabel(device) }) : "",
       targets: [], loading: !failed, status: failed ? failedStatus : loadingStatus,
     };
   }
@@ -1122,7 +1139,7 @@ const retireView = computed(() => {
   return {
     // The source row names the device while there are targets or they are still being read; a final empty or failed read is one status line.
     source: targets.length || pending ? device : null,
-    subtitle: fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }),
+    subtitle: fmt(t.value.tradein.retireSubtitle, { name: sourceDeviceLabel(device) }),
     targets, loading: pending,
     status: pending ? loadingStatus : failed ? failedStatus
       : targets.length ? null : { tone: "info" as const, text: t.value.tradein.retireNoTargets },
@@ -1164,29 +1181,30 @@ const tradeinView = computed(() => {
   const band = remoteQuote ? null : ladderBandFor(sourcePrice, earned);
   const creditRatePct = remoteQuote ? remoteQuote.creditRatePct : band?.creditPct ?? null;
   const estNet = remoteQuote?.payableUsdt ?? Math.max(0, +(s.newPrice - credit).toFixed(2));
+  const precision = remoteQuote ? 6 : 2;
   const targetPrice = remoteQuote?.targetPriceUsdt ?? s.newPrice;
+  const oldName = sourceDeviceLabel(oldDevice, remoteQuote?.sourceProductName);
+  const targetProductNo = remoteQuote?.targetProductNo ?? s.newKind;
+  const newName = targetProductLabel(targetProductNo, remoteQuote?.targetProductName);
   return {
     // The device pair's accessible name: what is handed in and what it becomes.
-    title: fmt(t.value.tradein.sheetTitle, {
-      from: kindLabel(oldDevice.kind),
-      to: kindLabel(s.newKind),
-    }),
+    title: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }),
     oldDevice,
-    oldName: kindLabel(oldDevice.kind),
-    newKind: s.newKind,
-    newName: kindLabel(s.newKind),
-    newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
-    estNet: amountParts(estNet),
-    credit: formatGroupedAmount(credit),
-    targetPrice: formatGroupedAmount(targetPrice),
+    oldName,
+    newKind: targetProductNo,
+    newName,
+    newImageUrl: getProduct(targetProductNo)?.imageUrl ?? null,
+    estNet: amountParts(estNet, precision),
+    credit: formatGroupedAmount(credit, precision),
+    targetPrice: formatGroupedAmount(targetPrice, precision),
     // How much of the target price the credit covers, drawn from the two server figures; no bar position when either is unknown.
     creditPct: targetPrice > 0 ? Math.round(Math.min(100, Math.max(0, credit / targetPrice * 100))) : null,
-    basis: fmtParts(t.value.tradein.sheetBasis, { price: `$${formatGroupedAmount(sourcePrice)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
+    basis: fmtParts(t.value.tradein.sheetBasis, { price: `$${formatGroupedAmount(sourcePrice, precision)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
     // An active old device loses its running job on payment (PRD §7.5.1, BUG-542); same condition as before, both branches.
     taskVoid: remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null,
     fundsGap: remoteQuote && !remoteQuote.sufficientFunds
-      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(remoteQuote.walletShortfallUsdt) }) : null,
-    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet) }),
+      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(remoteQuote.walletShortfallUsdt, precision) }) : null,
+    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet, precision) }),
   };
 });
 // Quota used up keeps the confirm label on the disabled button; the reason is the panel right above it (board B-4d).
@@ -1268,9 +1286,10 @@ const replaceView = computed(() => {
   if (s.kind !== "replace") return null;
   // The arriving machine, what it costs, and the device that steps down (board B-6a); the runtime-published copy may still
   // carry {newKind}, so it is still passed to the button labels.
-  const base = { newKind: s.newKind, newName: kindLabel(s.newKind), newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
-    replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
-    keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: kindLabel(s.newKind) }) };
+  const newName = targetProductLabel(s.newKind, s.canonicalCapacityQuote?.targetProductName);
+  const base = { newKind: s.newKind, newName, newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
+    replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: newName }),
+    keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: newName }) };
   if (remoteApiEnabled && s.canonicalCapacityQuote) {
     const quote = s.canonicalCapacityQuote;
     const device = quote.sourceDeviceId == null ? null : app.devices.find((d) => Number(d.id) === quote.sourceDeviceId) ?? null;
@@ -1278,7 +1297,7 @@ const replaceView = computed(() => {
       ...base,
       due: amountParts(quote.payableUsdt),
       source: { device, online: !!device && deviceOnlineState(device, Date.now()) === "online",
-        line: fmt(t.value.tradein.replaceSourceLine, { name: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable }) },
+        line: fmt(t.value.tradein.replaceSourceLine, { name: sourceDeviceLabel(device, quote.sourceDeviceName ?? undefined) }) },
       insufficient: false, // The shared payment selector checks wallet balance; external methods remain available.
       fundsGap: null,
     };
@@ -1290,7 +1309,7 @@ const replaceView = computed(() => {
     ...base,
     due: amountParts(s.newPrice),
     source: { device: lowest, online: deviceOnlineState(lowest, Date.now()) === "online",
-      line: fmt(t.value.tradein.replaceSourceLine, { name: lowest.name }) },
+      line: fmt(t.value.tradein.replaceSourceLine, { name: sourceDeviceLabel(lowest) }) },
     insufficient,
     // Same shortfall the composer checks; shown as one hint line above the disabled buttons (board B-6b).
     fundsGap: insufficient ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(s.newPrice - app.user.usdtBalance) }) : null,
@@ -1380,7 +1399,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
     const effectiveOperation = command.operation;
     const target = frozen ? frozen.targetProductNo : (command as PendingKeepCommand).targetProductNo;
     const payable = frozen ? frozen.payableUsdt : (command as PendingKeepCommand).payableUsdt;
-    const summary = frozen ? frozen.targetProductName : kindLabel(target as DeviceKind);
+    const summary = targetProductLabel(target, frozen?.targetProductName);
     if (!receipt) {
       if (readOnlyCurrent) return;
       const purchaseIsCurrent = () => current() && props.active
@@ -1618,8 +1637,8 @@ async function submitCanonicalCapacityReplacement(
         }
         writeCapacityPending(requestScope.accountKey,null);
         toast.success(fmt(t.value.tradein.replaceSuccessToast, {
-          newKind: kindLabel(newKind),
-          oldKind: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
+          newKind: targetProductLabel(newKind, quote.targetProductName),
+          oldKind: sourceDeviceLabel(app.devices.find(device => device.id === String(quote.sourceDeviceId)), quote.sourceDeviceName ?? undefined),
         }));
         hide();
         goDevices();
@@ -1686,8 +1705,8 @@ function onReplace() {
     amount: -s.newPrice,
     status: "posted",
     memo: fmt(t.value.tradein.replaceBillMemo, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   });
   if (paid !== "ok") {
@@ -1707,8 +1726,8 @@ function onReplace() {
   pending.settleProduct(s.newKind);
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   );
   confirming.value = false;
@@ -1783,7 +1802,7 @@ async function submitCanonicalKeepBuy(
           throw new Error("CAPACITY_COMMAND_RELEASE_FAILED");
         }
         writeCapacityPending(requestScope.accountKey,null);
-        toast.success(activeAtPurchase ? fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }) : t.value.orders.inventoryToast);
+        toast.success(activeAtPurchase ? fmt(t.value.tradein.keepBuySuccessToast, { newKind: targetProductLabel(newKind) }) : t.value.orders.inventoryToast);
         hide();
         goDevices();
       },
@@ -1818,7 +1837,7 @@ function onKeepBuy() {
     symbol: "USDT",
     amount: -s.newPrice,
     status: "posted",
-    memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: kindLabel(s.newKind) }),
+    memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: targetProductLabel(s.newKind) }),
   });
   if (paid !== "ok") {
     // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
@@ -1831,7 +1850,7 @@ function onKeepBuy() {
   // 成交即兑现意图:同账号该商品仍在窗内的链上发票一并作废(否则浮动条继续催第二笔;审计 R9 P1)。
   // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出可取消的旧票,不会二次扣款
   pending.settleProduct(s.newKind);
-  toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(s.newKind) }));
+  toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: targetProductLabel(s.newKind) }));
   confirming.value = false;
   hide();
   goDevices();
@@ -1934,8 +1953,8 @@ function onForce() {
     amount: -s.newPrice,
     status: "posted",
     memo: fmt(t.value.tradein.forceReplaceBillMemo, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   });
   if (paid !== "ok") {
@@ -1954,8 +1973,8 @@ function onForce() {
   pending.settleProduct(s.newKind);
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   );
   confirming.value = false;
@@ -1978,11 +1997,15 @@ const recoveryNotice = computed(() => {
   if (!recoveryNoticeOpen.value || s.kind !== "tradein") return null;
   const quote = purchaseRecoveryRecord.value?.tradeinQuote ?? null;
   const oldDevice = quote ? app.devices.find((d) => Number(d.id) === quote.sourceDeviceId) : undefined;
-  const oldName = oldDevice ? kindLabel(oldDevice.kind) : quote?.sourceProductName || "—";
-  const newKind = (quote?.targetProductNo ?? s.newKind) as DeviceKind;
-  const newName = kindLabel(newKind);
-  return { oldDevice, oldName, newKind, newName, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
-    pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt, 6) : null };
+  const oldName = sourceDeviceLabel(oldDevice, quote?.sourceProductName);
+  const newKind = quote?.targetProductNo ?? s.newKind;
+  const newName = targetProductLabel(newKind, quote?.targetProductName);
+  // Where the new device goes follows the quote, as on checkout (inheritActiveHint / inheritInventoryHint).
+  const newFate = quote?.targetDeviceStatus === "INACTIVE" ? t.value.tradein.recoveryTargetInventoryFate
+    : quote?.targetDeviceStatus === "ACTIVE" ? t.value.tradein.recoveryTargetActiveFate
+      : quote ? t.value.myDevices.inventorySectionActivationUnconfirmed : "—";
+  return { oldDevice, oldName, newKind, newName, newFate, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
+    due: quote ? amountParts(quote.payableUsdt, 6) : null };
 });
 // The capacity resume confirm (board B-6c): the machine and the amount still due, from the saved original command.
 const capacityNotice = computed(() => {
@@ -2138,13 +2161,18 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-hint > svg { flex: none; margin-top: calc(var(--v5-space-1) / 2); color: var(--v5-warning-ink); }
 .tis-hint__text { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink); }
 /* Recovery confirm (B-4e): the device pair stacked small, then the amount still due. */
-.tis-dlg-pair { align-self: stretch; display: flex; align-items: flex-start; justify-content: center; gap: var(--ui-space-row-y); margin-top: var(--v5-space-4); }
-.tis-dlg-pair__side { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); width: 104px; min-width: 0; }
-.tis-dlg-pair__art { width: 44px; height: 44px; }
-.tis-dlg-pair__art--src { opacity: .82; }
-.tis-dlg-pair__name { max-width: 100%; overflow-wrap: break-word; text-align: center; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.tis-dlg-pair__name--dst { font-weight: 500; color: var(--v5-ink); }
-.tis-dlg-pair__arrow { flex: none; margin-top: var(--v5-space-3); color: var(--v5-ink-4); }
+/* Device block (03 §3.5, same anatomy as the slot-replacement undo dialog, board S7): one surface-2 block, a row per device. */
+.tis-dlg-fate { align-self: stretch; margin-top: var(--v5-space-4); padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); text-align: left; }
+.tis-dlg-fate__row { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 6px; }
+.tis-dlg-fate__row + .tis-dlg-fate__row { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.tis-dlg-fate__art { flex: none; width: 48px; height: 48px; margin: -4px 0; }
+.tis-dlg-fate__meta { flex: 1 1 auto; min-width: 0; }
+.tis-dlg-fate__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.tis-dlg-fate__sub { display: flex; align-items: baseline; column-gap: 6px; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.tis-dlg-fate__code { max-width: 100%; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-list-subtitle-lh) var(--font-metric); letter-spacing: 0; }
+/* Beside a code the fate keeps its full width and wraps only once the code is down to prefix … tail. */
+.tis-dlg-fate__code + .tis-dlg-fate__text { flex: 0 0 auto; max-width: calc(100% - 11ch - 6px); overflow-wrap: break-word; }
+.tis-dlg-fate__text { min-width: 0; overflow-wrap: break-word; }
 .tis-dlg-due { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); margin-top: var(--v5-space-4); }
 .tis-dlg-due__label { white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .tis-dlg-due__amount { white-space: nowrap; font-family: var(--font-amount); font-weight: 500; font-size: var(--ui-type-page-title); line-height: var(--ui-type-page-title-lh); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--v5-ink); }
