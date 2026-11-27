@@ -316,12 +316,12 @@ const amountError = computed(() => {
   if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
 });
-// Why 「继续提现」 is grey on the account step: missing limits or a closed channel.
+// A closed channel can block withdrawal even before an account is bound.
 const continueReason = computed(() => {
   const shown = displayConfig.value;
-  if ((busy.value && !silentRead.value) || !shown?.enabled || !shown.beneficiary) return "";
-  if (!shown.policy || !shown.capacity) return c.value.capacityUnavailable;
-  return shown.capacity.withdrawalEnabled ? "" : c.value.unavailable;
+  if ((busy.value && !silentRead.value) || !shown) return "";
+  if (shown.enabled && shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
+  return shown.capacity && !shown.capacity.withdrawalEnabled ? c.value.unavailable : "";
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
