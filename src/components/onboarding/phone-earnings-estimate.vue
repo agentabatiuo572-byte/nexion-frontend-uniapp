@@ -107,7 +107,8 @@ let lastCountKey: string | null = null;
 watch(() => {
   const result = props.calibration;
   return props.shown && props.view === "detected" && phoneRate.value !== null && result
-    ? JSON.stringify([result.userId, result.deviceId, result.revision]) : null;
+    // The figure, not the row revision: activating or deferring bumps the revision but leaves the estimate as shown.
+    ? JSON.stringify([result.userId, result.deviceId, phoneUsdtLabel.value]) : null;
 }, (key) => {
   if (key === null) {
     // Stop on the same host so renderjs can restore the final amount.
