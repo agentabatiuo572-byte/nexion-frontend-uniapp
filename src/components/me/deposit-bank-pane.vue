@@ -9,23 +9,16 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FxRateLine v-if="paymentSessionReady" :style="fxReadFailure || paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
-    <!-- Only the rate read failing leaves this line: it hides the form. An order-list read failure only blocks 生成付款单, says so
-         above it in the bar and recovers by itself (03 §3.4, §3.5.2). -->
-    <view v-if="fxReadFailure" class="nx-bank-read-error" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-2)" role="status">
-      <text>{{ fxReadFailure }}</text>
-      <view class="nx-bank-read-retry" role="button" :tabindex="readRetryBusy ? -1 : 0" :aria-disabled="readRetryBusy" style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)" @click="retryReadData" @keydown.enter.prevent="retryReadData" @keydown.space.prevent="retryReadData">
-        <text>{{ readRetryBusy ? t.help.loadingMore : t.ui.retry }}</text>
-      </view>
-    </view>
-    <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
-      <text class="block" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger); overflow-wrap: break-word">{{ createError }}</text>
-    </view>
+    <FxRateLine v-if="paymentSessionReady" :style="paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
+    <!-- A failed read of the rate or the order list leaves the form in place with 「—」 for what it could not read; 生成付款单
+         stays grey with the reason above it in the bar while the page re-reads by itself (03 §3.4, §3.5.2). A failed create
+         is said once by a toast (03 §3.5.1). -->
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
-    <template v-if="paneView === 'form' && paymentSessionReady && fx.configReady && !fx.syncFailed">
-      <!-- An unconfigured bank channel is not shown: the page hides this segment and moves to USDT. -->
-      <view v-if="bankRailAvailable" :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
+    <template v-if="paneView === 'form' && paymentSessionReady && (fx.configReady || fx.syncFailed)">
+      <!-- An unconfigured bank channel is not shown: the page hides this segment and moves to USDT. A failed read is not a
+           closed channel: the form stays, its controls off, and nothing dims the rest (03 §3.4 其他内容照常). -->
+      <view v-if="bankRailAvailable || fx.syncFailed" :style="fxUsable || fx.syncFailed ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
         <view v-if="dailyCapacityExhausted" class="flex" :style="warnRowStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 3px" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
@@ -64,9 +57,9 @@
         </view>
 
         <view class="nx-bank-facts">
-          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factFee }}</text><text class="nx-bank-fact__v">{{ feeFact }}</text><text v-if="fx.configReady && fx.feeUsdt > 0 && fx.feeVnd > 0" class="nx-bank-fact__sub">{{ fmtVnd(fx.feeVnd) }}</text></view>
-          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factTodayRemaining }}</text><text class="nx-bank-fact__v">{{ todayRemainingFact }}</text></view>
-          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factSingleLimit }}</text><text class="nx-bank-fact__v">{{ limitFact }}</text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factFee }}</text><text class="nx-bank-fact__v">{{ feeFact.text }}<text v-if="feeFact.unit" class="nx-bank-fact__u">{{ '\u00A0' + feeFact.unit }}</text></text><text v-if="fx.configReady && fx.feeUsdt > 0 && fx.feeVnd > 0" class="nx-bank-fact__sub">{{ fmtVnd(fx.feeVnd) }}</text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factTodayRemaining }}</text><text class="nx-bank-fact__v">{{ todayRemainingFact }}<text v-if="todayRemainingFact !== '—'" class="nx-bank-fact__u">{{ '\u00A0USDT' }}</text></text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factSingleLimit }}</text><text class="nx-bank-fact__v">{{ limitFact }}<text v-if="limitFact !== '—'" class="nx-bank-fact__u">{{ '\u00A0USDT' }}</text></text></view>
         </view>
 
         <view class="nx-bank-hint">
@@ -465,17 +458,17 @@ function usdtLabel(value: number): string {
 function fmtVnd(value: number): string { return `${formatAmount(value, "VND")}\u00A0₫`; }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
-// Facts well under the amount: unknown values stay "—", never a fabricated 0.
-const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}\u2060–\u2060${shortUsdt(maxDeposit.value)}\u00A0USDT` : "—");
+// Facts well under the amount: unknown values stay "—", never a fabricated 0 (a failed read clears the config). Figures
+// only; the template sets each unit after its figure in the smaller secondary role, as the USDT ticket does.
+const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}\u2060–\u2060${shortUsdt(maxDeposit.value)}` : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
-const todayRemainingFact = computed(() => dailyCapacityKnown.value ? `${shortUsdt(todayRemainingDeposit.value)}\u00A0USDT` : "—");
+const todayRemainingFact = computed(() => fx.configReady && dailyCapacityKnown.value ? shortUsdt(todayRemainingDeposit.value) : "—");
 const feeFact = computed(() => {
-  if (!fx.configReady) return "—";
-  if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
-  return `${formatAmount(Math.max(fx.feeUsdt, 0))}\u00A0USDT`;
+  if (!fx.configReady) return { text: "—", unit: "" };
+  if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return { text: formatAmount(fx.feeVnd, "VND"), unit: "₫" };
+  return { text: shortUsdt(Math.max(fx.feeUsdt, 0)), unit: "USDT" };
 });
-// Whole numbers for presets, the limit range and today's remaining fact ("1,000"), keeping cents only when present; the
-// USDT unit is said once, by the amount field and after the range (03 §3.6.1).
+// Whole numbers for presets and the three facts ("1,000"), keeping cents only when present.
 function shortUsdt(value: number): string { return formatAmount(value).replace(/\.00$/, ""); }
 const quickAmounts = computed(() => [100, 500, 1000, 5000].map(value => ({ value, label: shortUsdt(value),
   enabled: fxUsable.value && !creating.value && !dailyCapacityExhausted.value && value >= minDeposit.value && value <= maxDeposit.value
@@ -507,8 +500,8 @@ const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.v
 
 // ── 生成付款单(mock ~600ms 延迟演加载态:按钮内联 spinner「生成中…」)──
 const creating = ref(false);
-const createError = ref("");
-const formCtaVisible = computed(() => paneView.value === "form" && paymentSessionReady.value && fx.configReady && !fx.syncFailed && bankRailAvailable.value);
+const formCtaVisible = computed(() => paneView.value === "form" && paymentSessionReady.value
+  && (fx.syncFailed || (fx.configReady && bankRailAvailable.value)));
 let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
@@ -516,7 +509,6 @@ function createOrder(presetUsdt?: number) {
     || creating.value || readError.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
-  if (presetUsdt === undefined) createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
 }
@@ -534,8 +526,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       return;
     }
     if (!fx.fxAvailable || !fx.configReady) {
-      createError.value = t.value.topupChrome.depositOpFailedNote;
-      toast.error(createError.value);
+      toast.error(t.value.topupChrome.depositOpFailedNote);
       creating.value = false;
       return;
     }
@@ -551,7 +542,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         : usdt > maxDeposit.value
           ? fmt(t.value.bankPane.singleLimitExceeded, { max: maxLabel.value })
           : fmt(t.value.bankPane.dailyCapacityExceeded, { max: todayRemainingLabel.value });
-      createError.value = reason;
       toast.error(reason);
       creating.value = false;
       return;
@@ -610,7 +600,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     }, {
       success: (it) => {
         if (!stillCurrent()) return;
-        createError.value = "";
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
@@ -618,9 +607,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       },
       failure: (reason) => {
         if (!stillCurrent()) return;
-        const userFacingReason = approvedBusinessFailureCopy || reason;
-        createError.value = userFacingReason;
-        toast.error(userFacingReason);
+        toast.error(approvedBusinessFailureCopy || reason);
       },
       settled: () => { creating.value = false; },
       // lib 新契约:fallback = 用户面人话(原始 cause 由 lib 进日志)。审计 R3 抓获:此处
@@ -633,7 +620,7 @@ function regen() {
   if (!it) return;
   if (!Number.isSafeInteger(it.usdtAmount)) {
     startNewTopup(); amount.value = "";
-    createError.value = t.value.bankPane.amountFormatError;
+    toast.warn(t.value.bankPane.amountFormatError);
     return;
   }
   createOrder(it.usdtAmount);
@@ -653,7 +640,6 @@ function startNewTopup() {
   autoResumePending.value = false;
   viewIntentId.value = null;
   paidPressed.value = false;
-  createError.value = "";
 }
 
 // ── 真倒计时(派生自 expireAt,与 store 过期引擎同源;到点 store 翻 expired 视图自换)──
@@ -715,7 +701,6 @@ function selectExistingPayment(choice: ExistingPaymentChoice) {
   if (!canSelectExistingPayment(choice)) return;
   viewIntentId.value = choice.intentId;
   paidPressed.value = false;
-  createError.value = "";
 }
 
 // ── 展示派生 ──
@@ -777,15 +762,13 @@ function copyAccount() {
 function openHostedOrder(it: DepositIntent) {
   if (openingHosted.value) return;
   if (it.paymentMode !== "hosted" || it.providerStatus !== "created" || !it.paymentUrl) {
-    createError.value = t.value.bankPane.hostedOpenFailed;
-    toast.error(createError.value);
+    toast.error(t.value.bankPane.hostedOpenFailed);
     return;
   }
   openingHosted.value = true;
   if (!openHostedPaymentPage(it.paymentUrl)) {
     openingHosted.value = false;
-    createError.value = t.value.bankPane.hostedOpenFailed;
-    toast.error(createError.value);
+    toast.error(t.value.bankPane.hostedOpenFailed);
     return;
   }
   hostedOpenTimer = setTimeout(() => { openingHosted.value = false; }, 1000);
@@ -938,12 +921,15 @@ const warnTextStyle: CSSProperties = {
 
 // ── Main actions for the page's fixed bottom bar (DS-30): one per stage, plus the credited stage's bills link. ──
 type PaneAction = { className: string; label: string; enabled: boolean; busy: boolean; external: boolean; note?: string; run: () => void };
-// Why 生成付款单 is grey, said once above it in the bar (03 §3.1 bottom bar), in existing copy.
+// Why 生成付款单 is grey, said once above it in the bar (03 §3.1 bottom bar). A failed rate read says the page is re-reading
+// it (03 §3.5.2); a remaining capacity above 0 but under the minimum says so, as the warning above the amount does.
 const createReason = computed(() => {
   if (ctaEnabled.value || creating.value) return "";
   if (readError.value) return readError.value;
+  if (paymentSessionReady.value && fx.syncFailed) return t.value.bankPane.fxReadRetrying;
   if (!fxUsable.value) return t.value.bankPane.createFxUnavailable;
-  if (dailyCapacityExhausted.value) return t.value.bankPane.dailyCapacityExhaustedTitle;
+  if (dailyCapacityExhausted.value) return todayRemainingDeposit.value > 0
+    ? fmt(t.value.bankPane.dailyCapacityBelowMin, { min: formatAmount(minDeposit.value) }) : t.value.bankPane.dailyCapacityExhaustedTitle;
   return amountError.value || t.value.bankPane.amountFormatError;
 });
 const primaryAction = computed<PaneAction | null>(() => {
@@ -1002,9 +988,11 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-fact { min-width: 0; }
 .nx-bank-fact > .nx-bank-k { padding-top: 3px; }
 .nx-bank-fact + .nx-bank-fact { padding-left: 12px; border-left: 1px solid var(--v5-border); }
-/* Values in the 10.1 行内数值 role, never cut and never split from their unit (03 §3.6.1): a value and its USDT are one
-   unbreakable run, so a column whose value is wider than its third grows to it and the others give way. */
-.nx-bank-fact__v { display: block; margin-top: 4px; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: break-word; }
+/* Three-column data block (10.1 统计数值), as the USDT ticket: the figure in the metric face, its unit after it in the 辅助数值
+   role and secondary ink. A figure and its unit are one unbreakable run (03 §3.6.1), so a column whose run is wider than its
+   third grows to it and the others give way. */
+.nx-bank-fact__v { display: block; margin-top: 2px; color: var(--v5-ink); font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-fact__u { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
 .nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-bank-hint > svg, .nx-bank-hint > .nx-native-svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }

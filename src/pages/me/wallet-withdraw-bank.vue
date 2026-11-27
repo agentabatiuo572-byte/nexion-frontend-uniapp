@@ -90,7 +90,7 @@
             </view>
             <view class="tear" aria-hidden="true" />
             <view class="ticket__net">
-              <text class="k">{{ c.receiveLabel }}（VND）</text>
+              <text class="k">{{ c.receive }}</text>
               <text class="ticket__vnd">{{ formatAmount(quote.amountVnd, 'VND') }}<text class="ticket__cur">₫</text></text>
               <text class="hint">{{ c.feeIncluded }}</text>
             </view>
@@ -137,9 +137,11 @@
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitReason : formStep === 'amount' && !!quoteReason }" />
       </template>
       <!-- First config or ?order= receipt read with nothing to show (03 §3.4, §3.5.2): when it fails, the page's one centred
-           result and its one 重新加载; while it runs, the still placeholder below. -->
+           result and its one 重新加载; while it runs, the still placeholder below. An ?order= number that is not a withdrawal
+           number can never load, so its result offers the way back instead (neutral glass L, 03 §3.1). -->
       <template v-else-if="requestedOrder !== null || !pendingAttempt">
-        <EmptyState v-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
+        <EmptyState v-if="error && orderRouteInvalid" kind="empty-list" page :title="useTranslations.pageLoad.unknown" :cta-label="c.backToWallet" cta-size="large" @cta="backToWallet" />
+        <EmptyState v-else-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
       </template>
       <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
       </template>
@@ -434,8 +436,11 @@ function scope() {
   return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch
     && apiRuntimeConfig.environment === environment && apiRuntimeConfig.baseUrl === baseUrl;
 }
-function report(_err: unknown) {
+// An ?order= number that fails the withdrawal-number check is a dead link, not a read that can recover.
+const orderRouteInvalid = ref(false);
+function report(err: unknown) {
   if (!config.value) configPresentation.value = null;
+  orderRouteInvalid.value = err instanceof Error && err.message === "BANK_ORDER_ROUTE_INVALID";
   error.value = c.value.error;
 }
 async function run(action: (current: () => boolean) => Promise<void>, quietRead = false) {
@@ -789,7 +794,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .checkbox.checked { background: var(--v5-brand); color: var(--v5-on-brand); border-color: var(--v5-brand); }
 /* P-45 bank withdrawal: physical bank card, compact account row, amount on glass, quote ticket, fixed actions. */
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+/* Field names in the 10.1 辅助数值 role. */
+.k { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .hint { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .hint.pad { margin: 12px 4px 0; }
 .bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
@@ -833,7 +839,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 /* The quote amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38) at 500 (01.2, as the result amount); the amount
    input keeps its own size (10.2). */
 .slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
+/* The unit beside the amount input in the 辅助数值 role at the unit weight 500 (01.2), secondary ink. */
+.slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; }
 /* The quote amount follows the 01.2 anatomy: integer in main ink, decimals and unit in secondary ink, unit max(12px, .4em),
    after a no-break space (03 §3.6.1), not the input row's 6px margin. The unit beside the amount input keeps 12/16 (10.2:
    the amount input is outside the type roles). Descendant, not child: uni-text puts nested text inside its own span. */
