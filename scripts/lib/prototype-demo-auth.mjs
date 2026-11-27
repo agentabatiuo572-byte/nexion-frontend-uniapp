@@ -140,10 +140,10 @@ export function createAuthDemo(state) {
         const intent=body.intent==='LINK'?'LINK':'LOGIN',accountId=intent==='LINK'?previewAccountId(state,headers):null;
         if(intent==='LINK'&&!accountId)return fail(401,'AUTH_REQUIRED');
         if(intent==='LINK'&&linksFor(accountId).includes(body.provider))return fail(409,'OAUTH_PROVIDER_ALREADY_LINKED');
-        // 第三方已有账号 authorizes the identity last bound for this provider. Every other result, and a provider
-        // nobody has bound, authorizes an identity no account has bound yet, which opens an account (PRD §4.2).
+        // The existing-account scenario picks the latest binding. The signup scenario reuses one
+        // simulated identity per provider so a second authorization can sign in to the new account.
         const bound=intent==='LOGIN'&&state.oauthState==='existing'?identities().findLast(row=>row.provider===body.provider):null;
-        const subject=accountId??bound?.subject??'new-'+randomBytes(8).toString('hex');
+        const subject=accountId??bound?.subject??(state.oauthState==='signup'?'signup':'new-'+randomBytes(8).toString('hex'));
         const displayName=accountId?activeUser().nickname:bound?.user.nickname??'Preview identity';
         const flowId='OIDC-'+randomBytes(16).toString('hex'),flowKey=randomBytes(32).toString('base64url'),receipt=randomBytes(32).toString('base64url'),browserState=randomBytes(32).toString('base64url');
         flows.set(flowId,{flowId,flowKey,receipt,browserState,provider:body.provider,intent,accountId,subject,displayName,sponsorCode:body.sponsorCode,approved:false});
@@ -182,9 +182,9 @@ export function createAuthDemo(state) {
         if(state.oauthState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
         if(state.oauthState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
         // A bound identity signs in to its account. The seeded bindings, and an account with two-step verification
-        // on, confirm with a code first.
+        // on, confirm with a code first. A replay of the signup flow still uses its original attempt and receipt.
         const identity=identities().find(row=>row.provider===flow.provider&&row.subject===flow.subject);
-        if(identity) {
+        if(identity&&!flow.signupAttemptId) {
           const {user}=identity;
           if(identity.requiresCode||demoSecurityAccount(state,user.userId).twoFactorEnabled) {
             if(!body.challengeNo&&!body.code) {
@@ -213,6 +213,7 @@ export function createAuthDemo(state) {
         const attemptId=headers['x-nexgrid-login-attempt-id'], recoveryProof=headers['x-nexgrid-login-recovery-key'];
         if(!/^[A-Za-z0-9_-]{16,80}$/.test(attemptId??'')||!/^[A-Za-z0-9_-]{43,128}$/.test(recoveryProof??''))return fail(422,'LOGIN_ATTEMPT_INVALID');
         const installationId=headers['x-nexgrid-installation-id'], authReference=flow.provider+':'+flow.flowId;
+        if(flow.signupAttemptId&&flow.signupAttemptId!==attemptId)return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
         const retained=attempts.get(attemptId);
         if(retained) {
           if(retained.recoveryProof!==recoveryProof)return fail(401,'LOGIN_ATTEMPT_RECOVERY_INVALID');
@@ -220,7 +221,10 @@ export function createAuthDemo(state) {
             return fail(409,'LOGIN_ATTEMPT_CONTEXT_MISMATCH');
           return issueLogin(retained.response.user,retained.response.registrationReceipt,retained.deviceName);
         }
-        const response=issueLogin({...existing,userId:900003,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false},receipt(flow.sponsorCode),body.deviceName);
+        const user={...existing,userId:900003,countryCode:'',phone:'',nickname:'Preview identity',onboardingComplete:false};
+        const response=issueLogin(user,receipt(flow.sponsorCode),body.deviceName);
+        identities().push({provider:flow.provider,subject:flow.subject,user});
+        flow.signupAttemptId=attemptId;
         attempts.set(attemptId,{recoveryProof,installationId,executionSupported:false,authMethod:'OAUTH',authReference,deviceName:body.deviceName,response:response.body.data});
         return response;
       }

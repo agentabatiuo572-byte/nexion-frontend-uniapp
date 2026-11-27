@@ -29,7 +29,7 @@
         <text class="block" style="font-size: var(--ui-type-list-subtitle); line-height: 1.5">{{ t.topupChrome.flowRetired }}</text>
       </view>
 
-      <view v-if="remoteApiEnabled" class="mx-4 security-providers"><ThirdPartyAuth :key="app.accountKey + ':' + app.accountBindingEpoch" intent="LINK" sheet :disabled="securityBusy || !remoteSecurity"
+      <view v-if="remoteApiEnabled" class="mx-4 security-providers"><ThirdPartyAuth :key="app.accountKey + ':' + app.accountBindingEpoch" intent="LINK" sheet :disabled="oauthLinkDisabled"
         :unavailable-reason="remoteSecurityReadFailed ? t.wallet.syncFailedTitle : undefined" @busy="oauthBusy = $event" /></view>
       <view v-if="phoneBound === false" class="mx-4 nx-glass-card" style="padding: var(--v5-space-4); margin-bottom: 16px" role="status">
         <text class="block">{{ t.security.phoneBindingRequired }}</text>
@@ -458,6 +458,10 @@ const deletionReadback = shallowRef<ConfirmedSecurityReadback | null>(null);
 let securityCommandToastId: string | undefined;
 const restoredPasswordReceipt = shallowRef<{ key: string; state: "checking" | "failed" | "confirmed" } | null>(null);
 const passwordSubmitDisabled = computed(() => securityBusy.value || !!overviewReadback.value || !!restoredPasswordReceipt.value);
+// OAuth reads its own linked providers. A foreground overview refresh can clear remoteSecurity
+// between pointerdown and click, so use the retained overview for this account's initial-read guard.
+const oauthLinkDisabled = computed(() => securityBusy.value || !hasCurrentSecuritySession()
+  || !securityPresentation.value || remoteSecurityReadFailed.value);
 const sessionWriteUnavailableReason = computed(() => remoteApiEnabled && !remoteSecurity.value ? "overview-unavailable" : undefined);
 const sessionWriteDisabled = computed(() => securityBusy.value || !!sessionWriteUnavailableReason.value || !!overviewReadback.value);
 const deletionWriteUnavailableReason = computed(() => {
@@ -575,11 +579,15 @@ function isCurrentSecurityRequest(
     && auth.accountId === accountKey;
 }
 
-function canReadRemoteSecurity(): boolean {
-  if (!remoteApiEnabled || securityEnvironmentInvalidated || !securityPageVisible.value || !auth.isAuthenticated) return false;
+function hasCurrentSecuritySession(): boolean {
+  if (!remoteApiEnabled || securityEnvironmentInvalidated || !auth.isAuthenticated) return false;
   const currentSession = sessionVault.read();
   return !!currentSession?.accessToken && auth.accountId === `user:${currentSession.user.userId}`
     && app.accountKey === auth.accountId;
+}
+
+function canReadRemoteSecurity(): boolean {
+  return securityPageVisible.value && hasCurrentSecuritySession();
 }
 
 function createSecurityRead(lane: SecurityRead, read: (isCurrent: () => boolean, accountKey: string) => Promise<boolean>) {
