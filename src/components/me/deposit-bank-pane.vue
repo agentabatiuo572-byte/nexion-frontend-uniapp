@@ -9,9 +9,11 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FxRateLine v-if="paymentSessionReady" :style="readFailure || paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
-    <view v-if="readFailure" class="nx-bank-read-error" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-2)" role="status">
-      <text>{{ readFailure }}</text>
+    <FxRateLine v-if="paymentSessionReady" :style="fxReadFailure || paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
+    <!-- Only the rate read failing leaves this line: it hides the form. An order-list read failure only blocks 生成付款单, says so
+         above it in the bar and recovers by itself (03 §3.4, §3.5.2). -->
+    <view v-if="fxReadFailure" class="nx-bank-read-error" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-2)" role="status">
+      <text>{{ fxReadFailure }}</text>
       <view class="nx-bank-read-retry" role="button" :tabindex="readRetryBusy ? -1 : 0" :aria-disabled="readRetryBusy" style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)" @click="retryReadData" @keydown.enter.prevent="retryReadData" @keydown.space.prevent="retryReadData">
         <text>{{ readRetryBusy ? t.help.loadingMore : t.ui.retry }}</text>
       </view>
@@ -25,10 +27,9 @@
       <!-- An unconfigured bank channel is not shown: the page hides this segment and moves to USDT. -->
       <view v-if="bankRailAvailable" :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
         <view v-if="dailyCapacityExhausted" class="flex" :style="warnRowStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 3px" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
-            <text class="block" :style="warnTextStyle" style="font-weight: 600">{{ t.bankPane.dailyCapacityExhaustedTitle }}</text>
-            <text class="block" :style="warnTextStyle" style="margin-top: 2px">{{ fmt(t.bankPane.dailyCapacityExhaustedBody, { remaining: todayRemainingLabel, min: minLabel }) }}</text>
+            <text class="block" :style="warnTextStyle">{{ fmt(t.bankPane.dailyCapacityExhaustedBody, { remaining: todayRemainingLabel, min: minLabel }) }}</text>
           </view>
         </view>
         <!-- Amount on a liquid-glass slab over a soft aura; preset amounts sit under it (selected = brand glass, others flat). -->
@@ -59,7 +60,6 @@
                 @click="pickAmount(preset)"
               ><text>{{ preset.label }}</text></view>
             </view>
-            <text v-if="amountError" class="nx-bank-err">{{ amountError }}</text>
           </view>
         </view>
 
@@ -109,18 +109,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
             <text>{{ hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
           </view>
-          <view
-            v-if="hostedRejected"
-            :class="['nx-bank-new-topup-cta w-full grid place-items-center', creating ? '' : 'active:opacity-70']"
-            :style="ghostBtnStyle" role="button" tabindex="0"
-            :aria-disabled="creating"
-            @click="hostedRejected && paneView === 'order' && !creating && startNewTopup()"
-          >
-            <text :style="ghostTextStyle">{{ t.bankPane.newTopupCta }}</text>
-          </view>
-          <view v-if="hostedRejected" class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-            <text :style="ghostTextStyle">{{ t.help.contactSupport }}</text>
-          </view>
+          <view v-if="hostedRejected" class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.help.contactSupport" @click="goSupport" /></view>
         </template>
 
         <template v-else>
@@ -140,12 +129,12 @@
         <view style="margin-top: 14px">
           <view class="flex items-center justify-between" :style="bankRowStyle">
             <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.accountName }}</text></view>
-            <view class="min-w-0"><text :style="bankValStyle">{{ intent.bankAccount?.accountName }}</text></view>
+            <view class="min-w-0"><text :style="bankTextStyle">{{ intent.bankAccount?.accountName }}</text></view>
           </view>
           <view class="flex items-center justify-between" :style="bankRowStyle">
             <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.accountNo }}</text></view>
             <view class="flex items-center min-w-0" style="gap: 4px">
-              <text class="font-mono-tabular" :style="bankValStyle" style="white-space: nowrap">{{ intent.bankAccount?.accountNumber }}</text>
+              <text class="font-mono-tabular" :style="bankFigStyle">{{ intent.bankAccount?.accountNumber }}</text>
               <view
                 class="nx-bank-copy-account-cta grid place-items-center shrink-0 active:opacity-80"
                 :style="copyIconBtnStyle"
@@ -159,7 +148,7 @@
           </view>
           <view class="flex items-center justify-between" :style="bankRowStyle">
             <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.bankLabel }}</text></view>
-            <view class="min-w-0"><text :style="bankValStyle">{{ intent.bankAccount?.bankName }}</text></view>
+            <view class="min-w-0"><text :style="bankTextStyle">{{ intent.bankAccount?.bankName }}</text></view>
           </view>
         </view>
 
@@ -194,9 +183,7 @@
     <template v-else-if="paneView === 'waiting' || reviewCopy">
       <!-- Waiting, expired and mismatch open with the shared result head (03 §3.6.1), as credited does. -->
       <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" :title="reviewCopy?.title ?? t.bankPane.waitingTitle" :description="reviewCopy?.body ?? t.bankPane.waitingBody" /></view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ reviewCopy ? t.help.contactSupport : t.topupChrome.depositNotArrived }}</text>
-      </view>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="reviewCopy ? t.help.contactSupport : t.topupChrome.depositNotArrived" @click="goSupport" /></view>
     </template>
 
     <!-- ── 成功(credited)── -->
@@ -221,22 +208,14 @@
       <!-- Closed by timeout: neutral with the clock glyph, as the checkout's expired order (03 §3.8). -->
       <view class="nx-bank-state nx-step-in"><NxResultHead tone="neutral" icon="clock" :title="t.bankPane.expiredTitle" :description="fmt(t.bankPane.expiredBody, { min: lockMinText })" /></view>
       <view v-if="intent.receivedVnd" class="flex" :style="warnRowStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 3px" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
         <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.bankPane.lateNote }}</text></view>
       </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
-      </view>
-      <view
-        v-for="choice in existingPaymentChoices" :key="choice.intentId"
-        class="nx-bank-existing-order-cta w-full grid place-items-center"
-        :style="ghostBtnStyle" role="button" tabindex="0"
-        :aria-disabled="!canSelectExistingPayment(choice)"
-        @click="selectExistingPayment(choice)"
-        @keydown.enter.prevent="selectExistingPayment(choice)"
-        @keydown.space.prevent="selectExistingPayment(choice)"
-      >
-        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) + '\u00A0USDT' }}</text>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
+      <view v-for="choice in existingPaymentChoices" :key="choice.intentId" class="nx-bank-link-row">
+        <NxButton class="nx-bank-existing-order-cta" variant="link" icon="chevron-right"
+          :label="`${t.store.viewDetails} · ${t.store.pendingBarLabel} · ${formatAmount(choice.usdtAmount)}\u00A0USDT`"
+          :disabled="!canSelectExistingPayment(choice)" @click="selectExistingPayment(choice)" />
       </view>
     </template>
 
@@ -247,19 +226,14 @@
       <view style="margin-top: 10px">
         <view class="flex items-center justify-between" :style="bankRowStyle">
           <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.expectedLabel }}</text></view>
-          <view class="min-w-0"><text class="tabular-nums" :style="bankValStyle" style="white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
+          <view class="min-w-0"><text class="nx-bank-fig">{{ fmtVnd(intent.vndAmount) }}</text></view>
         </view>
         <view class="flex items-center justify-between" :style="bankRowStyle">
           <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.receivedLabel }}</text></view>
-          <view class="min-w-0"><text class="tabular-nums" :style="bankValStyle" style="white-space: nowrap">{{ fmtVnd(intent.receivedVnd ?? 0) }}</text></view>
+          <view class="min-w-0"><text class="nx-bank-fig">{{ fmtVnd(intent.receivedVnd ?? 0) }}</text></view>
         </view>
       </view>
-      <view class="nx-bank-new-topup-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="startNewTopup">
-        <text :style="ghostTextStyle">{{ t.bankPane.newTopupCta }}</text>
-      </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
-      </view>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
     </template>
   </view>
 </template>
@@ -274,6 +248,7 @@ import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from
 import { onShow, onHide, onUnload, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
@@ -318,7 +293,8 @@ const pageActive = ref(false);
 const readError = ref("");
 const readRetryPending = ref(false);
 const readRetryBusy = computed(() => readRetryPending.value || fx.loading || dep.serverStatus === "loading");
-const readFailure = computed(() => readError.value || (paymentSessionReady.value && fx.syncFailed ? t.value.bankPane.createFxUnavailable : ""));
+const fxReadFailure = computed(() => paymentSessionReady.value && fx.syncFailed ? t.value.bankPane.createFxUnavailable : "");
+const readFailure = computed(() => readError.value || fxReadFailure.value);
 useAutoRecovery({
   failed: () => pageActive.value && paymentSessionReady.value && !readRetryBusy.value && !!readFailure.value,
   retry: retryReadData,
@@ -331,7 +307,7 @@ async function retryReadData() {
     const results = await Promise.allSettled([fx.load(), dep.refreshRemoteVietQrDeposits()]);
     if (!pageActive.value || !paymentSessionReady.value || accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
     readError.value = dep.serverStatus === "error" || results.some(result => result.status === "rejected")
-      ? t.value.topupChrome.depositOpFailedNote : "";
+      ? t.value.topupChrome.depositReadRetrying : "";
   } finally { readRetryPending.value = false; }
 }
 type PaymentReadScope = { accountKey: string; bindingEpoch: number };
@@ -392,7 +368,7 @@ watch(
           || app.accountKey !== accountKey || app.accountBindingEpoch !== bindingEpoch) return;
       if (dep.serverStatus === "error" && dep.serverError) {
         console.warn("[deposit] refresh failed:", dep.serverError);
-        readError.value = t.value.topupChrome.depositOpFailedNote;
+        readError.value = t.value.topupChrome.depositReadRetrying;
       }
     });
     dep.startRemoteVietQrPolling();
@@ -431,7 +407,7 @@ watch(
     } else {
       pendingPaymentRead = null;
       successfulPaymentRead.value = null;
-      if (status === "error" && initialStatus === "error") readError.value = t.value.topupChrome.depositOpFailedNote;
+      if (status === "error" && initialStatus === "error") readError.value = t.value.topupChrome.depositReadRetrying;
     }
   },
   { flush: "post" },
@@ -488,16 +464,16 @@ function fmtVnd(value: number): string { return `${formatAmount(value, "VND")}\u
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 // Facts well under the amount: unknown values stay "—", never a fabricated 0.
-const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}–${shortUsdt(maxDeposit.value)}\u00A0USDT` : "—");
+const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}\u2060–\u2060${shortUsdt(maxDeposit.value)}\u00A0USDT` : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
-const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemainingLabel.value : "—");
+const todayRemainingFact = computed(() => dailyCapacityKnown.value ? `${shortUsdt(todayRemainingDeposit.value)}\u00A0USDT` : "—");
 const feeFact = computed(() => {
   if (!fx.configReady) return "—";
   if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
   return `${formatAmount(Math.max(fx.feeUsdt, 0))}\u00A0USDT`;
 });
-// Whole numbers for presets and the limit range ("1,000"), keeping cents only when present; the USDT unit is said
-// once, by the amount field and after the range (03 §3.6.1).
+// Whole numbers for presets, the limit range and today's remaining fact ("1,000"), keeping cents only when present; the
+// USDT unit is said once, by the amount field and after the range (03 §3.6.1).
 function shortUsdt(value: number): string { return formatAmount(value).replace(/\.00$/, ""); }
 const quickAmounts = computed(() => [100, 500, 1000, 5000].map(value => ({ value, label: shortUsdt(value),
   enabled: fxUsable.value && !creating.value && !dailyCapacityExhausted.value && value >= minDeposit.value && value <= maxDeposit.value
@@ -896,11 +872,20 @@ const bankKeyStyle: CSSProperties = {
   fontSize: "var(--ui-type-list-subtitle)",
   color: "var(--v5-ink-3)",
 };
-const bankValStyle: CSSProperties = {
+// Manual order rows (10.1): names in the list-subtitle role in main ink, the account number in the inline-figure role.
+const bankTextStyle: CSSProperties = {
   fontSize: "var(--ui-type-list-subtitle)",
-  fontWeight: 500,
+  lineHeight: "var(--ui-type-list-subtitle-lh)",
+  fontWeight: "var(--ui-type-list-subtitle-weight)" as CSSProperties["fontWeight"],
   color: "var(--v5-ink)",
   textAlign: "right",
+};
+const bankFigStyle: CSSProperties = {
+  fontSize: "var(--ui-type-inline-figure)",
+  lineHeight: "var(--ui-type-inline-figure-lh)",
+  fontWeight: "var(--ui-type-inline-figure-weight)" as CSSProperties["fontWeight"],
+  color: "var(--v5-ink)",
+  whiteSpace: "nowrap",
 };
 const memoBoxStyle: CSSProperties = {
   marginTop: "10px",
@@ -942,27 +927,39 @@ const warnRowStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-warning-soft)",
 };
+// Warning notice rows in the 辅助说明 role (10.1; 10.2 提示行) in warning ink, 4.74:1 on warning-soft (01 §1.1.1).
 const warnTextStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-warning)",
-  lineHeight: 1.45,
+  fontSize: "var(--ui-type-description)",
+  lineHeight: "var(--ui-type-description-lh)",
+  color: "var(--v5-warning-ink)",
 };
 
 // ── Main actions for the page's fixed bottom bar (DS-30): one per stage, plus the credited stage's bills link. ──
-type PaneAction = { className: string; label: string; enabled: boolean; busy: boolean; external: boolean; run: () => void };
+type PaneAction = { className: string; label: string; enabled: boolean; busy: boolean; external: boolean; note?: string; run: () => void };
+// Why 生成付款单 is grey, said once above it in the bar (03 §3.1 bottom bar), in existing copy.
+const createReason = computed(() => {
+  if (ctaEnabled.value || creating.value) return "";
+  if (readError.value) return readError.value;
+  if (!fxUsable.value) return t.value.bankPane.createFxUnavailable;
+  if (dailyCapacityExhausted.value) return t.value.bankPane.dailyCapacityExhaustedTitle;
+  return amountError.value || t.value.bankPane.amountFormatError;
+});
 const primaryAction = computed<PaneAction | null>(() => {
   const it = intent.value, copy = t.value.bankPane;
   const regenAction = (enabled: boolean): PaneAction => ({ className: "nx-bank-regen-cta", label: creating.value ? copy.creating : copy.regenCta,
     enabled, busy: creating.value, external: false, run: regen });
   if (paneView.value === "form") return formCtaVisible.value ? { className: "nx-bank-create-cta", label: creating.value ? copy.creating : copy.createCta,
-    enabled: ctaEnabled.value, busy: creating.value, external: false, run: () => createOrder() } : null;
+    enabled: ctaEnabled.value, busy: creating.value, external: false, note: createReason.value, run: () => createOrder() } : null;
   if (paneView.value === "order" && it) {
     if (it.paymentMode !== "hosted") return { className: "nx-bank-paid-cta", label: copy.paidCta, enabled: true, busy: false, external: false, run: () => { paidPressed.value = true; } };
     if (hostedCanOpen.value) return { className: "nx-bank-hosted-continue-cta", label: copy.hostedContinueCta, enabled: true, busy: false, external: true, run: () => openHostedOrder(it) };
-    return hostedRejected.value ? regenAction(!creating.value && fxUsable.value) : null;
+    // Rejected before it was created: 重新发起充值 is the one bar action; it reopens the form, where the same amount or
+    // another one can be ordered (a bar 重新生成付款单 alone would leave no way back to the form).
+    return hostedRejected.value ? { className: "nx-bank-new-topup-cta", label: copy.newTopupCta, enabled: !creating.value, busy: false, external: false, run: startNewTopup } : null;
   }
   if (paneView.value === "credited" && it) return { className: "nx-bank-done-cta", label: copy.doneCta, enabled: true, busy: false, external: false, run: () => { void finishCreditedFlow(); } };
   if (paneView.value === "expired" && it) return regenAction(!creating.value);
+  if (paneView.value === "mismatch" && it) return { className: "nx-bank-new-topup-cta", label: copy.newTopupCta, enabled: true, busy: false, external: false, run: startNewTopup };
   return null;
 });
 const secondaryAction = computed<PaneAction | null>(() => paneView.value === "credited" && intent.value
@@ -997,15 +994,16 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-chip[aria-disabled="true"] { opacity: .45; cursor: default; }
 .nx-bank-chip:not([aria-disabled="true"]):active { transform: scale(.97); }
 .nx-bank-chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.nx-bank-err { display: block; margin-top: 10px; color: var(--v5-danger); font: 400 12px/18px var(--font-v5); }
-.nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
+.nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(min-content, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
   background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .nx-bank-facts { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .nx-bank-fact { min-width: 0; }
 .nx-bank-fact > .nx-bank-k { padding-top: 3px; }
 .nx-bank-fact + .nx-bank-fact { padding-left: 12px; border-left: 1px solid var(--v5-border); }
-.nx-bank-fact__v { display: block; margin-top: 4px; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
+/* Values in the 10.1 行内数值 role, never cut and never split from their unit (03 §3.6.1): a value and its USDT are one
+   unbreakable run, so a column whose value is wider than its third grows to it and the others give way. */
+.nx-bank-fact__v { display: block; margin-top: 4px; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: break-word; }
+.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
 .nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-bank-hint > svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
 /* Hosted payment: countdown ring on the glass slab, order summary card. */
@@ -1041,6 +1039,14 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); letter-spacing: 0; }
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }
+/* Result-state entries to the next layer: the shared text link (03 §3.9), centred under the head, 44px target row. */
+.nx-bank-link-row { display: flex; justify-content: center; align-items: center; min-height: 44px; margin-top: 6px; }
+/* The pending-payment link's composed label wraps inside the row instead of running past it. */
+.nx-bank-existing-order-cta { min-width: 0; max-width: 100%; }
+.nx-bank-existing-order-cta :deep(.nx-button__content), .nx-bank-existing-order-cta :deep(uni-text), .nx-bank-existing-order-cta :deep(text) { white-space: normal; }
+/* Mismatch expected/received values: the 10.1 行内数值 size, line height and weight; amounts in a label/value row keep the
+   interface face (01.2 plain figures). */
+.nx-bank-fig { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-v5); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 /* Credited details: the same role, in the interface face (01.2 plain figures). */
 .nx-bank-sum--done .nx-bank-sum__v { font-family: var(--font-v5); }
 @media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring__value { transition: none; } }

@@ -44,7 +44,7 @@
       <DepositUsdtPane v-if="seg === 'crypto'" :bank-available="visibleSegments.some((item) => item.id === 'bank')" @use-bank="useBankChannel" />
       <DepositBankPane v-else-if="seg === 'bank'" ref="bankPane" />
       <TopupCardForm v-else @change-channel="seg = 'crypto'" />
-      <view v-if="orderFunded || trialFunded || bankAction" style="height: 120px" />
+      <view v-if="orderFunded || trialFunded || bankAction" :style="{ height: bankAction?.note ? '144px' : '120px' }" />
       </template>
     </view>
     <!-- The page's main action sits in the thumb zone (DS-30): back to the order once it is covered, otherwise the bank pane's create action. -->
@@ -55,7 +55,8 @@
         <NxButton class="topup-sticky__btn" variant="primary" :label="orderBar.label" :disabled="!orderBar.enabled" @click="orderBar.run()" />
       </view>
       <view v-else-if="orderFunded || trialFunded" class="topup-sticky nx-glass-bar"><NxButton class="topup-sticky__btn" variant="primary" :label="payCopy.backToPay" :busy="returningToTrial" @click="backToOrder" /></view>
-      <view v-else-if="bankAction" class="topup-sticky nx-glass-bar">
+      <view v-else-if="bankAction" class="topup-sticky nx-glass-bar" :class="{ 'topup-sticky--note': bankAction.note }">
+        <text v-if="bankAction.note" class="nx-tray-note" role="status">{{ bankAction.note }}</text>
         <NxButton v-if="bankSecondary" :class="['topup-sticky__btn', bankSecondary.className]" variant="secondary" :label="bankSecondary.label" @click="bankSecondary.run()" />
         <NxButton :class="['topup-sticky__btn', bankAction.className]" variant="primary" :label="bankAction.label" :disabled="!bankAction.enabled" @click="bankAction.run()">
           <view class="topup-sticky__label">
