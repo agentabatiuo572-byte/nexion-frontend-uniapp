@@ -99,7 +99,7 @@ import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/pa
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
 import { isWeeklyQuestTargetClosed } from "@/lib/quest-business-availability";
-import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
+import { questActionRouteUnavailable, useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { weeklyQuestDisplayName } from "@/lib/quest-presentation";
 
 const visibility = useDataVisibility();
@@ -199,7 +199,7 @@ const { block: genesisBlock, secondaryBlock: genesisSecondaryBlock } = useGenesi
 const targetAvailability = useQuestTargetAvailability();
 
 function targetClosed(q: CanonicalQuest): boolean {
-  return isWeeklyQuestTargetClosed(
+  return questActionRouteUnavailable(q.actionRoute) || isWeeklyQuestTargetClosed(
     q,
     { ...targetAvailability.value, genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value) },
     genesisSecondaryBlock.value !== null,

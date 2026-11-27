@@ -1828,6 +1828,7 @@ chooseMethod: "Choose how to join the UVEL network",
     condMin: "On orders over ${min}",
     condCap: "Up to ${cap} off",
     scopeSingle: "For {name}",
+    scopeSingleUnnamed: "Specific product only",
     scopeAll: "All devices",
     noExpiry: "No expiry",
     expiryLabel: "Valid until {date}",
@@ -2066,30 +2067,30 @@ chooseMethod: "Choose how to join the UVEL network",
     // translated. verify.sh asserts every PRODUCTS id has an entry here.
     taskLevelLabels: {"1": "entry-level", "2": "intermediate", "3": "advanced", "4": "flagship"},
     taskLevelsLine: "Runs {levels} AI compute tasks",
+    productBadges: {
+      trending: "Trending",
+      upgradePick: "Upgrade Pick",
+      flagship: "Flagship",
+      lowBarrier: "Low Barrier",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Fully managed device",
-        badge: "Best Seller",
       },
       "stellarbox-pro": {
         tagline: "Compare GPU specifications and estimated earnings.",
-        badge: "Trending",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5× S1 throughput",
-        badge: "Upgrade Pick",
       },
       "stellarrack-p1": {
         tagline: "Datacenter-grade A100 rack for serious operators.",
-        badge: "Flagship",
       },
       "stellarrack-p2": {
         tagline: "Datacenter H100 rack — the top compute tier.",
-        badge: "Flagship",
       },
       "cloud-share": {
         tagline: "No hardware needed — buy a slice of the network.",
-        badge: "Low Barrier",
       },
     },
     tradeinUpgrade: {

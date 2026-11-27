@@ -1,5 +1,5 @@
 import type { EarnPhoneTier } from "@/api/earn-config-api";
-import type { Product } from "@/mock/products";
+import type { Product, ProductSeriesCode } from "@/mock/products";
 import { formatEstimate, formatEstimateRange } from "./estimate-display";
 import { productDailyEstimateRange, productDailyUvtRange } from "./product-estimates";
 
@@ -34,16 +34,16 @@ export interface StoreYieldCatalogProof {
   serverCanonical: boolean;
 }
 
-const LADDER_PRODUCT_IDS = {
-  entry: "stellarbox-s1",
-  pro: "stellarbox-pro",
-  proV2: "stellarbox-pro-v2",
-  rack: "stellarrack-p1",
-  rackP2: "stellarrack-p2",
+const LADDER_SERIES = {
+  entry: "S1",
+  pro: "PRO",
+  proV2: "PRO_V2",
+  rack: "RACK_P1",
+  rackP2: "RACK_P2",
 } as const;
 
-function productAmount(products: readonly Product[], productId: string): YieldAmount | null {
-  const candidates = products.filter((product) => product.id === productId
+function productAmount(products: readonly Product[], seriesCode: ProductSeriesCode): YieldAmount | null {
+  const candidates = products.filter((product) => product.seriesCode === seriesCode && product.seriesRepresentative
     && Number.isFinite(product.dailyEarn) && product.dailyEarn >= 0
     && Number.isFinite(product.dailyEarnNEX) && product.dailyEarnNEX >= 0);
   if (candidates.length !== 1) return null;
@@ -61,11 +61,11 @@ export function buildStoreYieldAuthority(
     && proof.runId === "" && proof.serverCanonical ? products : [];
   const typicalPhone = phoneTiers.find((row) => row.tier === 3);
   const phone = typicalPhone ? { usd: typicalPhone.baseRateUsdt, nex: typicalPhone.baseRateNex } : null;
-  const entry = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.entry);
-  const pro = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.pro);
-  const proV2 = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.proV2);
-  const rack = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.rack);
-  const rackP2 = productAmount(canonicalProducts, LADDER_PRODUCT_IDS.rackP2);
+  const entry = productAmount(canonicalProducts, LADDER_SERIES.entry);
+  const pro = productAmount(canonicalProducts, LADDER_SERIES.pro);
+  const proV2 = productAmount(canonicalProducts, LADDER_SERIES.proV2);
+  const rack = productAmount(canonicalProducts, LADDER_SERIES.rack);
+  const rackP2 = productAmount(canonicalProducts, LADDER_SERIES.rackP2);
   const complete = [phone, entry, pro, rack].every((amount) => amount !== null);
   const multiplier = phone && entry && phone.usd > 0 ? Math.round(entry.usd / phone.usd) : null;
   const rows: Array<[StoreYieldLadderRow["id"], YieldAmount | null]> = [

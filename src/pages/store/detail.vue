@@ -70,7 +70,7 @@
         <view class="mx-4 nx-glass-card nx-tint overflow-hidden relative detail-hero" :class="{ 'detail-hero--credit': trialCreditEntry }" style="--nx-tint: var(--v5-brand)">
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
-            <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
+            <ProductRender class="detail-product-render" :product-id="product.id" :series-code="product.seriesCode" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <ProductBadge v-if="copy.badge" :label="copy.badge" :kind="copy.badgeKind" detail />
             <!-- Live activity danmaku -->
             <LiveSocialProof v-if="product.liveActivityVisible !== false" :product="product" :placement="trialCreditEntry ? 'top-right' : 'bottom-left'" />
@@ -129,7 +129,7 @@
         <!-- Estimated returns: every product uses the Cloud Share card (user 2026-11-23), except a detail opened from an
              activity, which is an activity page (04 §4.6). Each figure shows the catalog's range when it sends one and its
              single estimate otherwise; all follow the selected quantity. -->
-        <view v-if="!activityId" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
+        <view v-if="showEstimatedReturns" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
           <text class="detail-returns__title">{{ t.bundle.estimatedDaily }}</text>
           <text v-if="isShare" class="detail-returns__description">{{ t.store.shareFlexibleDescription }}</text>
           <view class="detail-returns__rows">
@@ -249,7 +249,7 @@ import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
+import { isProductReleased, productOutOfStock } from "@/store/product-availability";
 import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
@@ -389,21 +389,18 @@ async function observeCanonicalProductDetail(): Promise<void> {
     isCurrent: isCurrentAccountScope,
     submit: () => h3ObservationApi.productDetail(canonicalProduct.id),
   });
-  if (canonicalProduct.id !== "stellarbox-s1" || canonicalProduct.productType === "SHARE"
+  if (!showEstimatedReturns.value || canonicalProduct.seriesCode !== "S1" || canonicalProduct.productType === "SHARE"
     || !Number.isFinite(canonicalProduct.price) || canonicalProduct.price <= 0
     || !Number.isFinite(canonicalProduct.dailyEarn) || canonicalProduct.dailyEarn <= 0) return;
   void reportDayOnePageObservation("view_product_roi", {
     scope,
     session: sessionVault.read(),
-    visible: () => detailPageVisible && pageEpoch === detailObservationEpoch,
+    visible: () => detailPageVisible && pageEpoch === detailObservationEpoch
+      && product.value === canonicalProduct && showEstimatedReturns.value,
     isCurrent: isCurrentAccountScope,
-    submit: () => dayOnePageObservationApi.s1Roi(),
+    submit: () => dayOnePageObservationApi.s1Roi(canonicalProduct.id),
   });
 }
-
-watch([catalogStatus, () => product.value?.id], () => {
-  void observeCanonicalProductDetail();
-});
 
 const isShare = computed(() => product.value?.productType === "SHARE");
 const earnConfig = useEarnConfig();
@@ -423,8 +420,13 @@ const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === tr
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
   const p = product.value;
-  if (!p || purchaseUnavailable.value) return false;
-  return !isProductAvailable(p, phase.value);
+  if (!p || (!p.releaseState && purchaseUnavailable.value)) return false;
+  return !isProductReleased(p, phase.value);
+});
+const showEstimatedReturns = computed(() => !publicOnly.value && !activityId.value && !!product.value
+  && catalogStatus.value !== "loading" && catalogStatus.value !== "error" && !isLocked.value && !purchaseUnavailable.value);
+watch([catalogStatus, () => product.value?.id, showEstimatedReturns], () => {
+  void observeCanonicalProductDetail();
 });
 
 // Per-user purchase gate — local V-rank/team snapshots are mock-only. Remote

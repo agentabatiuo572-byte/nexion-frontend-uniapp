@@ -17,13 +17,12 @@
   </view>
 </template>
 <script setup lang="ts">
-import { firstPurchaseTermsRules } from '@/lib/promotion-landing';
+import { firstPurchaseTermsRules, landingProductName } from '@/lib/promotion-landing';
 import { computed,ref } from 'vue';
 import type { PublicPromotion,PublicRewardSpec } from '@/api/promotion-contracts';
 import { useT } from '@/i18n/use-t';
 import { useLocaleStore } from '@/store/locale';
 import { localized,displayDeadline,rewardSummary as displayRewardSummary } from '@/lib/promotion-display';
-import { getProduct } from '@/mock/products';
 import { isPromotionActive,promotionDisclosures } from '@/lib/promotion-entry';
 import RewardRows from './reward-rows.vue';
 import PromotionTerms from './promotion-terms.vue';
@@ -32,7 +31,7 @@ const props=defineProps<{activity:PublicPromotion;productNo:string;expanded?:boo
 const t=useT(),locale=useLocaleStore(),termsOpen=ref(false);
 const rules=computed(()=>isPromotionActive(props.activity)?props.activity.rewardRules.filter(rule=>rule.productNo===props.productNo):[]);
 const disclosures=computed(()=>promotionDisclosures(props.activity,props.productNo));
-const productName=(id:string)=>props.publicOnly?id:getProduct(id)?.name??id;
+const productName=(id:string)=>landingProductName(props.activity,id,locale.code);
 const rewardSummary=(reward:PublicRewardSpec)=>`${reward.beneficiaryRole==='BUYER'?t.value.promotion.buyer:t.value.promotion.inviter} · ${displayRewardSummary(reward,t.value.promotion,reward.disclosure.deviceName)}`;
 const limits=(rule:PublicPromotion['rewardRules'][number])=>`${t.value.promotion.orderGroupLimit} · ${rule.maxGroups.mode==='LIMITED'?rule.maxGroups.value:t.value.promotion.unlimitedGroups}\n${t.value.promotion.personGroupLimit} · ${rule.maxGroupsPerPerson.mode==='LIMITED'?rule.maxGroupsPerPerson.value:t.value.promotion.unlimitedGroups}`;
 const ruleTerms=computed(()=>[

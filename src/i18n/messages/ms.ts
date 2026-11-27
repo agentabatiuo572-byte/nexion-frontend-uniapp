@@ -2276,6 +2276,7 @@ export const ms: Messages = {
     condMin: "Minimum pesanan ${min}",
     condCap: "Diskaun maks. ${cap}",
     scopeSingle: "Untuk {name}",
+    scopeSingleUnnamed: "Untuk produk tertentu sahaja",
     scopeAll: "Semua peranti",
     noExpiry: "Tiada had masa",
     expiryLabel: "Sah sehingga {date}",
@@ -2501,30 +2502,30 @@ export const ms: Messages = {
     releaseComingToast: "Model ini akan tiba tidak lama lagi — nantikan",
     taskLevelLabels: {"1":"asas","2":"pertengahan","3":"lanjutan","4":"utama"},
     taskLevelsLine: "Peringkat tugasan AI: {levels}",
+    productBadges: {
+      trending: "Sohor kini",
+      upgradePick: "Pilihan naik taraf",
+      flagship: "Perdana",
+      lowBarrier: "Mudah dimulakan",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Peranti diurus sepenuhnya",
-        badge: "Terlaris",
       },
       "stellarbox-pro": {
         tagline: "Bandingkan spesifikasi GPU dan anggaran pendapatan.",
-        badge: "Sohor kini",
       },
       "stellarbox-pro-v2": {
         tagline: "Daya pemprosesan 2.5× S1",
-        badge: "Pilihan naik taraf",
       },
       "stellarrack-p1": {
         tagline: "Rak A100 gred pusat data untuk pengendali serius.",
-        badge: "Perdana",
       },
       "stellarrack-p2": {
         tagline: "Rak H100 pusat data — peringkat pengkomputeran tertinggi.",
-        badge: "Perdana",
       },
       "cloud-share": {
         tagline: "Tanpa beli perkakasan — beli bahagian pengkomputeran rangkaian.",
-        badge: "Mudah dimulakan",
       },
     },
     tradeinUpgrade: {

@@ -64,9 +64,8 @@ import { formatAmount } from "@/lib/amount-display";
 import { computed } from "vue";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { useVoucher } from "@/store/voucher";
-import { getProduct } from "@/mock/products";
 import { isSingleSkuVoucher, listVouchers, type VoucherDef } from "@/mock/vouchers";
-import { visibleVoucherCatalog } from "@/lib/voucher-sheet-authority";
+import { visibleVoucherCatalog, voucherScopeText } from "@/lib/voucher-sheet-authority";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -113,11 +112,7 @@ function condText(v: VoucherDef): string {
   return "";
 }
 function scopeText(v: VoucherDef): string {
-  if (isSingleSkuVoucher(v)) {
-    const name = getProduct(v.applicableSkus[0])?.name ?? v.applicableSkus[0];
-    return fmt(t.value.voucher.scopeSingle, { name });
-  }
-  return t.value.voucher.scopeAll;
+  return voucherScopeText(v, t.value.voucher);
 }
 function expiryText(v: VoucherDef): string {
   return v.endAt === 0 ? t.value.voucher.noExpiry : fmt(t.value.voucher.expiryLabel, { date: formatDate(v.endAt) });

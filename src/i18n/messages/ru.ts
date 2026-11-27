@@ -2276,6 +2276,7 @@ export const ru: Messages = {
     condMin: "При заказе от ${min}",
     condCap: "Скидка до ${cap}",
     scopeSingle: "Для {name}",
+    scopeSingleUnnamed: "Только для указанного товара",
     scopeAll: "Все устройства",
     noExpiry: "Долгосрочно",
     expiryLabel: "Действует до {date}",
@@ -2501,30 +2502,30 @@ export const ru: Messages = {
     releaseComingToast: "Модель скоро появится в продаже — следите за новостями",
     taskLevelLabels: {"1":"начальный","2":"средний","3":"продвинутый","4":"флагманский"},
     taskLevelsLine: "Уровни задач ИИ: {levels}",
+    productBadges: {
+      trending: "В тренде",
+      upgradePick: "Для улучшения",
+      flagship: "Флагман",
+      lowBarrier: "Лёгкий старт",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Устройство с полным обслуживанием",
-        badge: "Хит продаж",
       },
       "stellarbox-pro": {
         tagline: "Сравните конфигурации GPU и ожидаемый доход.",
-        badge: "В тренде",
       },
       "stellarbox-pro-v2": {
         tagline: "В 2,5 раза выше пропускная способность, чем у S1",
-        badge: "Для улучшения",
       },
       "stellarrack-p1": {
         tagline: "Стойка A100 уровня дата-центра для серьёзных задач.",
-        badge: "Флагман",
       },
       "stellarrack-p2": {
         tagline: "Стойка H100 уровня дата-центра — максимальная мощность.",
-        badge: "Флагман",
       },
       "cloud-share": {
         tagline: "Без оборудования — купите долю мощности сети.",
-        badge: "Лёгкий старт",
       },
     },
     tradeinUpgrade: {

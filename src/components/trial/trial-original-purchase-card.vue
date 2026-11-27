@@ -4,7 +4,7 @@
     <view class="tpc__row">
       <view class="tpc__thumb" aria-hidden="true"><image v-if="purchase.device.imageUrl" class="tpc__img" :src="purchase.device.imageUrl" mode="aspectFit" /></view>
       <view class="tpc__main">
-        <text class="tpc__name">{{ purchase.device.productName }}</text>
+        <text class="tpc__name">{{ deviceName }}</text>
         <view v-if="isTrialDevice" class="tpc__tagline"><NxTag tone="neutral">{{ copy.thisTrialTag }}</NxTag></view>
         <text class="tpc__method">{{ methodText }}</text>
       </view>
@@ -30,6 +30,7 @@ import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useT } from "@/i18n/use-t";
 import { formatGroupedAmount } from "@/lib/amount-display";
+import { productDisplayName } from "@/lib/product-display-name";
 import { purchasePaymentCopy } from "@/lib/purchase-payment-copy";
 import { useLocaleStore } from "@/store/locale";
 
@@ -42,6 +43,8 @@ const props = defineProps<{
 }>();
 const copy = useTrialDetailCopy();
 const t = useT();
+const deviceName = computed(() => productDisplayName(props.purchase.device.productNo,
+  t.value.headerTitles.storeProduct, props.purchase.device.productName));
 const locale = useLocaleStore();
 const payCopy = computed(() => purchasePaymentCopy(locale.code));
 // The confirming spinner pauses off-screen and on hidden pages.

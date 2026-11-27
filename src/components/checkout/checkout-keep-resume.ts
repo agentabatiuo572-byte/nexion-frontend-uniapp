@@ -2,13 +2,10 @@ import type { InjectionKey, ShallowRef } from "vue";
 import type { PurchaseKind } from "@/api/purchase-payment-api";
 import { remoteApiEnabled } from "@/api/runtime";
 import { readCapacityPending, type CapacityPending } from "@/lib/capacity-command-recovery";
-import { deviceNameByKind } from "@/lib/device-copy";
+import { productDisplayName } from "@/lib/product-display-name";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import type { Messages } from "@/i18n/messages/en";
-import { getProduct } from "@/mock/products";
-import { DEVICE_SPECS } from "@/store/device-types";
 import { refusedPurchasePayment } from "@/store/purchase-payment";
-import type { DeviceKind } from "@/store/types";
 
 type CheckoutCapacityIdentity = Readonly<{ target: string; commandKey: string; operation: CapacityPending["operation"] }>;
 export type CheckoutKeepResume = CheckoutCapacityIdentity & (
@@ -18,14 +15,9 @@ type CheckoutCapacityDetails = Readonly<{ productName: string; payableUsdt: numb
 export type CheckoutCapacityRecovery = (CheckoutCapacityIdentity & CheckoutCapacityDetails)
   | Readonly<{ target: string; commandKey: null; operation: null }>;
 
-export function describeCapacityOriginal(original: CapacityPending, t: Parameters<typeof deviceNameByKind>[0]) {
-  if (original.quote) {
-    const { targetProductNo: target, targetProductName: productName, payableUsdt } = original.quote;
-    return { target, productName, payableUsdt };
-  }
-  const { targetProductNo: target, payableUsdt } = original;
-  const kind = target as DeviceKind;
-  const productName = getProduct(target)?.name ?? deviceNameByKind(t, kind, DEVICE_SPECS[kind]?.name ?? target);
+export function describeCapacityOriginal(original: CapacityPending, t: Messages) {
+  const { targetProductNo: target, payableUsdt } = original.quote ?? original;
+  const productName = productDisplayName(target, t.headerTitles.storeProduct, original.quote?.targetProductName);
   return { target, productName, payableUsdt };
 }
 

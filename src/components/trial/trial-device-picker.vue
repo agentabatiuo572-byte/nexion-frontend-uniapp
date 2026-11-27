@@ -19,7 +19,7 @@
           @keydown.down.stop.prevent="move(row, 1)" @keydown.right.stop.prevent="move(row, 1)" @keydown.up.stop.prevent="move(row, -1)" @keydown.left.stop.prevent="move(row, -1)">
           <view class="tdp-row__thumb" aria-hidden="true"><image v-if="row.option.imageUrl" class="tdp-row__img" :src="row.option.imageUrl" mode="aspectFit" /></view>
           <view class="tdp-row__main" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="main">
-            <text class="tdp-row__name" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="name">{{ row.option.productName }}</text>
+            <text class="tdp-row__name" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="name">{{ row.productName }}</text>
             <view v-if="row.option.isTrialProduct" class="tdp-row__tagline" :class="{ 'tdp-measure': row.claimPrice }" :data-row="row.productNo" data-part="tag"><NxTag tone="neutral">{{ copy.thisTrialTag }}</NxTag></view>
             <text v-if="row.reason" class="tdp-row__meta">{{ row.reason }}</text>
             <text v-else-if="row.estimate" class="tdp-row__meta"><text class="tdp-row__est-line">{{ row.estimate.label }}<text class="tdp-row__est">{{ row.estimate.value }}</text></text></text>
@@ -54,6 +54,7 @@ import { useTrialDetailCopy } from "@/i18n/trial-detail";
 import { useT } from "@/i18n/use-t";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { formatEstimateRange } from "@/lib/estimate-display";
+import { productDisplayName } from "@/lib/product-display-name";
 import { trialPurchaseReasonMessage } from "@/lib/trial-purchase-reason";
 import { trialOptionReadFailed } from "@/store/trial-purchase-options";
 
@@ -94,9 +95,10 @@ const rows = computed(() => props.options.map(option => {
   const link = (option.reasonCode === "PURCHASE_GATE_NOT_MET" || option.reasonCode === "ORDER_MONTHLY_QUOTA_REQUIREMENTS_NOT_MET")
     && (props.conditionLinks?.includes(option.productNo) ?? true);
   const checked = !props.locked && option.canBuy && option.productNo === props.selectedProductNo;
-  const aria = [option.productName, option.isTrialProduct ? copy.value.thisTrialTag : "", reason || (estimate ? estimate.label + estimate.value : ""),
+  const productName = productDisplayName(option.productNo, t.value.headerTitles.storeProduct, option.productName);
+  const aria = [productName, option.isTrialProduct ? copy.value.thisTrialTag : "", reason || (estimate ? estimate.label + estimate.value : ""),
     due ? `${copy.value.finalPrice} $${due.whole}${due.decimals}` : "", due ? `${claimPrice ? copy.value.claimPrice : copy.value.unitPrice} ${was}` : ""].filter(Boolean).join(", ");
-  return { option, productNo: option.productNo, selectable, quoteFailed, reason, estimate, due, was, claimPrice, link, checked, aria };
+  return { option, productNo: option.productNo, productName, selectable, quoteFailed, reason, estimate, due, was, claimPrice, link, checked, aria };
 }));
 // 「领取时价格」 sits beside the struck price (board S11) unless, on its own line, it would run into the name or the tag or
 // past the text column; that row takes it on a line of its own above the price. Read from the screen (H5 and App alike),

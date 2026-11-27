@@ -174,8 +174,8 @@ function homeRemaining(activity:EntryPromotion){return promotionRemaining(activi
 // Display only, written like the landing cards beside them (rewardParts: whole amounts without 「.00」). A UVT or USDT
 // reward splits into figure and muted unit; device gifts and order discounts stay one line of text.
 type RewardRule=PublicPromotion['rewardRules'][number];
-function partsText(activity:EntryPromotion,reward:RewardRule['buyerReward']){const live=liveActivity(activity);return keepUnits(live?rewardPartsText(rewardParts(live,reward),t.value.promotion):rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName));}
-function buyerFigure(activity:EntryPromotion,rule:RewardRule){const live=liveActivity(activity);if(!live)return null;const parts=rewardParts(live,rule.buyerReward);return parts.asset==='UVT'||parts.asset==='USDT'?{amount:parts.amount,unit:parts.unit}:null;}
+function partsText(activity:EntryPromotion,reward:RewardRule['buyerReward']){const live=liveActivity(activity);return keepUnits(live?rewardPartsText(rewardParts(live, reward, locale.code),t.value.promotion):rewardSummary(reward,t.value.promotion,reward.disclosure.deviceName));}
+function buyerFigure(activity:EntryPromotion,rule:RewardRule){const live=liveActivity(activity);if(!live)return null;const parts=rewardParts(live, rule.buyerReward, locale.code);return parts.asset==='UVT'||parts.asset==='USDT'?{amount:parts.amount,unit:parts.unit}:null;}
 // A number never parts from the unit or counter after it, nor from its 「×」 (06 §6.2): those joins become no-break
 // spaces; labels such as 「订单优惠 ·」 keep their ordinary space and may wrap before the amount.
 function keepUnits(text:string){return text.replace(/ × (?=\d)/g,'\u00A0×\u00A0').replace(/(\d) (?=\S)/g,'$1\u00A0');}
@@ -196,7 +196,7 @@ function landingCards(activity:EntryPromotion){
   const kind=eventLanding(activity),rule=activity.rewardRules[0];
   if(!kind||!rule)return [];
   void app.accountKey;void app.accountBindingEpoch;
-  const reward=rule.buyerReward,parts=rewardParts(activity,reward),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
+  const reward=rule.buyerReward,parts=rewardParts(activity, reward, locale.code),giftSku=reward.type==='DEVICE'?reward.giftProductNo:null;
   return [{kind,parts,discount:parts.asset==='DISCOUNT',rewardText:keepUnits(rewardPartsText(parts,t.value.promotion)),buySku:rule.productNo,buyName:landingProductName(activity,rule.productNo,locale.code),buyImage:landingProductImage(rule.productNo),giftSku,giftImage:giftSku?landingProductImage(giftSku):undefined}];
 }
 async function openTerms(activity:EntryPromotion){

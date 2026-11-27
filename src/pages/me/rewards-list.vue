@@ -149,7 +149,7 @@ import { useVoucher } from "@/store/voucher";
 import { useBills, isRewardBill, type Bill, type BillType } from "@/store/bills";
 import { courseRewardId, rewardsListCategory, type RewardsCat } from "./course-reward-link";
 import { courseRewardHref } from "@/pages/learn/course-navigation";
-import { getProduct } from "@/mock/products";
+import { voucherScopeText } from "@/lib/voucher-sheet-authority";
 import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import { navTo, takeNavigationQuery } from "@/lib/route";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
@@ -295,11 +295,7 @@ function stubLabel(v: VoucherDef): string {
   return v.type === "fixed" ? t.value.rewards.stubFixed : t.value.rewards.stubPercent;
 }
 function scopeText(v: VoucherDef): string {
-  if (isSingleSkuVoucher(v)) {
-    const name = getProduct(v.applicableSkus[0])?.name ?? v.applicableSkus[0];
-    return fmt(t.value.voucher.scopeSingle, { name });
-  }
-  return t.value.voucher.scopeAll;
+  return voucherScopeText(v, t.value.voucher);
 }
 function expiryText(v: VoucherDef): string {
   return v.endAt === 0 ? t.value.rewards.noExpiry : fmt(t.value.rewards.validUntil, { date: formatDate(v.endAt) });

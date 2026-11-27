@@ -2276,6 +2276,7 @@ export const kk: Messages = {
     condMin: "Ең аз тапсырыс: ${min}",
     condCap: "Ең көбі ${cap} жеңілдік",
     scopeSingle: "Тек {name} үшін",
+    scopeSingleUnnamed: "Тек белгіленген тауар үшін",
     scopeAll: "Барлық құрылғыға",
     noExpiry: "Мерзімсіз",
     expiryLabel: "Жарамдылық мерзімі: {date}",
@@ -2501,30 +2502,30 @@ export const kk: Messages = {
     releaseComingToast: "Бұл модель жақында келеді — күте тұрыңыз",
     taskLevelLabels: {"1":"бастапқы","2":"орта","3":"жоғары","4":"флагмандық"},
     taskLevelsLine: "AI тапсырмаларының деңгейлері: {levels}",
+    productBadges: {
+      trending: "Танымал",
+      upgradePick: "Жаңарту үшін",
+      flagship: "Флагман",
+      lowBarrier: "Төмен кіру шегі",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Толық қызмет көрсетілетін құрылғы",
-        badge: "Хит",
       },
       "stellarbox-pro": {
         tagline: "GPU сипаттамалары мен болжамды табысты салыстырыңыз.",
-        badge: "Танымал",
       },
       "stellarbox-pro-v2": {
         tagline: "Өткізу қабілеті S1 моделінен 2.5 есе жоғары",
-        badge: "Жаңарту үшін",
       },
       "stellarrack-p1": {
         tagline: "Тәжірибелі операторларға арналған деректер орталығы деңгейіндегі A100 тірегі.",
-        badge: "Флагман",
       },
       "stellarrack-p2": {
         tagline: "Деректер орталығының H100 тірегі — ең жоғары есептеу деңгейі.",
-        badge: "Флагман",
       },
       "cloud-share": {
         tagline: "Жабдық қажет емес — желінің есептеу қуатынан үлес сатып алыңыз.",
-        badge: "Төмен кіру шегі",
       },
     },
     tradeinUpgrade: {

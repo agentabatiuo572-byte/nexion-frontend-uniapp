@@ -365,6 +365,7 @@ import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
+import { productDisplayName } from "@/lib/product-display-name";
 import { fmt } from "@/i18n/format";
 import { apiClient, apiRuntimeConfig, deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
@@ -755,14 +756,16 @@ onMounted(() => {
 
 // ───────────────────────── helpers ─────────────────────────
 
-/** Product catalog label for any DeviceKind. `phone` isn't in the store catalog
- *  (user-owned hardware), so fall back to the device spec name, then the raw
- *  kind — never a bare literal, never a missing i18n key. */
 function kindLabel(kind: DeviceKind): string {
-  // SKU name first (brand mark). Kinds with no store listing — phone, pc-gpu —
-  // fall back to the localized device name, not the English DEVICE_SPECS one:
-  // the user's own phone can be the traded-in / replaced device here.
-  return getProduct(kind)?.name ?? deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
+  return deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
+}
+
+function sourceDeviceLabel(device: Device | null | undefined, quoteName?: string): string {
+  return quoteName?.trim() || (device ? deviceName(t.value, device).trim() || kindLabel(device.kind) : "—");
+}
+
+function targetProductLabel(productNo: string, quoteName?: string): string {
+  return productDisplayName(productNo, t.value.headerTitles.storeProduct, quoteName);
 }
 
 /** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
@@ -808,7 +811,7 @@ const choiceReadKey = computed(() => {
   return JSON.stringify([app.accountKey, app.accountBindingEpoch, apiRuntimeConfig.environment, apiRuntimeConfig.baseUrl,
     current.targetKind, choiceSources.value.map(device => [device.id, device.rowVersion])]);
 });
-const choiceQuotes = ref(new Map<string, Pick<CanonicalTradeinQuote, "discountUsdt" | "payableUsdt"> | null>());
+const choiceQuotes = ref(new Map<string, Pick<CanonicalTradeinQuote, "discountUsdt" | "payableUsdt" | "sourceProductName"> | null>());
 let choiceReadGeneration = 0;
 
 async function loadChoiceQuotes(sources: Device[]) {
@@ -828,7 +831,8 @@ async function loadChoiceQuotes(sources: Device[]) {
       const quote = await deviceE3Api.quote(id, target);
       if (!current()) return;
       const matches = quote.sourceDeviceId === id && quote.sourceRowVersion === version && quote.targetProductNo === target;
-      choiceQuotes.value.set(device.id, matches ? { discountUsdt: quote.discountUsdt, payableUsdt: quote.payableUsdt } : null);
+      const { discountUsdt, payableUsdt, sourceProductName } = quote;
+      choiceQuotes.value.set(device.id, matches ? { discountUsdt, payableUsdt, sourceProductName } : null);
     } catch {
       if (current()) choiceQuotes.value.set(device.id, null);
     }
@@ -858,7 +862,7 @@ const choiceView = computed(() => {
     const quote = choiceQuotes.value.get(d.id);
     const credit = remoteApiEnabled ? quote?.discountUsdt ?? null : previewCredit(d, s.newPrice);
     const net = remoteApiEnabled ? quote?.payableUsdt ?? null : Math.max(0, +(s.newPrice - (credit ?? 0)).toFixed(2));
-    const name = deviceName(t.value, d);
+    const name = sourceDeviceLabel(d, quote?.sourceProductName);
     const creditText = credit == null ? "—" : `$${formatGroupedAmount(credit)}`;
     const netText = net == null ? "—" : `$${formatGroupedAmount(net)}`;
     return { id: d.id, device: d, name, credit: creditText, net: net == null ? null : amountParts(net),
@@ -1090,7 +1094,7 @@ const retireView = computed(() => {
     // While reading, the source stays named (03 §3.4); a failed read is one status line that says it retries itself (03 §3.5.2).
     return {
       source: failed ? null : device,
-      subtitle: device ? fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }) : "",
+      subtitle: device ? fmt(t.value.tradein.retireSubtitle, { name: sourceDeviceLabel(device) }) : "",
       targets: [], loading: !failed, status: failed ? failedStatus : loadingStatus,
     };
   }
@@ -1122,7 +1126,7 @@ const retireView = computed(() => {
   return {
     // The source row names the device while there are targets or they are still being read; a final empty or failed read is one status line.
     source: targets.length || pending ? device : null,
-    subtitle: fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }),
+    subtitle: fmt(t.value.tradein.retireSubtitle, { name: sourceDeviceLabel(device) }),
     targets, loading: pending,
     status: pending ? loadingStatus : failed ? failedStatus
       : targets.length ? null : { tone: "info" as const, text: t.value.tradein.retireNoTargets },
@@ -1165,17 +1169,17 @@ const tradeinView = computed(() => {
   const creditRatePct = remoteQuote ? remoteQuote.creditRatePct : band?.creditPct ?? null;
   const estNet = remoteQuote?.payableUsdt ?? Math.max(0, +(s.newPrice - credit).toFixed(2));
   const targetPrice = remoteQuote?.targetPriceUsdt ?? s.newPrice;
+  const oldName = sourceDeviceLabel(oldDevice, remoteQuote?.sourceProductName);
+  const targetProductNo = remoteQuote?.targetProductNo ?? s.newKind;
+  const newName = targetProductLabel(targetProductNo, remoteQuote?.targetProductName);
   return {
     // The device pair's accessible name: what is handed in and what it becomes.
-    title: fmt(t.value.tradein.sheetTitle, {
-      from: kindLabel(oldDevice.kind),
-      to: kindLabel(s.newKind),
-    }),
+    title: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }),
     oldDevice,
-    oldName: kindLabel(oldDevice.kind),
-    newKind: s.newKind,
-    newName: kindLabel(s.newKind),
-    newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
+    oldName,
+    newKind: targetProductNo,
+    newName,
+    newImageUrl: getProduct(targetProductNo)?.imageUrl ?? null,
     estNet: amountParts(estNet),
     credit: formatGroupedAmount(credit),
     targetPrice: formatGroupedAmount(targetPrice),
@@ -1268,9 +1272,10 @@ const replaceView = computed(() => {
   if (s.kind !== "replace") return null;
   // The arriving machine, what it costs, and the device that steps down (board B-6a); the runtime-published copy may still
   // carry {newKind}, so it is still passed to the button labels.
-  const base = { newKind: s.newKind, newName: kindLabel(s.newKind), newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
-    replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
-    keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: kindLabel(s.newKind) }) };
+  const newName = targetProductLabel(s.newKind, s.canonicalCapacityQuote?.targetProductName);
+  const base = { newKind: s.newKind, newName, newImageUrl: getProduct(s.newKind)?.imageUrl ?? null,
+    replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: newName }),
+    keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: newName }) };
   if (remoteApiEnabled && s.canonicalCapacityQuote) {
     const quote = s.canonicalCapacityQuote;
     const device = quote.sourceDeviceId == null ? null : app.devices.find((d) => Number(d.id) === quote.sourceDeviceId) ?? null;
@@ -1278,7 +1283,7 @@ const replaceView = computed(() => {
       ...base,
       due: amountParts(quote.payableUsdt),
       source: { device, online: !!device && deviceOnlineState(device, Date.now()) === "online",
-        line: fmt(t.value.tradein.replaceSourceLine, { name: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable }) },
+        line: fmt(t.value.tradein.replaceSourceLine, { name: sourceDeviceLabel(device, quote.sourceDeviceName ?? undefined) }) },
       insufficient: false, // The shared payment selector checks wallet balance; external methods remain available.
       fundsGap: null,
     };
@@ -1290,7 +1295,7 @@ const replaceView = computed(() => {
     ...base,
     due: amountParts(s.newPrice),
     source: { device: lowest, online: deviceOnlineState(lowest, Date.now()) === "online",
-      line: fmt(t.value.tradein.replaceSourceLine, { name: lowest.name }) },
+      line: fmt(t.value.tradein.replaceSourceLine, { name: sourceDeviceLabel(lowest) }) },
     insufficient,
     // Same shortfall the composer checks; shown as one hint line above the disabled buttons (board B-6b).
     fundsGap: insufficient ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(s.newPrice - app.user.usdtBalance) }) : null,
@@ -1380,7 +1385,7 @@ async function runCanonicalCapacityPurchase(operation:'replace'|'keep',requested
     const effectiveOperation = command.operation;
     const target = frozen ? frozen.targetProductNo : (command as PendingKeepCommand).targetProductNo;
     const payable = frozen ? frozen.payableUsdt : (command as PendingKeepCommand).payableUsdt;
-    const summary = frozen ? frozen.targetProductName : kindLabel(target as DeviceKind);
+    const summary = targetProductLabel(target, frozen?.targetProductName);
     if (!receipt) {
       if (readOnlyCurrent) return;
       const purchaseIsCurrent = () => current() && props.active
@@ -1618,8 +1623,8 @@ async function submitCanonicalCapacityReplacement(
         }
         writeCapacityPending(requestScope.accountKey,null);
         toast.success(fmt(t.value.tradein.replaceSuccessToast, {
-          newKind: kindLabel(newKind),
-          oldKind: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
+          newKind: targetProductLabel(newKind, quote.targetProductName),
+          oldKind: sourceDeviceLabel(app.devices.find(device => device.id === String(quote.sourceDeviceId)), quote.sourceDeviceName ?? undefined),
         }));
         hide();
         goDevices();
@@ -1686,8 +1691,8 @@ function onReplace() {
     amount: -s.newPrice,
     status: "posted",
     memo: fmt(t.value.tradein.replaceBillMemo, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   });
   if (paid !== "ok") {
@@ -1707,8 +1712,8 @@ function onReplace() {
   pending.settleProduct(s.newKind);
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   );
   confirming.value = false;
@@ -1783,7 +1788,7 @@ async function submitCanonicalKeepBuy(
           throw new Error("CAPACITY_COMMAND_RELEASE_FAILED");
         }
         writeCapacityPending(requestScope.accountKey,null);
-        toast.success(activeAtPurchase ? fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }) : t.value.orders.inventoryToast);
+        toast.success(activeAtPurchase ? fmt(t.value.tradein.keepBuySuccessToast, { newKind: targetProductLabel(newKind) }) : t.value.orders.inventoryToast);
         hide();
         goDevices();
       },
@@ -1818,7 +1823,7 @@ function onKeepBuy() {
     symbol: "USDT",
     amount: -s.newPrice,
     status: "posted",
-    memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: kindLabel(s.newKind) }),
+    memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: targetProductLabel(s.newKind) }),
   });
   if (paid !== "ok") {
     // 新机已落盘(addDevice 只在落盘成功时给 id),撤销也必须落盘;撤不掉登记待对账(审计 R8 P1:直写内存不落盘 → 白得一台)
@@ -1831,7 +1836,7 @@ function onKeepBuy() {
   // 成交即兑现意图:同账号该商品仍在窗内的链上发票一并作废(否则浮动条继续催第二笔;审计 R9 P1)。
   // persist-verdict-ok: 作废不掉 = 票留在磁盘,浮动条继续露出可取消的旧票,不会二次扣款
   pending.settleProduct(s.newKind);
-  toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(s.newKind) }));
+  toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: targetProductLabel(s.newKind) }));
   confirming.value = false;
   hide();
   goDevices();
@@ -1934,8 +1939,8 @@ function onForce() {
     amount: -s.newPrice,
     status: "posted",
     memo: fmt(t.value.tradein.forceReplaceBillMemo, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   });
   if (paid !== "ok") {
@@ -1954,8 +1959,8 @@ function onForce() {
   pending.settleProduct(s.newKind);
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
-      newKind: kindLabel(s.newKind),
-      oldKind: kindLabel(lowest.kind),
+      newKind: targetProductLabel(s.newKind),
+      oldKind: sourceDeviceLabel(lowest),
     }),
   );
   confirming.value = false;
@@ -1978,9 +1983,9 @@ const recoveryNotice = computed(() => {
   if (!recoveryNoticeOpen.value || s.kind !== "tradein") return null;
   const quote = purchaseRecoveryRecord.value?.tradeinQuote ?? null;
   const oldDevice = quote ? app.devices.find((d) => Number(d.id) === quote.sourceDeviceId) : undefined;
-  const oldName = oldDevice ? kindLabel(oldDevice.kind) : quote?.sourceProductName || "—";
-  const newKind = (quote?.targetProductNo ?? s.newKind) as DeviceKind;
-  const newName = kindLabel(newKind);
+  const oldName = sourceDeviceLabel(oldDevice, quote?.sourceProductName);
+  const newKind = quote?.targetProductNo ?? s.newKind;
+  const newName = targetProductLabel(newKind, quote?.targetProductName);
   return { oldDevice, oldName, newKind, newName, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
     pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt, 6) : null };
 });

@@ -155,6 +155,7 @@ import type { QuestTaskCategory } from "@/api/quest-api";
 import { selectHomeQuestRows } from "./home-quest-source";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
 import { dayOneQuestDisplayName } from "@/lib/quest-presentation";
+import { questActionRouteUnavailable } from "@/composables/use-quest-target-availability";
 import { dayOneObservationRecovery } from "@/lib/day-one-observation-recovery";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { useApp } from "@/store/app";
@@ -323,7 +324,7 @@ function onClaim() {
 }
 
 function isActionable(task: QuestTask) {
-  return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task);
+  return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
 }
 
 const appOnlyPending = computed(() => !dayOneExpired.value && tasks.value.some((task) => task.appOnly && task.eligible && !isDone(task)));
