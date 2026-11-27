@@ -7,7 +7,8 @@
     <view v-else class="bank-withdraw" :aria-busy="busy">
       <!-- Not on the first-read failure below: its centred result already says it once. -->
       <view v-if="error && (order || uncertain || displayIntents.length || displayConfig || requestedOrder !== null || pendingAttempt)" class="notice danger" role="alert"><text>{{ error }}</text></view>
-      <text v-if="busy && !silentRead" class="muted loading" role="status">{{ c.loading }}</text>
+      <!-- Not on the first config read below: its placeholder already carries the loading status in the loaded layout's place. -->
+      <text v-if="busy && !silentRead && (displayConfig || order || uncertain || requestedOrder !== null || pendingAttempt)" class="muted loading" role="status">{{ c.loading }}</text>
       <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
         <text>{{ c.resumeUsdt }}</text>
         <NxButton class="page-action" variant="secondary" label="USDT" data-testid="bank-resume-usdt" :disabled="busy" @click="openUsdt" />
@@ -66,7 +67,7 @@
             <view class="aura" aria-hidden="true"><view /><view /></view>
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
-              <text class="slab__amt">{{ usdt2(quote.amountUsdt).replace(/\.\d*$/, "") }}<text class="slab__dec">{{ usdt2(quote.amountUsdt).replace(/^[^.]*/, "") }}</text><text class="slab__unit">USDT</text></text>
+              <text class="slab__amt">{{ usdt2(quote.amountUsdt).replace(/\.\d*$/, "") }}<text class="slab__dec">{{ usdt2(quote.amountUsdt).replace(/^[^.]*/, "") }}</text><text class="slab__unit">{{ '\u00A0' }}USDT</text></text>
               <!-- Balance and single limit on two lines, as on the amount step, so the range never breaks at its dash. -->
               <view v-if="displayConfig.policy && displayConfig.capacity" class="limits">
                 <text>{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
@@ -136,16 +137,27 @@
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitReason : formStep === 'amount' && !!quoteReason }" />
       </template>
-      <!-- First config read with no snapshot (03 §3.4, §3.5.2): while it runs, only the page's loading line above; when it
-           fails, the page's one centred result and its one 重新加载. No form skeleton and no grey main-action placeholders;
-           the bar renders nothing here (04 §4.0). -->
+      <!-- First config read with no snapshot (03 §3.4, §3.5.2): while it runs, a still placeholder at the bound account step's
+           size (card, binding note, bar clearance) and an empty tray in the bar, no grey main-action buttons; when it fails,
+           the page's one centred result and its one 重新加载. -->
       <template v-else-if="requestedOrder === null && !pendingAttempt">
         <EmptyState v-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
+        <view v-else class="first-read" role="status" aria-busy="true" data-testid="bank-first-read">
+          <text class="vh">{{ c.loading }}</text>
+          <view class="first-read__card" aria-hidden="true">
+            <view class="first-read__top"><view class="first-read__dot" /><view class="first-read__bar first-read__bar--name" /><view class="first-read__bar first-read__bar--tag" /></view>
+            <view class="first-read__bot"><view class="first-read__bar first-read__bar--label" /><view class="first-read__bar first-read__bar--no" /></view>
+          </view>
+          <view class="first-read__bar first-read__bar--note" aria-hidden="true" />
+          <view class="bar-space bar-space--result" />
+        </view>
       </template>
       <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
     </view>
     <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm; result → new withdrawal + back to wallet. -->
     <template #pageFixed>
+      <!-- First config read: the tray in its place, empty until the read lands (the first-read placeholder above). -->
+      <view v-if="remoteSessionReady && !displayConfig && !order && !uncertain && requestedOrder === null && !pendingAttempt && !error" class="bar bar--first-read nx-glass-bar" aria-hidden="true"><view class="bar__hold" /></view>
       <view v-if="remoteSessionReady && order" class="bar bar--result nx-glass-bar">
         <NxButton v-if="terminal" variant="secondary" :label="c.newWithdrawal" data-testid="bank-new" :disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" />
         <NxButton variant="primary" :label="c.backToWallet" :disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" />
@@ -786,13 +798,15 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 /* Amount slab: its amber as one uniform tint (.nx-tint) over the outer aura. */
 .slab { --nx-tint: var(--v5-warning); position: relative; padding: 18px 20px 16px; border-radius: var(--v5-radius-xl); }
 .slab__head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
-.slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The quote amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38) at 500 (01.2, as the result amount); the amount
+   input keeps its own size (10.2). */
+.slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
-/* The quote amount follows the 01.2 anatomy: integer in main ink, decimals and unit in secondary ink, unit max(12px, .4em).
-   The unit beside the amount input keeps 12/16 (10.2: the amount input is outside the type roles). Descendant, not child:
-   uni-text puts nested text inside its own span. */
+/* The quote amount follows the 01.2 anatomy: integer in main ink, decimals and unit in secondary ink, unit max(12px, .4em),
+   after a no-break space (03 §3.6.1), not the input row's 6px margin. The unit beside the amount input keeps 12/16 (10.2:
+   the amount input is outside the type roles). Descendant, not child: uni-text puts nested text inside its own span. */
 .slab__dec { color: var(--v5-ink-3); }
-.slab__amt .slab__unit { font-size: max(12px, .4em); }
+.slab__amt .slab__unit { margin-left: 2px; font-size: max(12px, .4em); }
 .slab .amount-input { display: flex; align-items: baseline; gap: 0; margin-top: 4px; padding: 0; border: 0; border-radius: 0; }
 .slab .amount-input input { flex: 0 1 auto; max-width: calc(100% - 48px); height: 48px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .slab .limits { gap: 0; margin-top: 4px; font: 400 12px/18px var(--font-v5); }
@@ -833,6 +847,18 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .cfm-v { flex: none; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .cfm-row--amount .cfm-v { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
 .cfm-rules-title { display: block; margin: 20px 0 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
+/* First config read (03 §3.4): still blocks where the bound account step's card and binding note land, no shimmer. */
+.first-read__card { display: flex; flex-direction: column; justify-content: space-between; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
+.first-read__top, .first-read__bot { display: flex; align-items: center; gap: 10px; }
+.first-read__bot { flex-direction: column; align-items: flex-start; gap: 8px; }
+.first-read__dot { flex: none; width: 36px; height: 36px; border-radius: 50%; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.first-read__bar { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent); }
+.first-read__bar--name { width: 40%; }
+.first-read__bar--tag { width: 64px; height: 24px; margin-left: auto; border-radius: 999px; }
+.first-read__bar--label { width: 30%; }
+.first-read__bar--no { width: 62%; height: 28px; border-radius: 8px; }
+.first-read__bar--note { width: 62%; margin: 17px 4px 0; }
+.bar--first-read .bar__hold { flex: 1 1 100%; height: 48px; }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }
 /* A reason above the button makes the tray taller: up to two note lines over the 48 button (04 §4.0 clearance). */
