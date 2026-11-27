@@ -395,7 +395,9 @@ function labelStyle(task: QuestTask): CSSProperties {
 
 function catStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
-  if (props.missionLayout) return {font:'400 12px/16px var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-nex-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-success-ink)' : 'var(--v5-warning-ink)'};
+  // A category is an attribute, not a status (01 §1.1.1 rule 4, 03 §3.8): the common one stays neutral, the other two take
+  // attribute-tag inks (teal for identity, brand-2 coral for social), each at least 4.5:1 on the card surface.
+  if (props.missionLayout) return {font:'var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-tech-cyan-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-brand-2-tag-ink)' : 'var(--v5-ink-3)'};
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "12px",
