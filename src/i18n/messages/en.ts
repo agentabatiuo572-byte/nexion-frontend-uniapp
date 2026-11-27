@@ -101,7 +101,7 @@ export const en = {
     available: "Ready to receive",
     unbound: "No receiving account",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Unavailable", tagUnverified: "Verifying",
+    tagUnavailable: "Unavailable", tagUnverified: "Verifying", balanceBelowMin: "Your withdrawable balance is below the minimum of {min}\u00A0USDT.",
     unboundNotice: "Add a bank account in your own name before continuing the withdrawal.",
     amountTitle: "Withdrawal amount",
     amountHint: "Enter the total USDT to deduct, including the exchange fee.",
@@ -161,7 +161,7 @@ export const en = {
     quoteExpired: "This quote has expired. Refresh or cancel it to get a new quote.",
     refundAmount: "Returned amount (USDT)", confirmedAt: "Confirmed at", refunded: "Returned to your wallet",
     accountStatus: {
-      ready: "Receiving account saved.", unavailable: "This receiving account is unavailable.", unverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
+      ready: "Receiving account saved.", unavailable: "This receiving account is unavailable.", unverified: "Your receiving account is being verified. You can withdraw once it's done.",
     },
     requote: "Cancel unused quote / start again",
     title: "Bank withdrawal", unavailable: "Bank withdrawals are currently unavailable. Please try again later.",

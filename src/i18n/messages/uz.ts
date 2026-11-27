@@ -439,7 +439,7 @@ export const uz: Messages = {
     available: "Qabul qilishga tayyor",
     unbound: "Qabul qiluvchi hisob yoʻq",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Mavjud emas", tagUnverified: "Tekshirilmoqda",
+    tagUnavailable: "Mavjud emas", tagUnverified: "Tekshirilmoqda", balanceBelowMin: "Yechib olinadigan balans eng kam miqdordan ({min}\u00A0USDT) past.",
     unboundNotice: "Pul yechishni davom ettirishdan oldin oʻz nomingizdagi bank hisobini qoʻshing.",
     amountTitle: "Yechish summasi",
     amountHint: "Ayirboshlash haqi bilan birga yechiladigan umumiy USDT summasini kiriting.",
@@ -519,7 +519,7 @@ export const uz: Messages = {
     accountStatus: {
       ready: "Qabul qiluvchi hisob saqlandi.",
       unavailable: "Bu hisobdan hozircha foydalanib boʻlmaydi.",
-      unverified: "Bankka pul yechish hozir mavjud emas. Yuborilgan soʻrovlarni koʻrishingiz mumkin.",
+      unverified: "Qabul qiluvchi hisob tekshirilmoqda. Tekshiruv tugagach, pul yecha olasiz.",
     },
     requote: "Narxni bekor qilib, qaytadan boshlash",
     title: "Bankka pul yechish",

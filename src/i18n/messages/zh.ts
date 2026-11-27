@@ -102,7 +102,7 @@ export const zh: Messages = {
     available: "可用于提现",
     unbound: "未绑定收款账户",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "暂不可用", tagUnverified: "待核实",
+    tagUnavailable: "暂不可用", tagUnverified: "待核实", balanceBelowMin: "可提现余额不足最低提现金额 {min}\u00A0USDT。",
     unboundNotice: "请先添加本人银行收款账户，再继续提现。",
     amountTitle: "提现金额",
     amountHint: "输入本次从余额中扣除的总额（含换汇手续费）。",
@@ -162,7 +162,7 @@ export const zh: Messages = {
     quoteExpired: "报价已过期，请刷新或取消后重新获取报价。",
     refundAmount: "已退回金额（USDT）", confirmedAt: "确认时间", refunded: "已退回钱包",
     accountStatus: {
-      ready: "收款账户已绑定。", unavailable: "暂时无法使用此收款账户。", unverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
+      ready: "收款账户已绑定。", unavailable: "暂时无法使用此收款账户。", unverified: "收款账户正在核实，核实完成后才能提现。",
     },
     requote: "取消未提交报价／重新填写",
     title: "银行卡提现", unavailable: "银行卡提现暂不可用，请稍后再试。",

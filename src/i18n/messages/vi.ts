@@ -102,7 +102,7 @@ export const vi: Messages = {
     available: "Có thể nhận tiền",
     unbound: "Chưa có tài khoản nhận",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Tạm ngưng", tagUnverified: "Chờ xác minh",
+    tagUnavailable: "Tạm ngưng", tagUnverified: "Chờ xác minh", balanceBelowMin: "Số dư có thể rút thấp hơn mức tối thiểu {min}\u00A0USDT.",
     unboundNotice: "Vui lòng thêm tài khoản ngân hàng chính chủ trước khi tiếp tục rút tiền.",
     amountTitle: "Số tiền rút",
     amountHint: "Nhập tổng số USDT trừ khỏi số dư, đã gồm phí quy đổi.",
@@ -162,7 +162,7 @@ export const vi: Messages = {
     quoteExpired: "Báo giá đã hết hạn. Tải lại hoặc hủy để lấy báo giá mới.",
     refundAmount: "Số tiền đã hoàn (USDT)", confirmedAt: "Thời gian xác nhận", refunded: "Đã hoàn tiền về ví",
     accountStatus: {
-      ready: "Đã liên kết tài khoản nhận tiền.", unavailable: "Chưa thể sử dụng tài khoản nhận tiền này.", unverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
+      ready: "Đã liên kết tài khoản nhận tiền.", unavailable: "Chưa thể sử dụng tài khoản nhận tiền này.", unverified: "Tài khoản nhận tiền đang được xác minh. Bạn có thể rút tiền sau khi hoàn tất.",
     },
     requote: "Hủy báo giá chưa dùng / nhập lại",
     title: "Rút tiền về ngân hàng", unavailable: "Hiện chưa thể rút tiền về ngân hàng. Vui lòng thử lại sau.",

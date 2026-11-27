@@ -439,7 +439,7 @@ export const fil: Messages = {
     available: "Handang tumanggap",
     unbound: "Walang account na tatanggap",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Hindi available", tagUnverified: "Bineberipika",
+    tagUnavailable: "Hindi available", tagUnverified: "Bineberipika", balanceBelowMin: "Mas mababa sa minimum na {min}\u00A0USDT ang balanseng puwedeng i-withdraw.",
     unboundNotice: "Magdagdag ng account sa bangko na nakapangalan sa iyo bago ituloy ang withdrawal.",
     amountTitle: "Halaga ng withdrawal",
     amountHint: "Ilagay ang kabuuang USDT na ibabawas, kasama ang exchange fee.",
@@ -519,7 +519,7 @@ export const fil: Messages = {
     accountStatus: {
       ready: "Na-save ang account na tatanggap.",
       unavailable: "Hindi available ang account na ito.",
-      unverified: "Hindi available ngayon ang bank withdrawal. Masusubaybayan mo pa rin ang mga naisumiteng withdrawal.",
+      unverified: "Bine-verify pa ang receiving account. Makakapag-withdraw ka kapag tapos na.",
     },
     requote: "I-cancel ang quote / magsimula ulit",
     title: "Withdrawal sa bangko",

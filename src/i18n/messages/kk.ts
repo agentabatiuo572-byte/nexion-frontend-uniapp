@@ -439,7 +439,7 @@ export const kk: Messages = {
     available: "Шығаруға дайын",
     unbound: "Ақша түсетін шот жоқ",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Қолжетімсіз", tagUnverified: "Тексерілуде",
+    tagUnavailable: "Қолжетімсіз", tagUnverified: "Тексерілуде", balanceBelowMin: "Шығаруға болатын қалдық ең аз сомадан ({min}\u00A0USDT) төмен.",
     unboundNotice: "Ақша шығаруды жалғастыру үшін өз атыңыздағы банк шотын қосыңыз.",
     amountTitle: "Шығару сомасы",
     amountHint: "Айырбастау комиссиясын қоса шегерілетін жалпы USDT сомасын енгізіңіз.",
@@ -519,7 +519,7 @@ export const kk: Messages = {
     accountStatus: {
       ready: "Ақша түсетін шот сақталды.",
       unavailable: "Ақша түсетін бұл шот қолжетімсіз.",
-      unverified: "Банк шотына шығару қазір қолжетімсіз. Жіберілген сұрауларды қарай аласыз.",
+      unverified: "Алушы шоты тексерілуде. Тексеру аяқталған соң ақша шығара аласыз.",
     },
     requote: "Баға ұсынысынан бас тарту / қайта бастау",
     title: "Банк шотына шығару",
