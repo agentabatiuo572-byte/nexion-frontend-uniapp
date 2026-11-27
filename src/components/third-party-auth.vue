@@ -2,10 +2,15 @@
   <view v-if="providers?.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
     <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
     <text v-if="intent === 'LINK' && providers?.length === 0" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
-    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || providersDisabled" :preserve-appearance="providersDisabled && !flow && !submitting && !unavailableReason" :unavailable-reason="unavailableReason" @select="start" />
-    <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
-      <!-- Host pages point their greyed CTA here while the panel is open (03 §3.1: the panel already says what is under way). -->
-      <text id="oauth-panel-copy" class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
+    <!-- LINK reads two lists and recovers them silently (03 §3.4, §3.5.2). First read with both unknown: placeholder tiles of
+         the final size. Bound list still unknown: the tiles stay greyed and the line below says when binding opens. -->
+    <AuthProviderGrid v-if="labels.length || listsLoading" :providers="labels" :linked="linkedLabels" :placeholders="listsLoading ? providerCount : 0"
+      :busy="!!flow || submitting || providersDisabled" :preserve-appearance="providersDisabled && !flow && !submitting && !unavailableReason && !linkedUnknown"
+      :unavailable-reason="unavailableReason || (linkedUnknown ? t.thirdParty.linkedLoading : undefined)" @select="start" />
+    <text v-if="linkedUnknown && !unavailableReason" class="oauth-copy">{{ t.thirdParty.linkedLoading }}</text>
+    <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'"
+      :close-locked-by="submitting ? 'oauth-confirm-reason' : undefined" aria-live="polite" @close="cancelFromUser">
+      <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
       <!-- The security sheet is not a short sign-in flow, so the field keeps a visible label (03 §3.3). -->
       <text v-if="verified && intent === 'LINK'" class="oauth-label">{{ t.security.currentPassword }}</text>
@@ -19,11 +24,13 @@
       <!-- 03 §3.1: confirm is the primary L action, cancel is neutral glass L; busy shows NxButton's spinner. -->
       <NxButton v-if="verified" class="oauth-action" variant="primary" :label="confirmLabel" :busy="submitting"
         :disabled="completionDisabled" :aria-describedby="completionReason && !submitting ? 'oauth-confirm-reason' : undefined" @click="complete()" />
-      <!-- 03 §3.1: a greyed confirm names what is missing on the line below it. The line keeps its height once the field is
-           filled, hidden from view and from screen readers, so 取消 does not jump. -->
-      <text v-if="verified && (intent === 'LINK' || challengeNo)" id="oauth-confirm-reason" class="oauth-reason"
-        :class="{ 'oauth-reason--off': !completionReason || submitting }" :aria-hidden="!completionReason || submitting ? 'true' : undefined">{{ completionReason }}</text>
-      <NxButton class="oauth-action" variant="secondary" :label="t.ui.cancel" :disabled="submitting" @click="cancelFromUser" />
+      <!-- 03 §3.1: the line under confirm names what is missing while confirm is greyed, and while submitting says why 取消 and the
+           sheet's close wait (mask, Esc and back keep the same guard in cancelFromUser). It keeps its height when empty, hidden
+           from view and from screen readers, so 取消 does not jump. -->
+      <text v-if="verified" id="oauth-confirm-reason" class="oauth-reason" :class="{ 'oauth-reason--off': !confirmNote }"
+        :aria-hidden="confirmNote ? undefined : 'true'">{{ confirmNote }}</text>
+      <NxButton class="oauth-action" variant="secondary" :label="t.ui.cancel" :disabled="submitting"
+        :aria-describedby="submitting && verified ? 'oauth-confirm-reason' : undefined" @click="cancelFromUser" />
     </component>
     <!-- The host page owns recovery of an unknown sign-in result. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
@@ -96,9 +103,13 @@ const completionDisabled = computed(() => submitting.value || (props.intent === 
   || (!!challengeNo.value && !/^\d{6}$/.test(code.value)));
 const completionReason = computed(() => props.intent === "LINK" && !password.value ? t.value.security.twoFactorPasswordRequired
   : !!challengeNo.value && !/^\d{6}$/.test(code.value) ? t.value.login.errorInvalidCode : "");
+const confirmNote = computed(() => submitting.value ? t.value.thirdParty.submitLocked : completionReason.value);
 const showCaptcha = ref(false);
 const names = { GOOGLE: "Google", APPLE: "Apple", TELEGRAM: "Telegram" } as const;
 const label = (provider: ThirdPartyProvider) => names[provider];
+const providerCount = Object.keys(names).length;
+const listsLoading = computed(() => props.intent === "LINK" && providers.value === null && linked.value === null);
+const linkedUnknown = computed(() => props.intent === "LINK" && linked.value === null && !!providers.value?.length);
 const linkedLabels = computed(() => props.intent === "LINK" ? (linked.value ?? []).map(label) : []);
 const labels = computed(() => (props.intent === "LINK"
   ? [...new Set([...(providers.value ?? []), ...(linked.value ?? [])])] : (providers.value ?? [])).map(label));
@@ -286,7 +297,8 @@ async function complete(captchaTicket?: string) {
       } else if (cause instanceof ApiError && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) showCaptcha.value = true;
       else if (!sponsorRefused(cause)) toast.error(errorMessage(cause));
     }
-  } finally { submitting.value = false; password.value = ""; }
+  // A refused link keeps the typed password for correction (03 §3.3); success and cancel clear it through cancel().
+  } finally { submitting.value = false; }
 }
 onMounted(() => {
   // #ifdef H5
