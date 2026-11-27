@@ -74,10 +74,11 @@
       <view class="nx-step-in" :style="intent.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
         <template v-if='intent.paymentMode === "hosted"'>
-          <view class="nx-bank-stage">
+          <!-- Rejected before it was created: the shared result head (03 §3.6.1), not the countdown stage. -->
+          <view v-if="hostedRejected" class="nx-bank-state"><NxResultHead tone="danger" :title="t.bankPane.hostedRejectedNote" /></view>
+          <view v-else class="nx-bank-stage">
             <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
             <view class="nx-bank-slab nx-bank-pay nx-tint">
-              <template v-if="!hostedRejected">
                 <view class="nx-bank-ring" role="timer" :aria-label="`${t.bankPane.remainingLabel} ${countdownText}`" :style="{ '--nx-bank-ring-offset': (427 * (1 - countdownRatio)).toFixed(1) }">
                   <view class="nx-bank-ring__svg" aria-hidden="true"><svg width="148" height="148" viewBox="0 0 148 148">
                     <circle class="nx-bank-ring__track" cx="74" cy="74" r="68" />
@@ -86,11 +87,6 @@
                   <view class="nx-bank-ring__c"><text class="nx-bank-ring__t">{{ countdownText }}</text><text class="nx-bank-k">{{ t.bankPane.remainingLabel }}</text></view>
                 </view>
                 <text class="nx-bank-cd">{{ countdownParts[0] }}<text class="nx-bank-cd__time">{{ countdownText }}</text>{{ countdownParts[1] }}</text>
-              </template>
-              <view v-else class="nx-bank-pay__rejected">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
-                <text>{{ t.bankPane.hostedRejectedNote }}</text>
-              </view>
             </view>
           </view>
           <view class="nx-bank-sum">
@@ -106,9 +102,9 @@
         </template>
 
         <template v-else>
-        <view><text class="block text-center tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
-        <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-amount); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
-        <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
+        <view><text class="nx-bank-manual__cd">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
+        <view><text class="nx-bank-manual__amt">{{ fmtVnd(intent.vndAmount) }}</text></view>
+        <view><text class="nx-bank-manual__line">{{ creditLineText }}</text></view>
         </template>
 
         <template v-if="intent.paymentMode !== 'hosted'">
@@ -116,7 +112,7 @@
         <view v-if="intent.qrPayload" :style="qrBoxStyle">
           <image :src="intent.qrPayload" mode="aspectFit" style="width: 100%; height: 100%" />
         </view>
-        <view v-if="intent.qrPayload"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.bankPane.scanHint }}</text></view>
+        <view v-if="intent.qrPayload"><text class="nx-bank-manual__line nx-bank-manual__line--scan">{{ t.bankPane.scanHint }}</text></view>
 
         <!-- 收款账户(完整账号,转账要用,不脱敏;规格 ③) -->
         <view style="margin-top: 14px">
@@ -146,29 +142,27 @@
         </view>
 
         <!-- 附言码强调块 + 复制(转账匹配的生命线,规格「务必填写」) -->
-        <view class="flex items-center justify-between" :style="memoBoxStyle">
+        <view class="nx-bank-memo">
           <view class="flex-1 min-w-0">
-            <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.bankPane.memoLabel }}</text>
-            <text class="block font-mono-code" :style="memoCodeStyle">{{ intent.memoCode }}</text>
+            <text class="nx-bank-memo__k">{{ t.bankPane.memoLabel }}</text>
+            <text class="nx-bank-memo__code">{{ intent.memoCode }}</text>
           </view>
-          <view class="nx-bank-copy-memo-cta grid place-items-center shrink-0 active:opacity-80" :style="memoCopyBtnStyle" role="button" tabindex="0" @click="copyMemo">
-            <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.bankPane.copyCta }}</text>
-          </view>
+          <!-- The shared compact copy control, as on the USDT ticket: brand glass S, 32px with a 44px target (03 §3.1). -->
+          <NxButton class="nx-bank-copy-memo-cta" variant="brand" size="small" :label="t.bankPane.copyCta" @click="copyMemo" />
         </view>
 
         <!-- 三步指引 -->
         <view style="margin-top: 14px">
-          <view v-for="(s, i) in steps" :key="i" class="flex items-start" style="gap: 10px; padding: 5px 0">
-            <view class="grid place-items-center shrink-0" :style="stepNumStyle"><text style="font-size: 12px; font-weight: 600; color: var(--v5-brand)">{{ i + 1 }}</text></view>
-            <view class="flex-1 min-w-0"><text style="font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-2); line-height: 1.5">{{ s }}</text></view>
+          <view v-for="(s, i) in steps" :key="i" class="nx-bank-step">
+            <text class="nx-bank-step__n">{{ i + 1 }}</text>
+            <text class="nx-bank-step__t">{{ s }}</text>
           </view>
         </view>
 
         </template>
         <!-- HDPay 无关闭订单/退款接口，provider order 创建后禁止制造本地取消分叉。 -->
-        <view v-if="intent.paymentMode !== 'hosted'" class="nx-bank-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="askCancel">
-          <text :style="ghostTextStyle">{{ t.bankPane.cancelCta }}</text>
-        </view>
+        <!-- A reverse action: the shared quiet ink-3 text, no container, 44px target (03 §3.1 .nx-reverse-action). -->
+        <view v-if="intent.paymentMode !== 'hosted'" class="nx-bank-link-row"><NxButton class="nx-bank-cancel-cta nx-reverse-action" variant="text" size="small" :label="t.bankPane.cancelCta" @click="askCancel" /></view>
       </view>
     </template>
 
@@ -805,27 +799,10 @@ function goBills() {
 }
 
 // ── styles ──
-const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
 // 牌价不可用:段内容置灰禁下单([FEAT-PAY03] ② 异常1;文案由 FxRateLine 灰态给出)
 const disabledWrapStyle: CSSProperties = {
   opacity: 0.45,
   pointerEvents: "none",
-};
-const ghostBtnStyle: CSSProperties = {
-  marginTop: "6px",
-  minHeight: "44px",
-  borderRadius: "999px",
-  background: "transparent",
-};
-const ghostTextStyle: CSSProperties = {
-  fontSize: "var(--ui-type-list-subtitle)",
-  color: "var(--v5-ink-3)",
 };
 const qrBoxStyle: CSSProperties = {
   width: "160px",
@@ -872,38 +849,11 @@ const bankFigStyle: CSSProperties = {
   color: "var(--v5-ink)",
   whiteSpace: "nowrap",
 };
-const memoBoxStyle: CSSProperties = {
-  marginTop: "10px",
-  padding: "12px",
-  gap: "8px",
-  borderRadius: "12px",
-  background: "var(--v5-brand-soft)",
-};
-const memoCodeStyle: CSSProperties = {
-  marginTop: "2px",
-  fontSize: "20px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-  letterSpacing: "1px",
-  whiteSpace: "nowrap",
-};
-const memoCopyBtnStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 16px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-};
 const copyIconBtnStyle: CSSProperties = {
   width: "44px",
   height: "44px",
   margin: "-10px -6px -10px 0", // 44 热区不撑 9px 行距(负 margin 同 fx-rate-line 手法)
   borderRadius: "10px",
-};
-const stepNumStyle: CSSProperties = {
-  width: "22px",
-  height: "22px",
-  borderRadius: "50%",
-  background: "var(--v5-brand-soft)",
 };
 const warnRowStyle: CSSProperties = {
   marginTop: "8px",
@@ -994,7 +944,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-fact__v { display: block; margin-top: 2px; color: var(--v5-ink); font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-bank-fact__u { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
-.nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .nx-bank-hint > svg, .nx-bank-hint > .nx-native-svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
 /* Hosted payment: countdown ring on the glass slab, order summary card. */
 /* Order/credited stages open right under the header (switch and rate line hidden); 15px clears its collapsing 12px margin as on the board. */
@@ -1011,7 +961,22 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-ring__t { color: var(--v5-ink); font: 500 32px/38px var(--font-metric); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .nx-bank-cd { display: block; margin-top: 16px; color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
 .nx-bank-cd__time { color: var(--v5-ink); font-family: var(--font-metric); font-weight: 500; font-variant-numeric: tabular-nums; }
-.nx-bank-pay__rejected { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--v5-ink-2); font: 400 var(--ui-type-list-subtitle)/1.55 var(--font-v5); }
+/* Manual order (10.1 roles): countdown in 辅助说明; the amount to transfer at the 10.2 待付金额 size (page-title role) in
+   Montserrat 500 (01.2: amounts never 600); the credit and scan lines in 辅助数值. */
+.nx-bank-manual__cd { display: block; color: var(--v5-ink-3); text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); font-variant-numeric: tabular-nums; }
+.nx-bank-manual__amt { display: block; margin-top: 8px; color: var(--v5-ink); text-align: center; font: 500 var(--ui-type-page-title)/var(--ui-type-page-title-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-manual__line { display: block; margin-top: 4px; color: var(--v5-ink-3); text-align: center; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-bank-manual__line--scan { margin-top: 8px; }
+/* Memo block: a 12px brand-soft info block; label in 辅助数值, the code in the 卡内主数值 role in the mono face (01.2), the
+   shared brand glass S copy button beside it. */
+.nx-bank-memo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--v5-brand-soft); }
+.nx-bank-memo__k { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-bank-memo__code { display: block; margin-top: 2px; color: var(--v5-brand); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-metric); white-space: nowrap; }
+.nx-bank-copy-memo-cta { flex: none; }
+/* Transfer steps (04 §4.7 numbered item): 24px brand-soft index in 辅助说明 at 500, step text in 说明正文 with body ink. */
+.nx-bank-step { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; }
+.nx-bank-step__n { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 var(--ui-type-description)/1 var(--font-v5); font-variant-numeric: tabular-nums; }
+.nx-bank-step__t { flex: 1; min-width: 0; color: var(--v5-ink-2); font: var(--ui-type-guide-body-weight) var(--ui-type-guide-body)/var(--ui-type-guide-body-lh) var(--font-v5); overflow-wrap: break-word; }
 .nx-bank-sum { margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); overflow: hidden; }
 .nx-bank-sum__r { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; }
 .nx-bank-sum__r + .nx-bank-sum__r { border-top: 1px solid var(--v5-border); }
