@@ -77,9 +77,7 @@
 
         <!-- Step 2: OTP -->
         <view v-else-if="step === 2" class="lg-col">
-          <view class="lg-otp">
-            <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :cursor-spacing="keyboardSpacing.otp" :aria-label="fmt(t.login.otpDigitLabel, { n: i + 1 })" :focus="focusIdx === i" :value="d" :confirm-type="i === 5 ? 'done' : 'next'" @input="onCode(i, $event)" @confirm="i === 5 && onPrimary()" />
-          </view>
+          <OtpCodeInput class="lg-otp" :model-value="code.join('')" :label="t.authOtp.codeInputLabel" :focus="codeFocus" :cursor-spacing="keyboardSpacing.otp" @update:model-value="onCode" @confirm="onPrimary" />
           <view v-if="developmentOtpEnabled" class="lg-development-otp" data-testid="development-otp-code" role="status">
             <text class="lg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
           </view>
@@ -162,6 +160,7 @@ import BrandLockup from "@/components/brand-lockup.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
+import OtpCodeInput from "@/components/otp-code-input.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
@@ -224,7 +223,7 @@ const password = ref("");
 const newPassword = ref("");
 const confirmPwd = ref("");
 const code = ref<string[]>(["", "", "", "", "", ""]);
-const focusIdx = ref(0);
+const codeFocus = ref(true);
 const showPwd = ref(false);
 const error = ref<string | null>(null);
 /**
@@ -413,7 +412,7 @@ const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryRea
   inputs: {
     phone: { selector: ".lg-phone__in", seed: 243 },
     password: { selector: "#lg-password", seed: 149 },
-    otp: { selector: ".lg-otp__in", seed: 120 },
+    otp: { selector: ".lg-otp", seed: 120 },
     newPassword: { selector: "#lg-new-password", seed: 161 },
     confirmPassword: { selector: "#lg-confirm-password", seed: 93 },
     retryPassword: { selector: "#lg-retry-password", seed: 172 },
@@ -528,14 +527,15 @@ function onPhoneConfirm() {
 function onPwd(e: Event) { password.value = inputVal(e); error.value = null; }
 function onNewPwd(e: Event) { newPassword.value = inputVal(e); error.value = null; }
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
-function onCode(i: number, e: Event) {
-  const digits = inputVal(e).replace(/\D/g, "");
-  const next = [...code.value];
-  next[i] = digits.slice(-1) || "";
-  code.value = next;
+function onCode(value: string) {
+  code.value = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
   error.value = null;
-  if (next[i] && i < 5) focusIdx.value = i + 1;
-  if (next.every(Boolean)) verifyCode();
+  if (codeOk.value) verifyCode();
+}
+// Puts the keyboard back on the code field after the code is cleared.
+function focusCode() {
+  codeFocus.value = false;
+  void nextTick(() => { codeFocus.value = true; });
 }
 function pickCountry(c: string) {
   if (!isSelectablePhoneDialCode(c)) return;
@@ -687,7 +687,7 @@ async function requestCode(captchaTicket?: string) {
       otpRequestId.value = res.challengeNo;
       otpVerifyToken.value = null;
       code.value = ["", "", "", "", "", ""];
-      focusIdx.value = 0;
+      focusCode();
       step.value = 2;
       startResend(res.resendAfterSec);
     } catch (cause) {
@@ -715,7 +715,7 @@ async function requestCode(captchaTicket?: string) {
     otpRequestId.value = res.requestId;
     otpVerifyToken.value = null;
     code.value = ["", "", "", "", "", ""];
-    focusIdx.value = 0;
+    focusCode();
     step.value = 2;
     startResend(res.resendAfterSec);
     return;
@@ -811,7 +811,7 @@ async function signInWithPassword(captchaTicket?: string) {
     if (result.kind === "challenge") {
       remoteTwoFactorChallenge.value = result.challengeNo;
       code.value = ["", "", "", "", "", ""];
-      focusIdx.value = 0;
+      focusCode();
       loading.value = false;
       step.value = 2;
       return;
@@ -960,7 +960,7 @@ async function verifyCode() {
     } else if (res.error === "otp_attempts_exceeded") {
       error.value = t.value.authOtp.errorOtpExhausted;
       code.value = ["", "", "", "", "", ""];
-      focusIdx.value = 0;
+      focusCode();
     } else {
       error.value = t.value.authOtp.errorOtpNotFound;
     }
@@ -1057,7 +1057,7 @@ function back() {
     code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
     step.value = 2; return;
   }
-  code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0; focusIdx.value = 0;
+  code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0; focusCode();
   step.value = 1;
 }
 function close() {
@@ -1122,11 +1122,8 @@ onUnmounted(() => cleanup());
 .lg-eye { min-width: 44px; min-height: 44px; margin-right: -10px; display: flex; align-items: center; justify-content: center; }
 .lg-forgot-row { display: flex; justify-content: flex-end; }
 .lg-forgot { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
-.lg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .lg-development-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
 .lg-development-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
-.lg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
-.lg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
 .lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: var(--ui-type-list-subtitle); }
 .lg-resend__change { color: var(--v5-ink-3); }
 .lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
