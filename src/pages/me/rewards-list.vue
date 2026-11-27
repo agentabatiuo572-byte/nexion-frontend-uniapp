@@ -295,7 +295,7 @@ function stubLabel(v: VoucherDef): string {
   return v.type === "fixed" ? t.value.rewards.stubFixed : t.value.rewards.stubPercent;
 }
 function scopeText(v: VoucherDef): string {
-  return voucherScopeText(v, t.value.voucher, locale.code);
+  return voucherScopeText(v, t.value.voucher);
 }
 function expiryText(v: VoucherDef): string {
   return v.endAt === 0 ? t.value.rewards.noExpiry : fmt(t.value.rewards.validUntil, { date: formatDate(v.endAt) });

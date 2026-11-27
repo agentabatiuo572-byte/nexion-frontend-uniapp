@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': targetClosed(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -71,9 +71,13 @@
             </svg>
             <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: missionLayout ? 'var(--v5-ink-3)' : task.color }">{{ task.order }}</text>
           </view>
-          <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-            <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
-            <text :style="catStyle(task)">{{ task.cat }}</text>
+          <view style="min-width: 0">
+            <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
+              <text :class="targetClosed(task) ? 'newcomer-task__label--wrap' : 'truncate'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text :style="catStyle(task)">{{ task.cat }}</text>
+            </view>
+            <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
+            <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -139,6 +143,7 @@ import { selectHomeQuestRows } from "./home-quest-source";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
 import { dayOneQuestDisplayName } from "@/lib/quest-presentation";
 import { questActionRouteUnavailable } from "@/composables/use-quest-target-availability";
+import { productCatalogState } from "@/store/product-catalog";
 import { dayOneObservationRecovery } from "@/lib/day-one-observation-recovery";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { useApp } from "@/store/app";
@@ -308,6 +313,12 @@ function isActionable(task: QuestTask) {
   return task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
 }
 
+// Only a pending row whose target the read catalog confirms closed; while the catalog is unread the row stays quiet.
+function targetClosed(task: QuestTask) {
+  return task.eligible && !dayOneExpired.value && !isDone(task) && productCatalogState.status === "ready"
+    && questActionRouteUnavailable(task.href);
+}
+
 function onRowTap(task: QuestTask) {
   if (!isActionable(task)) return;
   navTo(task.href);
@@ -362,7 +373,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : targetClosed(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
@@ -421,6 +432,9 @@ const toggleStyle: CSSProperties = {
 
 <style scoped>
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
+.newcomer-task__reason { display: block; margin-top: 2px; overflow-wrap: break-word; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.newcomer-task__label--wrap { min-width: 0; overflow-wrap: break-word; }
+.newcomer-task__circle--closed { opacity: .5; }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
 .newcomer-task__observation-item { margin-top: var(--v5-space-2); }
 .newcomer-task__observation-actions { display: flex; flex-wrap: wrap; gap: var(--v5-space-2); }

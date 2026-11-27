@@ -1,13 +1,13 @@
 import { isSingleSkuVoucher, type VoucherDef, type VoucherSurface } from "@/mock/vouchers";
 import { fmt } from "@/i18n/format";
 import type { Messages } from "@/i18n/messages/en";
-import { landingCopy } from "@/i18n/promotion-landing";
 import { productDisplayName } from "./product-display-name";
 
-export function voucherScopeText(voucher: VoucherDef, copy: Messages["voucher"], language: string): string {
+export function voucherScopeText(voucher: VoucherDef, copy: Messages["voucher"]): string {
   if (!isSingleSkuVoucher(voucher)) return copy.scopeAll;
-  const name = productDisplayName(voucher.applicableSkus[0], landingCopy(language).deviceFallback);
-  return fmt(copy.scopeSingle, { name });
+  // Without a name the scope stays a single product, said as one sentence (no product number, no stand-in noun).
+  const name = productDisplayName(voucher.applicableSkus[0], "");
+  return name ? fmt(copy.scopeSingle, { name }) : copy.scopeSingleUnnamed;
 }
 
 /** H7's empty surface list allows every supported claim entry. */
