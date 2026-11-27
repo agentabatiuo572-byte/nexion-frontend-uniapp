@@ -21,7 +21,7 @@
           </view>
           <view v-if="!claimState.empty" class="newcomer-task__reward">
             <text class="newcomer-task__reward-value">{{ rewardText }}</text>
-            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">UVT</text>
+            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">{{ "\u00A0" }}UVT</text>
           </view>
         </view>
         <view v-if="!claimState.empty && !questUnavailable && (!remoteApiEnabled || dayOneWindow)" class="newcomer-task__clock" style="text-align: right; flex-shrink: 0">
@@ -563,7 +563,8 @@ const toggleStyle: CSSProperties = {
 
 
 .newcomer-task--mission .newcomer-task__count { display:inline-flex; align-items:center; height:24px; min-width:38px; box-sizing:border-box; justify-content:center; padding:0 8px; }
-.newcomer-task--mission .newcomer-task__reward { gap:6px; margin-top:17.5px; }
+/* The no-break space before UVT (03 §3.6.1) carries ~3px of the approved 6px gap. */
+.newcomer-task--mission .newcomer-task__reward { gap:3px; margin-top:17.5px; }
 .newcomer-task--mission .newcomer-task__unit { margin-left:0!important; }
 /* The countdown stays in the row, so it keeps its real width (countdown or the expired label) and the title and task count
    wrap beside it; it is centred on the title's first line, 12px down. */
