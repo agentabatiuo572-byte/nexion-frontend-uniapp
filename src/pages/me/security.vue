@@ -1762,7 +1762,7 @@ const dangerLabelStyle: CSSProperties = {
 
 <style scoped>
 .security-providers { margin-top:18px; margin-bottom:var(--v5-space-6); }
-.security-providers :deep(.oauth-title) { font:600 17px/24px var(--font-v5); margin:0 4px 12px; color:var(--v5-ink); }
+.security-providers :deep(.oauth-title) { font:var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); margin:0 4px 12px; color:var(--v5-ink); }
 .security-providers :deep(.auth-provider) { position:relative; height:88px; min-height:88px; border-radius:18px; background:var(--v5-surface); gap:6px; }
 .security-providers :deep(.auth-provider--linked) { box-shadow:none; }
 :global([data-theme="light"] .security-providers .auth-provider--linked) { box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--v5-success) 55%,transparent); }

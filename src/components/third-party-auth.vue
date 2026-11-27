@@ -4,7 +4,8 @@
     <text v-if="intent === 'LINK' && providers?.length === 0" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
     <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || providersDisabled" :preserve-appearance="providersDisabled && !flow && !submitting && !unavailableReason" :unavailable-reason="unavailableReason" @select="start" />
     <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
-      <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
+      <!-- Host pages point their greyed CTA here while the panel is open (03 §3.1: the panel already says what is under way). -->
+      <text id="oauth-panel-copy" class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
       <!-- The security sheet is not a short sign-in flow, so the field keeps a visible label (03 §3.3). -->
       <text v-if="verified && intent === 'LINK'" class="oauth-label">{{ t.security.currentPassword }}</text>
@@ -17,7 +18,11 @@
       </view>
       <!-- 03 §3.1: confirm is the primary L action, cancel is neutral glass L; busy shows NxButton's spinner. -->
       <NxButton v-if="verified" class="oauth-action" variant="primary" :label="confirmLabel" :busy="submitting"
-        :disabled="completionDisabled" @click="complete()" />
+        :disabled="completionDisabled" :aria-describedby="completionReason && !submitting ? 'oauth-confirm-reason' : undefined" @click="complete()" />
+      <!-- 03 §3.1: a greyed confirm names what is missing on the line below it. The line keeps its height once the field is
+           filled, hidden from view and from screen readers, so 取消 does not jump. -->
+      <text v-if="verified && (intent === 'LINK' || challengeNo)" id="oauth-confirm-reason" class="oauth-reason"
+        :class="{ 'oauth-reason--off': !completionReason || submitting }" :aria-hidden="!completionReason || submitting ? 'true' : undefined">{{ completionReason }}</text>
       <NxButton class="oauth-action" variant="secondary" :label="t.ui.cancel" :disabled="submitting" @click="cancelFromUser" />
     </component>
     <!-- The host page owns recovery of an unknown sign-in result. -->
@@ -89,6 +94,8 @@ const submitting = ref(false);
 const confirmLabel = computed(() => props.intent === "LINK" ? t.value.thirdParty.confirmLink : t.value.thirdParty.continueLogin);
 const completionDisabled = computed(() => submitting.value || (props.intent === "LINK" && !password.value)
   || (!!challengeNo.value && !/^\d{6}$/.test(code.value)));
+const completionReason = computed(() => props.intent === "LINK" && !password.value ? t.value.security.twoFactorPasswordRequired
+  : !!challengeNo.value && !/^\d{6}$/.test(code.value) ? t.value.login.errorInvalidCode : "");
 const showCaptcha = ref(false);
 const names = { GOOGLE: "Google", APPLE: "Apple", TELEGRAM: "Telegram" } as const;
 const label = (provider: ThirdPartyProvider) => names[provider];
@@ -296,7 +303,7 @@ onUnmounted(() => {
 
 <style scoped>
 .third-party-auth { margin: var(--v5-space-5) 0; color: var(--v5-ink); }
-.oauth-title { display: block; font-size: var(--ui-type-subheading); font-weight: var(--ui-type-subheading-weight); margin-bottom: var(--v5-space-3); }
+.oauth-title { display: block; font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); margin-bottom: var(--v5-space-3); }
 /* Card and sheet descriptions use the description role (10 §10.1); the sheet body is dialog body copy. */
 .oauth-copy { display: block; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); margin: var(--v5-space-2) 0; overflow-wrap: break-word; }
 .oauth-panel-sheet .oauth-copy { font: var(--ui-type-body-weight) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5); color: var(--v5-ink-2); }
@@ -309,7 +316,9 @@ onUnmounted(() => {
 .oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px 12px; border-radius: var(--ui-radius-icon); color: var(--v5-ink); background: var(--v5-surface-3); font: var(--ui-type-input-weight) var(--ui-type-input)/var(--ui-type-input-lh) var(--font-v5); margin: var(--v5-space-3) 0; }
 .oauth-label + .oauth-input { margin-top: 4px; }
 .oauth-action { display: flex; width: 100%; margin-top: var(--v5-space-3); }
-.oauth-action + .oauth-action { margin-top: var(--v5-space-2); }
+.oauth-action + .oauth-action, .oauth-reason + .oauth-action { margin-top: var(--v5-space-2); }
+.oauth-reason { display: block; min-height: var(--ui-type-description-lh); margin-top: var(--v5-space-2); text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.oauth-reason--off { visibility: hidden; }
 </style>
 
 <style scoped>

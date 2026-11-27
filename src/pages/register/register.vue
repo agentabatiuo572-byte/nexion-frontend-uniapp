@@ -125,15 +125,16 @@
       </view>
       <!-- Primary CTA -->
       <!-- Incomplete fields still allow a tap to show their reason. A missing challenge or an unresolved result
-           disables the CTA. Busy shows NxButton's spinner and takes no taps. -->
+           disables the CTA. Busy shows NxButton's spinner and takes no taps. While the third-party panel is open the CTA
+           is disabled, not busy: the panel's confirm is the only primary in view (03 §3.1). -->
       <NxButton
         class="rg-cta"
-        :class="{ 'rg-cta--off': !ctaEnabled && !busy }"
+        :class="{ 'rg-cta--off': !ctaEnabled && !ctaBusy }"
         data-system-chrome-primary
         variant="primary"
         :label="ctaLabel"
-        :busy="busy"
-        :disabled="registrationResultPending || otpChallengeMissing"
+        :busy="ctaBusy"
+        :disabled="registrationResultPending || otpChallengeMissing || oauthBusy"
         :aria-disabled="!ctaEnabled || busy"
         :aria-describedby="ctaDescriptionId"
         @click="onCta"
@@ -348,6 +349,8 @@ const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.val
 const oauthBusy = ref(false);
 const formBusy = computed(() => verifying.value || completing.value || oauthBusy.value || checkingInvite.value);
 const busy = computed(() => formBusy.value || registrationInFlight.value);
+// The CTA spins only for this page's own work; an open third-party panel still blocks it through busy.
+const ctaBusy = computed(() => busy.value && !oauthBusy.value);
 // The durable attempt is pending even while its original POST is in flight.
 const registrationResultPending = ref(false);
 function syncRegistrationResult() {
@@ -389,6 +392,7 @@ const ctaDisabledReason = computed(() => {
 });
 const inlineError = computed(() => error.value === blockingStatusReason.value ? null : error.value);
 const ctaDescriptionId = computed(() => {
+  if (oauthBusy.value) return "oauth-panel-copy";
   if (ctaEnabled.value || busy.value) return undefined;
   if (blockingStatusReason.value) return "rg-status-reason";
   return inlineError.value ? "rg-error" : "rg-cta-reason";
