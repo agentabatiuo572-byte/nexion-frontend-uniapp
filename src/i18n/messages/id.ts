@@ -2815,6 +2815,7 @@ export const id: Messages = {
     trackFailedBody: "Penarikan belum selesai. Hubungi layanan pelanggan.",
     trackEtaPending: "Perkiraan selesai dalam {n} jam",
     trackExpectedAt: "Perkiraan waktu proses: {time}",
+    trackExpectedArrivalDate: "Dana diperkirakan masuk pada {date}",
     trackEtaTitlePending: "Diproses",
     trackArrivedAt: "Diterima {time}",
     trackContactSupport: "Hubungi CS",

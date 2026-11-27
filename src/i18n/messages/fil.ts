@@ -2815,6 +2815,7 @@ export const fil: Messages = {
     trackFailedBody: "Hindi natapos ang withdrawal. Makipag-ugnayan sa support.",
     trackEtaPending: "Inaasahan sa loob ng {n} oras",
     trackExpectedAt: "Tinatayang oras ng proseso: {time}",
+    trackExpectedArrivalDate: "Inaasahang matatanggap ang pondo sa {date}",
     trackEtaTitlePending: "Pinoproseso",
     trackArrivedAt: "Dumating {time}",
     trackContactSupport: "Kontakin ang support",

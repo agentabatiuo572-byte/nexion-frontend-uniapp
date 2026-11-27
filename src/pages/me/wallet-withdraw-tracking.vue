@@ -117,15 +117,17 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { businessWallClock } from "@/lib/business-calendar";
 import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
-import { formatDisplayDateTime } from "@/lib/display-date";
+import { displayTimestamp, formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { formatWalletCalendarDay } from "@/lib/wallet-bill-date";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import { apiRuntimeConfig, remoteApiEnabled, sessionVault, withdrawalApi } from "@/api/runtime";
 import { toCanonicalWithdrawal, type WithdrawalDetailSnapshot, type WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
-import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
+import { PLATFORM_UTC_OFFSET_HOURS, platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
 import EmptyState from "@/components/empty-state.vue";
 import AppChassis from "@/components/app-chassis.vue";
@@ -509,14 +511,23 @@ const etaSub = computed(() => {
     if (current.complianceReviewRequired) return t.value.walletV3.complianceReviewRequired;
     return t.value.wallet.withdrawRouteHeldSub;
   }
-  // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
-  if (isTerminalDone.value && wd.value) {
-    const at = wd.value.confirmedAt;
+  const current = wd.value;
+  if (!current) return t.value.wallet.trackReviewNote;
+  if (isTerminalDone.value) {
+    const at = current.confirmedAt;
     return typeof at === "number" && Number.isFinite(at)
       ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.confirmed;
   }
-  const at = wd.value?.estimatedCompletion;
-  return Number.isFinite(at) ? fmt(t.value.wallet.trackExpectedAt, { time: absTime(at as number) }) : t.value.wallet.trackReviewNote;
+  const submittedAt = displayTimestamp(current.displaySubmittedAt === undefined ? current.submittedAt : current.displaySubmittedAt);
+  if (submittedAt === null) return t.value.wallet.trackReviewNote;
+  const holdUntil = displayTimestamp(current.reviewHoldUntil);
+  const startAt = Math.max(submittedAt, holdUntil ?? submittedAt);
+  // Payout dates use the same Vietnam day boundary as the daily withdrawal limit.
+  const date = businessWallClock(PLATFORM_UTC_OFFSET_HOURS * 60, startAt);
+  const weekday = date.getUTCDay();
+  const daysUntilPayout = weekday >= 5 ? 8 - weekday : 1;
+  date.setUTCDate(date.getUTCDate() + daysUntilPayout);
+  return fmt(t.value.wallet.trackExpectedAt, { time: formatWalletCalendarDay(date, dateLocale()) });
 });
 
 /** 按界面语言显示包含年份的本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */
