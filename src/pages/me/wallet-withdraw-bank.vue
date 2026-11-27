@@ -166,7 +166,8 @@
         <template v-else-if="formStep === 'account'">
           <!-- Grey 「继续提现」: its reason above both buttons (03 §3.1 bottom bar), as on the amount step. -->
           <text v-if="continueReason" class="nx-tray-note" role="status" data-testid="bank-continue-reason">{{ continueReason }}</text>
-          <NxButton variant="secondary" :label="displayConfig.beneficiary ? c.changeAccount : c.addAccount" :disabled="navigationLocked" @click="manageBank" />
+          <!-- Unbound: 添加收款账户 is the page's one action, so it is the primary (04 §4.0 floating button). -->
+          <NxButton :variant="displayConfig.beneficiary ? 'secondary' : 'primary'" :label="displayConfig.beneficiary ? c.changeAccount : c.addAccount" :disabled="navigationLocked" @click="manageBank" />
           <NxButton v-if="displayConfig.beneficiary" variant="primary" :label="c.continueWithdrawal" data-testid="bank-continue" :disabled="busy || !canContinue" @click="continueWithdrawal" />
         </template>
         <template v-else>
