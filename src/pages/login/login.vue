@@ -672,6 +672,10 @@ function finishVerifiedOtpSignIn(verifyToken: string, context: OtpFlowContext) {
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
   if (step.value === 1 && refreshResend() > 0) {
+    if (!otpRequestId.value) {
+      toast.info(fmt(t.value.authOtp.errorTooFrequent, { s: resendLeft.value }));
+      return;
+    }
     focusCode();
     step.value = 2;
     return;
@@ -1005,7 +1009,13 @@ async function finishReset() {
     loading.value = false;
     const message = cause instanceof ApiError ? cause.message : "";
     const invalidOtp = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID";
-    if (invalidOtp) clearSmsChallenge();
+    if (invalidOtp) {
+      clearSmsChallenge();
+      code.value = ["", "", "", "", "", ""];
+      refreshResend();
+      step.value = 2;
+      focusCode();
+    }
     error.value = invalidOtp
       ? t.value.authOtp.errorOtpInvalidOrExpired
       : message === "USER_NEW_PASSWORD_MUST_DIFFER"
@@ -1051,10 +1061,15 @@ function goReset() {
   step.value = 1;
   mode.value = "reset";
 }
-function back() {
-  if (step.value === 2 && remoteTwoFactorChallenge.value && !authApi.pendingLogin()) {
+function cancelOwnedPasswordChallenge() {
+  if (!remoteTwoFactorChallenge.value) return;
+  const attempt = authApi.pendingLoginContext();
+  if (attempt && !attempt.pending && attempt.context.challengeNo === remoteTwoFactorChallenge.value) {
     authApi.cancelLoginChallenge();
   }
+}
+function back() {
+  cancelOwnedPasswordChallenge();
   const preserveSmsChallenge = mode.value !== "password" && step.value > 1;
   invalidateOtpFlow(preserveSmsChallenge);
   error.value = null;
@@ -1084,6 +1099,7 @@ function goRegister() {
 }
 
 function cleanup() {
+  cancelOwnedPasswordChallenge();
   mounted = false;
   invalidateOtpFlow();
 }
