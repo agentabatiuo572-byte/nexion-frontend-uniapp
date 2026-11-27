@@ -174,7 +174,7 @@ export type OrderCreateCommand =
 
 export interface OrderApi {
   list(beforeOrderNo?: string | null, pageSize?: number): Promise<CanonicalOrderList>;
-  create(request: CreateOrderRequest): Promise<CreatedOrder>;
+  create(request: CreateOrderRequest & { expectedAmountUsdt: string }): Promise<CreatedOrder>;
   createCommand(idempotencyKey: string): Promise<OrderCreateCommand>;
   cancel(orderNo: string, idempotencyKey: string): Promise<CancelledOrder>;
   hide(orderNo: string, idempotencyKey: string): Promise<void>;
@@ -572,6 +572,7 @@ export function createOrderApi(client: ApiClient, mode: ApiEnvironment = "prod")
           productNo,
           quantity: request.quantity,
           voucherId: request.voucherId ?? null,
+          expectedAmountUsdt: request.expectedAmountUsdt,
         },
       }));
     },
