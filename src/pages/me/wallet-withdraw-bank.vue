@@ -264,7 +264,9 @@ const order = ref<BankOrder | null>(null);
 const busy = ref(false);
 const silentRead = ref(false);
 const readingConfig = ref(false);
-const navigationLocked = computed(() => busy.value && !readingConfig.value);
+// Any config read, cold or warm, leaves the page free to navigate (03 §3.4, §3.5.2); writes (quote, submit, abandon) lock it.
+const configReadInFlight = ref(false);
+const navigationLocked = computed(() => busy.value && !readingConfig.value && !configReadInFlight.value);
 const error = ref("");
 const configPresentation = ref<{ owner: string; epoch: number; value: BankConfig } | null>(null);
 const displayConfig = computed(() => {
@@ -417,7 +419,7 @@ async function run(action: (current: () => boolean) => Promise<void>, quietRead 
       report(err);
     }
   } finally {
-    if (current()) { readingConfig.value = false; busy.value = false; silentRead.value = false; }
+    if (current()) { readingConfig.value = false; configReadInFlight.value = false; busy.value = false; silentRead.value = false; }
   }
 }
 function load() { return loadConfig(false); }
@@ -430,6 +432,7 @@ async function loadConfig(recoverConfig: boolean) {
     const pending = storedPending === displayedQuote?.quoteNo ? null : storedPending;
     const warmRead = !readingReceipt && !pending && config.value !== null;
     readingConfig.value = !readingReceipt && !pending && (warmRead || recoverConfig);
+    configReadInFlight.value = true;
     if (!readingConfig.value) config.value = null;
     if (!displayedQuote || pending) accepted.value = false;
     if (readingReceipt) {
@@ -667,7 +670,7 @@ function startNew() {
 }
 function clearScope() {
   pendingQuoteNo.value = null; capacityRefusalQuoteNo = null; orderReadGeneration++;
-  revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingConfig.value = false; error.value = ""; uncertain.value = false;
+  revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingConfig.value = false; configReadInFlight.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }
 function invalidate() {
