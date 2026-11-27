@@ -206,12 +206,13 @@
 
     <!-- ── 成功(credited)── -->
     <template v-else-if="paneView === 'credited' && intent">
-      <!-- Credited (P-44): medal with a one-time ring, the credited amount, then a details card; actions sit in the bottom bar. -->
-      <view class="nx-bank-done nx-step-in" role="status">
-        <view class="nx-bank-done__medal"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5" /></svg></view>
-        <text class="nx-bank-done__title">{{ t.bankPane.successTitle }}</text>
-        <text class="nx-bank-done__amt">+{{ formatTruncatedAmount(creditedUsdt).replace(/\.\d*$/, "") }}<text class="nx-bank-done__dec">{{ formatTruncatedAmount(creditedUsdt).replace(/^[^.]*/, "") }}</text><text class="nx-bank-done__unit">{{ '\u00A0' }}USDT</text></text>
-        <text class="nx-bank-done__line">{{ fmt(t.bankPane.successLine, { rate: fmtVnd(intent.fxRate) }) }}</text>
+      <!-- Credited: the shared result head (03 §3.6.1: 56px success circle, its one-time pop), the credited amount and its line
+           in the head's slot, then a details card; actions sit in the bottom bar. -->
+      <view class="nx-bank-done nx-step-in">
+        <NxResultHead tone="success" :title="t.bankPane.successTitle">
+          <text class="nx-bank-done__amt">+{{ formatTruncatedAmount(creditedUsdt).replace(/\.\d*$/, "") }}<text class="nx-bank-done__dec">{{ formatTruncatedAmount(creditedUsdt).replace(/^[^.]*/, "") }}</text><text class="nx-bank-done__unit">{{ '\u00A0' }}USDT</text></text>
+          <text class="nx-bank-done__line">{{ fmt(t.bankPane.successLine, { rate: fmtVnd(intent.fxRate) }) }}</text>
+        </NxResultHead>
       </view>
       <view class="nx-bank-sum nx-bank-sum--done">
         <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.methodLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--text">{{ t.bankPane.segBank }}</text></view>
@@ -290,6 +291,7 @@ import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onShow, onHide, onUnload, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
+import NxResultHead from "@/components/ui/nx-result-head.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
@@ -1083,12 +1085,10 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-sum__v { min-width: 0; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .nx-bank-sum__v--big { font-family: var(--font-amount); font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
 .nx-bank-sum__v--text { font: 500 14px/20px var(--font-v5); }
-/* Credited: medal pops once and rings once; amount in the success ink. */
-.nx-bank-done { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -5px; padding: 28px 20px 8px; text-align: center; }
-.nx-bank-done::before { content: ""; position: absolute; left: 50%; top: 70px; width: 300px; height: 180px; margin-left: -150px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 20%, transparent), transparent); pointer-events: none; }
-.nx-bank-done__medal { position: relative; width: 88px; height: 88px; display: grid; place-items: center; border-radius: 50%; background: var(--v5-success-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-success) 35%, transparent); animation: nx-viz-pop 520ms cubic-bezier(.2,1.4,.4,1) 120ms both; }
-.nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
-.nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
+/* Credited: the shared result head over a soft success glow behind its title and amount (01 §1.1.2 page effects). */
+.nx-bank-done { position: relative; margin-top: -5px; padding: 20px 20px 8px; }
+.nx-bank-done::before { content: ""; position: absolute; left: 50%; top: 54px; width: 300px; height: 180px; margin-left: -150px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 20%, transparent), transparent); pointer-events: none; }
+.nx-bank-done > .nx-result-head { position: relative; }
 /* The credited amount is the result's main amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38) at 500 (01.2), in
    main ink; success colour is for status only (01 §1.1.1 rule 4). Decimals in secondary ink, unit max(12px, .4em), 500,
    secondary ink (01.2). Cut to two places, not rounded (06 §6.2). */
@@ -1098,6 +1098,5 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }
 .nx-bank-sum--done .nx-bank-sum__v { font: 500 14px/20px var(--font-v5); }
-@keyframes nx-bank-ring-out { 0% { opacity: .55; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
-@media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring__value { transition: none; } .nx-bank-done__medal, .nx-bank-done__medal::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring__value { transition: none; } }
 </style>
