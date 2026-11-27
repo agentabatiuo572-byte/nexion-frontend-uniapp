@@ -435,7 +435,7 @@ export const ru: Messages = {
   bankWithdrawal: {
     refreshLimits: "Обновить лимиты",
     recipientTitle: "Счёт получателя",
-    recipientSubtitle: "Счёт во Вьетнаме · в VND",
+    recipientSubtitle: "Банковский счёт · VND",
     continueWithdrawal: "Продолжить вывод",
     available: "Готов к зачислению",
     unbound: "Нет счёта получателя",

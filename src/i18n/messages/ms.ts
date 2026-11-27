@@ -435,7 +435,7 @@ export const ms: Messages = {
   bankWithdrawal: {
     refreshLimits: "Muat semula had",
     recipientTitle: "Akaun penerima",
-    recipientSubtitle: "Akaun bank Vietnam · Terima VND",
+    recipientSubtitle: "Akaun bank · VND",
     continueWithdrawal: "Teruskan pengeluaran",
     available: "Sedia untuk pengeluaran",
     unbound: "Tiada akaun penerima",

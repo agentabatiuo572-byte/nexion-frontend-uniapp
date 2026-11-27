@@ -97,7 +97,7 @@ export const en = {
   bankWithdrawal: {
     refreshLimits: "Refresh limits",
     recipientTitle: "Receiving account",
-    recipientSubtitle: "Vietnamese bank account · Receive VND",
+    recipientSubtitle: "Bank account · VND",
     continueWithdrawal: "Continue withdrawal",
     available: "Ready to receive",
     unbound: "No receiving account",

@@ -98,7 +98,7 @@ export const zh: Messages = {
   bankWithdrawal: {
     refreshLimits: "刷新额度",
     recipientTitle: "收款账户",
-    recipientSubtitle: "越南银行收款账户 · VND 到账",
+    recipientSubtitle: "银行账户 · VND",
     continueWithdrawal: "继续提现",
     available: "可用于提现",
     unbound: "未绑定收款账户",

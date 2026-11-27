@@ -435,7 +435,7 @@ export const fil: Messages = {
   bankWithdrawal: {
     refreshLimits: "I-refresh ang limit",
     recipientTitle: "Account na tatanggap",
-    recipientSubtitle: "Bangko sa Vietnam · VND",
+    recipientSubtitle: "Bank account · VND",
     continueWithdrawal: "Ituloy ang withdrawal",
     available: "Handang tumanggap",
     unbound: "Walang account na tatanggap",

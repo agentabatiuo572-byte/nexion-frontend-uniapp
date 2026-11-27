@@ -98,7 +98,7 @@ export const vi: Messages = {
   bankWithdrawal: {
     refreshLimits: "Cập nhật hạn mức",
     recipientTitle: "Tài khoản nhận",
-    recipientSubtitle: "Tài khoản ngân hàng Việt Nam · Nhận VND",
+    recipientSubtitle: "Tài khoản ngân hàng · VND",
     continueWithdrawal: "Tiếp tục rút tiền",
     available: "Có thể nhận tiền",
     unbound: "Chưa có tài khoản nhận",

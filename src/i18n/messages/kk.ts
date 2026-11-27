@@ -435,7 +435,7 @@ export const kk: Messages = {
   bankWithdrawal: {
     refreshLimits: "Лимиттерді жаңарту",
     recipientTitle: "Ақша түсетін шот",
-    recipientSubtitle: "Вьетнам банкіндегі шот · VND түрінде алу",
+    recipientSubtitle: "Банк шоты · VND",
     continueWithdrawal: "Шығаруды жалғастыру",
     available: "Шығаруға дайын",
     unbound: "Ақша түсетін шот жоқ",

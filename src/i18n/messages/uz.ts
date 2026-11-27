@@ -435,7 +435,7 @@ export const uz: Messages = {
   bankWithdrawal: {
     refreshLimits: "Limitlarni yangilash",
     recipientTitle: "Qabul qiluvchi hisob",
-    recipientSubtitle: "Vyetnam bank hisobi · VNDda qabul qilish",
+    recipientSubtitle: "Bank hisobi · VND",
     continueWithdrawal: "Yechishni davom ettirish",
     available: "Qabul qilishga tayyor",
     unbound: "Qabul qiluvchi hisob yoʻq",
