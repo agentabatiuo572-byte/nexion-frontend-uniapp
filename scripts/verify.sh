@@ -695,8 +695,15 @@ for (const dir of flowDirs) {
   };
   walk(root);
 }
-for (const file of pages) {
+function mountedShellSource(file) {
   const source = fs.readFileSync(file, "utf8");
+  if (!/<template>\s*<PhoneOnboardingFlow\b/.test(source)) return source;
+  const flow = source.match(/import PhoneOnboardingFlow from "@\/(components\/onboarding\/phone-onboarding-flow\.vue)"/);
+  if (!flow) throw new Error(`${file}: missing mounted PhoneOnboardingFlow import`);
+  return fs.readFileSync(path.join("src", flow[1]), "utf8");
+}
+for (const file of pages) {
+  const source = mountedShellSource(file);
   if (!/<StandalonePageShell\b/.test(source) || !/import StandalonePageShell from "@\/components\/device\/standalone-page-shell\.vue"/.test(source)) {
     throw new Error(`${file}: missing StandalonePageShell`);
   }
@@ -707,9 +714,14 @@ if (!/BOTTOM_SAFE_PADDING\s*=\s*"var\(--nx-overlay-safe-bottom\)"/.test(shell)) 
 if (!/paddingBottom:\s*props\.reserveBottom\s*\?\s*BOTTOM_SAFE_PADDING\s*:\s*"0px"/.test(shell)) throw new Error("standalone shell no longer applies its bottom safe-area baseline");
 const chassis = fs.readFileSync("src/components/app-chassis.vue", "utf8");
 if (!/<DeviceHomeIndicator\s*\/>/.test(chassis)) throw new Error("AppChassis no longer shares DeviceHomeIndicator");
-const estimator = fs.readFileSync("src/pages/onboarding/estimator.vue", "utf8");
-if (!/:top-inset="24"/.test(estimator) || !/\.est-cta\s*\{[\s\S]*?margin-right:\s*4px;[\s\S]*?margin-left:\s*4px;/.test(estimator)) {
-  throw new Error("estimator CTA no longer aligns to register-success 24px side inset");
+const onboarding = mountedShellSource("src/pages/onboarding/estimator.vue");
+const tokens = fs.readFileSync("src/styles/tokens.css", "utf8");
+if (!/<StandalonePageShell\b[^>]*:top-inset="4"[^>]*:reserve-bottom="false"/.test(onboarding)
+    || !/<view v-if="bar\.kind !== 'none'" class="ob-bar nx-glass-bar"[^>]*>[\s\S]*?data-system-chrome-primary/.test(onboarding)
+    || !/\.ob-bar\s*\{[^}]*position:\s*fixed\s*;/.test(onboarding)
+    || !/\.nx-glass-bar\s*\{[^}]*left:\s*12px\s*;[^}]*right:\s*12px\s*;[^}]*bottom:\s*var\(--nx-tray-bottom\)\s*;/.test(tokens)
+    || !/--nx-tray-bottom:\s*max\(22px, calc\(var\(--nx-nav-buttons, 0px\) \+ 8px\)\)/.test(tokens)) {
+  throw new Error("onboarding CTA no longer uses the shared fixed glass bar and its navigation-safe inset");
 }
 const success = fs.readFileSync("src/pages/register/success.vue", "utf8");
 if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*var\(--nx-overlay-safe-bottom\)\s*;/.test(success)) {

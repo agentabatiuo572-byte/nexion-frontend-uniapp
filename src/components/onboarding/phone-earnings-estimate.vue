@@ -64,14 +64,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance } from "vue";
+import { computed, getCurrentInstance, ref, watch } from "vue";
 import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
 import type { CountUpConfig } from "@/lib/count-up-view";
 import { useT } from "@/i18n/use-t";
 import { formatEstimate } from "@/lib/estimate-display";
+import { claimPhoneEarningsEntrance } from "@/lib/phone-earnings-entrance";
 import NxTag from "@/components/ui/nx-tag.vue";
 
-const props = defineProps<{ view: "loading" | "read-failed" | "detected"; calibration: OnboardingCalibration | null }>();
+const props = defineProps<{ view: "loading" | "read-failed" | "detected"; calibration: OnboardingCalibration | null; shown: boolean }>();
 const t = useT();
 const comparison = (key: string) => computed(() => props.calibration?.comparisonConfig.find((item) => item.key === key) ?? null);
 const phone = comparison("phone");
@@ -98,13 +99,25 @@ const compareRows = computed(() => {
   }));
 });
 
-const countHost = `onboarding-estimate-${getCurrentInstance()!.uid}`;
+const hostPrefix = `onboarding-estimate-${getCurrentInstance()!.uid}`;
+const countHost = ref(hostPrefix);
+const countEntrance = ref(false);
+let hostVersion = 0;
+watch(() => {
+  const result = props.calibration;
+  return props.shown && props.view === "detected" && phoneRate.value !== null && result
+    ? JSON.stringify([result.userId, result.deviceId, result.revision]) : null;
+}, (key) => {
+  if (key === null) return;
+  countEntrance.value = claimPhoneEarningsEntrance(key);
+  countHost.value = `${hostPrefix}-${++hostVersion}`;
+}, { immediate: true });
 const countConfig = computed<CountUpConfig>(() => ({
-  hostId: countHost,
+  hostId: countHost.value,
   kind: "estimate",
   follow: false,
   value: props.view === "detected" && phoneRate.value !== null ? Number(phoneUsdtLabel.value.replace(/,/g, "")) : null,
-  count: true,
+  count: countEntrance.value,
 }));
 </script>
 

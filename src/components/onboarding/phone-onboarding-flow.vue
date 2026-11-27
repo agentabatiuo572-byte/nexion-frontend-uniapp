@@ -88,7 +88,7 @@
       </template>
 
       <!-- Result states: NxResultHead is the only title; links sit under it. -->
-      <PhoneEarningsEstimate v-if="isEstimate && nativePhoneAvailable" v-show="estimateShown" :view="estimateView" :calibration="canonical" />
+      <PhoneEarningsEstimate v-if="isEstimate && nativePhoneAvailable" v-show="estimateShown" :view="estimateView" :calibration="canonical" :shown="estimateShown && pageVisible" />
       <view v-if="estimateShown && !(bar.kind === 'tray' && bar.note)" class="cn-rules cn-rules--estimate"><NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" /></view>
       <view v-if="!dialMode && !estimateShown" class="ob-rh">
         <NxResultHead :tone="head.tone" :icon="head.icon" :title="head.title" :description="head.body">
@@ -151,7 +151,7 @@ import { useSession } from "@/store/session";
 import { markAuthAccountOnboardingComplete } from "@/store/auth-account";
 import { getDeviceId } from "@/lib/device-id";
 import { collectDeviceSignals } from "@/lib/device-signals";
-import { beginPhoneCommand, createPhoneWriteReadback, finishPhoneCommand, readPhoneCommand, type PhoneCommand } from "@/lib/phone-onboarding-commands";
+import { beginPhoneCommand, confirmedPhoneWriteRejection, createPhoneWriteReadback, finishPhoneCommand, readPhoneCommand, type PhoneCommand } from "@/lib/phone-onboarding-commands";
 import { readCurrentPhoneActive, readReplacementSourceDevice } from "@/lib/phone-onboarding-authority";
 import { apiRuntimeConfig, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
 import { phoneRecoveryCredential } from "@/lib/phone-recovery-credential";
@@ -194,6 +194,8 @@ const isRecal = ref(props.entry === "connect" && props.options.mode === "recalib
 const isLogin = props.entry === "connect" && props.options.mode === "login";
 const loginCheckNeeded = ref(isLogin);
 let autoRecalibrate = props.entry === "estimator" && props.options.recalibrate === "1";
+// A failed preflight read must not turn a requested remeasurement into a read-only result.
+let recalibrationRequested = false;
 const standalone = computed(() => isRecal.value || isLogin);
 const isEstimate = computed(() => props.entry === "connect" && !standalone.value && props.options.mode !== "resume");
 const stepLabel = computed(() => isEstimate.value ? t.value.onboarding.step3of3 : t.value.onboarding.step2of3);
@@ -205,7 +207,9 @@ const failedAction = ref<FailedAction>("calibration");
 const failureCode = ref("");
 const activationOutcome = ref<"idle" | "preflight-unconfirmed" | "unconfirmed" | "active">("idle");
 const canDefer = computed(() => activationOutcome.value !== "unconfirmed" && activationOutcome.value !== "active"
-  && deferOutcome.value !== "unknown" && !deferSyncPending.value && !currentPhoneActive.value && canonical.value?.activationStatus !== "ACTIVE");
+  && deferOutcome.value !== "unknown" && !deferSyncPending.value && !currentPhoneActive.value && canonical.value?.activationStatus !== "ACTIVE"
+  && (phase.value !== "result" || iosPhone || inFlight.value === "defer"
+    || deferCalibrationRetry.value));
 
 // Every runtime mode receives final facts from the authenticated server. The
 // onboarding path intentionally has no local capability fallback, so mock,
@@ -244,6 +248,7 @@ watch(authenticatedAccountKey, (next, previous) => {
   accountEpoch += 1;
   requestGeneration += 1;
   autoRecalibrate = false;
+  recalibrationRequested = false;
   activationBusy.value = false;
   calibrationBusy.value = false;
   finishScanWait(false);
@@ -273,7 +278,7 @@ watch(authenticatedAccountKey, (next, previous) => {
 
 const iosPending = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION" && canonical.value.signals?.platform === "ios");
 function contactSupport() { if (!activationBusy.value) navTo("/pages/support/messages"); }
-const failureFeedback = computed(() => failedAction.value === "activate" || loginCheckNeeded.value
+const failureFeedback = computed(() => failedAction.value === "activate" || loginCheckNeeded.value || isRecal.value
   ? phoneActivationFeedback(failureCode.value) : undefined);
 const supportRequired = computed(() => activationOutcome.value === "idle" && failureFeedback.value?.action === "support");
 
@@ -388,7 +393,17 @@ async function openFlow() {
   }
 }
 
-async function startCalibration({ force = false, resend = false } = {}) {
+function beginCalibrationScan() {
+  readOnlyWait.value = false;
+  motionRun.value += 1;
+  scanState.value = { kind: "scan" };
+}
+
+async function startCalibration({ force = false, resend = false, preflight }: {
+  force?: boolean;
+  resend?: boolean;
+  preflight?: { current: OnboardingCalibration | null; active: boolean };
+} = {}) {
   if (isEstimate.value || !nativePhoneAvailable || !pageVisible.value || calibrationBusy.value || activationBusy.value
       || activationOutcome.value !== "idle" || deferOutcome.value === "unknown" || deferSyncPending.value) return;
   if (loginCheckNeeded.value) { void openFlow(); return; }
@@ -401,40 +416,41 @@ async function startCalibration({ force = false, resend = false } = {}) {
   resultReadRecovering.value = false;
   requestGeneration += 1;
   const options = calibrationOptions();
-  const remeasure = force || standalone.value || canonical.value?.activationStatus === "DEFERRED";
+  recalibrationRequested ||= force || isRecal.value || canonical.value?.activationStatus === "DEFERRED";
   try {
     if (!resend && restorePhoneWrite(options)) return;
     currentPhoneActive.value = false;
     canonical.value = null;
-    readOnlyWait.value = false;
+    readOnlyWait.value = isLogin && !recalibrationRequested && !resend;
     phase.value = "calibrating";
-    motionRun.value += 1;
-    scanState.value = { kind: "scan" };
+    if (!readOnlyWait.value) beginCalibrationScan();
     let current: OnboardingCalibration | null;
-    let active = false;
+    let active: boolean;
     try {
-      current = await calibrationFlow.read(options);
-      active = current ? await readCurrentPhoneActive(current) : false;
+      current = preflight ? preflight.current : await calibrationFlow.read(options);
+      active = preflight ? preflight.active : !!current && await readCurrentPhoneActive(current);
       if (!options.isCurrent()) return;
     } catch {
       if (!options.isCurrent()) return;
-      await waitForScanTurn(null);
+      if (!readOnlyWait.value) await waitForScanTurn(null);
       if (!options.isCurrent()) return;
       calibrationReadback.reset();
       readOnlyWait.value = true;
       if (!resend) resultReadRecovering.value = true;
       return;
     }
-    let result = resend ? calibrationFlow.reconcile(current) : current && (active || !remeasure) ? current : null;
+    let result = resend ? calibrationFlow.reconcile(current) : current && (active || !recalibrationRequested) ? current : null;
     if (!result) {
+      if (readOnlyWait.value) beginCalibrationScan();
       result = await calibrationFlow.write(options, current, resend);
       if (!options.isCurrent()) return;
       active = await readCurrentPhoneActive(result);
     }
     if (!options.isCurrent()) return;
     const target = isMatched(result) && result.activationStatus !== "DEFERRED" ? String(result.computeValue) : null;
-    const handoff = await waitForScanTurn(target);
+    const handoff = !readOnlyWait.value && await waitForScanTurn(target);
     if (!options.isCurrent()) return;
+    recalibrationRequested = false;
     calibrationWritePending.value = false;
     if (handoff && target !== null) startEntrance("scan", handoff);
     await acceptCalibration(result, options, active);
@@ -442,13 +458,14 @@ async function startCalibration({ force = false, resend = false } = {}) {
     if (!options.isCurrent()) return;
     if (scanState.value.kind !== "idle") await waitForScanTurn(null);
     if (!options.isCurrent()) return;
+    recalibrationRequested = false;
     if (calibrationFlow.hasPendingWrite()) {
       calibrationWritePending.value = true;
       readOnlyWait.value = true;
       return;
     }
     calibrationWritePending.value = false;
-    failureCode.value = cause instanceof Error ? cause.message : "";
+    failureCode.value = cause instanceof Error && confirmedPhoneWriteRejection(cause) ? cause.message : "";
     failedAction.value = "calibration";
     phase.value = "error";
   } finally {
@@ -469,7 +486,13 @@ async function recoverCalibration() {
     if (pending && !result) { calibrationReadback.observe(); return; }
     const active = result ? await readCurrentPhoneActive(result) : false;
     if (!options.isCurrent()) return;
-    if (result && (pending || active || !standalone.value)) {
+    if (!pending && recalibrationRequested && !active) {
+      calibrationReadback.reset();
+      await startCalibration({ preflight: { current, active } });
+      return;
+    }
+    recalibrationRequested = false;
+    if (result && (pending || active || !isRecal.value)) {
       await acceptCalibration(result, options, active);
     } else if (isEstimate.value) {
       goToCalibration();
@@ -542,6 +565,7 @@ const receiptNotFound = ref(false);
 const deferOutcome = ref<"rejected" | "unknown" | null>(null);
 const deferSyncPending = ref(false);
 const deferNeedsCalibration = ref(false);
+const deferCalibrationRetry = computed(() => deferOutcome.value === "rejected" && deferNeedsCalibration.value);
 let leaveAfterDeferral = false;
 
 const calibrationResendAvailable = computed(() => calibrationWritePending.value && calibrationReadback.resendAvailable.value);
@@ -644,7 +668,7 @@ const bar = computed<Bar>(() => {
     primary: main(o.calibrationStart, () => { void startCalibration({ force: true }); }),
     secondary: { label: t.value.ui.notFoundCta, run: goHome },
   };
-  if (deferOutcome.value === "rejected" && deferNeedsCalibration.value)
+  if (deferCalibrationRetry.value)
     return pair(main(o.iosRecalibrate, recalibrateNow));
   if (calibrationResendAvailable.value) return { kind: "tray", note: o.calibrationResendBody, primary: { label: o.calibrationResendAction, run: resendCalibration } };
   if (resultReadRecovering.value) return {
@@ -1153,7 +1177,7 @@ function resendDeferral() {
 
 async function deferPhoneActivation(resend = false) {
   if (!pageVisible.value || activationCompleted || !nativePhoneAvailable || !mounted || activationBusy.value
-      || (resend ? !deferResendAvailable.value : !canDefer.value || (phase.value === "result" && !iosPhone))) return;
+      || (resend ? !deferResendAvailable.value : !canDefer.value)) return;
   const current = deferOutcome.value === "rejected" ? null : canonical.value;
   if (isEstimate.value && hasCalibration.value) phase.value = "result";
   if (!resend) deferOutcome.value = null;
