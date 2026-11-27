@@ -172,7 +172,7 @@
         </template>
         <template v-else>
           <!-- Grey 「获取报价」: its reason above it (03 §3.1 bottom bar); the amount field no longer repeats it. -->
-          <text v-if="quoteReason" id="bank-quote-reason" class="nx-tray-note" role="status" data-testid="bank-quote-reason">{{ quoteNote }}</text>
+          <text v-if="quoteReason" id="bank-quote-reason" class="nx-tray-note" role="status" data-testid="bank-quote-reason">{{ quoteReason }}</text>
           <NxButton variant="primary" :label="c.quote" data-testid="bank-quote" :disabled="quoteDisabled" @click="getQuote" />
         </template>
       </view>
@@ -251,12 +251,14 @@ function refreshPendingAttempt() {
 watch([() => app.accountKey, () => app.accountBindingEpoch, remoteSessionReady], refreshPendingAttempt, { flush: "sync" });
 const api = createBankWithdrawalApi(apiClient);
 const config = ref<BankConfig | null>(null);
+const configRefreshFailed = ref(false);
+watch(config, () => { configRefreshFailed.value = false; }, { flush: "sync" });
 const quote = ref<BankQuote | null>(null);
 const order = ref<BankOrder | null>(null);
 const busy = ref(false);
 const silentRead = ref(false);
-const readingLimits = ref(false);
-const navigationLocked = computed(() => busy.value && !readingLimits.value);
+const readingConfig = ref(false);
+const navigationLocked = computed(() => busy.value && !readingConfig.value);
 const error = ref("");
 const configPresentation = ref<{ owner: string; epoch: number; value: BankConfig } | null>(null);
 const displayConfig = computed(() => {
@@ -286,29 +288,37 @@ const money = (value: number) => formatAmount(value);
 const usdt2 = (value: number) => formatTruncatedAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
-const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
+const canSubmit = computed(() => newWithdrawalAllowed.value && !configRefreshFailed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
   && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE"
   && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
 const displayIntents = computed(() => displayConfig.value?.unresolvedIntent?.state === "MULTIPLE" ? displayConfig.value.unresolvedIntent.intents : []);
+const configBlockReason = computed(() => {
+  const shown = displayConfig.value;
+  if (!shown) return "";
+  if (!shown.enabled) return c.value.unavailable;
+  if (shown.beneficiary && !bankBeneficiaryReady(shown.beneficiary)) return c.value.accountStatus[bankAccountNotice(shown.beneficiary)];
+  if (shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
+  if (shown.capacity?.dailyRemainingCount === 0) return `${c.value.dailyExhausted} ${displayDate(shown.capacity.dailyCountResetAt)}`;
+  if (shown.capacity && !shown.capacity.withdrawalEnabled) return c.value.unavailable;
+  return configRefreshFailed.value && shown.beneficiary ? c.value.capacityUnavailable : "";
+});
 // The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
 const cardTag = computed(() => {
   const shown = displayConfig.value, c0 = c.value;
   if (!shown?.enabled) return { tone: "warning", label: c0.tagUnavailable } as const;
   if (!shown.beneficiary) return { tone: "warning", label: c0.unbound } as const;
   if (!bankBeneficiaryReady(shown.beneficiary)) return { tone: "warning", label: bankAccountNotice(shown.beneficiary) === "unverified" ? c0.tagUnverified : c0.tagUnavailable } as const;
-  // Green only when a withdrawal can start: limits still being read count as not yet available, like the grey 继续提现.
-  if (!shown.policy || !shown.capacity || !shown.capacity.withdrawalEnabled) return { tone: "warning", label: c0.tagUnavailable } as const;
+  if (busy.value || configBlockReason.value) return { tone: "warning", label: c0.tagUnavailable } as const;
   return { tone: "success", label: c0.available } as const;
 });
-const accountStatus = computed(() => displayConfig.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(displayConfig.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
 const statusLabel = computed(() => c.value[outcome.value]);
 // Status map (DS 03 §3.8): paid = success, refunded = neutral, waiting / in transfer / under review = warning.
 const resultTone = computed(() => outcome.value === "paid" ? "success" : outcome.value === "refunded" ? "neutral" : "warning");
 const recipient = computed(() => order.value?.bank ?? quote.value ?? displayConfig.value?.beneficiary);
-const canContinue = computed(() => newWithdrawalAllowed.value && bankCanQuote(config.value) && !!config.value?.policy && !!config.value?.capacity && config.value.capacity.withdrawalEnabled);
+const canContinue = computed(() => newWithdrawalAllowed.value && bankCanQuote(config.value) && !configBlockReason.value);
 const amountProblem = computed(() => bankAmountError(amount.value, config.value));
 const quoteDisabled = computed(() => busy.value || !canContinue.value || !!amountProblem.value);
 const maxAmount = computed(() => bankMaximumAmount(config.value));
@@ -325,14 +335,6 @@ const quoteRatio = computed(() => {
 const secondsLeft = computed(() => Math.max(0, Math.ceil(((parseServerTimestamp(quote.value?.expiresAt) ?? 0) - now.value) / 1000)));
 const title = computed(() => quote.value ? c.value.confirmTitle : formStep.value === "amount" ? c.value.amountTitle : c.value.recipientTitle);
 const feeNote = computed(() => displayConfig.value?.policy ? format(c.value.feeNote, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
-const configBlockReason = computed(() => {
-  const shown = displayConfig.value;
-  if (!shown) return "";
-  if (!shown.enabled) return c.value.unavailable;
-  if (shown.beneficiary && !bankBeneficiaryReady(shown.beneficiary)) return accountStatus.value;
-  if (shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
-  return shown.capacity && !shown.capacity.withdrawalEnabled ? c.value.unavailable : "";
-});
 const quoteReason = computed(() => {
   if (!quoteDisabled.value) return "";
   if (configBlockReason.value) return configBlockReason.value;
@@ -341,10 +343,7 @@ const quoteReason = computed(() => {
   if (!problem || problem === "unavailable") return busy.value ? c.value.loading : "";
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
 });
-const continueReason = computed(() => busy.value && !silentRead.value ? "" : configBlockReason.value);
-// The tray says the daily limit once, with its reset time (03 §3.1); the page no longer repeats it in a notice.
-const quoteNote = computed(() => quoteReason.value === c.value.amountErrors.daily && displayConfig.value?.capacity
-  ? `${c.value.dailyExhausted} ${displayDate(displayConfig.value.capacity.dailyCountResetAt)}` : quoteReason.value);
+const continueReason = computed(() => configBlockReason.value || (busy.value && displayConfig.value?.beneficiary ? c.value.loading : ""));
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
 const rulesMode = ref<"read" | "submit" | null>(null);
@@ -402,21 +401,23 @@ async function run(action: (current: () => boolean) => Promise<void>, quietRead 
   const current = scope(); busy.value = true; silentRead.value = quietRead; error.value = "";
   try { await action(current); } catch (err) {
     if (current()) {
-      if (readingLimits.value) throw err;
+      if (readingConfig.value) throw err;
       report(err);
     }
   } finally {
-    if (current()) { readingLimits.value = false; busy.value = false; silentRead.value = false; }
+    if (current()) { readingConfig.value = false; busy.value = false; silentRead.value = false; }
   }
 }
 function load() { return loadConfig(false); }
-async function loadConfig(recoverLimits: boolean) {
+async function loadConfig(recoverConfig: boolean) {
   await run(async current => {
     const owner = app.accountKey, epoch = app.accountBindingEpoch;
     const readingReceipt = requestedOrder !== null || !!order.value;
     const pending = readingReceipt ? null : readPendingQuoteNo();
-    readingLimits.value = recoverLimits && !readingReceipt && !pending;
-    if (!readingLimits.value) { config.value = null; accepted.value = false; }
+    const warmRead = !readingReceipt && !pending && config.value !== null;
+    readingConfig.value = !readingReceipt && !pending && (warmRead || recoverConfig);
+    if (!readingConfig.value) config.value = null;
+    if (!recoverConfig || !readingConfig.value) accepted.value = false;
     if (readingReceipt) {
       const orderNo = requestedOrder ?? order.value!.withdrawalNo;
       if (!/^WD-[A-Z0-9]+$/.test(orderNo)) throw new Error("BANK_ORDER_ROUTE_INVALID");
@@ -430,9 +431,18 @@ async function loadConfig(recoverLimits: boolean) {
       applyRecovery(recovered, pending);
       if (recovered.state === "COMMITTED" || uncertain.value) return;
     }
-    const loaded = await api.config();
-    if (!current() || (readingLimits.value && !canReadVisibleBankPage())) return;
-    readingLimits.value = false;
+    let loaded: BankConfig;
+    try {
+      loaded = await api.config();
+    } catch (err) {
+      if (current() && warmRead) {
+        configRefreshFailed.value = true;
+        if (!recoverConfig) return;
+      }
+      throw err;
+    }
+    if (!current() || (recoverConfig && readingConfig.value && !canReadVisibleBankPage())) return;
+    readingConfig.value = false;
     config.value = loaded;
     configPresentation.value = { owner, epoch, value: loaded };
     if (loaded.unresolvedIntent?.state === "MULTIPLE") { quote.value = null; uncertain.value = true; return; }
@@ -511,11 +521,11 @@ useAutoRecovery({
   retry: pollOrder,
   repeatMs: 15_000,
 });
-// Limits (single limit, balance, daily count) that came back missing are re-read by the system, no button (03 §3.5.2).
+// Re-read missing limits and failed refreshes through the same recovery owner (03 §3.5.2).
 const limitsMissing = computed(() => !!config.value?.enabled && !!config.value.beneficiary && (!config.value.policy || !config.value.capacity));
-const canRereadLimits = () => limitsMissing.value && !order.value && !uncertain.value && !quote.value;
+const canRereadConfig = () => !order.value && !uncertain.value && (configRefreshFailed.value || (limitsMissing.value && !quote.value));
 useAutoRecovery({
-  failed: () => canReadVisibleBankPage() && canRereadLimits() && !busy.value,
+  failed: () => canReadVisibleBankPage() && canRereadConfig() && !busy.value,
   retry: () => loadConfig(true),
   repeatMs: 30_000,
 });
@@ -523,7 +533,7 @@ useAutoRecovery({
 watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenticated], ([isVisible, allowed, sessionReady, authenticated], [wasVisible]) => {
   if (!isVisible || !allowed || !sessionReady || !authenticated) return;
   // Orders and unknown results have one read owner; load() would reset consent.
-  if (order.value || uncertain.value || canRereadLimits()) return;
+  if (order.value || uncertain.value || canRereadConfig()) return;
   if (!wasVisible || (!config.value && !quote.value)) void load();
 });
 
@@ -635,7 +645,7 @@ function startNew() {
 }
 function clearScope() {
   pendingQuoteNo.value = null; orderReadGeneration++;
-  revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingLimits.value = false; error.value = ""; uncertain.value = false;
+  revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingConfig.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }
 function invalidate() {
