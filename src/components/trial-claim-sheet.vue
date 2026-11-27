@@ -232,7 +232,6 @@ async function onClaim() {
   if (claimDisabled.value || !sheet.open || activated.value) return;
   if (shownReason.value === 'capacity-full' || shownReason.value === 'converted') { goDevices(); return; }
   if (shownReason.value === 'in-progress' || shownReason.value === 'used') { goTrial(); return; }
-  // Lite has no setup step: a server setup refusal can only be resolved by support.
   const config = trialView.config.value;
   if (!config) return;
   const confirmedTerms = {
