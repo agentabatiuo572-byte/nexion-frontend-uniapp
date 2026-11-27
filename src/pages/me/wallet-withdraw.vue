@@ -1677,7 +1677,7 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 
 <style scoped>
 /* P-45 USDT withdrawal: balance card, amount on liquid glass, route card, recessed fee well, quota pips, fixed submit. */
-.wd-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.wd-k { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .wd-k--brand { color: var(--v5-brand); }
 /* USDT after the amount (06 §6.2, not a $ prefix): 01.2 unit, max(12px, .4em), 500, secondary ink. */
 .wd-unit { color: var(--v5-ink-3); font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; }
@@ -1733,11 +1733,11 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-fee > .wd-fee__r:first-child, .wd-fee > .wd-fee__offset:first-child > .wd-fee__r, .wd-fee__r--net { border-top: 0; }
 .wd-fee__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-fee__v--brand { color: var(--v5-brand); }
-.wd-fee__hint { display: block; margin: -4px 0 10px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-fee__hint { display: block; margin: -4px 0 10px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .wd-fee__net { color: var(--v5-ink); font: 500 22px/28px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-fee__msg, .wd-fee__sk { padding: 12px 0; }
 .wd-fee__sk { display: flex; flex-direction: column; gap: 8px; }
-.wd-warn { display: block; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
+.wd-warn { display: block; color: var(--v5-warning-ink); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .wd-quota { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; margin-top: 14px; padding: 0 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-quota__use { display: flex; align-items: center; gap: 8px; }
 /* The link keeps the row's right end; when it does not fit beside the quota line it moves whole to the next line, still right. */
@@ -1759,7 +1759,7 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
 .wd-bar-space { height: 120px; }
 .wd-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; }
-.wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: 500 15px/20px var(--font-v5); cursor: default; }
+.wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: default; }
 .wd-submit--on { cursor: pointer; }
 .wd-submit--on:active { transform: scale(.98); }
 @media (prefers-reduced-motion: reduce) { .wd-submit--on:active { transform: none; } }

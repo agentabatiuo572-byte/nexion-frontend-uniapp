@@ -94,18 +94,20 @@ const sheetBody1 = computed(() =>
 // P-44: muted 13/18 caption with the rate itself in the mono metric face; a bare info glyph in a 44px target.
 const capStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  lineHeight: "18px",
+  fontSize: "var(--ui-type-list-subtitle)",
+  lineHeight: "var(--ui-type-list-subtitle-lh)",
+  fontWeight: "var(--ui-type-list-subtitle-weight)" as CSSProperties["fontWeight"],
   color: "var(--v5-ink-3)",
 };
 // When the row is too narrow the lock note and info button move to their own line, so the button never leaves the screen.
 const tailStyle: CSSProperties = { flex: "1 0 auto", maxWidth: "100%", gap: "6px" };
 const lockStyle: CSSProperties = { ...capStyle, minWidth: "0" };
+// The rate in the 10.1 行内数值 role; the caption and lock note in 列表副说明.
 const valueStyle: CSSProperties = {
   fontFamily: "var(--font-metric)",
-  fontSize: "13px",
-  lineHeight: "18px",
-  fontWeight: 500,
+  fontSize: "var(--ui-type-inline-figure)",
+  lineHeight: "var(--ui-type-inline-figure-lh)",
+  fontWeight: "var(--ui-type-inline-figure-weight)" as CSSProperties["fontWeight"],
   color: "var(--v5-ink)",
 };
 const infoHitStyle: CSSProperties = {
