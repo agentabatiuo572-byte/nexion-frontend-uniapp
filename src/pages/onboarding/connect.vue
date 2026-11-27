@@ -1078,8 +1078,9 @@ function leaveConnect() {
   navReset({ url: "/pages/index/index", fail: () => {} });
   // #endif
   // #ifndef H5
-  // Returning to the estimator while the command is pending would immediately reopen this page.
-  const onboardingReturn = activationIntent ? "/pages/onboarding/intro" : "/pages/onboarding/estimator";
+  // Returning to the estimator while the command is pending would immediately reopen this page; home keeps the to-do
+  // that resumes the same command.
+  const onboardingReturn = activationIntent ? "/pages/index/index" : "/pages/onboarding/estimator";
   navReset({ url: isLogin.value ? "/pages/index/index" : isRecal.value ? "/pages/me/devices" : onboardingReturn, fail: () => {} });
   // #endif
 }
