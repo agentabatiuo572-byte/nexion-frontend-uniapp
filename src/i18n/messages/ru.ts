@@ -439,6 +439,8 @@ export const ru: Messages = {
     continueWithdrawal: "Продолжить вывод",
     available: "Готов к зачислению",
     unbound: "Нет счёта получателя",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Недоступен", tagUnverified: "На проверке",
     unboundNotice: "Чтобы продолжить вывод, добавьте банковский счёт на своё имя.",
     amountTitle: "Сумма вывода",
     amountHint: "Введите общую сумму USDT к списанию, включая комиссию за обмен.",

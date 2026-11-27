@@ -42,7 +42,7 @@
             <view class="bcard__top">
               <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
               <text class="bcard__nm">{{ c.recipientSubtitle }}</text>
-              <view class="bcard__tag" :class="{ warn: !displayConfig.enabled || !displayConfig.beneficiary?.canWithdraw }" data-testid="bank-account-status" role="status"><text>{{ !displayConfig.enabled ? c.unavailable : !displayConfig.beneficiary ? c.unbound : displayConfig.beneficiary.canWithdraw ? c.available : accountStatus }}</text></view>
+              <view class="bcard__tag" :class="{ warn: !displayConfig.enabled || !displayConfig.beneficiary?.canWithdraw }" data-testid="bank-account-status" role="status"><text>{{ !displayConfig.enabled ? c.tagUnavailable : !displayConfig.beneficiary ? c.unbound : displayConfig.beneficiary.canWithdraw ? c.available : bankAccountNotice(displayConfig.beneficiary) === "unverified" ? c.tagUnverified : c.tagUnavailable }}</text></view>
             </view>
             <view class="bcard__bot">
               <view><text class="vh">{{ c.recipientTitle }}</text><text class="bcard__lb">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="bcard__no">{{ recipient ? dots(recipient.maskedAccount) : "—" }}</text></view>

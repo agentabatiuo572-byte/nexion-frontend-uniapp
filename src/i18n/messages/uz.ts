@@ -439,6 +439,8 @@ export const uz: Messages = {
     continueWithdrawal: "Yechishni davom ettirish",
     available: "Qabul qilishga tayyor",
     unbound: "Qabul qiluvchi hisob yoʻq",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Mavjud emas", tagUnverified: "Tekshirilmoqda",
     unboundNotice: "Pul yechishni davom ettirishdan oldin oʻz nomingizdagi bank hisobini qoʻshing.",
     amountTitle: "Yechish summasi",
     amountHint: "Ayirboshlash haqi bilan birga yechiladigan umumiy USDT summasini kiriting.",

@@ -101,6 +101,8 @@ export const en = {
     continueWithdrawal: "Continue withdrawal",
     available: "Ready to receive",
     unbound: "No receiving account",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Unavailable", tagUnverified: "Verifying",
     unboundNotice: "Add a bank account in your own name before continuing the withdrawal.",
     amountTitle: "Withdrawal amount",
     amountHint: "Enter the total USDT to deduct, including the exchange fee.",

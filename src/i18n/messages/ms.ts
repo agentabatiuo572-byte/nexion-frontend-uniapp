@@ -439,6 +439,8 @@ export const ms: Messages = {
     continueWithdrawal: "Teruskan pengeluaran",
     available: "Sedia untuk pengeluaran",
     unbound: "Tiada akaun penerima",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu pengesahan",
     unboundNotice: "Tambah akaun bank atas nama anda sendiri sebelum meneruskan pengeluaran.",
     amountTitle: "Jumlah pengeluaran",
     amountHint: "Masukkan jumlah USDT untuk ditolak, termasuk caj pertukaran.",

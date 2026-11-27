@@ -102,6 +102,8 @@ export const vi: Messages = {
     continueWithdrawal: "Tiếp tục rút tiền",
     available: "Có thể nhận tiền",
     unbound: "Chưa có tài khoản nhận",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Tạm ngưng", tagUnverified: "Chờ xác minh",
     unboundNotice: "Vui lòng thêm tài khoản ngân hàng chính chủ trước khi tiếp tục rút tiền.",
     amountTitle: "Số tiền rút",
     amountHint: "Nhập tổng số USDT trừ khỏi số dư, đã gồm phí quy đổi.",

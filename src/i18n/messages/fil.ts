@@ -439,6 +439,8 @@ export const fil: Messages = {
     continueWithdrawal: "Ituloy ang withdrawal",
     available: "Handang tumanggap",
     unbound: "Walang account na tatanggap",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Hindi available", tagUnverified: "Bineberipika",
     unboundNotice: "Magdagdag ng account sa bangko na nakapangalan sa iyo bago ituloy ang withdrawal.",
     amountTitle: "Halaga ng withdrawal",
     amountHint: "Ilagay ang kabuuang USDT na ibabawas, kasama ang exchange fee.",

@@ -439,6 +439,8 @@ export const id: Messages = {
     continueWithdrawal: "Lanjutkan penarikan",
     available: "Siap untuk penarikan",
     unbound: "Belum ada rekening penerima",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu verifikasi",
     unboundNotice: "Tambahkan rekening bank atas nama Anda sendiri sebelum melanjutkan penarikan.",
     amountTitle: "Jumlah penarikan",
     amountHint: "Masukkan total USDT yang dipotong, termasuk biaya penukaran.",

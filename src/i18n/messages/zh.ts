@@ -102,6 +102,8 @@ export const zh: Messages = {
     continueWithdrawal: "继续提现",
     available: "可用于提现",
     unbound: "未绑定收款账户",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "暂不可用", tagUnverified: "待核实",
     unboundNotice: "请先添加本人银行收款账户，再继续提现。",
     amountTitle: "提现金额",
     amountHint: "输入本次从余额中扣除的总额（含换汇手续费）。",

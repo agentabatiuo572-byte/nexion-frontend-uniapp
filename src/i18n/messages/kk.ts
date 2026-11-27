@@ -439,6 +439,8 @@ export const kk: Messages = {
     continueWithdrawal: "Шығаруды жалғастыру",
     available: "Шығаруға дайын",
     unbound: "Ақша түсетін шот жоқ",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Қолжетімсіз", tagUnverified: "Тексерілуде",
     unboundNotice: "Ақша шығаруды жалғастыру үшін өз атыңыздағы банк шотын қосыңыз.",
     amountTitle: "Шығару сомасы",
     amountHint: "Айырбастау комиссиясын қоса шегерілетін жалпы USDT сомасын енгізіңіз.",
