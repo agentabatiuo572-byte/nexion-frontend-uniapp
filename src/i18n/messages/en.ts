@@ -2380,7 +2380,6 @@ rankBenefits: "View rank benefits",
     timeHoursAgo: "{n}h ago",
     timeDaysAgo: "{n}d ago",
 
-    minWithdrawNote: "Minimum withdrawal: ${n}.",
 
     withdrawalStatusSubtitle: "Withdrawal Status",
     noActiveWithdrawal: "No active withdrawal.",
@@ -4211,8 +4210,6 @@ timeHoursAgo: "{n}h ago",
     withdrawReviewNotice: "Withdrawals are reviewed after you submit. You can follow progress in your withdrawal history.",
     withdrawHoldNotice: "This one may take about {days} more day(s).",
     withdrawConfirmTitle: "Confirm withdrawal",
-    withdrawConfirmBody: "Withdraw ${amount}\u00A0USDT · Network confirmation fee −${fee} · You receive ${receive}",
-    withdrawConfirmBodyNex: "Withdraw ${amount}\u00A0USDT · Network confirmation fee −${fee} · UVT offset +${waived} ({nex}\u00A0UVT) · You receive ${receive}",
     withdrawConfirmCta: "Confirm",
 
     feeDetailPlaceholder: "Enter an amount to see the fee breakdown",

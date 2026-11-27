@@ -2342,7 +2342,6 @@ rankBenefits: "Xem quyền lợi cấp bậc",
     timeHoursAgo: "{n} giờ trước",
     timeDaysAgo: "{n} ngày trước",
 
-    minWithdrawNote: "Rút tối thiểu: ${n}.",
 
     withdrawalStatusSubtitle: "Trạng thái rút tiền",
     noActiveWithdrawal: "Không có lệnh rút nào đang xử lý.",
@@ -4130,8 +4129,6 @@ timeHoursAgo: "{n} giờ",
     withdrawReviewNotice: "Yêu cầu rút tiền cần được xét duyệt sau khi gửi; bạn có thể xem tiến độ trong lịch sử rút tiền.",
     withdrawHoldNotice: "Yêu cầu này dự kiến chờ thêm khoảng {days} ngày.",
     withdrawConfirmTitle: "Xác nhận rút tiền",
-    withdrawConfirmBody: "Rút ${amount}\u00A0USDT · Phí xác nhận mạng −${fee} · Bạn nhận được ${receive}",
-    withdrawConfirmBodyNex: "Rút ${amount}\u00A0USDT · Phí xác nhận mạng −${fee} · Bù bằng UVT +${waived} ({nex}\u00A0UVT) · Bạn nhận được ${receive}",
     withdrawConfirmCta: "Xác nhận",
 
     feeDetailPlaceholder: "Nhập số tiền để xem chi tiết phí",

@@ -2356,7 +2356,6 @@ rankBenefits: "查看等级权益",
     timeHoursAgo: "{n} 小时前",
     timeDaysAgo: "{n} 天前",
 
-    minWithdrawNote: "最低提现:${n}。",
 
     withdrawalStatusSubtitle: "提现状态",
     noActiveWithdrawal: "暂无进行中的提现。",
@@ -4144,8 +4143,6 @@ timeHoursAgo: "{n}小时前",
     withdrawReviewNotice: "提交后需要审核，可在提现记录查看进度。",
     withdrawHoldNotice: "这笔预计需多等约 {days} 天。",
     withdrawConfirmTitle: "确认提现",
-    withdrawConfirmBody: "提现 ${amount}\u00A0USDT · 网络确认费 −${fee} · 实际到账 ${receive}",
-    withdrawConfirmBodyNex: "提现 ${amount}\u00A0USDT · 网络确认费 −${fee} · UVT 抵扣 +${waived}(消耗 {nex}\u00A0UVT)· 实际到账 ${receive}",
     withdrawConfirmCta: "确认提现",
 
     feeDetailPlaceholder: "输入金额后显示费用明细",
