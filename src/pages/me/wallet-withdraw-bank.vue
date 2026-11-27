@@ -57,7 +57,8 @@
           <!-- Changing the account is offered before a quote exists; a live quote is left with "重新填写金额" first. -->
           <view v-if="!quote" class="acct__change nx-frosted-button" role="button" tabindex="0" :aria-disabled="busy" :aria-label="c.changeAccount" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.change }}</text></view>
         </view>
-        <view v-if="(displayConfig.beneficiary && !hasVerifiedBankIdentity(displayConfig.beneficiary)) || (quote && !hasVerifiedBankIdentity(quote))" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
+        <!-- On the account step this reason sits in the tray above 继续提现 (continueReason); the amount and quote steps keep the notice. -->
+        <view v-if="(formStep === 'amount' && displayConfig.beneficiary && !hasVerifiedBankIdentity(displayConfig.beneficiary)) || (quote && !hasVerifiedBankIdentity(quote))" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
 
         <template v-if="quote">
           <view class="stage">
@@ -319,12 +320,15 @@ const quoteReason = computed(() => {
   if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
 });
-// Why 「继续提现」 is grey on the account step, in the tray instead of a page notice: limits the system is re-reading, or a
-// closed channel (shown even before an account is bound, as the old notice was). Same read guard as quoteReason.
+// Why 「继续提现」 is grey on the account step, one reason in the tray instead of page notices, the first blocker first:
+// bank withdrawal closed, the account not usable (routing unverified or cannot withdraw), limits the system is re-reading,
+// then a closed channel. The closed states show even before an account is bound. Same read guard as quoteReason.
 const continueReason = computed(() => {
   const shown = displayConfig.value;
   if ((busy.value && !silentRead.value) || !shown) return "";
-  if (shown.enabled && shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
+  if (!shown.enabled) return c.value.unavailable;
+  if (shown.beneficiary && !bankBeneficiaryReady(shown.beneficiary)) return accountStatus.value;
+  if (shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
   return shown.capacity && !shown.capacity.withdrawalEnabled ? c.value.unavailable : "";
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
