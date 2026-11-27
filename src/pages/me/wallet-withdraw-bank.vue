@@ -64,7 +64,7 @@
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
               <text class="slab__amt">{{ usdt2(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
-              <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
+              <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
             </view>
           </view>
           <view class="ticket" :aria-label="c.quoteTitle">
@@ -113,7 +113,7 @@
                 <text class="slab__unit">USDT</text>
               </view>
               <view class="limits" v-if="displayConfig.policy && displayConfig.capacity">
-                <text><text data-testid="bank-balance">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text> · <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text></text>
+                <text><text data-testid="bank-balance">{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text> · <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text></text>
               </view>
               <text v-if="amountError" class="error-text" role="alert">{{ amountError }}</text>
             </view>
