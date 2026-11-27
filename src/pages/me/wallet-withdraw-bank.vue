@@ -877,7 +877,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .first-read__dot--head { width: 56px; height: 56px; }
 .first-read__bar--title { width: 36%; height: 24px; margin: 20px 0 4px; border-radius: 8px; }
 .first-read__bar--desc { width: 56%; margin: 8px 0 4px; }
-.first-read__bar--desc2 { width: 40%; margin: 6px 0 4px; }  /* the result description usually runs to two lines */
+.first-read__bar--desc2 { width: 40%; margin: 4px 0 4px; }  /* the result description usually runs to two lines */
 .first-read__bar--muted { width: 28%; margin: 4px 0; }
 .first-read__bar--money { width: 52%; height: 32px; margin: 17px 0 6px; border-radius: 8px; }
 .first-read__bar--account { width: 44%; height: 20px; margin: 11px 0; }
