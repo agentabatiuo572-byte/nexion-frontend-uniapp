@@ -301,7 +301,7 @@ const periodStyle: CSSProperties = {
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
+  fontSize: "var(--ui-type-meta)",
   color: "var(--v5-ink-3)",
 };
 const claimErrorStyle: CSSProperties = { ...categoryLabelStyle, color: "var(--v5-ink)" };

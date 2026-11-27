@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': hasUnavailableNavigation(task) }">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': !!rowReason(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -73,11 +73,11 @@
           </view>
           <view style="min-width: 0">
             <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-              <text :class="isActionable(task) ? 'truncate' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text class="newcomer-task__label--wrap" :style="labelStyle(task)">{{ task.label }}</text>
               <text class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
             </view>
-            <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
-            <text v-if="hasUnavailableNavigation(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
+            <!-- A pending row that cannot be opened says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
+            <text v-if="rowReason(task)" class="newcomer-task__reason">{{ rowReason(task) }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -322,8 +322,15 @@ function isActionable(task: QuestTask) {
   return canActOnTask(task) && taskNavigationState(task) === "available";
 }
 
-function hasUnavailableNavigation(task: QuestTask) {
-  return canActOnTask(task) && taskNavigationState(task) !== "available";
+// Why a pending row cannot be opened: its claim window has passed, its target is closed, or its route did not resolve.
+// A done row needs no reason.
+function rowReason(task: QuestTask): string {
+  if (isDone(task)) return "";
+  if (task.ineligibilityReason === "expired" || dayOneExpired.value) return t.value.questClaim.expired;
+  const navigation = taskNavigationState(task);
+  if (navigation === "missing-route") return t.value.home.dayOneTaskUnreachable;
+  if (navigation === "closed-target") return t.value.questClaim.definitionInactive;
+  return "";
 }
 
 function onRowTap(task: QuestTask) {
@@ -380,7 +387,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : hasUnavailableNavigation(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : rowReason(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };

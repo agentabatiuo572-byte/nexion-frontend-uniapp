@@ -39,11 +39,13 @@
             <text class="vcs-name">{{ v.name }}</text>
             <text class="vcs-scope">{{ scopeText(v) }}</text>
             <text class="vcs-expiry">{{ expiryText(v) }}</text>
+            <!-- The product is no longer in the catalog: the reason sits right above the greyed 「马上去使用」, which points to it (03 §3.1 禁用). -->
+            <text v-if="voucherTargetStatus(v) === 'unavailable'" :id="`vcs-target-${v.id}`" class="vcs-reason">{{ t.voucher.targetUnavailable }}</text>
             <!-- One control whose role follows the voucher (03 §3.1, 3.9; ticket-material voucher cards keep brand glass for 领取,
                  04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
                  text action with a trailing arrow into the next page. The same node stays, and the slot keeps the 44px row. -->
             <view class="vcs-cta">
-              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
@@ -301,6 +303,12 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);
   font-variant-numeric: tabular-nums;
   color: var(--v5-ink-3);
+}
+.vcs-reason {
+  margin-top: 2px;
+  font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);
+  color: var(--v5-ink-3);
+  overflow-wrap: break-word;
 }
 .vcs-cta {
   /* 主人 2026-08-16:CTA 落卡片右下角,与上方文字块拉开,不挤在一起 */
