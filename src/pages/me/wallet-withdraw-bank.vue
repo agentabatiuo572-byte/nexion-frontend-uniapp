@@ -267,6 +267,7 @@ const config = ref<BankConfig | null>(null);
 const configRefreshFailed = ref(false);
 watch(config, () => { configRefreshFailed.value = false; }, { flush: "sync" });
 const quote = ref<BankQuote | null>(null);
+const refusedQuoteNo = ref<string | null>(null);
 const order = ref<BankOrder | null>(null);
 const busy = ref(false);
 const silentRead = ref(false);
@@ -310,7 +311,15 @@ const money = (value: number) => formatAmount(value);
 const usdt2 = (value: number) => formatTruncatedAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
-const canSubmit = computed(() => newWithdrawalAllowed.value && !configBlockReason.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
+const quoteLimitsChanged = computed(() => {
+  const current = quote.value;
+  if (!current) return false;
+  if (refusedQuoteNo.value === current.quoteNo) return true;
+  const policy = config.value?.policy;
+  return !!policy && (current.amountUsdt < policy.minAmountUsd || current.amountUsdt > policy.maxAmountUsd
+    || (current.d7Version !== undefined && policy.version > current.d7Version));
+});
+const canSubmit = computed(() => newWithdrawalAllowed.value && !submitReason.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
   && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE"
   && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
@@ -331,7 +340,10 @@ const configBlockReason = computed(() => {
   if (shown.beneficiary && shown.capacity && quote.value && shown.capacity.maxWithdrawableUsdt < quote.value.amountUsdt) return c.value.amountErrors.balance;
   return "";
 });
-const submitReason = computed(() => quote.value && !quoteExpired.value ? configBlockReason.value : "");
+const submitReason = computed(() => {
+  if (!quote.value || quoteExpired.value) return "";
+  return quoteLimitsChanged.value ? c.value.quoteLimitsChanged : configBlockReason.value;
+});
 // The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
 const cardTag = computed(() => {
   const shown = displayConfig.value, c0 = c.value;
@@ -416,7 +428,7 @@ function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.valu
 function goBack() {
   if (navigationLocked.value) return;
   // The quote reference is saved, so leaving is safe; the result is read again on return.
-  if (uncertain.value) { navBack("/pages/me/wallet-withdraw-method"); return; }
+  if (uncertain.value || (quote.value && configReadInFlight.value)) { navBack("/pages/me/wallet-withdraw-method"); return; }
   if (quote.value) { void abandon(); return; }
   if (!order.value && formStep.value === "amount") { formStep.value = "account"; return; }
   navBack("/pages/me/wallet-withdraw-method");
@@ -629,7 +641,7 @@ async function submit() {
   if (!canSubmit.value || uncertain.value) return;
   await run(async current => {
     refreshPendingAttempt();
-    if (!newWithdrawalAllowed.value) return;
+    if (!canSubmit.value) return;
     const no = quote.value!.quoteNo;
     const pending = readPendingQuoteNo();
     if (pending && pending !== no) {
@@ -650,7 +662,14 @@ async function submit() {
       const value = await api.submit(no, `bank-submit:${no}`);
       if (current()) applyRecovery(value, no);
     } catch (cause) {
-      if (!current() || !isApiRefusal(cause, 409, "WITHDRAWAL_BALANCE_LIMIT_EXCEEDED",
+      if (!current()) throw cause;
+      if (isApiRefusal(cause, 409, "BANK_QUOTE_RECONFIRM_REQUIRED")) {
+        refusedQuoteNo.value = no;
+        if (readPendingQuoteNo() === no) uni.removeStorageSync(pendingKey());
+        accepted.value = false; uncertain.value = false; pendingQuoteNo.value = null;
+        return;
+      }
+      if (!isApiRefusal(cause, 409, "WITHDRAWAL_BALANCE_LIMIT_EXCEEDED",
         "WITHDRAWAL_RELEASE_BUCKET_INSUFFICIENT", "WITHDRAWAL_DAILY_LIMIT_EXCEEDED")) throw cause;
       capacityRefusalQuoteNo = no;
     }
@@ -694,7 +713,7 @@ function startNew() {
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }
 function clearScope() {
-  pendingQuoteNo.value = null; capacityRefusalQuoteNo = null; orderReadGeneration++;
+  pendingQuoteNo.value = null; refusedQuoteNo.value = null; capacityRefusalQuoteNo = null; orderReadGeneration++;
   revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingConfig.value = false; configReadInFlight.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }

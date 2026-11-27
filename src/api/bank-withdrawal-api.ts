@@ -38,6 +38,7 @@ export interface BankQuote {
   quoteNo: string; amountUsdt: number; feeUsdt: number; netUsdt: number; rateVnd: number;
   amountVnd: number; bankCode: string; bankName: string; maskedAccount: string; expiresAt: string;
   bankRoutingVerified?: boolean;
+  d7Version?: number;
 }
 export interface BankSettlementEvidence {
   status: "unconfirmed" | "paid" | "refunded" | "review_required"; evidenceRef: string | null;
@@ -139,7 +140,11 @@ export function parseBankQuote(value: unknown): BankQuote {
   const q: BankQuote = { quoteNo: text(r.quoteNo), amountUsdt: usdt(r.amountUsdt), feeUsdt: usdt(r.feeUsdt),
     netUsdt: usdt(r.netUsdt), rateVnd: number(r.rateVnd), amountVnd: number(r.amountVnd), bankCode: bankCode(r.bankCode),
     bankName: text(r.bankName), maskedAccount: text(r.maskedAccount), expiresAt: date(r.expiresAt),
-    bankRoutingVerified: r.bankRoutingVerified === true };
+    bankRoutingVerified: r.bankRoutingVerified === true, d7Version: optionalEvidence(() => {
+      const version = number(r.d7Version);
+      if (!Number.isSafeInteger(version)) throw invalid();
+      return version;
+    }) };
   if (!/^BQ-[a-f0-9]{32}$/.test(q.quoteNo) || q.amountUsdt <= 0 || q.netUsdt <= 0 || q.rateVnd <= 0
       || !Number.isSafeInteger(q.amountVnd) || q.amountVnd <= 0
       || Math.round(q.amountUsdt * 1e6) !== Math.round(q.feeUsdt * 1e6) + Math.round(q.netUsdt * 1e6)) throw invalid();
