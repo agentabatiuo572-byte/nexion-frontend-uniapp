@@ -103,12 +103,19 @@ const hostPrefix = `onboarding-estimate-${getCurrentInstance()!.uid}`;
 const countHost = ref(hostPrefix);
 const countEntrance = ref(false);
 let hostVersion = 0;
+let lastCountKey: string | null = null;
 watch(() => {
   const result = props.calibration;
   return props.shown && props.view === "detected" && phoneRate.value !== null && result
     ? JSON.stringify([result.userId, result.deviceId, result.revision]) : null;
 }, (key) => {
-  if (key === null) return;
+  if (key === null) {
+    // Stop on the same host so renderjs can restore the final amount.
+    countEntrance.value = false;
+    return;
+  }
+  if (key === lastCountKey) return;
+  lastCountKey = key;
   countEntrance.value = claimPhoneEarningsEntrance(key);
   countHost.value = `${hostPrefix}-${++hostVersion}`;
 }, { immediate: true });

@@ -278,7 +278,7 @@ watch(authenticatedAccountKey, (next, previous) => {
 
 const iosPending = computed(() => canonical.value?.calibrationStatus === "PENDING_VERIFICATION" && canonical.value.signals?.platform === "ios");
 function contactSupport() { if (!activationBusy.value) navTo("/pages/support/messages"); }
-const failureFeedback = computed(() => failedAction.value === "activate" || loginCheckNeeded.value || isRecal.value
+const failureFeedback = computed(() => failedAction.value === "activate" || isLogin || isRecal.value
   ? phoneActivationFeedback(failureCode.value) : undefined);
 const supportRequired = computed(() => activationOutcome.value === "idle" && failureFeedback.value?.action === "support");
 
