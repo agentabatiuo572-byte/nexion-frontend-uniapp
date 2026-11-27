@@ -138,7 +138,7 @@ export const en = {
     backToAmount: "Edit amount",
     backToWallet: "Back to wallet",
     orderNumber: "Withdrawal number",
-    amountErrors: {"format": "Enter an amount greater than zero with up to 6 decimal places.", "range": "Enter an amount within the displayed per-transaction limits.", "balance": "The amount exceeds your available withdrawal balance.", "daily": "Daily withdrawal count reached. Please try tomorrow.", "unavailable": "Withdrawal limits are unavailable. Please reload."},
+    amountErrors: {"format": "Enter an amount greater than zero with up to 6 decimal places.", "range": "Enter an amount within the displayed per-transaction limits.", "balance": "The amount exceeds your available withdrawal balance.", "daily": "Daily withdrawal count reached. Please try tomorrow.", "unavailable": "Withdrawal limits are unavailable."},
     resultNotes: {"review": "Your request was submitted and is awaiting processing.", "processing": "Waiting for the bank's result. This page updates once the money arrives — no need to withdraw again.", "held": "This page updates once the check is done. Please don't submit another withdrawal.", "paid": "Receipt by the bank has been confirmed.", "refunded": "The withdrawal amount has been returned to your wallet."},
     chooseMethod: "Choose withdrawal method", chooseMethodHint: "Select where to receive your withdrawal.",
     usdtMethodHint: "Send USDT to your wallet address", bankMethod: "Bank account", bankMethodHint: "Receive VND in your Vietnamese bank account",

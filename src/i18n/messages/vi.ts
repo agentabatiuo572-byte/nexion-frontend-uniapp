@@ -139,7 +139,7 @@ export const vi: Messages = {
     backToAmount: "Sửa số tiền",
     backToWallet: "Về ví",
     orderNumber: "Mã lệnh rút",
-    amountErrors: {"format": "Nhập số tiền lớn hơn 0, tối đa 6 chữ số thập phân.", "range": "Nhập số tiền trong hạn mức mỗi giao dịch được hiển thị.", "balance": "Số tiền vượt quá số dư có thể rút.", "daily": "Đã hết lượt rút hôm nay. Vui lòng thử lại ngày mai.", "unavailable": "Hạn mức rút chưa khả dụng. Vui lòng tải lại."},
+    amountErrors: {"format": "Nhập số tiền lớn hơn 0, tối đa 6 chữ số thập phân.", "range": "Nhập số tiền trong hạn mức mỗi giao dịch được hiển thị.", "balance": "Số tiền vượt quá số dư có thể rút.", "daily": "Đã hết lượt rút hôm nay. Vui lòng thử lại ngày mai.", "unavailable": "Hạn mức rút chưa khả dụng."},
     resultNotes: {"review": "Yêu cầu đã được gửi và đang chờ xử lý.", "processing": "Đang chờ ngân hàng xử lý. Trang này sẽ cập nhật khi tiền về tài khoản, bạn không cần rút lại.", "held": "Trang này sẽ cập nhật khi xác nhận xong. Vui lòng không gửi yêu cầu rút tiền khác.", "paid": "Đã xác nhận tiền đến ngân hàng.", "refunded": "Số tiền rút đã được hoàn về ví."},
     chooseMethod: "Chọn cách rút tiền", chooseMethodHint: "Chọn nơi nhận tiền rút.",
     usdtMethodHint: "Chuyển USDT đến địa chỉ ví", bankMethod: "Tài khoản ngân hàng", bankMethodHint: "Nhận VND vào tài khoản ngân hàng Việt Nam",

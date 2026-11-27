@@ -481,7 +481,7 @@ export const fil: Messages = {
       range: "Maglagay ng halagang pasok sa ipinapakitang limit bawat transaksyon.",
       balance: "Lampas ang halaga sa balanseng mawi-withdraw mo.",
       daily: "Ubos na ang puwedeng withdrawal ngayon. Subukan ulit bukas.",
-      unavailable: "Hindi available ang limit ng withdrawal. I-reload.",
+      unavailable: "Hindi available ang limit ng withdrawal.",
     },
     resultNotes: {
       review: "Naisumite ang request mo at hinihintay itong maproseso.",

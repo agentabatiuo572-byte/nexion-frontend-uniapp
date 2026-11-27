@@ -481,7 +481,7 @@ export const uz: Messages = {
       range: "Koʻrsatilgan bir martalik limitlar doirasidagi summani kiriting.",
       balance: "Summa yechish mumkin boʻlgan balansdan oshib ketdi.",
       daily: "Kunlik pul yechish limiti tugadi. Ertaga urinib koʻring.",
-      unavailable: "Pul yechish limitlarini yuklab boʻlmadi. Qayta yuklang.",
+      unavailable: "Pul yechish limitlarini yuklab boʻlmadi.",
     },
     resultNotes: {
       review: "Soʻrovingiz yuborildi va koʻrib chiqilishini kutmoqda.",

@@ -481,7 +481,7 @@ export const ms: Messages = {
       range: "Masukkan jumlah dalam had setiap transaksi yang dipaparkan.",
       balance: "Jumlah melebihi baki yang boleh dikeluarkan.",
       daily: "Had pengeluaran harian dicapai. Sila cuba esok.",
-      unavailable: "Had pengeluaran tidak tersedia. Sila muat semula.",
+      unavailable: "Had pengeluaran tidak tersedia.",
     },
     resultNotes: {
       review: "Permintaan anda telah dihantar dan menunggu pemprosesan.",

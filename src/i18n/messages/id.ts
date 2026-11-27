@@ -481,7 +481,7 @@ export const id: Messages = {
       range: "Masukkan jumlah dalam batas per transaksi yang ditampilkan.",
       balance: "Jumlah melebihi saldo yang dapat ditarik.",
       daily: "Jatah penarikan harian habis. Coba lagi besok.",
-      unavailable: "Batas penarikan tidak tersedia. Muat ulang.",
+      unavailable: "Batas penarikan tidak tersedia.",
     },
     resultNotes: {
       review: "Permintaan Anda sudah terkirim dan menunggu diproses.",

@@ -139,7 +139,7 @@ export const zh: Messages = {
     backToAmount: "重新填写金额",
     backToWallet: "返回钱包",
     orderNumber: "提现单号",
-    amountErrors: {"format": "请输入大于 0 的金额，最多 6 位小数。", "range": "金额超出当前单笔限额，请按显示范围填写。", "balance": "金额超过当前可提现余额。", "daily": "今日提现次数已用完，请在次日再试。", "unavailable": "提现额度暂不可用，请重新加载。"},
+    amountErrors: {"format": "请输入大于 0 的金额，最多 6 位小数。", "range": "金额超出当前单笔限额，请按显示范围填写。", "balance": "金额超过当前可提现余额。", "daily": "今日提现次数已用完，请在次日再试。", "unavailable": "提现额度暂不可用。"},
     resultNotes: {"review": "提现申请已提交，正在等待处理。", "processing": "等待银行处理结果，到账后这里会更新，无需重复提现。", "held": "核对完成后这里会更新，请勿重复提现。", "paid": "银行到账结果已确认。", "refunded": "本次提现金额已退回钱包。"},
     chooseMethod: "选择提现方式", chooseMethodHint: "请选择收款方式。",
     usdtMethodHint: "USDT 转入钱包地址", bankMethod: "银行卡", bankMethodHint: "VND 转入越南银行账户",
