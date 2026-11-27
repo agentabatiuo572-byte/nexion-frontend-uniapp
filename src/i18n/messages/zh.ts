@@ -362,6 +362,7 @@ export const zh: Messages = {
     errorTooFrequent: "操作过于频繁,{s} 秒后可重发",
     errorOtpInvalid: "验证码不正确,还可尝试 {n} 次",
     errorOtpExpired: "验证码已过期,请重新获取",
+    codeExpiredSubtitle: "上一条验证码已失效",
     errorOtpExhausted: "验证码已失效,请重新获取",
     errorOtpNotFound: "请先获取验证码",
     errorOtpSendUnavailable: "验证码暂未发送，请稍后重试。",

@@ -730,6 +730,7 @@ export const kk: Messages = {
     errorTooFrequent: "Тым жиі — {s} сек өткен соң қайталаңыз",
     errorOtpInvalid: "Код қате — қалған әрекет: {n}",
     errorOtpExpired: "Кодтың мерзімі өтті — жаңасын сұраңыз",
+    codeExpiredSubtitle: "Алдыңғы кодтың мерзімі өтті",
     errorOtpExhausted: "Код жарамсыз болды — жаңасын сұраңыз",
     errorOtpNotFound: "Алдымен растау кодын сұраңыз",
     errorOtpSendUnavailable: "Растау коды әлі жіберілмеді. Кейінірек қайталап көріңіз.",

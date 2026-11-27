@@ -36,6 +36,7 @@
       <text class="rg-subtitle">
         <!-- 奖励金额护栏(包 zm T1):配置未到位/被中毒清零时金额句整体让位,$0 永不上转化首屏 -->
         <template v-if="step === 1"><template v-if="newcomerSubtitle === 'amount'"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { reward: giftLabel }) }}</text>{{ t.register.subtitleRest }}</template><template v-else>{{ t.register.subtitleRewardDisabled }}</template></template>
+        <template v-else-if="step === 2 && otpChallengeMissing">{{ t.authOtp.codeExpiredSubtitle }}</template>
         <template v-else-if="step === 2">{{ t.register.codeSentTo }} <text class="rg-subtitle__ph">{{ country }} {{ phone }}</text></template>
         <template v-else>{{ t.register.setPasswordHint }}</template>
       </text>

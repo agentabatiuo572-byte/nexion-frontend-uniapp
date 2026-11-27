@@ -730,6 +730,7 @@ export const fil: Messages = {
     errorTooFrequent: "Masyadong madalas — subukan ulit sa {s}s",
     errorOtpInvalid: "Mali ang code — {n} subok na lang",
     errorOtpExpired: "Nag-expire ang code — humiling ng bago",
+    codeExpiredSubtitle: "Nag-expire na ang naunang code",
     errorOtpExhausted: "Hindi na valid ang code — humiling ng bago",
     errorOtpNotFound: "Humiling muna ng code sa pag-verify",
     errorOtpSendUnavailable: "Hindi pa naipadala ang code sa pag-verify. Subukan ulit mamaya.",

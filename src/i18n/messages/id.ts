@@ -730,6 +730,7 @@ export const id: Messages = {
     errorTooFrequent: "Terlalu sering — coba lagi dalam {s} dtk",
     errorOtpInvalid: "Kode salah — sisa {n} percobaan",
     errorOtpExpired: "Kode kedaluwarsa — minta kode baru",
+    codeExpiredSubtitle: "Kode sebelumnya sudah kedaluwarsa",
     errorOtpExhausted: "Kode tidak berlaku — minta kode baru",
     errorOtpNotFound: "Minta kode verifikasi terlebih dahulu",
     errorOtpSendUnavailable: "Kode verifikasi belum terkirim. Coba lagi nanti.",
