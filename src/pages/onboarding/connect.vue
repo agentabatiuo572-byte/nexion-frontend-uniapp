@@ -34,10 +34,11 @@
     <view class="ob-content" :class="{ 'cn-content--nav': standalone }" :style="{ paddingBottom: (dialMode ? dialClearance : barClearance) + 'px' }">
       <!-- One dial box for start, read-wait, scan and result (boards V1): position and size never change between them. -->
       <template v-if="dialMode">
-        <view class="cn-dialwrap" :style="{ minHeight: dialGeo.min + 'px' }">
+        <!-- @vue-ignore: uni supplies dialView in the WebView. -->
+        <view class="cn-dialwrap" :dial-motion="dialMotion" :change:dial-motion="dialView.update" :style="{ minHeight: dialGeo.min + 'px' }">
           <view class="cn-score" :class="['cn-score--' + dialMode, { 'cn-score--ready': dialReady, 'cn-score--anim': entering && dialReady, 'cn-score--from-scan': enterFrom === 'scan' }]"
             :role="dialMode === 'idle' ? undefined : 'img'" :aria-hidden="dialMode === 'idle'" :aria-label="dialMode === 'result' ? t.onboarding.resultTitle + ' ' + finalText + ' ' + t.onboarding.phoneComputeUnit : dialMode === 'scan' ? t.onboarding.detecting : undefined"
-            :style="{ width: dialSize + 'px', height: dialSize + 'px', '--cn-sweep-at': sweepAt + 'deg' }">
+            :style="{ width: dialSize + 'px', height: dialSize + 'px', '--cn-sweep-at': '0deg' }">
             <view class="cn-score__glow" aria-hidden="true" />
             <view class="cn-score__lens" aria-hidden="true" :style="{ width: dialGeo.inner * 2 + 'px', height: dialGeo.inner * 2 + 'px' }" />
             <view class="cn-score__svg" aria-hidden="true"><svg width="100%" height="100%" :viewBox="`0 0 ${dialSize} ${dialSize}`" focusable="false">
@@ -55,7 +56,7 @@
             <!-- Count while the entrance runs; under reduced motion the final value shows at once. -->
             <view v-if="dialMode === 'result'" class="cn-score__num" aria-hidden="true">
               <view class="cn-score__value" :style="{ fontSize: dialNumberSize + 'px' }">
-                <text class="cn-score__v cn-score__v--count">{{ shownScore }}</text>
+                <text class="cn-score__v cn-score__v--count">{{ entering ? zeroText : finalText }}</text>
                 <text class="cn-score__v cn-score__v--final">{{ finalText }}</text>
               </view>
               <text class="cn-score__u" :style="{ fontSize: dialUnitSize + 'px', lineHeight: dialGeo.unitLh + 'px' }">{{ t.onboarding.phoneComputeUnit }}</text>
@@ -139,6 +140,19 @@ import { useSession } from "@/store/session";
 import { markAuthAccountOnboardingComplete } from "@/store/auth-account";
 import { getDeviceId } from "@/lib/device-id";
 import { collectDeviceSignals } from "@/lib/device-signals";
+import { beginPhoneCommand, createPhoneWriteReadback, finishPhoneCommand, readPhoneCommand, type PhoneCommand } from "@/lib/phone-onboarding-commands";
+import { readCurrentPhoneActive, readReplacementSourceDevice } from "@/lib/phone-onboarding-authority";
+import { apiRuntimeConfig, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
+import { phoneRecoveryCredential } from "@/lib/phone-recovery-credential";
+import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
+import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
+import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { ApiError } from "@/api/errors";
+import { phoneActivationFeedback, confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
+import { confirmDeferredPhoneActivation, syncDeferredPhoneActivation } from "@/lib/defer-phone-activation";
+import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
 // #ifdef APP-PLUS
 import NativeGpuObserver from "@/components/native-gpu-observer.vue";
 import { createNativeGpuRequest } from "@/lib/native-gpu-request";
@@ -156,19 +170,6 @@ async function collectCalibrationSignals() {
   // #endif
   return collectDeviceSignals();
 }
-import { beginPhoneCommand, createPhoneWriteReadback, finishPhoneCommand, readPhoneCommand, type PhoneCommand } from "@/lib/phone-onboarding-commands";
-import { readCurrentPhoneActive, readReplacementSourceDevice } from "@/lib/phone-onboarding-authority";
-import { apiRuntimeConfig, onboardingCalibrationApi, remoteApiEnabled } from "@/api/runtime";
-import { phoneRecoveryCredential } from "@/lib/phone-recovery-credential";
-import type { OnboardingCalibration } from "@/api/onboarding-calibration-api";
-import { confirm as uiConfirm, toast, useUI } from "@/store/ui";
-import { calibrationBelongsTo, createPhoneCalibrationFlow } from "@/lib/phone-calibration-flow";
-import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
-import type { RemoteAccountRequest } from "@/lib/remote-account-epoch";
-import { ApiError } from "@/api/errors";
-import { phoneActivationFeedback, confirmedPhoneActivationRejection } from "@/lib/phone-activation-feedback";
-import { confirmDeferredPhoneActivation, syncDeferredPhoneActivation } from "@/lib/defer-phone-activation";
-import { isCurrentOnboardingCalibrationScope, type OnboardingCalibrationScope } from "@/lib/onboarding-calibration-scope";
 
 const t = useT();
 const auth = useAuth();
@@ -182,8 +183,6 @@ const resumeDeferred = ref(false);
 type Phase = "intro" | "calibrating" | "result" | "error";
 type FailedAction = "calibration" | "activate";
 const phase = ref<Phase>("intro");
-const shownScore = ref("0");
-let scoreTimer: ReturnType<typeof setInterval> | null = null;
 const failedAction = ref<FailedAction>("calibration");
 const failureCode = ref("");
 const activationOutcome = ref<"idle" | "preflight-unconfirmed" | "unconfirmed" | "active">("idle");
@@ -223,6 +222,7 @@ watch(authenticatedAccountKey, (next, previous) => {
   // account switch and must not invalidate an in-flight server calibration.
   if ((!previous || previous === "default") && next && next !== "default") return;
   activationBusy.value = false;
+  finishScanWait();
   accountEpoch += 1;
   requestGeneration += 1;
   useUI().clearConfirmsBy(confirmOwner);
@@ -373,11 +373,19 @@ async function startCalibration(resend = false) {
       return;
     }
     readOnlyWait.value = false;
-    const result = await calibrationFlow.write(options, current, resend);
-    if (options.isCurrent()) {
-      calibrationWritePending.value = false;
-      await acceptCalibration(result, options);
+    let result: OnboardingCalibration;
+    let active: boolean;
+    try {
+      result = await calibrationFlow.write(options, current, resend);
+      if (!options.isCurrent()) return;
+      active = await readCurrentPhoneActive(result);
+    } finally {
+      // Keep the scan, back guard and empty action bar until this turn ends, on success or failure.
+      if (options.isCurrent() && dialMode.value === "scan") await waitForScanTurn();
     }
+    if (!options.isCurrent()) return;
+    calibrationWritePending.value = false;
+    await acceptCalibration(result, options, active);
   } catch (cause) {
     if (!options.isCurrent()) return;
     if (calibrationFlow.hasPendingWrite()) {
@@ -651,45 +659,49 @@ watch([dialMode, () => bar.value.kind, () => t.value.onboarding.iosActivateLater
 // Entrance (board S0): from the read-wait dial or from the live scan into the result, once; transform and opacity only.
 const entering = ref(false);
 const enterFrom = ref<"read" | "scan" | null>(null);
-let enterTimer: ReturnType<typeof setTimeout> | null = null;
-// The scan sweep turns once per SWEEP_MS from the moment the scan dial shows; at the hand-off its angle is read from that
-// clock (the page script has no DOM in the App), so the sweep freezes and the tick conversion starts where its head is.
-const SWEEP_MS = 1600;
-let scanStartedAt = 0;
-const sweepAt = ref(38);
-watch(dialMode, (mode) => { if (mode === "scan") scanStartedAt = Date.now(); }, { flush: "post" });
-const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const zeroText = computed(() => (0).toFixed(finalText.value.split(".")[1]?.length ?? 0));
+const scanFinishing = ref(false);
+let resolveScan: (() => void) | null = null;
+function waitForScanTurn() {
+  scanFinishing.value = true;
+  return new Promise<void>(resolve => { resolveScan = resolve; });
+}
+function finishScanWait() {
+  scanFinishing.value = false;
+  resolveScan?.();
+  resolveScan = null;
+}
+const dialMotion = computed(() => {
+  if (dialMode.value === "scan") return scanFinishing.value ? "finish-scan" : "scan";
+  return entering.value ? "enter" : "idle";
+});
+function finishEntrance() {
+  entering.value = false;
+  enterFrom.value = null;
+}
 watch(phase, (next, previous) => {
-  if (enterTimer) clearTimeout(enterTimer);
-  enterTimer = null;
-  if (next === "result" && previous === "calibrating" && dialReady.value && !reducedMotion()) {
+  if (next === "result" && previous === "calibrating" && dialReady.value) {
     enterFrom.value = readOnlyWait.value ? "read" : "scan";
-    if (enterFrom.value === "scan") sweepAt.value = Math.round((Date.now() - scanStartedAt) % SWEEP_MS / SWEEP_MS * 360);
     entering.value = true;
-    enterTimer = setTimeout(() => { entering.value = false; enterFrom.value = null; }, 1400);
   } else {
-    entering.value = false;
-    enterFrom.value = null;
+    finishEntrance();
   }
 });
-// The count runs 100–1000ms with ease-out and the final value's decimals; the server value is the only figure shown at rest.
-watch([phase, finalScore, entering, dialReady], ([next, score, running, ready]) => {
-  if (scoreTimer) clearInterval(scoreTimer);
-  scoreTimer = null;
-  if (next !== "result") { shownScore.value = "0"; return; }
-  const target = Math.max(0, score), places = (String(target).split(".")[1] ?? "").length;
-  if (!running || !ready) { shownScore.value = String(target); return; }
-  const start = Date.now();
-  shownScore.value = (0).toFixed(places);
-  scoreTimer = setInterval(() => {
-    const progress = Math.max(0, Math.min(1, (Date.now() - start - 100) / 900));
-    shownScore.value = progress === 1 ? String(target) : (target * (1 - (1 - progress) ** 3)).toFixed(places);
-    if (progress === 1 && scoreTimer) { clearInterval(scoreTimer); scoreTimer = null; }
-  }, 30);
-}, { immediate: true });
-// The tick conversion runs clockwise from the tick under the sweep's head (the brightest segment ends 16° past the rotation).
-const scanHead = computed(() => Math.round((sweepAt.value + 16) / 5) % 72);
-function tickOrder(i: number) { return enterFrom.value === "scan" ? (i - scanHead.value + 72) % 72 : i; }
+
+// App-Plus resolves renderjs callMethod on the page proxy, outside script-setup bindings.
+defineOptions({ methods: {
+  onDialMotionEnd(this: { $: { exposed: { receiveDialMotionEnd(kind: string): void } | null } }, kind: string) {
+    this.$.exposed?.receiveDialMotionEnd(kind);
+  },
+} });
+defineExpose({ receiveDialMotionEnd(kind: string) {
+  if (kind === "finish-scan" && scanFinishing.value) finishScanWait();
+  if (kind === "enter" && entering.value) finishEntrance();
+} });
+
+// At the end of a whole turn the brightest sweep segment ends 16° past the top.
+const scanHead = Math.round(16 / 5);
+function tickOrder(i: number) { return enterFrom.value === "scan" ? (i - scanHead + 72) % 72 : i; }
 const policyLines = computed(() => [
   t.value.onboarding.policyLine1,
   t.value.onboarding.policyLine2,
@@ -1120,10 +1132,15 @@ onBackPress((event) => { if (!dialogHoldsBack(event)) leaveConnect(); return tru
 onUnmounted(() => {
   mounted = false;
   useUI().clearConfirmsBy(confirmOwner);
-  if (scoreTimer) clearInterval(scoreTimer);
-  if (enterTimer) clearTimeout(enterTimer);
+  finishScanWait();
   requestGeneration += 1;
 });
+</script>
+
+<script module="dialView" lang="renderjs">
+import { calibrationDialView } from "@/lib/calibration-dial-view";
+// @ts-expect-error vue-tsc 1.x treats the renderjs block as a second normal script.
+export default calibrationDialView;
 </script>
 
 <style scoped>
