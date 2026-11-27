@@ -4,10 +4,10 @@
       <!-- Top bar -->
       <view class="lg-top">
         <view v-if="!loginRecoveryPending && (step > 1 || mode === 'reset')" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
         <view v-else class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.close" @click="close" @keydown.enter.prevent="close" @keydown.space.prevent="close">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
         <view class="lg-brand">
           <BrandLockup :height="40" />
@@ -22,9 +22,7 @@
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
-      <view v-if="modeLabel" class="lg-mode-badge" data-testid="auth-runtime-label">
-        <text class="lg-mode-badge__t">{{ modeLabel }}</text>
-      </view>
+      <NxTag v-if="modeLabel" class="lg-mode-badge" tone="warning" data-testid="auth-runtime-label">{{ modeLabel }}</NxTag>
       <view v-if="sessionEndNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
         <text class="lg-recovery-notice__t">{{ sessionEndNotice }}</text>
       </view>
@@ -47,7 +45,7 @@
         <text v-if="retryNeedsPassword || retryNeedsCode" class="lg-sub">{{ t.login.retryOriginalHint }}</text>
         <input id="lg-retry-password" class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" :cursor-spacing="keyboardSpacing.retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
         <input id="lg-retry-code" class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" :cursor-spacing="keyboardSpacing.retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
-        <view class="lg-cta lg-recovery__action" :class="canRetryOriginal || loading ? 'lg-cta--on' : ''" role="button" :tabindex="canRetryOriginal ? 0 : -1" :aria-disabled="!canRetryOriginal" data-system-chrome-primary @click="retryOriginalLogin()" @keydown.enter.prevent="retryOriginalLogin()" @keydown.space.prevent="retryOriginalLogin()"><text class="lg-cta__t" :class="canRetryOriginal || loading ? 'lg-cta__t--on' : ''">{{ loading ? t.login.signingIn : t.login.retryOriginal }}</text></view>
+        <NxButton class="lg-cta lg-recovery__action" data-system-chrome-primary variant="primary" :label="t.login.retryOriginal" :busy="loading" :busy-label="t.login.signingIn" :disabled="!canRetryOriginal" @click="retryOriginalLogin()" />
         <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
       </view>
       <view v-if="!loginRecoveryPending" class="lg-body">
@@ -65,8 +63,8 @@
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
               <input id="lg-password" class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" :cursor-spacing="keyboardSpacing.password" :focus="passwordFocused" confirm-type="done" @input="onPwd" @blur="passwordFocused = false" @confirm="onPrimary" />
               <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
-                <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+                <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
               </view>
             </view>
             <view class="lg-forgot-row">
@@ -82,9 +80,9 @@
             <text class="lg-development-otp__t">{{ fmt(t.authOtp.developmentCodeHint, { code: developmentOtpCode }) }}</text>
           </view>
           <view class="lg-resend">
-            <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
+            <NxButton variant="text" size="small" :label="t.login.changeNumber" @click="back" />
             <text v-if="!remoteTwoFactorChallenge && resendLeft > 0" class="lg-resend__count">{{ resendInText }}</text>
-            <text v-else-if="!remoteTwoFactorChallenge" class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter.prevent="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
+            <NxButton v-else-if="!remoteTwoFactorChallenge" variant="text" size="small" :label="t.login.resend" @click="resend" />
           </view>
         </view>
 
@@ -93,8 +91,8 @@
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': newPassword && !newPwdOk }">
             <input id="lg-new-password" class="lg-field--flex" :cursor-spacing="keyboardSpacing.newPassword" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :aria-label="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" confirm-type="next" @input="onNewPwd" @confirm="focusResetConfirmation" />
             <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
-              <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
+              <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
           </view>
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': confirmPwd && newPassword !== confirmPwd }">
@@ -105,15 +103,14 @@
 
       <!-- Error -->
       <view v-if="error && !(loginRecoveryPending && error === t.login.unknownAttempt)" class="lg-error" role="alert" aria-live="assertive">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="lg-error__t">{{ error }}</text>
       </view>
 
       <!-- Primary CTA -->
-      <view v-if="!loginRecoveryPending" class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading && (phoneTouched || submitAttempted) ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
-        <text v-if="loading" class="lg-cta__t lg-cta__t--on">···</text>
-        <text v-else class="lg-cta__t" :class="canPrimary ? 'lg-cta__t--on' : ''">{{ primaryText }}</text>
-      </view>
+      <!-- A greyed CTA still takes the tap (onPrimary writes the reason into the error line): no `disabled` prop, only the
+           50% look and aria-disabled (03 §3.1). Busy shows NxButton's spinner and takes no taps. -->
+      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading && (phoneTouched || submitAttempted) ? 'lg-cta-reason' : undefined" @click="onPrimary" />
       <!-- 简报 #211:空白表单首次展示必须中性 —— 只在用户已与手机号字段交互或尝试提交后
            才给出禁用原因。此前它从首帧起就存在(空表单天然 canPrimary=false),而 sr-only
            的 clip 裁不住 uni-app 内部的 <span>,导致文本提取/自动化会读到用户从未触发的错误。 -->
@@ -161,6 +158,8 @@ import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import OtpCodeInput from "@/components/otp-code-input.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
@@ -410,13 +409,13 @@ const developmentOtpEnabled = computed(() =>
 const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
   root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta",
   inputs: {
-    phone: { selector: ".lg-phone__in", seed: 243 },
-    password: { selector: "#lg-password", seed: 149 },
-    otp: { selector: ".lg-otp", seed: 120 },
-    newPassword: { selector: "#lg-new-password", seed: 161 },
-    confirmPassword: { selector: "#lg-confirm-password", seed: 93 },
-    retryPassword: { selector: "#lg-retry-password", seed: 172 },
-    retryCode: { selector: "#lg-retry-code", seed: 104 },
+    phone: { selector: ".lg-phone__in", seed: 235 },
+    password: { selector: "#lg-password", seed: 141 },
+    otp: { selector: ".lg-otp", seed: 116 },
+    newPassword: { selector: "#lg-new-password", seed: 153 },
+    confirmPassword: { selector: "#lg-confirm-password", seed: 85 },
+    retryPassword: { selector: "#lg-retry-password", seed: 164 },
+    retryCode: { selector: "#lg-retry-code", seed: 96 },
   },
   layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
     error.value, phoneFormatMessage.value, developmentOtpEnabled.value],
@@ -1094,8 +1093,7 @@ onUnmounted(() => cleanup());
 .lg-dot--active { width: 32px; background: var(--v5-brand); }
 .lg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
-.lg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
-.lg-mode-badge__t { font-size: 12px; font-weight: 600; color: var(--v5-warning); }
+.lg-mode-badge { align-self: flex-start; margin-top: 8px; }
 .lg-recovery-notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 12%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 34%, transparent); }
 .lg-recovery__account { box-sizing: border-box; padding: 0 16px; font-size: var(--ui-type-input); color: var(--v5-ink); }
 .lg-recovery__input { box-sizing: border-box; height: 56px; padding: 0 16px; border-radius: 16px; background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); }
@@ -1108,32 +1106,30 @@ onUnmounted(() => cleanup());
 .lg-body { margin-top: 28px; }
 .lg-col { display: flex; flex-direction: column; gap: 12px; }
 .lg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
-.lg-phone--err { border-color: color-mix(in srgb, var(--v5-brand-2) 55%, transparent); }
+.lg-phone--err { border-color: color-mix(in srgb, var(--v5-danger) 55%, transparent); }
 .lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
 .lg-phone__cc-t { font-size: var(--ui-type-body); color: var(--v5-ink); }
 .lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); color: var(--v5-ink); }
-.lg-phone-hint { display: block; margin-top: -4px; padding: 0 4px; font-size: 12px; line-height: 18px; color: var(--v5-ink-3); }
-.lg-phone-hint--err { color: var(--v5-brand-2); }
+.lg-phone-hint { display: block; margin-top: -4px; padding: 0 4px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lg-phone-hint--err { color: var(--v5-danger); }
 .lg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
-.lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
+.lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-danger) 45%, transparent); }
 .lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); color: var(--v5-ink); }
 /* 《07》tap≥44:三处热区实测 24×30 / 65×36 / 342×18。热区靠 min-* 撑开,
    图标与文字靠 flex 居中 + 负 margin 抵消,视觉位置与原先一致(只有热区变大)。 */
 .lg-eye { min-width: 44px; min-height: 44px; margin-right: -10px; display: flex; align-items: center; justify-content: center; }
 .lg-forgot-row { display: flex; justify-content: flex-end; }
 .lg-forgot { font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
-.lg-development-otp { padding: 10px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
-.lg-development-otp__t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--v5-warning); }
-.lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: var(--ui-type-list-subtitle); }
-.lg-resend__change { color: var(--v5-ink-3); }
-.lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
-.lg-resend__btn { color: var(--v5-brand); font-weight: 500; }
-.lg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border-radius: 8px; padding: 8px 12px; }
+.lg-development-otp { padding: 8px 12px; border-radius: 12px; background: var(--v5-warning-soft); }
+.lg-development-otp__t { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-warning-ink); }
+/* 更换手机号 / 重新发送 are NxButton text S (13/18, brand) whose 44px target reaches 13px past the row: 4px more than the
+   column gap keeps that target off the code field above. */
+.lg-resend { margin-top: 4px; display: flex; align-items: center; justify-content: space-between; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); }
+.lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
+.lg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-danger); background: var(--v5-danger-soft); border-radius: 12px; padding: 8px 12px; }
 .lg-error__t { flex: 1; }
-.lg-cta { margin-top: 24px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
-.lg-cta--on { background: var(--v5-brand); }
-.lg-cta__t { font-size: var(--ui-type-button); font-weight: 600; color: var(--v5-ink-4); }
-.lg-cta__t--on { color: var(--v5-on-brand); }
+.lg-cta { margin-top: 24px; }
+.lg-cta--off { opacity: .5; }
 .lg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 /* min-height 18→44 会多占 26px,margin-top 12→4 抵消一半,视觉间距 12→17px 基本不变 */
 .lg-switch { margin-top: 4px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
