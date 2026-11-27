@@ -4,7 +4,7 @@ import { ApiError } from "./errors";
 export interface DayOnePageObservationApi {
   earnPage(): Promise<DayOnePageObservationResult>;
   storePage(): Promise<DayOnePageObservationResult>;
-  s1Roi(): Promise<DayOnePageObservationResult>;
+  s1Roi(productNo: string): Promise<DayOnePageObservationResult>;
 }
 
 export interface DayOnePageObservationResult {
@@ -23,16 +23,17 @@ function accepted(value: unknown): DayOnePageObservationResult {
 
 /** Fixed read-only surfaces; no caller can choose a task code or reward. */
 export function createDayOnePageObservationApi(client: ApiClient): DayOnePageObservationApi {
-  const observe = async (surface: "earn" | "store" | "s1-roi"): Promise<DayOnePageObservationResult> => {
+  const observe = async (surface: "earn" | "store" | "s1-roi", body?: { productNo: string }): Promise<DayOnePageObservationResult> => {
     return accepted(await client.request<unknown>({
       method: "POST",
       path: `/api/growth/day-one/page-observations/${surface}`,
+      ...(body ? { body } : {}),
       authenticated: true,
     }));
   };
   return {
     earnPage: () => observe("earn"),
     storePage: () => observe("store"),
-    s1Roi: () => observe("s1-roi"),
+    s1Roi: (productNo) => observe("s1-roi", { productNo }),
   };
 }

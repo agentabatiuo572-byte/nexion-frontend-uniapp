@@ -93,6 +93,8 @@ import { voucherBenefitSummary } from '@/lib/voucher-benefit-summary';
 import { voucherSupportsSurface } from '@/lib/voucher-sheet-authority';
 import { navTo } from '@/lib/route';
 import { remoteApiEnabled } from '@/api/runtime';
+import { productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
+import { productOutOfStock } from '@/store/product-availability';
 import type { VoucherDef } from "@/mock/vouchers";
 
 const COUPON_ART = '/static/img/home-glass-20260928/coupon.webp';
@@ -128,8 +130,13 @@ const trialOffer = computed(() => showRestartOffer.value || (!hasLifecycle.value
 const trialPending = computed(() => status.value === 'active' || status.value === 'grace' || (status.value === 'ended' && !showRestartOffer.value));
 const trialOfferEnabled = computed(() => trial.startRetryable ? eligibility.value.ok
   : trial.canOpenClaim() || trialView.actionsReady.value && capacityFull.value);
-// B53: only the confirmed trial product is named; until then the card shows the same "—" as its unknown amounts, never a default S1.
-const trialName = computed(() => confirmedOffer.value?.deviceName ?? trialView.deviceName.value ?? '—');
+const trialName = computed(() => (confirmedOffer.value?.deviceName ?? trialView.deviceName.value)
+  || (confirmedOffer.value?.reason === "product-unavailable" ? t.value.trial.pageTitle : '—'));
+const trialProductOutOfStock = computed(() => {
+  const productId = confirmedOffer.value?.productId;
+  return !!productId && productCatalogState.status === 'ready'
+    && productOutOfStock(productCatalogPresentation.value?.products.find(product => product.id === productId));
+});
 const trialDays = computed(() => confirmedOffer.value?.trialDays ?? trialView.config.value?.trialDays ?? trialCfg.config.trialDays);
 const trialArt = computed(() => getProductMedia(confirmedOffer.value ? confirmedOffer.value.productId : trialView.productId.value)?.src);
 const online = computed(() => trialView.presentationReady.value && status.value === 'active');
@@ -153,7 +160,9 @@ const trialPill = computed<[string, string, string]>(() => {
   switch (offerState.value) {
     case "claimable": return [t.value.trial.homeClaimShort, copy.value.benefitTrialClaim, copy.value.benefitTrialClaim];
     case "error": return [copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailable, copy.value.benefitTrialUnavailableAria];
-    case "unavailable": return [copy.value.benefitTrialOut, copy.value.benefitTrialOut, t.value.trial.heroProductUnavailable];
+    case "unavailable": return confirmedOffer.value?.reason === "product-unavailable" && trialProductOutOfStock.value
+      ? [copy.value.benefitTrialOut, copy.value.benefitTrialOut, t.value.trial.heroProductUnavailable]
+      : [t.value.trial.entryUnavailable, t.value.trial.entryUnavailable, lifecycleCopy.value.deviceUnclaimable];
     default: return [copy.value.benefitTrialChecking, copy.value.benefitTrialChecking, t.value.trial.entryChecking];
   }
 });

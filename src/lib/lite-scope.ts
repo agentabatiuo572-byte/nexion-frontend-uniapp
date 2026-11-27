@@ -1,5 +1,5 @@
 import type { CanonicalQuest } from "@/api/quest-api";
-import type { Product } from "@/mock/products";
+import type { Product, ProductSeriesCode } from "@/mock/products";
 import type { Device, DeviceKind } from "@/store/types";
 
 /** Lite's device views leave out phones, and a device missing from the list is out of view too. A replacement whose
@@ -17,19 +17,17 @@ function hasPhoneQuestText(value: string): boolean {
   return /(?:^|[\s_/-])(?:(?:phone|mobile|smartphone)(?:[\s_/-]|$)|iphone(?=\d|[\s_/-]|$))|手机|手機|điện thoại/i.test(value);
 }
 
-const HARDWARE_SKUS = new Set([
-  "pc-gpu", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2",
-]);
+const HARDWARE_SERIES = new Set<ProductSeriesCode>(["S1", "PRO", "PRO_V2", "RACK_P1", "RACK_P2"]);
 const PHONE_SKUS = new Set(["phone", "phone-basic", "iphone15"]);
 
-// Catalog currently supplies only id and DEVICE/SHARE. Never infer identity from
-// display names; unclassified SKUs need an explicit identity from the server.
-export function isLiteProduct(product: Pick<Product, "id" | "productType"> & {
+// The explicit series takes priority for hardware. Retain the phone exclusion for older reads
+// that only include a product number, and keep unclassified hardware visible.
+export function isLiteProduct(product: Pick<Product, "id" | "productType"> & Partial<Pick<Product, "seriesCode">> & {
   kind?: DeviceKind;
   productCode?: string;
 }): boolean {
   const identities = [product.id, product.productCode ?? ""].map((value) => value.trim().toLowerCase());
-  if (product.productType === "SHARE" || identities.some((id) => HARDWARE_SKUS.has(id))) return true;
+  if (product.productType === "SHARE" || (product.seriesCode != null && HARDWARE_SERIES.has(product.seriesCode))) return true;
   return product.kind !== "phone" && !identities.some((id) => PHONE_SKUS.has(id));
 }
 

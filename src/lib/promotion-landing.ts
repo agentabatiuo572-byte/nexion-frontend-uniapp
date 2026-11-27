@@ -8,8 +8,9 @@ import { remoteApiEnabled, sessionVault } from '@/api/runtime';
 import { getProduct } from '@/mock/products';
 import { getProductMedia } from '@/lib/product-media';
 import { isLiteProduct } from '@/lib/lite-scope';
-import { isProductCatalogDisplayCurrent, productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
+import { productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
 import { displayDeadline, localized, rewardAmount } from './promotion-display';
+import { productDisplayName } from './product-display-name';
 
 /** Purchase offers with a dedicated landing page; other templates keep the store entry. */
 export type LandingKind = 'gift' | 'first' | 'repurchase';
@@ -60,20 +61,20 @@ export function litePromotion<T extends Pick<PublicPromotion, 'productNos' | 're
     ? activity : { ...activity, productNos, rewardRules, bannerImageUrl: null };
 }
 export function landingProductImage(sku: string): string | undefined {
-  return catalogReady() ? getProduct(sku)?.imageUrl : getProductMedia(sku)?.src;
+  return getProductMedia(sku)?.src;
 }
-/** A signed-out read takes the public catalog name; without one it says "eligible device", never the internal SKU. */
-export function landingProductName(activity: PublicPromotion, sku: string, language?: string): string {
+/** Use the published name for this exact product, including on signed-out pages. */
+export function landingProductName(activity: PublicPromotion, sku: string, language: string, frozenName?: string | null): string {
   const gift = activity.rewardRules.flatMap(rule => [rule.buyerReward, rule.inviterReward])
     .find(reward => reward?.type === 'DEVICE' && reward.giftProductNo === sku);
-  const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products.find(product => product.id === sku) : undefined;
-  return landingProduct(sku)?.name ?? gift?.disclosure.deviceName ?? display?.name ?? (language ? landingCopy(language).deviceFallback : sku);
+  return productDisplayName(sku, landingCopy(language).deviceFallback, frozenName || gift?.disclosure.deviceName);
 }
 
 // An order discount lowers the order total at checkout; it is never credited as a USDT reward.
 export type RewardParts = { amount: string; unit: string; asset: 'UVT' | 'USDT' | 'DEVICE' | 'DISCOUNT' };
-export function rewardParts(activity: PublicPromotion, reward: PublicRewardSpec): RewardParts {
-  if (reward.type === 'DEVICE') return { amount: String(reward.quantity), unit: reward.disclosure.deviceName ?? landingProductName(activity, reward.giftProductNo), asset: 'DEVICE' };
+export function rewardParts(activity: PublicPromotion, reward: PublicRewardSpec, language: string): RewardParts {
+  if (reward.type === 'DEVICE') return { amount: String(reward.quantity), unit: landingProductName(activity, reward.giftProductNo,
+    language, reward.disclosure.deviceName), asset: 'DEVICE' };
   const amount = rewardAmount(reward);
   return reward.type === 'UVT' ? { amount, unit: 'UVT', asset: 'UVT' } : { amount, unit: 'USDT', asset: reward.type === 'DISCOUNT_USDT' ? 'DISCOUNT' : 'USDT' };
 }
@@ -124,7 +125,7 @@ export function promotionTermsRules(activity: PublicPromotion, copy: Messages['p
   const landing = landingCopy(language);
   const rules = activity.rewardRules.map(rule => {
     const rewards = [rule.buyerReward, rule.inviterReward].filter((reward): reward is NonNullable<typeof reward> => !!reward);
-    return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardPartsText(rewardParts(activity, reward), copy)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? ambassadorCount(landing.rewardLimitOrder, rule.maxGroups.value) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? ambassadorCount(landing.rewardLimitPerson, rule.maxGroupsPerPerson.value) : ''].filter(Boolean).join(' · ') };
+    return { id: rule.ruleId, text: productName(rule.productNo) + ' · ' + copy.rulePer + ' ' + rule.minBuyQty + ' · ' + (rule.repeatMode === 'PER_GROUP' ? copy.perGroup : copy.oncePerOrder) + '\n' + rewards.map(reward => (reward.beneficiaryRole === 'BUYER' ? copy.buyer : copy.inviter) + ' · ' + rewardPartsText(rewardParts(activity, reward, language), copy)).join(' / ') + '\n' + [rule.maxGroups.mode === 'LIMITED' ? ambassadorCount(landing.rewardLimitOrder, rule.maxGroups.value) : '', rule.maxGroupsPerPerson.mode === 'LIMITED' ? ambassadorCount(landing.rewardLimitPerson, rule.maxGroupsPerPerson.value) : ''].filter(Boolean).join(' · ') };
   });
   return [...rules, ...firstPurchaseTermsRules(activity.firstPurchaseCondition, language)];
 }

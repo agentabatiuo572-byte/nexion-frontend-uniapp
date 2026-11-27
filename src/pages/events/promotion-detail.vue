@@ -193,7 +193,7 @@
               <view v-if="slab.count !== null" class="lp-slab__head"><text class="lp-slab__label">{{ c.myDevices }}</text><text class="lp-slab__count"><text class="lp-slab__count-number">{{ slab.count }}</text> {{ c.deviceUnit }}</text></view>
               <view v-if="slab.fleetRow" class="lp-slab__fleet">
                 <view v-for="(device, index) in slab.thumbs" :key="device.id" class="lp-owned lp-own" :class="'lp-own--' + index">
-                  <view class="lp-owned__art"><CatalogMachineImage class="lp-fill" :sku="device.sku" :image-url="productImage(device.sku)" :scope-key="'owned:' + device.id" /><text v-if="index === slab.thumbs.length - 1 && slab.more" class="lp-owned__more">+{{ slab.more }}</text></view>
+                  <view class="lp-owned__art"><CatalogMachineImage class="lp-fill" :sku="device.sku" :image-url="device.imageUrl" :scope-key="'owned:' + device.id" /><text v-if="index === slab.thumbs.length - 1 && slab.more" class="lp-owned__more">+{{ slab.more }}</text></view>
                   <text class="lp-owned__name">{{ device.label }}</text>
                 </view>
                 <view class="lp-slab__plus" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg></view>
@@ -316,8 +316,8 @@ const visibility = useDataVisibility();
 const inviteHero = computed(() => {
   const a = activity.value, r = rule.value;
   if (!a || !r) return null;
-  const buyer = rewardParts(a, r.buyerReward);
-  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward), friend: partsText(buyer) };
+  const buyer = rewardParts(a, r.buyerReward, locale.code);
+  if (r.inviterReward) return { label: c.value.youGet, parts: rewardParts(a, r.inviterReward, locale.code), friend: partsText(buyer) };
   return { label: c.value.friendGets, parts: buyer, friend: '' };
 });
 // Share of the line in brand colour: up to the furthest step that is done or current (0, half or all).
@@ -365,7 +365,7 @@ const stageMode = computed(() => phase.value === 'ended' ? 'ended' : signInNeede
 const readIdentity = () => `${app.accountKey}:${app.accountBindingEpoch}:${locale.code}`;
 
 // Catalog names and images follow the signed-in session; reading the account keys keeps them reactive.
-function productName(sku: string): string { void app.accountKey; void app.accountBindingEpoch; return activity.value ? landingProductName(activity.value, sku, locale.code) : sku; }
+function productName(sku: string): string { void app.accountKey; void app.accountBindingEpoch; return activity.value ? landingProductName(activity.value, sku, locale.code) : c.value.deviceFallback; }
 function productImage(sku: string): string | undefined { void app.accountKey; void app.accountBindingEpoch; return landingProductImage(sku); }
 const priceText = (price: number) => formatGroupedAmount(price);
 // Long published amounts step down before they could clip (01.2).
@@ -374,7 +374,7 @@ const capText = (limit: PublicPurchaseRule['maxGroups']) => limit.mode === 'LIMI
 const partsText = (parts: RewardParts) => rewardPartsText(parts, t.value.promotion);
 // An order discount is named by its own label, so the amount alone follows it.
 const plainAmount = (parts: RewardParts) => parts.asset === 'DISCOUNT' ? `${parts.amount} ${parts.unit}` : partsText(parts);
-const rulePartsOf = () => activity.value && rule.value ? rewardParts(activity.value, rule.value.buyerReward) : null;
+const rulePartsOf = () => activity.value && rule.value ? rewardParts(activity.value, rule.value.buyerReward, locale.code) : null;
 function shortStart(value: string): string {
   const date = new Date(Date.parse(value)), time = formatDisplayTime(value, false, 0), two = (part: number) => String(part).padStart(2, '0');
   if (locale.code === 'zh') return `${two(date.getUTCMonth() + 1)}/${two(date.getUTCDate())} ${time} UTC`;
@@ -433,14 +433,14 @@ const rewardTerms = computed(() => rule.value ? localized(rule.value.buyerReward
 const stage = computed(() => {
   const a = activity.value, r = rule.value;
   if (!a || !r) return null;
-  const parts = rewardParts(a, r.buyerReward);
+  const parts = rewardParts(a, r.buyerReward, locale.code);
   return { mainSku: r.productNo, mainName: productName(r.productNo), giftSku: r.buyerReward.type === 'DEVICE' ? r.buyerReward.giftProductNo : null, getLabel: parts.asset === 'DISCOUNT' ? t.value.promotion.orderDiscount : c.value.stageGet, giftText: plainAmount(parts), parts };
 });
 const giftTickets = computed(() => {
   const a = activity.value;
   if (!a) return [];
   return a.rewardRules.map(r => {
-    const reward = r.buyerReward, parts = rewardParts(a, reward), device = reward.type === 'DEVICE';
+    const reward = r.buyerReward, parts = rewardParts(a, reward, locale.code), device = reward.type === 'DEVICE';
     const countMode = r.repeatMode === 'PER_GROUP' ? fmt(c.value.perGroup, { n: r.minBuyQty }) : r.minBuyQty > 1 ? fmt(c.value.oncePerOrderMin, { n: r.minBuyQty }) : c.value.oncePerOrder;
     return {
       id: r.ruleId, buySku: r.productNo, buyName: productName(r.productNo), buyQty: fmt(c.value.qtyDevice, { n: r.minBuyQty }),
@@ -479,7 +479,7 @@ const giftTerms = computed(() => {
 const firstTicket = computed(() => {
   const a = activity.value, r = rule.value;
   if (!a || !r) return null;
-  const parts = rewardParts(a, r.buyerReward);
+  const parts = rewardParts(a, r.buyerReward, locale.code);
   const limit = r.maxGroupsPerPerson.mode === 'LIMITED' ? fmt(c.value.limitTimes, { n: r.maxGroupsPerPerson.value }) : c.value.limitNone;
   return { parts, label: parts.asset === 'DISCOUNT' ? t.value.promotion.orderDiscount : c.value.firstReward, giftSku: r.buyerReward.type === 'DEVICE' ? r.buyerReward.giftProductNo : null, limit, muted: phase.value === 'ended' || refused.value };
 });
@@ -504,7 +504,7 @@ const products = computed(() => {
   if (!a) return [];
   return a.productNos.map(sku => {
     const product = landingProduct(sku), r = a.rewardRules.find(item => item.productNo === sku) ?? a.rewardRules[0];
-    const parts = r ? rewardParts(a, r.buyerReward) : null;
+    const parts = r ? rewardParts(a, r.buyerReward, locale.code) : null;
     // Referral, bundle and gift pages name the reward in their hero and rules, so their rows carry no tag.
     const tag = !parts || (kind.value !== 'first' && kind.value !== 'repurchase') ? '' : parts.asset === 'DISCOUNT' ? partsText(parts) : fmt(kind.value === 'first' ? c.value.firstTag : c.value.repurchaseTag, { reward: partsText(parts) });
     return {
@@ -523,7 +523,7 @@ const ownedDevices = computed(() => {
 const slab = computed(() => {
   const a = activity.value, r = rule.value;
   if (!a || !r) return null;
-  const parts = rewardParts(a, r.buyerReward), discount = parts.asset === 'DISCOUNT', owned = ownedDevices.value;
+  const parts = rewardParts(a, r.buyerReward, locale.code), discount = parts.asset === 'DISCOUNT', owned = ownedDevices.value;
   const fleetRow = !!owned && owned.length > 0 && !refused.value;
   // A refused member who already bought (the gap line shows) is told to meet the terms, not to make a first purchase.
   const line = refused.value ? (repurchaseInterval.value ? (discount ? c.value.ownedLineDiscount : c.value.ownedLine) : discount ? c.value.emptyLineDiscount : c.value.emptyLine) : fmt(discount ? c.value.addLineDiscount : c.value.addLine, { n: r.minBuyQty, name: productName(r.productNo) });
@@ -531,7 +531,11 @@ const slab = computed(() => {
   return {
     // A refused member with devices gets no count: "N devices" would contradict the first-purchase prompt.
     count: owned && !(refused.value && owned.length > 0) ? owned.length : null, fleetRow, refused: refused.value,
-    thumbs: fleetRow ? owned.slice(0, 3).map(device => { const sku = device.kind; return { id: device.id, sku, label: getProductMedia(sku)?.tierCode ?? device.name }; }) : [],
+    thumbs: fleetRow ? owned.slice(0, 3).map(device => {
+      const sku = device.productCode;
+      const media = getProductMedia(sku);
+      return { id: device.id, sku, imageUrl: device.imageUrl ?? media?.src, label: media?.tierCode ?? device.name };
+    }) : [],
     more: fleetRow && owned.length > 3 ? owned.length - 3 : 0,
     target: r.productNo, targetName: productName(r.productNo), rewardText: partsText(parts), tagText: discount ? partsText(parts) : '+' + partsText(parts), uvt: parts.asset === 'UVT', line: [before, after],
   };

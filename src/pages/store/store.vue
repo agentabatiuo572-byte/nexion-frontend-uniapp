@@ -112,7 +112,7 @@ import { PRODUCTS, type Product } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
+import { isProductAvailable, isProductReleased, productOutOfStock } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import StoreHero from "@/components/store/store-hero.vue";
@@ -121,6 +121,7 @@ import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
 import { productPublishedDailyUsdtRange } from "@/lib/product-estimates";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
+import { findDeviceCatalogProduct } from "@/lib/product-media";
 import { useApp } from "@/store/app";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -292,7 +293,7 @@ const liveYield = computed(() => buildStoreYieldAuthority(
 ));
 const yieldAuthority = computed(() => {
   if (!remoteApiEnabled) return liveYield.value;
-  const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("catalogYield");
+  const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("representativeCatalogYield");
   const phone = earnConfig.phoneTiers.value ? liveYield.value.phone : readTabSnapshot("phoneYield");
   const entry = catalog?.entry ?? null, pro = catalog?.pro ?? null, rack = catalog?.rack ?? null;
   const rows = liveYield.value.ladder.map(row => ({ ...row, amount: row.id === "phone" ? phone : catalog?.ladder.find(item => item.id === row.id)?.amount ?? null }));
@@ -304,13 +305,13 @@ const yieldAuthority = computed(() => {
 const unlockedProducts = computed(() =>
   displayProducts.value.filter((p) => {
     if (!mounted.value) return false;
-    return isProductAvailable(p, phase.value);
+    return isProductReleased(p, phase.value);
   }),
 );
 const lockedProducts = computed(() =>
   displayProducts.value.filter((p) => {
     if (!mounted.value) return false;
-    return !isProductAvailable(p, phase.value);
+    return !isProductReleased(p, phase.value);
   }),
 );
 
@@ -324,19 +325,13 @@ const bundleSelectedProducts = computed(() => cart.items
   .map((id) => bundleHardware.value.find((p) => p.id === id))
   .filter((p): p is Product => !!p));
 
-const purchasableProducts = computed(() => unlockedProducts.value.filter(product => !productOutOfStock(product)));
+const purchasableProducts = computed(() => unlockedProducts.value.filter(product =>
+  isProductAvailable(product, phase.value) && !productOutOfStock(product)));
 const upgrade = computed(() => storeUpgrade(purchasableProducts.value, ownedDevices.value));
-const upgradeBaseImageUrl = computed(() => {
-  const base = upgrade.value?.base;
-  return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
-});
-const upgradeBaseDailyRange = computed(() => {
-  const base = upgrade.value?.base;
-  if (!base) return null;
-  const sku = base.productCode?.toLowerCase() ?? base.kind;
-  const product = displayProducts.value.find(p => p.id.toLowerCase() === sku);
-  return product ? productPublishedDailyUsdtRange(product) : null;
-});
+const upgradeBaseProduct = computed(() => findDeviceCatalogProduct(displayProducts.value, upgrade.value?.base.productCode));
+const upgradeBaseImageUrl = computed(() => upgrade.value?.base.imageUrl ?? upgradeBaseProduct.value?.imageUrl);
+const upgradeBaseDailyRange = computed(() => upgradeBaseProduct.value
+  ? productPublishedDailyUsdtRange(upgradeBaseProduct.value) : null);
 const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(offer => voucherSupportsSurface(offer, 'store')));
 const voucherOffers = computed(() => remoteApiEnabled
   ? voucher.remoteStatus === "ready" || voucher.presentationOffers.length ? voucher.presentationOffers.filter(offer => !voucher.presentationClaimable.some(item => item.id === offer.id) || voucherSupportsSurface(offer, 'store'))

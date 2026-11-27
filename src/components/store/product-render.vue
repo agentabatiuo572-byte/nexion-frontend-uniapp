@@ -38,20 +38,21 @@
 import { computed, ref, watch, type CSSProperties } from "vue";
 import { productTierCode } from "@/lib/product-image";
 import { useProductImage } from "@/composables/use-product-image";
+import type { ProductSeriesCode } from "@/mock/products";
 
-const props = defineProps<{ productId: string; tier: "Entry" | "Pro" | "Flagship" | "Share"; imageUrl?: string; videoUrl?: string }>();
+const props = defineProps<{ productId: string; seriesCode: ProductSeriesCode | null; tier: "Entry" | "Pro" | "Flagship" | "Share"; imageUrl?: string; videoUrl?: string }>();
 
 const { imageSrc, imageError: fallbackProductImage } = useProductImage(() => props.imageUrl);
 const photo = computed(() => {
   const imageUrl = imageSrc.value;
-  return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.productId, props.tier) } : null;
+  return imageUrl ? { src: imageUrl } : null;
 });
 
 const failedVideoUrl = ref("");
 watch(() => props.videoUrl, () => { failedVideoUrl.value = ""; }, { immediate: true });
 const video = computed(() => failedVideoUrl.value === props.videoUrl ? undefined : props.videoUrl);
 const videoPoster = computed(() => photo.value?.src ?? "");
-const displayTierCode = computed(() => photo.value?.tierCode ?? props.tier);
+const displayTierCode = computed(() => productTierCode(props.seriesCode, props.tier));
 function fallbackProductVideo() {
   failedVideoUrl.value = props.videoUrl ?? "";
 }

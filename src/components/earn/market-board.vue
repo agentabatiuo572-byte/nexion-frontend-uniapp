@@ -66,15 +66,15 @@
           v-for="d in deviceRankings"
           :key="d.rank"
           class="earn-ranking-row"
-          :class="{ 'earn-ranking-row--link': d.kind }"
+          :class="{ 'earn-ranking-row--link': d.productNo }"
           :style="{ '--rank-figure-ch': rankFigureChars }"
-          :role="d.kind ? 'link' : undefined"
-          :tabindex="d.kind ? 0 : undefined"
-          @click="d.kind && goDetail(d.kind)"
-          @keydown.enter.stop.prevent="d.kind && goDetail(d.kind)"
+          :role="d.productNo ? 'link' : undefined"
+          :tabindex="d.productNo ? 0 : undefined"
+          @click="d.productNo && goDetail(d.productNo)"
+          @keydown.enter.stop.prevent="d.productNo && goDetail(d.productNo)"
         >
           <text class="earn-ranking-row__no">#{{ d.rank }}</text>
-          <DeviceArt class="earn-ranking-row__art" :src="d.isPhone ? PHONE_ART : d.kind ? getProductMedia(d.kind)?.src ?? null : null" />
+          <DeviceArt class="earn-ranking-row__art" :src="d.imageUrl" />
           <view class="earn-ranking-row__identity"><text class="earn-ranking-row__name">{{ d.name ?? t.market.yourPhone }}</text></view>
           <view class="earn-ranking-value">
             <text class="earn-ranking-value__amount">{{ rankAmountText(d) }}</text>
@@ -95,7 +95,7 @@ import { navTo } from "@/lib/route";
 import type { EstimateRange } from "@/api/estimate-range";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
-import type { DeviceKind, TaskCategory } from "@/store/types";
+import type { TaskCategory } from "@/store/types";
 import { useApp } from "@/store/app";
 import { remoteApiEnabled } from "@/api/runtime";
 import { compactMarketUnit, marketWorkloadCopy } from "@/lib/workload-label";
@@ -105,7 +105,6 @@ import DeviceArt from "@/components/device-art.vue";
 import { useLoopsInView } from "@/composables/use-loops-in-view";
 import { marketBoardRotation } from "./market-board-rotation";
 
-const PHONE_ART = "/static/img/home-glass-20260928/phone.webp";
 
 interface WorkloadPrice {
   code: TaskCategory;
@@ -123,8 +122,8 @@ interface DeviceRanking {
   name?: string;
   dailyEarn: number | null;
   dailyUsdtRange?: EstimateRange | null;
-  isPhone?: boolean;
-  kind?: Exclude<DeviceKind, "phone">;
+  imageUrl?: string;
+  productNo?: string;
 }
 
 const t = useT();
@@ -143,9 +142,9 @@ const PRICE_INDEX: WorkloadPrice[] = [
 ];
 
 const DEVICE_RANKINGS: DeviceRanking[] = [
-  { rank: 1, name: "UVELRack P1", dailyEarn: 45, kind: "stellarrack-p1" },
-  { rank: 2, name: "UVELBox Pro", dailyEarn: 13, kind: "stellarbox-pro" },
-  { rank: 3, name: "UVELBox S1", dailyEarn: 7, kind: "stellarbox-s1" },
+  { rank: 1, name: "UVELRack P1", dailyEarn: 45, productNo: "stellarrack-p1" },
+  { rank: 2, name: "UVELBox Pro", dailyEarn: 13, productNo: "stellarbox-pro" },
+  { rank: 3, name: "UVELBox S1", dailyEarn: 7, productNo: "stellarbox-s1" },
 ];
 
 // Which of the three non-content states the board is in when a section has no rows (03 §3.4).
@@ -178,8 +177,8 @@ const workloadCopy = (row: WorkloadPrice) => {
   return { name: copy.name, unit: compactMarketUnit(row.code, copy.unit) };
 };
 const deviceRankings = computed<DeviceRanking[]>(() => remoteApiEnabled
-  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, dailyUsdtRange: row.dailyUsdtRange, kind: row.kind && row.kind !== "phone" ? row.kind : undefined, isPhone: row.kind === "phone" }))
-  : DEVICE_RANKINGS);
+  ? (app.homeTruth?.marketBoard.deviceRankings ?? []).filter((row) => row.kind !== "cloud-share" && row.kind !== "phone").map((row) => ({ rank: row.rank, name: row.name ? (row.name) : undefined, dailyEarn: row.dailyUsdt, dailyUsdtRange: row.dailyUsdtRange, productNo: row.productNo, imageUrl: row.imageUrl }))
+  : DEVICE_RANKINGS.map(row => ({ ...row, imageUrl: getProductMedia(row.productNo)?.src })));
 
 function spokenWorkload(w: WorkloadPrice): string {
   const copy = workloadCopy(w);
@@ -227,8 +226,8 @@ function sparkPoints(data: number[]): string {
     .join(" ");
 }
 
-function goDetail(kind: Exclude<DeviceKind, "phone">) {
-  navTo(`/pages/store/detail?id=${kind}`);
+function goDetail(productNo: string) {
+  navTo(`/pages/store/detail?id=${encodeURIComponent(productNo)}`);
 }
 
 </script>

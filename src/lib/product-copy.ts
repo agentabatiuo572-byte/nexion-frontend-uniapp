@@ -33,25 +33,12 @@ export interface ProductCopy {
   taskLevels: string;
 }
 
-type CatalogEntry = { tagline: string; badge: string };
-type CatalogId = keyof typeof en.store.catalog;
-
-const CATALOG_BADGE_KIND: Record<CatalogId, KnownBadgeKind> = {
-  "stellarbox-s1": "bestSeller",
-  "stellarbox-pro": "trending",
-  "stellarbox-pro-v2": "upgradePick",
-  "stellarrack-p1": "flagship",
-  "stellarrack-p2": "flagship",
-  "cloud-share": "lowBarrier",
-};
+type CatalogEntry = { tagline: string };
 
 function badgeText(t: Messages, kind: KnownBadgeKind): string {
   if (kind === "recommended") return t.store.badgeRecommended;
   if (kind === "bestSeller") return t.store.bestSeller;
-  if (kind === "trending") return t.store.catalog["stellarbox-pro"].badge;
-  if (kind === "upgradePick") return t.store.catalog["stellarbox-pro-v2"].badge;
-  if (kind === "flagship") return t.store.catalog["stellarrack-p1"].badge;
-  return t.store.catalog["cloud-share"].badge;
+  return t.store.productBadges[kind];
 }
 
 // Catalog responses that predate badgeKind still match known labels across UI languages.
@@ -62,7 +49,7 @@ for (const store of [en.store, zh.store, vi.store, ru.store, kk.store, uz.store,
   add(store.badgeRecommended, "recommended");
   add(store.bestSeller, "bestSeller");
   add(store.trending, "trending");
-  for (const id of Object.keys(CATALOG_BADGE_KIND) as CatalogId[]) add(store.catalog[id].badge, CATALOG_BADGE_KIND[id]);
+  for (const [kind, label] of Object.entries(store.productBadges)) add(label, kind as keyof typeof store.productBadges);
 }
 // Labels earlier App versions offered, which saved products can still carry: they keep their kind and show today's label.
 const LEGACY_BADGES: [string, KnownBadgeKind][] = [
@@ -102,10 +89,10 @@ export function serverTagline(t: Messages, p: Product, locale?: LocaleCode): str
   // A Chinese catalog can carry these exact strings as published translations.
   // Keep that snapshot intact while the next language is loading.
   if (p.catalogRequestLocale === "zh") return p.tagline;
-  if (p.id === "cloud-share" && normalizedPublishedTagline(p.tagline) === zh.store.cloudShareLowBarrierTagline) {
+  if (p.seriesCode === "CLOUD_SHARE" && normalizedPublishedTagline(p.tagline) === zh.store.cloudShareLowBarrierTagline) {
     return t.store.cloudShareLowBarrierTagline;
   }
-  if (p.id === "stellarbox-pro" && normalizedPublishedTagline(p.tagline) === PRO_PUBLISHED_TAGLINE && locale && locale !== "zh") {
+  if (p.seriesCode === "PRO" && normalizedPublishedTagline(p.tagline) === PRO_PUBLISHED_TAGLINE && locale && locale !== "zh") {
     return PRO_TAGLINE_LABEL[uiLocale(locale)];
   }
   return p.tagline;
@@ -126,8 +113,7 @@ export function productCopy(t: Messages, p: Product, serverCatalog = false, loca
   const entry = (t.store.catalog as Record<string, CatalogEntry | undefined>)[p.id];
   return {
     tagline: entry?.tagline ?? p.tagline,
-    badge: entry?.badge ?? p.badge ?? "",
-    badgeKind: entry ? CATALOG_BADGE_KIND[p.id as CatalogId] : "custom",
+    ...serverBadge(t, p),
     taskLevels: productTaskLevelsText(t, p.taskLevels),
   };
 }

@@ -45,12 +45,17 @@ export function trialDemo(url,locale,state,request,capacityFull,products,require
   const data=structuredClone(fixture(new URL('/api/trial/state',url.origin),locale,{offers:true},request));
   const switched=state.catalogState==='trial-h2-switched';
   const originalProduct=products.find(product=>product.id===previewDefaultTrialSku);
-  const product=switched?products.find(product=>product.id==='stellarbox-pro'):originalProduct;
+  const product=mode==='unconfigured'?undefined:switched?products.find(product=>product.id==='stellarbox-pro'):originalProduct;
   const hasYield=product?.dailyEarn>0&&product.dailyEarnNEX>0;
   const available=hasYield&&product.available&&product.productType==='DEVICE'&&product.inventoryMode==='FINITE'&&product.stock>0;
   const unclaimedConfig=Object.assign(data.config,product&&previewTrialProductConfig(product));
   // A long catalog name for the claim sheet's wrap check; the claim chain itself is unchanged.
   if(state.trialNameState==='long')unclaimedConfig.trialProductName='UVELBox S100 Pro Max Edition 2026';
+  if(!product){
+    delete unclaimedConfig.trialProductId;
+    delete unclaimedConfig.trialProductName;
+    delete unclaimedConfig.imageUrl;
+  }
   if(state.trialStartPhaseClosed)unclaimedConfig.phaseOpen=false;
   if(!hasYield){
     unclaimedConfig.shadowDailyUSD=null;
