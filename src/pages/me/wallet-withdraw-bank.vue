@@ -4,7 +4,7 @@
     <view class="bank-withdraw" :aria-busy="!remoteSessionReady || busy">
       <template v-if="remoteSessionReady">
       <!-- Not on the first-read failure below: its centred result already says it once. -->
-      <view v-if="error && (order || uncertain || displayIntents.length || displayConfig || requestedOrder !== null || pendingAttempt)" class="notice danger" role="alert"><text>{{ error }}</text></view>
+      <view v-if="error && (order || uncertain || displayIntents.length || displayConfig || (requestedOrder === null && pendingAttempt))" class="notice danger" role="alert"><text>{{ error }}</text></view>
       <!-- Not while a still placeholder below stands in: it already carries the loading status in the loaded layout's place. -->
       <text v-if="busy && !silentRead && !stillPlaceholder()" class="muted loading" role="status">{{ c.loading }}</text>
       <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
@@ -135,9 +135,9 @@
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitReason : formStep === 'amount' && !!quoteReason }" />
       </template>
-      <!-- First config read with no snapshot (03 §3.4, §3.5.2): when it fails, the page's one centred result and its one
-           重新加载; while it runs, the still placeholder below. -->
-      <template v-else-if="requestedOrder === null && !pendingAttempt">
+      <!-- First config or ?order= receipt read with nothing to show (03 §3.4, §3.5.2): when it fails, the page's one centred
+           result and its one 重新加载; while it runs, the still placeholder below. -->
+      <template v-else-if="requestedOrder !== null || !pendingAttempt">
         <EmptyState v-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
       </template>
       <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
