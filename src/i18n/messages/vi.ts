@@ -412,7 +412,6 @@ export const vi: Messages = {
   login: {
     recoverAttempt: "Kiểm tra kết quả đăng nhập",
     retryOriginal: "Thử đăng nhập lại",
-    retryOriginalHint: "Nhập lại mật khẩu hoặc mã xác minh cho lần đăng nhập này.",
     retryCode: "Mã xác minh",
     unknownAttempt: "Đăng nhập chưa hoàn tất. Vui lòng thử lại.",
     verificationPending: "Hoàn tất xác minh để đăng nhập.",

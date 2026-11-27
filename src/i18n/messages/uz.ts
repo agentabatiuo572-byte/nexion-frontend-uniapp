@@ -767,7 +767,6 @@ export const uz: Messages = {
   login: {
     recoverAttempt: "Kirish natijasini tekshirish",
     retryOriginal: "Qayta kirish",
-    retryOriginalHint: "Bu kirish uchun parol yoki tasdiqlash kodini qayta kiriting.",
     retryCode: "Tasdiqlash kodi",
     unknownAttempt: "Kirish yakunlanmadi. Qayta urining.",
     verificationPending: "Kirishni yakunlash uchun tasdiqlash kerak.",

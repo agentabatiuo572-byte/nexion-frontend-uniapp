@@ -417,7 +417,6 @@ export const en = {
   login: {
     recoverAttempt: "Check sign-in result",
     retryOriginal: "Retry sign-in",
-    retryOriginalHint: "Re-enter the password or verification code for this sign-in.",
     retryCode: "Verification code",
     unknownAttempt: "Sign-in is incomplete. Please retry.",
     verificationPending: "Verification is required to finish signing in.",

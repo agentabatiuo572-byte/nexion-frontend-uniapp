@@ -767,7 +767,6 @@ export const ru: Messages = {
   login: {
     recoverAttempt: "Проверить результат входа",
     retryOriginal: "Повторить вход",
-    retryOriginalHint: "Введите заново пароль или код подтверждения для этого входа.",
     retryCode: "Код подтверждения",
     unknownAttempt: "Вход не завершён. Повторите попытку.",
     verificationPending: "Чтобы войти, пройдите проверку.",

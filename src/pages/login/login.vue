@@ -110,9 +110,9 @@
       </view>
 
       <!-- Primary CTA -->
-      <!-- A greyed CTA still takes the tap (onPrimary writes the reason into the error line): no `disabled` prop, only the
-           50% look and aria-disabled (03 §3.1). Busy shows NxButton's spinner and takes no taps. -->
-      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
+      <!-- Incomplete fields still allow a tap to show their reason. A missing challenge disables the CTA.
+           Busy shows NxButton's spinner and takes no taps. -->
+      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :disabled="otpChallengeMissing" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
            directly above is showing, that line carries the reason and the button points to it instead. The recovery view
            has the same line under its own button (lg-retry-reason). The line keeps its height when it has
@@ -385,6 +385,7 @@ const phoneFormatMessage = computed(() => {
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const otpScene = computed<OtpScene>(() => (mode.value === "reset" ? "reset" : "login"));
 const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
+const otpChallengeMissing = computed(() => step.value === 2 && !otpRequestId.value && !remoteTwoFactorChallenge.value);
 // Login mode accepts any non-empty password (existing users may have shorter
 // passwords from before the strength rule) — mirrors prototype `pwdOk`.
 const pwdOk = computed(() => password.value.length > 0);
@@ -419,7 +420,7 @@ const primaryText = computed(() => {
 });
 const canPrimary = computed(() => {
   if (step.value === 1) return mode.value === "password" ? (phoneOk.value && pwdOk.value && !loading.value) : (phoneOk.value && !loading.value);
-  if (step.value === 2) return codeOk.value && !loading.value;
+  if (step.value === 2) return !otpChallengeMissing.value && codeOk.value && !loading.value;
   return pwdMatch.value && !loading.value;
 });
 const primaryDisabledReason = computed(() => {
@@ -428,7 +429,10 @@ const primaryDisabledReason = computed(() => {
     if (!phoneOk.value) return t.value.register.ctaDisabledPhone;
     if (mode.value === "password" && !pwdOk.value) return t.value.login.errorInvalidPassword;
   }
-  if (step.value === 2 && !codeOk.value) return t.value.login.errorInvalidCode;
+  if (step.value === 2) {
+    if (otpChallengeMissing.value) return resendLeft.value > 0 ? resendInText.value : t.value.authOtp.errorOtpExpired;
+    if (!codeOk.value) return t.value.login.errorInvalidCode;
+  }
   if (step.value === 3) {
     if (!newPwdOk.value) return t.value.login.errorWeakPassword;
     if (!confirmPwd.value) return t.value.login.confirmPasswordPlaceholder;
@@ -539,6 +543,7 @@ function onNewPwd(e: Event) { newPassword.value = inputVal(e); error.value = nul
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
 function onCode(value: string) {
   code.value = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
+  if (otpChallengeMissing.value) return;
   error.value = null;
   if (codeOk.value) verifyCode();
 }
@@ -897,7 +902,7 @@ async function verifyRemoteTwoFactor() {
   }
 }
 async function verifyCode() {
-  if (loading.value || signInTimer) return;
+  if (loading.value || signInTimer || otpChallengeMissing.value) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
   if (remoteTwoFactorChallenge.value) { await verifyRemoteTwoFactor(); return; }
@@ -1034,12 +1039,11 @@ async function finishReset() {
       refreshResend();
       step.value = 2;
       focusCode();
+      return;
     }
-    error.value = invalidOtp
-      ? t.value.authOtp.errorOtpInvalidOrExpired
-      : message === "USER_NEW_PASSWORD_MUST_DIFFER"
-        ? t.value.login.errorPasswordUnchanged
-        : t.value.authOtp.errorServiceUnavailable;
+    error.value = message === "USER_NEW_PASSWORD_MUST_DIFFER"
+      ? t.value.login.errorPasswordUnchanged
+      : t.value.authOtp.errorServiceUnavailable;
     return;
   }
   loading.value = false;

@@ -767,7 +767,6 @@ export const ms: Messages = {
   login: {
     recoverAttempt: "Semak keputusan log masuk",
     retryOriginal: "Cuba log masuk lagi",
-    retryOriginalHint: "Masukkan semula kata laluan atau kod pengesahan untuk log masuk ini.",
     retryCode: "Kod pengesahan",
     unknownAttempt: "Log masuk tidak lengkap. Sila cuba lagi.",
     verificationPending: "Pengesahan diperlukan untuk melengkapkan log masuk.",
