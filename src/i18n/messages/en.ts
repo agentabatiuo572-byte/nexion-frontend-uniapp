@@ -5660,7 +5660,7 @@ openSeaErrorPool: {
     confirmDelayed: "Network congested — confirmation is taking longer",
     copyAddress: "Copy address",
     addrCopied: "Address copied",
-    depositOpFailedNote: "Deposit information is temporarily unavailable. Refresh or contact support.",
+    depositOpFailedNote: "Deposit information is temporarily unavailable. Refresh or contact support.", depositReadRetrying: "Unable to load top-up details. Retrying automatically.",
     addrPreparing: "Preparing your deposit address. It will appear automatically.",
     addrLoadFailed: "Couldn't load your deposit address",
     cardFeeLabel: "Card fee {rate}",

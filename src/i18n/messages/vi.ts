@@ -5563,7 +5563,7 @@ openSeaErrorPool: {
     confirmDelayed: "Mạng tắc nghẽn, xác nhận lâu hơn bình thường",
     copyAddress: "Sao chép địa chỉ",
     addrCopied: "Đã sao chép địa chỉ",
-    depositOpFailedNote: "Thông tin nạp tiền tạm thời chưa khả dụng. Vui lòng làm mới hoặc liên hệ hỗ trợ.",
+    depositOpFailedNote: "Thông tin nạp tiền tạm thời chưa khả dụng. Vui lòng làm mới hoặc liên hệ hỗ trợ.", depositReadRetrying: "Chưa tải được thông tin nạp tiền. Đang tự động thử lại.",
     addrPreparing: "Đang chuẩn bị địa chỉ nạp. Địa chỉ sẽ tự động hiển thị khi sẵn sàng.",
     addrLoadFailed: "Không tải được địa chỉ nạp",
     cardFeeLabel: "Phí thẻ {rate}",

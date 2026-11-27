@@ -5888,7 +5888,7 @@ export const fil: Messages = {
     confirmDelayed: "Congested ang network — mas matagal ang kumpirmasyon",
     copyAddress: "Kopyahin ang address",
     addrCopied: "Nakopya ang address",
-    depositOpFailedNote: "Pansamantalang hindi available ang impormasyon ng deposit. Mag-refresh o makipag-ugnayan sa support.",
+    depositOpFailedNote: "Pansamantalang hindi available ang impormasyon ng deposit. Mag-refresh o makipag-ugnayan sa support.", depositReadRetrying: "Hindi pa ma-load ang detalye ng top-up. Awtomatikong sinusubukan muli.",
     addrPreparing: "Inihahanda ang address ng deposit mo. Awtomatiko itong lalabas.",
     addrLoadFailed: "Hindi ma-load ang address ng deposit mo",
     cardFeeLabel: "Fee sa card {rate}",

@@ -5888,7 +5888,7 @@ export const uz: Messages = {
     confirmDelayed: "Tarmoq band — tasdiqlash uzoqroq davom etmoqda",
     copyAddress: "Manzilni nusxalash",
     addrCopied: "Manzil nusxalandi",
-    depositOpFailedNote: "Toʻldirish maʼlumotlarini vaqtincha yuklab boʻlmaydi. Yangilang yoki yordam xizmatiga murojaat qiling.",
+    depositOpFailedNote: "Toʻldirish maʼlumotlarini vaqtincha yuklab boʻlmaydi. Yangilang yoki yordam xizmatiga murojaat qiling.", depositReadRetrying: "Toʻldirish maʼlumotlari yuklanmadi. Avtomatik qayta urinilmoqda.",
     addrPreparing: "Toʻldirish manzilingiz tayyorlanmoqda. U avtomatik paydo boʻladi.",
     addrLoadFailed: "Toʻldirish manzilini yuklab boʻlmadi",
     cardFeeLabel: "Karta haqi {rate}",

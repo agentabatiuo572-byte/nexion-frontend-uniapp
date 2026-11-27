@@ -5569,7 +5569,7 @@ openSeaErrorPool: {
     confirmDelayed: "网络拥堵,确认时间延长",
     copyAddress: "复制地址",
     addrCopied: "地址已复制",
-    depositOpFailedNote: "充值信息暂不可用，请刷新或联系客服。",
+    depositOpFailedNote: "充值信息暂不可用，请刷新或联系客服。", depositReadRetrying: "暂时无法读取充值信息，正在自动重试。",
     addrPreparing: "正在准备充值地址，完成后将自动显示",
     addrLoadFailed: "充值地址加载失败",
     cardFeeLabel: "卡通道费 {rate}",

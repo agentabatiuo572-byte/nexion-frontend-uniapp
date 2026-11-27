@@ -315,7 +315,7 @@ async function retryReadData() {
     const results = await Promise.allSettled([fx.load(), dep.refreshRemoteVietQrDeposits()]);
     if (!pageActive.value || !paymentSessionReady.value || accountKey !== app.accountKey || bindingEpoch !== app.accountBindingEpoch) return;
     readError.value = dep.serverStatus === "error" || results.some(result => result.status === "rejected")
-      ? t.value.topupChrome.depositOpFailedNote : "";
+      ? t.value.topupChrome.depositReadRetrying : "";
   } finally { readRetryPending.value = false; }
 }
 type PaymentReadScope = { accountKey: string; bindingEpoch: number };
@@ -370,7 +370,7 @@ watch(
           || app.accountKey !== accountKey || app.accountBindingEpoch !== bindingEpoch) return;
       if (dep.serverStatus === "error" && dep.serverError) {
         console.warn("[deposit] refresh failed:", dep.serverError);
-        readError.value = t.value.topupChrome.depositOpFailedNote;
+        readError.value = t.value.topupChrome.depositReadRetrying;
       }
     });
     dep.startRemoteVietQrPolling();
@@ -409,7 +409,7 @@ watch(
     } else {
       pendingPaymentRead = null;
       successfulPaymentRead.value = null;
-      if (status === "error" && initialStatus === "error") readError.value = t.value.topupChrome.depositOpFailedNote;
+      if (status === "error" && initialStatus === "error") readError.value = t.value.topupChrome.depositReadRetrying;
     }
   },
   { flush: "post" },

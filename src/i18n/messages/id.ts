@@ -5888,7 +5888,7 @@ export const id: Messages = {
     confirmDelayed: "Jaringan padat — konfirmasi butuh waktu lebih lama",
     copyAddress: "Salin alamat",
     addrCopied: "Alamat disalin",
-    depositOpFailedNote: "Informasi top up sementara tidak tersedia. Muat ulang atau hubungi layanan pelanggan.",
+    depositOpFailedNote: "Informasi top up sementara tidak tersedia. Muat ulang atau hubungi layanan pelanggan.", depositReadRetrying: "Info top up belum bisa dimuat. Mencoba lagi otomatis.",
     addrPreparing: "Menyiapkan alamat top up Anda. Alamat akan muncul otomatis.",
     addrLoadFailed: "Alamat top up gagal dimuat",
     cardFeeLabel: "Biaya kartu {rate}",

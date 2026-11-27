@@ -5888,7 +5888,7 @@ export const ms: Messages = {
     confirmDelayed: "Rangkaian sesak — pengesahan mengambil masa lebih lama",
     copyAddress: "Salin alamat",
     addrCopied: "Alamat disalin",
-    depositOpFailedNote: "Maklumat deposit tidak tersedia buat sementara. Muat semula atau hubungi khidmat pelanggan.",
+    depositOpFailedNote: "Maklumat deposit tidak tersedia buat sementara. Muat semula atau hubungi khidmat pelanggan.", depositReadRetrying: "Maklumat tambah nilai belum dapat dimuatkan. Mencuba semula secara automatik.",
     addrPreparing: "Menyediakan alamat deposit anda. Ia akan dipaparkan secara automatik.",
     addrLoadFailed: "Alamat deposit gagal dimuatkan",
     cardFeeLabel: "Caj kad {rate}",
