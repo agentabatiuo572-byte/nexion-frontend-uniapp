@@ -4,10 +4,10 @@
       <!-- Top bar -->
       <view class="rg-top">
         <view v-if="step > 1" class="rg-iconbtn" role="button" tabindex="0" :aria-label="t.register.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          <view class="rg-iconbtn__face nx-design-glass"><LiquidGlass :radius="20" tone="navigation" :blur="8" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></view>
         </view>
         <view v-else class="rg-iconbtn" role="button" tabindex="0" :aria-label="t.register.close" @click="close" @keydown.enter.prevent="close" @keydown.space.prevent="close">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          <view class="rg-iconbtn__face nx-design-glass"><LiquidGlass :radius="20" tone="navigation" :blur="8" /><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></view>
         </view>
         <view class="rg-brand">
           <BrandLockup :height="40" />
@@ -22,7 +22,7 @@
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ displayNickname(sponsorPreview.displayName) }}</text> {{ sponsorPreview.kind === "ADVISOR" ? t.ref.advisorLabel : t.ref.invitedYou }}</text>
           <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ formatAmount(giftUsdt) }} + {{ formatAmount(giftNex) }} UVT</text>
         </view>
-        <text v-if="sponsorPreview.vRank && sponsorPreview.kind !== 'ADVISOR'" class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
+        <NxTag v-if="sponsorPreview.vRank && sponsorPreview.kind !== 'ADVISOR'" tone="brand">{{ sponsorPreview.vRank }}</NxTag>
       </view>
 
       <!-- Step dots -->
@@ -58,7 +58,7 @@
               <text class="rg-phone__cc-t">{{ country }}</text>
               <view :style="{ display: 'grid', flex: 'none', transform: showCountries ? 'rotate(180deg)' : '' }"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg></view>
             </view>
-            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :cursor-spacing="keyboardSpacing.phone" :placeholder="t.register.phonePlaceholder" :aria-label="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @blur="phoneTouched = true" @confirm="onCta" />
+            <input class="rg-phone__in" type="number" inputmode="numeric" maxlength="15" :cursor-spacing="keyboardSpacing.phone" :placeholder="t.register.phonePlaceholder" :aria-label="t.register.phonePlaceholder" :value="phone" :aria-invalid="!!phone && !phoneOk" aria-describedby="register-phone-format" confirm-type="done" @input="onPhone" @confirm="onCta" />
           </view>
           <text id="register-phone-format" data-testid="auth-phone-hint" class="rg-phone-hint" :class="{ 'rg-phone-hint--err': phone && !phoneOk }" role="status" aria-live="polite">{{ phoneFormatMessage }}</text>
           <view class="rg-invite">
@@ -115,7 +115,7 @@
         <text class="rg-review__body">{{ reviewNoticeBody }}</text>
       </view>
       <!-- Error -->
-      <view v-if="error" class="rg-error" role="alert" aria-live="assertive">
+      <view v-if="error" id="rg-error" class="rg-error" role="alert" aria-live="assertive">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="rg-error__t">{{ error }}</text>
       </view>
@@ -131,11 +131,12 @@
         :label="ctaLabel"
         :busy="busy"
         :aria-disabled="!ctaEnabled || busy"
-        :aria-describedby="!ctaEnabled && !busy && (phoneTouched || submitAttempted) ? 'rg-cta-reason' : undefined"
+        :aria-describedby="!ctaEnabled && !busy ? (error ? 'rg-error' : 'rg-cta-reason') : undefined"
         @click="onCta"
       />
-      <!-- 简报 #213:空白表单首次展示必须中性 —— 交互过或尝试提交后才给出禁用原因。 -->
-      <text v-if="!ctaEnabled && !busy && (phoneTouched || submitAttempted)" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
+      <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
+           directly above is showing, that line carries the reason and the button points to it instead. -->
+      <text v-if="!ctaEnabled && !busy && !error" id="rg-cta-reason" class="rg-cta-reason">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
       <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" :before-start="manualInviteAccepted" :sponsor-rejected="rejectSponsorCode" @busy="oauthBusy = $event" />
@@ -179,6 +180,7 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import OtpCodeInput from "@/components/otp-code-input.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
+import LiquidGlass from "@/components/liquid-glass.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
 import { useOtpResend } from "@/composables/use-otp-resend";
@@ -262,15 +264,6 @@ const confirmPwd = ref("");
 const showPwd = ref(false);
 const confirmPasswordFocused = ref(false);
 const error = ref<string | null>(null);
-/**
- * 简报 #213(与 #211 同一类):空白表单首次展示必须中性。此前 CTA 的禁用原因只挂在
- * `!ctaEnabled` 上,空表单天然满足,于是「请输入有效手机号后继续。」从首帧起就在 DOM 里;
- * 它虽带 .rg-sr-only,但 uni-app 会把内容包进内部 <span>,clip: rect(0,0,0,0) 裁不住
- * 那个子盒,文本提取与自动化因此能读到用户从未触发的校验错误。
- * 现在只在用户与手机号字段交互过、或尝试提交过之后才渲染。
- */
-const phoneTouched = ref(false);
-const submitAttempted = ref(false);
 const devBackendDown = ref(false);
 const showCaptcha = ref(false);
 const registrationRisk = ref<RegistrationAssessment | null>(null);
@@ -477,7 +470,6 @@ function inputVal(e: Event): string {
 function onPhone(e: Event) {
   const next = sanitizePhoneInput(inputVal(e));
   if (phone.value !== next) changeOtpNumber();
-  phoneTouched.value = true;
   phone.value = next;
   error.value = null;
   registrationRisk.value = null;
@@ -508,7 +500,6 @@ function pickCountry(c: string) {
 }
 
 function onCta() {
-  submitAttempted.value = true;
   if (busy.value) return;
   if (requiresOriginalRegistrationRecovery(authApi, { countryCode: country.value, phone: phoneClean.value })) {
     error.value = t.value.login.unknownAttempt;
@@ -1087,26 +1078,32 @@ onUnmounted(() => cleanup());
 .rg-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
 .rg-wrap { display: flex; flex-direction: column; padding: 16px 24px 0; min-height: 100%; box-sizing: border-box; }
 .rg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-.rg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; transition: opacity 0.15s; }
+.rg-iconbtn { position: relative; width: 44px; height: 44px; margin-left: -2px; display: grid; place-items: center; justify-self: start; }
+/* 03 §3.1 顶部图标动作: its own Liquid Glass round face, as on SubPageHeader and the onboarding back; 40 face, 44 target. */
+.rg-iconbtn__face { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; transition: transform 100ms cubic-bezier(.2, .8, .2, 1); }
+.rg-iconbtn__face > svg, .rg-iconbtn__face > .nx-native-svg { position: relative; z-index: 1; }
+[data-theme="light"] .rg-iconbtn__face { --ui-control-shadow: var(--v5-glass-shadow); }
+.rg-iconbtn:active .rg-iconbtn__face { transform: scale(.92); }
+@media (prefers-reduced-motion: reduce) { .rg-iconbtn__face { transition: none; } .rg-iconbtn:active .rg-iconbtn__face { transform: none; } }
 /* 《08》§2 按下反馈(同 login) */
-.rg-iconbtn:active, .rg-phone__cc:active { opacity: 0.6; }
+.rg-phone__cc:active { opacity: 0.6; }
 .rg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .rg-top__sp { }
-.rg-sponsor { --nx-tint: var(--v5-brand); margin-top: 16px; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; }
+.rg-sponsor { --nx-tint: var(--v5-brand); margin-top: 16px; border-radius: var(--ui-radius-surface); padding: var(--ui-space-inset); display: flex; align-items: center; gap: 12px; }
 .rg-sponsor__av { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: linear-gradient(135deg, var(--v5-brand), var(--v5-tech-cyan)); }
 .rg-sponsor__av-t { color: var(--v5-on-brand); font-size: 24px; }
 .rg-sponsor__body { flex: 1; min-width: 0; }
-.rg-sponsor__name { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.rg-sponsor__name-b { font-weight: 600; }
-.rg-sponsor__gift { display: block; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--v5-brand); margin-top: 2px; }
-.rg-sponsor__v { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 15%, transparent); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+.rg-sponsor__name { display: block; font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rg-sponsor__name-b { font-weight: var(--ui-type-list-title-weight); }
+.rg-sponsor__gift { display: block; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-brand); margin-top: 4px; }
 .rg-dots { margin-top: 28px; display: flex; align-items: center; gap: 6px; }
-.rg-dot { height: 4px; width: 16px; border-radius: 9999px; background: var(--v5-surface-2); transition: all 0.3s; }
+/* Upcoming step: foreground 8%, the step-track tone of 04 (onboarding track), so it reads on both page floors. */
+.rg-dot { height: 4px; width: 16px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); transition: all 0.3s; }
 .rg-dot--active { width: 32px; background: var(--v5-brand); }
 .rg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .rg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
-.rg-subtitle { display: block; margin-top: 8px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
-.rg-subtitle__hl { color: var(--v5-brand); font-weight: 600; }
+.rg-subtitle { display: block; margin-top: 8px; font-size: var(--ui-type-list-subtitle); line-height: var(--ui-type-list-subtitle-lh); color: var(--v5-ink-3); }
+.rg-subtitle__hl { color: var(--v5-brand); font-weight: var(--ui-type-list-title-weight); }
 .rg-subtitle__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .rg-body { margin-top: 28px; }
 .rg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
@@ -1138,18 +1135,20 @@ onUnmounted(() => cleanup());
 .rg-review { margin-top: 16px; border-radius: 12px; background: var(--v5-warning-soft); padding: 8px 12px; }
 .rg-review__title { display: block; font-size: var(--ui-type-description); line-height: var(--ui-type-description-lh); font-weight: 500; color: var(--v5-warning-ink); }
 .rg-review__body { display: block; margin-top: 4px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
-.rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-danger); background: var(--v5-danger-soft); border-radius: 12px; padding: 8px 12px; }.rg-phone-hint { display: block; margin-top: 8px; font-size: var(--ui-type-note); color: var(--v5-ink-3); }
+.rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-danger); background: var(--v5-danger-soft); border-radius: 12px; padding: 8px 12px; }
+.rg-phone-hint { display: block; margin-top: 8px; font-size: var(--ui-type-note); color: var(--v5-ink-3); }
 .rg-phone-hint--err { color: var(--v5-danger); }
 .rg-devbanner { margin-top: 12px; border-radius: 12px; padding: 8px 12px; background: var(--v5-warning-soft); }
 .rg-devbanner__t { font-size: var(--ui-type-note); color: var(--v5-warning-ink); }
 .rg-error__t { flex: 1; }
-.rg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .rg-cta { margin-top: 20px; }
 .rg-cta--off { opacity: .5; }
+/* 03 §3.1 禁用: the greyed CTA names its reason in one neutral line right under it (description role, ink-3). */
+.rg-cta-reason { display: block; margin-top: 8px; text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .rg-oauth { }
 .rg-divider { display: flex; align-items: center; margin: 24px 0; }
-.rg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
-.rg-divider__t { padding: 0 12px; font-size: 12px; color: var(--v5-ink-3); }
+.rg-divider__line { flex: 1; height: 1px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.rg-divider__t { padding: 0 12px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .rg-mode-badge { align-self: flex-start; margin-top: 8px; }
 .rg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .rg-footer__acc { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
