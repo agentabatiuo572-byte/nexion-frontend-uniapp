@@ -101,8 +101,6 @@
 
         <template v-else-if="formStep === 'account'">
           <view class="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg><text>{{ displayConfig.beneficiary ? c.bindingNotice : c.unboundNotice }}</text></view>
-          <view v-if="displayConfig.enabled && displayConfig.beneficiary && (!displayConfig.policy || !displayConfig.capacity)" class="notice" role="status"><text>{{ c.capacityUnavailable }}</text></view>
-          <view v-else-if="displayConfig.capacity && !displayConfig.capacity.withdrawalEnabled" class="notice"><text>{{ c.unavailable }}</text></view>
         </template>
 
         <template v-else>
@@ -135,7 +133,7 @@
         </template>
         <view v-if="error" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
-        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
+        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
       </template>
       <template v-else-if="requestedOrder === null && !pendingAttempt">
         <text class="screen-title" role="heading" aria-level="1">{{ title }}</text>
@@ -166,6 +164,8 @@
           <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="confirmSubmit" @keydown.enter.prevent="confirmSubmit" @keydown.space.prevent="confirmSubmit"><text>{{ c.confirm }}</text></view>
         </template>
         <template v-else-if="formStep === 'account'">
+          <!-- Grey 「继续提现」: its reason above both buttons (03 §3.1 bottom bar), as on the amount step. -->
+          <text v-if="continueReason" class="nx-tray-note" role="status" data-testid="bank-continue-reason">{{ continueReason }}</text>
           <view class="action secondary nx-tray-text" role="button" tabindex="0" :aria-disabled="busy" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ displayConfig.beneficiary ? c.changeAccount : c.addAccount }}</text></view>
           <view v-if="displayConfig.beneficiary" class="action primary" role="button" tabindex="0" data-testid="bank-continue" :aria-disabled="busy || !canContinue" @click="continueWithdrawal" @keydown.enter.prevent="continueWithdrawal" @keydown.space.prevent="continueWithdrawal"><text>{{ c.continueWithdrawal }}</text></view>
         </template>
@@ -318,6 +318,13 @@ const quoteReason = computed(() => {
   // Missing limits are a read the system is retrying; a closed channel is not.
   if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
+});
+// Why 「继续提现」 is grey on the account step: limits the system is re-reading, or a closed channel. Same read guard as quoteReason.
+const continueReason = computed(() => {
+  const shown = displayConfig.value;
+  if ((busy.value && !silentRead.value) || !shown?.enabled || !shown.beneficiary) return "";
+  if (!shown.policy || !shown.capacity) return c.value.capacityUnavailable;
+  return shown.capacity.withdrawalEnabled ? "" : c.value.unavailable;
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
@@ -762,6 +769,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .bar-space--result { height: 168px; }
 /* A reason above the button makes the tray taller: up to two note lines over the 48 button (04 §4.0 clearance). */
 .bar-space--note { height: 150px; }
+/* Account step with a reason: up to two note lines over the two buttons, which stack in long languages. */
+.bar-space--result-note { height: 208px; }
 .bar > .nx-tray-note { flex: 1 1 100%; }
 /* Buttons size to their words so no label wraps; when two labels cannot share one row (long languages at 360), the bar stacks them. */
 .bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
