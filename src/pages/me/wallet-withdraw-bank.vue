@@ -754,8 +754,9 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .ticket__net { padding: 14px 16px 16px; }
 .ticket__net > .k:first-child { padding-top: 3.5px; }
 /* The bank amount in main ink like both confirms: success colour is for status only (01 §1.1.1 rule 4); the ₫ symbol
-   follows the 01.2 amount anatomy (max(12px, .55em), 500, secondary ink). */
-.ticket__vnd { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+   follows the 01.2 amount anatomy (max(12px, .55em), 500, secondary ink). Size: the 10.1 display-title role, the nearest
+   to the old 28/34 (390: 26/34, 360: 24/32), in the amount face at 500 (01.2: amounts do not take 600). */
+.ticket__vnd { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ticket__cur { margin-left: 2px; color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
 .ticket__net .hint { margin-top: 6px; }
 .consent { margin: 16px 4px 0; }
