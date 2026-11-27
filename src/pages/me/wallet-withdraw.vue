@@ -110,7 +110,7 @@
         </view>
         <view class="wd-notice__main">
           <text v-if="rejectNotice" class="wd-notice__title">{{ riskNoticeTitle }}</text>
-          <text class="wd-notice__t" :class="{ 'wd-notice__t--sub': rejectNotice }">{{ rejectNotice ? riskNoticeBody : t.walletV3.withdrawReviewNotice }}</text>
+          <text class="wd-notice__t" :class="{ 'wd-notice__t--sub': rejectNotice }">{{ rejectNotice ? riskNoticeBody : reviewNoticeText }}</text>
         </view>
       </view>
 
@@ -317,7 +317,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { forgetWithdrawAttempt, newWithdrawKey, readWithdrawAttempt, rememberWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { createAbortController } from "@/lib/abort-controller-compat";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
-import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
+import { normalizeReviewWindowDays, normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
 import { financialFactState, shouldRequestWithdrawalEligibility, withdrawalFactsActionsFresh } from "@/lib/withdrawal-facts-state";
@@ -1226,6 +1226,19 @@ const quoteBlocked = computed(() =>
 // One review notice under the amount: the risk route's, or the policy's compliance review before the route is read.
 const reviewNoticeVisible = computed(() => withdrawalRiskNotice.value || complianceHoldEnabled.value);
 const rejectNotice = computed(() => withdrawalRiskNotice.value && eligibility.value.route === "reject");
+// An extra compliance wait is said before submit (06 §6.5), as days only: the server's decision for this amount when read,
+// else the policy guidance; the same applies-test the page used before.
+const complianceHoldDays = computed(() => {
+  const policy = withdrawalPolicy.value;
+  if (!complianceHoldEnabled.value || !policy || amountNum.value <= 0) return 0;
+  const applies = remoteEligibility.value?.complianceHoldApplies ?? amountNum.value > policy.complianceReviewThresholdUsdt;
+  return normalizeReviewWindowDays(remoteEligibility.value?.complianceHoldDays ?? (applies ? policy.cooldownDays : 0));
+});
+const reviewNoticeText = computed(() => complianceHoldDays.value > 0
+  // A full-width stop needs no space before the next sentence; Latin and Cyrillic sentences do.
+  ? [t.value.walletV3.withdrawReviewNotice, fmt(t.value.walletV3.withdrawHoldNotice, { days: complianceHoldDays.value })]
+    .join(t.value.walletV3.withdrawReviewNotice.endsWith("。") ? "" : " ")
+  : t.value.walletV3.withdrawReviewNotice);
 // ── 提现说明:只在拿到 policy 且当前网络开放时出现;金额全部读 policy(单笔最高是展示常量)。──
 const rulesOpen = ref(false);
 const rulesReady = computed(() => withdrawalPolicyCurrent.value && !!withdrawalPolicy.value && !networkClosed.value);
@@ -1234,7 +1247,7 @@ function withdrawRulesItems(net: CryptoNetwork, networkFee: number): RuleItem[] 
   const usdt = (value: number) => `${formatGroupedAmount(value, "full")}\u00A0USDT`;
   const label = ALL_NETWORKS.find((nw) => nw.id === net)!.label;
   return [
-    { title: r.amountTitle, body: r.amountBody, figures: { min: usdt(minWithdrawable.value), max: usdt(USDT_WITHDRAWAL_DISPLAY_MAX) } },
+    { title: r.amountTitle, body: r.amountBody, figures: { range: `${formatGroupedAmount(minWithdrawable.value, "full")}–${formatGroupedAmount(USDT_WITHDRAWAL_DISPLAY_MAX, "full")}\u00A0USDT` } },
     { title: r.etaTitle, body: r.etaBody },
     formatGroupedAmount(networkFee, "full") === "0"
       ? { title: r.feeTitle, body: r.feeFreeBody, values: { network: label } }
