@@ -984,7 +984,7 @@ function goStore() {
 .device-phone-card__cta { display: inline-flex; margin-top: 12px; }
 .device-phone-card__art { position: relative; width: 84px; height: 72px; }
 .device-phone-card__img { position: absolute; left: 3px; top: 2px; width: 78px; height: 64px; }
-.device-phone-card__floor { position: absolute; left: 20%; right: 20%; bottom: 2px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
+.device-phone-card__floor { position: absolute; left: 20%; right: 20%; bottom: 12px; height: 8px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.65), transparent); }
 [data-theme="light"] .device-phone-card__floor { background: radial-gradient(closest-side, rgba(20,16,8,.20), transparent); }
 .device-page__bar-space { height: calc(110px + env(safe-area-inset-bottom)); }
 .device-page__bar { position: absolute; z-index: 36; display: flex; }

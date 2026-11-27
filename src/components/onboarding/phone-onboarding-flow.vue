@@ -60,7 +60,7 @@
             </svg></view>
             <view class="cn-score__ctr" aria-hidden="true">
               <text v-if="dialMode === 'scan' || enterFrom === 'scan'" class="cn-score__scan-t">{{ t.onboarding.detecting }}</text>
-              <text v-else-if="tapToStart" class="cn-score__tap-t" :style="{ maxWidth: dialGeo.inner * 1.4 + 'px' }">{{ t.onboarding.tapToCalibrate }}</text>
+              <text v-else-if="tapToStart" class="cn-score__tap-t" :style="{ maxWidth: dialGeo.inner * 1.8 + 'px' }">{{ t.onboarding.tapToCalibrate }}</text>
               <svg v-else width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></svg>
             </view>
             <!-- Count while the entrance runs; under reduced motion the final value shows at once. -->
@@ -1387,7 +1387,8 @@ export default calibrationDialView;
 .cn-score--scan .cn-score__num { opacity: var(--cn-number-opacity, 0); }
 .cn-score__ctr { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; color: var(--v5-ink-3); }
 .cn-score__scan-t { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
-/* Start: the whole dial is the button; its prompt is the brand-coloured action text in the centre. */
+/* Start: the whole dial is the button; its prompt is the brand-coloured action text in the centre. It is a prompt inside a
+   round target, not a pill button, so a long language may take two balanced lines (the inner circle fits both). */
 .cn-score--tap { border-radius: 50%; cursor: pointer; }
 .cn-score--tap:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 4px; }
 .cn-score__tap-t { font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); color: var(--v5-brand); text-align: center; text-wrap: balance; transition: opacity 100ms ease-out; }
