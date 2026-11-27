@@ -630,7 +630,6 @@ const head = computed<Head>(() => {
     if (feedback.detail === "phoneCalibrationPendingBody") return { tone: "warning", icon: "clock", title: o.phoneCalibrationPendingTitle, body };
     if (feedback.action === "devices") return { tone: "danger", icon: "failed", title: o.rejectTitleBlocked, body, link: canDefer.value ? "retry" : undefined };
     if (feedback.action === "support") return { tone: "danger", icon: "failed", title: o.rejectTitleSupport, body };
-    if (feedback.action === "terms") return { tone: "warning", icon: "alert", title: o.rejectTitleTerms, body, link: "support" };
     if (feedback.action === "login") return { tone: "warning", icon: "alert", title: o.rejectTitleLogin, body, link: "support" };
     if (feedback.action === "recalibrate") return { tone: "warning", icon: "alert", title: o.rejectTitleRecal, body };
     const title = feedback.detail === "phoneReplacementCooldown" ? o.rejectTitleBlocked
@@ -708,7 +707,6 @@ const bar = computed<Bar>(() => {
   const action = failureFeedback.value?.action;
   if (action === "devices") return pair(main(o.phoneActivationManageDevices, retry, true));
   if (supportRequired.value) return pair(main(o.iosContactSupport, retry, true));
-  if (action === "terms") return pair(main(o.phoneActivationTermsAction, retry, true));
   if (action === "login") return pair(main(o.phoneActivationLoginAction, retry, true));
   if (action === "recalibrate" || iosPending.value || (!action && (failedAction.value === "calibration" || canonical.value?.calibrationStatus === "PENDING_VERIFICATION")))
     return pair(main(o.iosRecalibrate, retry));
@@ -864,7 +862,6 @@ function retryCalibration(event?: Event) {
     void navReset("/pages/login/login");
     return;
   }
-  if (failureFeedback.value?.action === "terms") { navTo("/pages/onboarding/terms"); return; }
   if (supportRequired.value) { contactSupport(); return; }
   if (failureFeedback.value?.action === "recalibrate") { recalibrateNow(); return; }
   if (failedAction.value === "activate") {
