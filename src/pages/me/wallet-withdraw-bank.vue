@@ -117,17 +117,18 @@
                 <input data-testid="bank-amount" v-model="amount" type="text" inputmode="decimal" :disabled="busy || !canContinue" placeholder="0.00" :aria-label="c.amount" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" />
                 <text class="slab__unit">USDT</text>
               </view>
-              <view class="limits" v-if="displayConfig.policy && displayConfig.capacity">
-                <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
-                <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
+              <!-- Limits that came back missing keep their lines with 「—」 while the system re-reads them (03 §3.4, §3.5.2). -->
+              <view class="limits">
+                <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: displayConfig.capacity ? usdt2(displayConfig.capacity.maxWithdrawableUsdt) : "—" }) }}</text>
+                <text v-if="displayConfig.policy" data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
               </view>
               <text v-if="amountError" class="error-text" role="alert">{{ amountError }}</text>
             </view>
           </view>
           <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
-          <view v-if="displayConfig.policy && displayConfig.capacity" class="daily">
-            <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity.dailyRemainingCount, total: displayConfig.capacity.dailyLimitCount }) }}</text>
-            <view class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
+          <view class="daily">
+            <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity?.dailyRemainingCount ?? "—", total: displayConfig.capacity?.dailyLimitCount ?? "—" }) }}</text>
+            <view v-if="displayConfig.policy && displayConfig.capacity" class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
           </view>
           <view v-if="displayConfig.capacity?.dailyRemainingCount === 0" class="notice" role="status"><text>{{ c.dailyExhausted }} {{ displayDate(displayConfig.capacity.dailyCountResetAt) }}</text></view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
@@ -311,6 +312,8 @@ const amountError = computed(() => {
   if (busy.value && !silentRead.value) return "";
   const problem = silentRead.value ? bankAmountError(amount.value, displayConfig.value) : amountProblem.value;
   if (!problem) return "";
+  // Missing limits are a read the system is retrying; a closed channel is not.
+  if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
@@ -475,6 +478,14 @@ useAutoRecovery({
   failed: () => (canPollOrder() || canRecoverQuote()) && !busy.value && !readingOrder.value,
   retry: pollOrder,
   repeatMs: 15_000,
+});
+// Limits (single limit, balance, daily count) that came back missing are re-read by the system (03 §3.5.2).
+// Orders, unknown results and quotes have the reader above, and load() would clear a quote's consent, so they are left out.
+const limitsMissing = computed(() => !!config.value?.enabled && !!config.value.beneficiary && (!config.value.policy || !config.value.capacity));
+useAutoRecovery({
+  failed: () => canReadVisibleBankPage() && limitsMissing.value && !busy.value && !order.value && !uncertain.value && !quote.value,
+  retry: load,
+  repeatMs: 30_000,
 });
 
 watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenticated], ([isVisible, allowed, sessionReady, authenticated], [wasVisible]) => {
