@@ -3204,6 +3204,7 @@ export const uz: Messages = {
     notFoundMessage: "Siz qidirayotgan sahifa koʻchirilgan yoki mavjud emas.",
     notFoundCta: "Bosh sahifaga",
     navigationFailed: "Bu sahifani hozir ochib boʻlmadi. Qayta urinib koʻring.",
+    scrollRegion: "{title}, aylantirish mumkin",
   },
   profile: {
     copyUid: "UID nusxalash",

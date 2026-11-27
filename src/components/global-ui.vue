@@ -40,7 +40,10 @@
       </view>
       <!-- Detail layout (e.g. withdrawal): a recessed list of what will happen, the last row the amount received. With rules,
            rows and rules share one scrolling region; without them the wrapper adds nothing. -->
-      <view v-if="topConfirm.rows?.length || topConfirm.rules" :class="{ 'nx-modal__scroll': topConfirm.rules }">
+      <!-- With rules the scrolling body is also a keyboard stop (03 §3.5), so arrows and PageDown read it to the end. -->
+      <view v-if="topConfirm.rows?.length || topConfirm.rules" :class="{ 'nx-modal__scroll': topConfirm.rules }"
+        :role="topConfirm.rules ? 'region' : undefined" :tabindex="topConfirm.rules ? 0 : undefined"
+        :aria-label="topConfirm.rules ? fmt(t.ui.scrollRegion, { title: topConfirm.rules.title }) : undefined">
       <view v-if="topConfirm.rows?.length" class="nx-modal__rows">
         <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount, 'nx-modal__row--code': row.code }">
           <text class="nx-modal__k">{{ row.label }}</text>
@@ -106,6 +109,7 @@ import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxRulesList from "@/components/ui/nx-rules-list.vue";
 import { useUI } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import MilestoneCelebration from "@/components/milestone-celebration.vue";
 import PaymentPasswordDialog from "@/components/payment-password-dialog.vue";
 import PurchasePaymentDialog from "@/components/purchase-payment-dialog.vue";
@@ -149,11 +153,13 @@ function cancelConfirm() {
 }
 
 // 确认框:Esc = 取消(与点遮罩同义),Tab 只在框内循环,关掉后焦点回到触发它的按钮。
+// Opening focus stays on the first action (cancel, else the primary) even when the scrolling body before it is a Tab stop.
 useDialogA11y(
   computed(() => topConfirm.value !== null),
   ".nx-mask--confirm",
   cancelConfirm,
   true, 10,
+  () => document.querySelector(".nx-mask--confirm .nx-modal__actions [role=\"button\"]"),
 );
 // 断网遮罩:**不传 close** —— 它只有「重试」一条路,没有取消语义。
 // 给它接 Esc 会凭空造出一个"看起来关掉了、其实什么都没做"的出口。
@@ -242,6 +248,9 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 /* Rules under the rows: the dialog stops scrolling as a whole; the rows and rules scroll between a fixed head and actions. */
 .nx-modal--rules { overflow: hidden; }
 .nx-modal > .nx-modal__scroll { flex-shrink: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* The scrolling body takes keyboard focus: the shared focus ring for keyboard use, none for a tap. */
+.nx-modal__scroll:focus { outline: none; }
+.nx-modal__scroll:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .nx-modal__rules { margin-top: 20px; text-align: left; }
 .nx-modal__rules-title { display: block; margin-bottom: 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 /* Device block (03 §3.5): one surface-2 block, a row per device (art, name, number · where it goes), as the devices page. */

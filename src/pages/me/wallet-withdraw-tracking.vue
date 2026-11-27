@@ -120,7 +120,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { businessWallClock } from "@/lib/business-calendar";
 import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
 import { displayTimestamp, formatDisplayDateTime } from "@/lib/display-date";
-import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { formatTruncatedAmount } from "@/lib/amount-display";
 import { formatWalletCalendarDay } from "@/lib/wallet-bill-date";
 import { computed, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
@@ -469,14 +469,14 @@ const reasonLines = computed(() => [...new Set([
 // FEAT-WD02:fee 是结构化快照,展示只读 actualFeeUsd(旧单读盘时已归一,禁重算)。
 // Ticket header: amount anatomy and a status tag that names where the withdrawal stands.
 const amountParts = computed<[string, string]>(() => {
-  const text = wd.value ? formatAmount(wd.value.amount) : "", at = text.lastIndexOf(".");
+  const text = wd.value ? formatTruncatedAmount(wd.value.amount) : "", at = text.lastIndexOf(".");
   return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
 });
 const statusTag = computed(() => isTerminalDone.value ? steps.value[steps.value.length - 1]!.label
   : isFailedEnd.value ? failedTitle.value : isFrozenHold.value ? etaTitle.value : steps.value[currentIdx.value]?.label ?? "");
 const statusTone = computed(() => isTerminalDone.value ? "ok" : isFailedEnd.value ? "bad" : isFrozenHold.value ? "warn" : "brand");
 const viaLine = computed(() =>
-  wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: formatAmount(wd.value.fee.actualFeeUsd) }) : "",
+  wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: formatTruncatedAmount(wd.value.fee.actualFeeUsd) }) : "",
 );
 const etaTitle = computed(() =>
   wd.value?.status === "confirmed"

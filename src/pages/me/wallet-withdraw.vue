@@ -1304,10 +1304,10 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   // FEAT-WD01b:今日笔数用完 → 置灰 + 告知何时重置(不建单不扣款)
   if (decision.dailyLimitReached) return dailyLimitReachedText.value;
   if (amount < minWithdrawable.value) {
-    return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatAmount(minWithdrawable.value) });
+    return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatTruncatedAmount(minWithdrawable.value) });
   }
   if (amount > decision.maxWithdrawableUsdt) {
-    return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatAmount(decision.maxWithdrawableUsdt) });
+    return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatTruncatedAmount(decision.maxWithdrawableUsdt) });
   }
   if (!decision.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
   return "";
@@ -1319,7 +1319,7 @@ const submitHintVisible = computed(() => !pendingAttempt.value && Boolean(submit
   && (amountNum.value <= 0 || !quoteBlocked.value));
 
 function fmtNex(n: number): string {
-  return formatAmount(n);
+  return formatTruncatedAmount(n);
 }
 
 const canSubmit = computed(() => submitDisabledReason.value === "");

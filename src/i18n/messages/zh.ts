@@ -2772,6 +2772,7 @@ autoDetect: "自动识别即将推出",
     notFoundMessage: "你访问的页面已迁移或不存在。",
     notFoundCta: "返回首页",
     navigationFailed: "页面暂时无法打开，请重试。",
+    scrollRegion: "{title}，可滚动",
   },
   profile: {
     copyUid: "复制 UID",

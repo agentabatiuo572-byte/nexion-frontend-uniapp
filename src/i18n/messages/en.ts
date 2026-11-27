@@ -2808,6 +2808,8 @@ autoDetect: "auto-detect coming soon",
     notFoundMessage: "The page you're looking for has moved or doesn't exist.",
     notFoundCta: "Back to Home",
     navigationFailed: "That page couldn't be opened right now. Please try again.",
+    // Name of a dialog's scrolling body, a keyboard stop so its content can be scrolled (03 §3.5).
+    scrollRegion: "{title}, scrollable",
   },
   profile: {
     copyUid: "Copy UID",

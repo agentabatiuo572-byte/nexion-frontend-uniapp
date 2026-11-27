@@ -3204,6 +3204,7 @@ export const ms: Messages = {
     notFoundMessage: "Halaman yang anda cari telah dipindahkan atau tidak wujud.",
     notFoundCta: "Kembali ke Utama",
     navigationFailed: "Halaman itu tidak dapat dibuka sekarang. Sila cuba lagi.",
+    scrollRegion: "{title}, boleh ditatal",
   },
   profile: {
     copyUid: "Salin UID",

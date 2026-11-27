@@ -3204,6 +3204,7 @@ export const fil: Messages = {
     notFoundMessage: "Nailipat na o wala na ang page na hinahanap mo.",
     notFoundCta: "Bumalik sa Home",
     navigationFailed: "Hindi mabuksan ang page ngayon. Subukan ulit.",
+    scrollRegion: "{title}, puwedeng i-scroll",
   },
   profile: {
     copyUid: "Kopyahin ang UID",
