@@ -12,6 +12,14 @@ export interface PendingCheckoutCreate {
   productName?: string;
   voucherName?: string;
 }
+/** Stored merchandise subtotal and voucher discount also exist on pre-B127 pending records. */
+export function checkoutCreateRequest(entry: PendingCheckoutCreate) {
+  return {
+    ...entry.request,
+    expectedAmountUsdt: Math.max(0, entry.subtotal - entry.discount).toFixed(6),
+  };
+}
+
 type FailedCreate = Extract<OrderCreateCommand, { status: 'FAILED' }>;
 type Row = {
   creates: Record<string, PendingCheckoutCreate>;
