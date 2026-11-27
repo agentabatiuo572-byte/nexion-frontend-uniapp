@@ -89,7 +89,7 @@
             <view class="tear" aria-hidden="true" />
             <view class="ticket__net">
               <text class="k">{{ c.receiveLabel }}（VND）</text>
-              <text class="ticket__vnd">{{ formatAmount(quote.amountVnd, 'VND') }}₫</text>
+              <text class="ticket__vnd">{{ formatAmount(quote.amountVnd, 'VND') }}<text class="ticket__cur">₫</text></text>
               <text class="hint">{{ c.feeIncluded }}</text>
             </view>
           </view>
@@ -748,7 +748,10 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .tear::before { left: -28px; } .tear::after { right: -28px; }
 .ticket__net { padding: 14px 16px 16px; }
 .ticket__net > .k:first-child { padding-top: 3.5px; }
-.ticket__vnd { display: block; margin-top: 4px; color: var(--v5-success-ink); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The bank amount in main ink like both confirms: success colour is for status only (01 §1.1.1 rule 4); the ₫ symbol
+   follows the 01.2 amount anatomy (max(12px, .55em), 500, secondary ink). */
+.ticket__vnd { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 28px/34px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ticket__cur { margin-left: 2px; color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
 .ticket__net .hint { margin-top: 6px; }
 .consent { margin: 16px 4px 0; }
 .acct__change { position: relative; flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
