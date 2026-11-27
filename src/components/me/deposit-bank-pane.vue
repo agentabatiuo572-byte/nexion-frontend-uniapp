@@ -317,14 +317,12 @@ const intent = computed<DepositIntent | null>(
   () => dep.intents.find((i) => i.intentId === viewIntentId.value) ?? null,
 );
 
-type PaneView = "form" | "order" | "waiting" | "credited" | "expired" | "mismatch";
+type PaneView = "form" | "order" | "waiting" | "credited" | "expired" | "mismatch" | "receipt_review" | "late_review";
 const paneView = computed<PaneView>(() => {
   const it = intent.value;
   if (!it || it.status === "cancelled" || it.status === "return_pending") return "form";
   if (it.status === "awaiting_payment") return paidPressed.value ? "waiting" : "order";
-  if (it.status === "credited") return "credited";
-  if (it.status === "expired") return "expired";
-  return "mismatch";
+  return it.status === "mismatch_review" ? "mismatch" : it.status;
 });
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
