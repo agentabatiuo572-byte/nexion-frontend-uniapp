@@ -291,11 +291,12 @@ const pendingLabelStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const inactiveLabelStyle: CSSProperties = { ...pendingLabelStyle, color: "var(--v5-ink-3)" };
+// The period line is the only reason an expired row gives, so it reads in the secondary ink (01 §1.1.1), not the disabled one.
 const periodStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-metric)",
   fontSize: "12px",
-  color: "var(--v5-ink-4)",
+  color: "var(--v5-ink-3)",
 };
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",
