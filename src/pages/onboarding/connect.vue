@@ -660,13 +660,23 @@ watch([dialMode, () => bar.value.kind, () => t.value.onboarding.iosActivateLater
 const entering = ref(false);
 const enterFrom = ref<"read" | "scan" | null>(null);
 const zeroText = computed(() => (0).toFixed(finalText.value.split(".")[1]?.length ?? 0));
+// The WebView reports when the scan turn and the entrance have played. If its report never arrives, the page still moves
+// on: after the longest real wait (a turn of 1600ms plus the bridge) for the scan, after the 1400ms entrance and its halo
+// for the result. Page updates reach the WebView in order, so these limits never cut a playing animation short.
+const SCAN_RELEASE_MS = 4000;
+const ENTRANCE_RELEASE_MS = 3000;
 const scanFinishing = ref(false);
 let resolveScan: (() => void) | null = null;
+let scanRelease: ReturnType<typeof setTimeout> | null = null;
+let entranceRelease: ReturnType<typeof setTimeout> | null = null;
 function waitForScanTurn() {
   scanFinishing.value = true;
+  scanRelease = setTimeout(finishScanWait, SCAN_RELEASE_MS);
   return new Promise<void>(resolve => { resolveScan = resolve; });
 }
 function finishScanWait() {
+  if (scanRelease) clearTimeout(scanRelease);
+  scanRelease = null;
   scanFinishing.value = false;
   resolveScan?.();
   resolveScan = null;
@@ -676,6 +686,8 @@ const dialMotion = computed(() => {
   return entering.value ? "enter" : "idle";
 });
 function finishEntrance() {
+  if (entranceRelease) clearTimeout(entranceRelease);
+  entranceRelease = null;
   entering.value = false;
   enterFrom.value = null;
 }
@@ -683,6 +695,8 @@ watch(phase, (next, previous) => {
   if (next === "result" && previous === "calibrating" && dialReady.value) {
     enterFrom.value = readOnlyWait.value ? "read" : "scan";
     entering.value = true;
+    if (entranceRelease) clearTimeout(entranceRelease);
+    entranceRelease = setTimeout(finishEntrance, ENTRANCE_RELEASE_MS);
   } else {
     finishEntrance();
   }
@@ -1133,6 +1147,7 @@ onUnmounted(() => {
   mounted = false;
   useUI().clearConfirmsBy(confirmOwner);
   finishScanWait();
+  if (entranceRelease) clearTimeout(entranceRelease);
   requestGeneration += 1;
 });
 </script>

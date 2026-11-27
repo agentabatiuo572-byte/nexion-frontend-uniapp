@@ -4,6 +4,9 @@ type Owner = { callMethod(name: string, motion: DialMotion): void };
 
 const SWEEP_MS = 1600;
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// An older WebView may lack the Web Animations API; the dial then falls back to the clock below.
+const runningAnimation = (node: Element | null | undefined) =>
+  node && typeof node.getAnimations === "function" ? node.getAnimations()[0] : undefined;
 
 export const calibrationDialView = {
   beforeUnmount(this: DialView) { this.cancelMotion?.(); },
@@ -29,7 +32,9 @@ export const calibrationDialView = {
       frame = requestAnimationFrame(() => {
         const dial = document.querySelector(".cn-score");
         if (motion === "finish-scan") {
-          const spin = dial?.querySelector(".cn-sweep")?.getAnimations()[0];
+          // Reduced motion has a static dial: hand the result over at once.
+          if (reducedMotion()) { finish(); return; }
+          const spin = runningAnimation(dial?.querySelector(".cn-sweep"));
           if (spin?.effect) {
             // Finish the CSS animation at its next full turn and hold it at the starting angle
             // while its completion crosses the App bridge. The keyframes and speed stay the same.
@@ -37,7 +42,6 @@ export const calibrationDialView = {
             spin.effect.updateTiming({ iterations: turn, fill: "forwards" });
             void spin.finished.then(finish, finish);
           } else {
-            // Reduced motion has a static dial. Keep the same scan phase without rotating it.
             const elapsed = performance.now() - (this.scanStart ?? performance.now());
             timer = window.setTimeout(finish, SWEEP_MS - elapsed % SWEEP_MS);
           }
@@ -49,7 +53,7 @@ export const calibrationDialView = {
         if (!count || !target || reducedMotion()) { finish(); return; }
         const value = Number(target), places = target.split(".")[1]?.length ?? 0;
         const start = performance.now();
-        const pulse = dial?.querySelector(".cn-burst")?.getAnimations()[0];
+        const pulse = runningAnimation(dial?.querySelector(".cn-burst"));
         const draw = (now: number) => {
           const elapsed = now - start;
           const progress = Math.max(0, Math.min(1, (elapsed - 100) / 900));
