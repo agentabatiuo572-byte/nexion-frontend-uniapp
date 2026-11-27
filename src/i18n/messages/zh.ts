@@ -5677,6 +5677,7 @@ openSeaErrorPool: {
     fxReadRetrying: "暂时无法读取牌价，正在自动重试。",
     hostedSecureNote: "请在付款页获取收款账户或二维码，核对金额后转账。",
     hostedPendingNote: "订单确认中，请稍后刷新。",
+    hostedRejectedTitle: "付款单未生成",
     hostedRejectedNote: "付款单未生成，请联系客服。",
     hostedContinueCta: "前往银行付款页",
     hostedOpenFailed: "付款页暂时无法打开，请重试。",

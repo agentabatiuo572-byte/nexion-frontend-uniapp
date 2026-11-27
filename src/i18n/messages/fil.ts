@@ -5995,6 +5995,7 @@ export const fil: Messages = {
     fxReadRetrying: "Hindi pa ma-load ang rate. Awtomatikong sinusubukan muli.",
     hostedSecureNote: "Kunin ang account na tatanggap o QR code sa page ng bayad. Suriin ang halaga bago mag-transfer.",
     hostedPendingNote: "Kinukumpirma ang order mo. Mag-refresh mamaya.",
+    hostedRejectedTitle: "Hindi nagawa ang order ng bayad",
     hostedRejectedNote: "Hindi nagawa ang order ng bayad. Makipag-ugnayan sa support.",
     hostedContinueCta: "Buksan ang page ng bayad",
     hostedOpenFailed: "Hindi mabuksan ang page ng bayad. Subukan ulit.",

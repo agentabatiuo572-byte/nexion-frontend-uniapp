@@ -5768,6 +5768,7 @@ openSeaErrorPool: {
     fxReadRetrying: "Unable to load the rate. Retrying automatically.",
     hostedSecureNote: "Get the receiving account or QR code from the payment page. Check the amount before transferring.",
     hostedPendingNote: "Your order is being confirmed. Please refresh shortly.",
+    hostedRejectedTitle: "Payment order not created",
     hostedRejectedNote: "The payment order was not created. Please contact support.",
     hostedContinueCta: "Go to bank payment page",
     hostedOpenFailed: "The payment page could not open. Please try again.",

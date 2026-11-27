@@ -5671,6 +5671,7 @@ openSeaErrorPool: {
     fxReadRetrying: "Chưa tải được tỷ giá. Đang tự động thử lại.",
     hostedSecureNote: "Vui lòng lấy tài khoản nhận hoặc mã QR trên trang thanh toán, kiểm tra số tiền rồi chuyển khoản.",
     hostedPendingNote: "Đơn đang được xác nhận. Vui lòng làm mới sau ít phút.",
+    hostedRejectedTitle: "Chưa tạo được lệnh thanh toán",
     hostedRejectedNote: "Chưa tạo được lệnh thanh toán. Vui lòng liên hệ hỗ trợ.",
     hostedContinueCta: "Đến trang thanh toán ngân hàng",
     hostedOpenFailed: "Chưa mở được trang thanh toán. Vui lòng thử lại.",

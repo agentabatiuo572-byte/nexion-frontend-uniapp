@@ -5995,6 +5995,7 @@ export const id: Messages = {
     fxReadRetrying: "Kurs belum bisa dimuat. Mencoba lagi otomatis.",
     hostedSecureNote: "Dapatkan rekening penerima atau kode QR dari halaman pembayaran. Periksa jumlahnya sebelum transfer.",
     hostedPendingNote: "Pesanan Anda sedang dikonfirmasi. Muat ulang sebentar lagi.",
+    hostedRejectedTitle: "Pesanan pembayaran tidak dibuat",
     hostedRejectedNote: "Pesanan pembayaran tidak dibuat. Hubungi layanan pelanggan.",
     hostedContinueCta: "Ke halaman pembayaran bank",
     hostedOpenFailed: "Halaman pembayaran gagal dibuka. Coba lagi.",

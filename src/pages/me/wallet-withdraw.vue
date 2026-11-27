@@ -258,19 +258,15 @@
         <NxRulesList :items="rulesItems" />
       </NxNoticeDialog>
 
-      <view class="wd-bar-space" />
+      <view class="wd-bar-space" :style="barTrayHeight ? { height: barTrayHeight - 2 + 'px' } : undefined" />
     </view>
     <!-- 主操作在底部固定栏(DS-30);不可提交时原因写在按钮上方。 -->
     <template #pageFixed>
-      <view class="wd-bar nx-glass-bar">
+      <view ref="barTray" class="wd-bar nx-glass-bar">
         <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why nx-tray-note" role="status">{{ submitDisabledReason }}</text>
-        <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
-        <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
-          <view class="inline-flex items-center" style="gap: 8px">
-            <svg v-if="submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-            <text>{{ submitting ? t.wallet.submitChecking : pendingAttempt ? (canRetryPendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.withdrawRecoveryWaitCta) : canSubmitAction ? t.walletV3.submitCtaPaired : t.walletV3.submitCtaDisabled }}</text>
-          </view>
-        </view>
+        <!-- The shared primary (03 §3.1 bottom bar): grey while it cannot submit, spinner with the width held while submitting. -->
+        <NxButton class="nx-withdraw-submit-cta" variant="primary" :label="pendingAttempt ? (canRetryPendingAttempt ? t.walletV3.withdrawResendCta : t.walletV3.withdrawRecoveryWaitCta) : canSubmitAction ? t.walletV3.submitCtaPaired : t.walletV3.submitCtaDisabled"
+          :busy="submitting" :busy-label="t.wallet.submitChecking" :disabled="!canSubmitAction" @click="handleSubmit" />
       </view>
     </template>
   </AppChassis>
@@ -278,6 +274,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrayHeight } from "@/composables/use-tray-height";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
@@ -1234,6 +1231,9 @@ function fmtNex(n: number): string {
 const canSubmit = computed(() => submitDisabledReason.value === "");
 const canSubmitAction = computed(() => remoteSessionReady.value && !withdrawalCommandBusy.value
   && (pendingAttempt.value ? canRetryPendingAttempt.value : canSubmit.value));
+// The bar as rendered: a reason above the button, one or two lines, makes it taller, and the content clears it (04 §4.0).
+const barTray = ref<unknown>(null);
+const barTrayHeight = useTrayHeight(barTray, ".wd-bar", () => [submitDisabledReason.value, submitHintVisible.value, canSubmitAction.value, submitting.value]);
 
 function networkHint(id: CryptoNetwork): string {
   switch (id) {
@@ -1699,7 +1699,7 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 /* Labels keep at least the zh width; long-language labels grow and wrap by word instead of running under the value. */
 .wd-route__k { flex: none; width: min-content; min-width: 52px; max-width: 72px; overflow-wrap: break-word; }
 .wd-net { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-v5); }
-.wd-manage:focus-visible, .wd-add:focus-visible, .wd-submit:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
+.wd-manage:focus-visible, .wd-add:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-route__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
 .wd-route__a--empty { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
@@ -1741,12 +1741,11 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-why__d { color: var(--v5-ink-2); font: var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); overflow-wrap: break-word; }
 .wd-quota__pip { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
+/* Content clearance under the bar (04 §4.0): the tray's height + 38 from the screen bottom, so the last card scrolls to 16
+   above it. The chassis already pads tray bottom + 18 below the content, so the space is the measured bar height − 2
+   (barTrayHeight); until it is read, room for a reason line over the button. */
 .wd-bar-space { height: 120px; }
 .wd-bar { position: absolute; z-index: 36; display: flex; flex-direction: column; }
-.wd-submit { display: flex; align-items: center; justify-content: center; height: 48px; border-radius: var(--v5-radius-full); background: var(--v5-brand); color: var(--v5-on-brand); font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); cursor: default; }
-.wd-submit--on { cursor: pointer; }
-.wd-submit--on:active { transform: scale(.98); }
-@media (prefers-reduced-motion: reduce) { .wd-submit--on:active { transform: none; } }
 /* B34 找回横幅:与页内合规/冻结横幅同一语汇(8% 色底 + 28px 图标块),色只按状态换。 */
 .wd-recover { --wd-recover-hue: var(--v5-warning); display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px 4px; border-radius: 12px; background: color-mix(in srgb, var(--wd-recover-hue) 8%, transparent); }
 .wd-recover--rejected { --wd-recover-hue: var(--v5-danger); }

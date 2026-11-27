@@ -5995,6 +5995,7 @@ export const uz: Messages = {
     fxReadRetrying: "Kurs yuklanmadi. Avtomatik qayta urinilmoqda.",
     hostedSecureNote: "Qabul qiluvchi hisob yoki QR kodni toʻlov sahifasidan oling. Oʻtkazishdan oldin summani tekshiring.",
     hostedPendingNote: "Buyurtmangiz tasdiqlanmoqda. Birozdan keyin yangilang.",
+    hostedRejectedTitle: "Toʻlov hujjati yaratilmadi",
     hostedRejectedNote: "Toʻlov hujjati yaratilmadi. Yordam xizmatiga murojaat qiling.",
     hostedContinueCta: "Bank toʻlov sahifasiga oʻtish",
     hostedOpenFailed: "Toʻlov sahifasi ochilmadi. Qayta urinib koʻring.",
