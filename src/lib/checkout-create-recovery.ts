@@ -14,7 +14,6 @@ export interface PendingCheckoutCreate {
   productName?: string;
   voucherName?: string;
 }
-/** Stored merchandise subtotal and voucher discount also exist on pre-B127 pending records. */
 const MICRO_USDT = 1_000_000n;
 
 function decimalUnits(value: number, scale: number): bigint {
@@ -33,6 +32,7 @@ export function confirmedOrderAmountUsdt(subtotal: number, voucher?: VoucherDef)
   return String(amount / MICRO_USDT) + '.' + String(amount % MICRO_USDT).padStart(6, '0');
 }
 
+/** Stored merchandise subtotal and voucher discount also exist on pre-B127 pending records. */
 export function checkoutCreateRequest(entry: PendingCheckoutCreate) {
   return {
     ...entry.request,
