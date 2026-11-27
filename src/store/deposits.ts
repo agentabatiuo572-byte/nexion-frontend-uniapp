@@ -904,14 +904,7 @@ export const useDeposits = defineStore("deposits", () => {
   }
 
   function remoteIntentStatus(status: VietQrIntentStatus): DepositIntent["status"] {
-    if (status === "credited") return "credited";
-    if (status === "expired") return "expired";
-    if (status === "cancelled" || status === "returned") return "cancelled";
-    if (status === "return_pending") return "return_pending";
-    if (status === "receipt_review" || status === "mismatch_review" || status === "late_review") {
-      return "mismatch_review";
-    }
-    return "awaiting_payment";
+    return status === "returned" ? "cancelled" : status;
   }
 
   function remoteVietQrIntent(snapshot: VietQrIntentSnapshot): DepositIntent {
@@ -986,7 +979,8 @@ export const useDeposits = defineStore("deposits", () => {
       if (!succeedVietQrReceiptPageRead(remoteReceiptPage, receiptRead, receiptPage.items, receiptPage.nextOffset)) return;
       syncRemoteReceiptPage();
       snapshots.forEach((snapshot) => {
-        if (snapshot.status !== "awaiting_payment" && snapshot.status !== "receipt_review") {
+        if (snapshot.status !== "awaiting_payment" && snapshot.status !== "receipt_review"
+          && snapshot.status !== "late_review") {
           finishVietQrCommandByIntent(expectedAccountKey, snapshot.intentNo);
         }
       });
@@ -1050,7 +1044,8 @@ export const useDeposits = defineStore("deposits", () => {
 
   function hasPendingRemoteVietQrWork(): boolean {
     return intents.value.some(intent => intent.status === "awaiting_payment"
-      || intent.status === "mismatch_review" || intent.status === "return_pending")
+      || intent.status === "receipt_review" || intent.status === "mismatch_review"
+      || intent.status === "late_review" || intent.status === "return_pending")
       || hasPendingVietQrCommand(serverAccountKey);
   }
 

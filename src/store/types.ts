@@ -437,9 +437,11 @@ export interface DepositRecord {
 // [FEAT-PAY02] ④ 银行轨意向单状态机(本文件只定形状;意向单生命周期动作归 A4)。
 export type DepositIntentStatus =
   | "awaiting_payment"
+  | "receipt_review"
   | "credited"
   | "expired"
   | "mismatch_review"
+  | "late_review"
   | "cancelled"
   | "return_pending";
 

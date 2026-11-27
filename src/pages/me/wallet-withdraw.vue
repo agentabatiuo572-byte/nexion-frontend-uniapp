@@ -1234,7 +1234,9 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQ
     return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatTruncatedAmount(decision.maxWithdrawableUsdt) });
   }
   const netTooLow = decision.quote && Number(decision.quote.netReceive) <= 0;
-  if (netTooLow) return forQuoteDisplay ? "" : t.value.walletV3.netTooLow;
+  // Without UVT to spend, or with the offset already on, raising the amount is the only way on.
+  if (netTooLow) return forQuoteDisplay ? "" : offsetToggleDisabled.value || offsetWithNex.value
+    ? t.value.walletV3.netTooLowRaise : t.value.walletV3.netTooLow;
   if (!decision.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
   if (remoteApiEnabled && !decision.quote) return t.value.walletV3.submitReasonServiceUnavailable;
   return "";

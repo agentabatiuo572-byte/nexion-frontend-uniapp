@@ -191,11 +191,11 @@
     </template>
 
     <!-- ── 等待回调(仅 UI 等待提示,单仍 awaiting;到点过期由 store 引擎翻面)── -->
-    <template v-else-if="paneView === 'waiting'">
+    <template v-else-if="paneView === 'waiting' || reviewCopy">
       <!-- Waiting, expired and mismatch open with the shared result head (03 §3.6.1), as credited does. -->
-      <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" :title="t.bankPane.waitingTitle" :description="t.bankPane.waitingBody" /></view>
+      <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" :title="reviewCopy?.title ?? t.bankPane.waitingTitle" :description="reviewCopy?.body ?? t.bankPane.waitingBody" /></view>
       <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
+        <text :style="ghostTextStyle">{{ reviewCopy ? t.help.contactSupport : t.topupChrome.depositNotArrived }}</text>
       </view>
     </template>
 
@@ -344,14 +344,18 @@ const intent = computed<DepositIntent | null>(
   () => dep.intents.find((i) => i.intentId === viewIntentId.value) ?? null,
 );
 
-type PaneView = "form" | "order" | "waiting" | "credited" | "expired" | "mismatch";
+type PaneView = "form" | "order" | "waiting" | "credited" | "expired" | "mismatch" | "receipt_review" | "late_review";
 const paneView = computed<PaneView>(() => {
   const it = intent.value;
   if (!it || it.status === "cancelled" || it.status === "return_pending") return "form";
   if (it.status === "awaiting_payment") return paidPressed.value ? "waiting" : "order";
-  if (it.status === "credited") return "credited";
-  if (it.status === "expired") return "expired";
-  return "mismatch";
+  return it.status === "mismatch_review" ? "mismatch" : it.status;
+});
+const reviewCopy = computed(() => {
+  const copy = t.value.bankPane;
+  if (paneView.value === "receipt_review") return { title: copy.receiptReviewTitle, body: copy.receiptReviewBody };
+  if (paneView.value === "late_review") return { title: copy.lateReviewTitle, body: copy.lateReviewBody };
+  return null;
 });
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)

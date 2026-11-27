@@ -24,10 +24,9 @@ export function validateHostedPaymentUrl(raw: string): string | null {
   }
 }
 
-export function findResumablePaymentIntent<T extends {
-  status: "awaiting_payment" | "mismatch_review" | string;
-}>(intents: T[]): T | undefined {
-  return intents.find((item) => item.status === "awaiting_payment" || item.status === "mismatch_review");
+export function findResumablePaymentIntent<T extends { status: string }>(intents: T[]): T | undefined {
+  return intents.find(({ status }) => status === "awaiting_payment" || status === "mismatch_review"
+    || status === "receipt_review" || status === "late_review");
 }
 
 export function openHostedPaymentPage(
