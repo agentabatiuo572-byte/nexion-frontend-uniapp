@@ -1,5 +1,6 @@
 // Loopback preview only. OAuth handoff/receipt model ported from App e1e96526,
 // c44d6526 scripts/oauth-provider.h5.e2e.mjs; no real provider or SMS is contacted.
+// Binding, the linked list and sign-in share one identity table (App e6401a36f, 2c70f8293).
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { isResetPasswordOk } from '../../src/auth/password-rules.ts';
@@ -10,7 +11,7 @@ import { clearPreviewAccessToken, demoReferralBuyer, issuePreviewAccessToken, pr
 export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',registrationState:'normal',phoneBindingState:'normal',savedAttemptState:'none'};
 export const authDemoOptions = {
   authState:[['signed-in','已登录'],['signed-out','未登录（验证登录/注册）']],
-  oauthState:[['signup','第三方新账号'],['existing','第三方已有账号'],['lost-unissued','complete 丢失且过期：未签发'],['lost-issued','complete 回包丢失且过期：已签发，恢复暂时不可用'],['invite-refused','授权后邀请码被拒'],['device-limit','第三方注册设备上限'],['ip-limit','第三方注册 IP 上限'],['start-failed','发起授权失败']],
+  oauthState:[['signup','第三方新账号'],['existing','第三方已有账号（按绑定关系；Google/Telegram 需验证码 123456）'],['lost-unissued','complete 丢失且过期：未签发'],['lost-issued','complete 回包丢失且过期：已签发，恢复暂时不可用'],['invite-refused','授权后邀请码被拒'],['device-limit','第三方注册设备上限'],['ip-limit','第三方注册 IP 上限'],['start-failed','发起授权失败']],
   savedAttemptState:[['none','无旧尝试'],['legacy-empty','旧空安装 ID：恢复已签发会话'],['storage-cleared','旧浏览器 ID：恢复已签发会话'],['registration','手机号注册恢复']],
   phoneBindingState:[['normal','正常绑定（验证码 123456）'],['captcha','绑定发码需滑块'],['used','手机号已被使用']],
   registrationState:[['normal','正常注册'],['captcha','发码需滑块'],['captcha-invalid','发码 ticket 无效后重新验证'],['device-limit','注册设备上限'],['ip-limit','注册 IP 上限']],
@@ -28,14 +29,24 @@ function png(width,height,pixel) {
 const background=png(300,150,(x,y)=>x>=150&&x<190&&y>=55&&y<95?[15,20,30]:[40+Math.floor(x/5),65+Math.floor(y/4),100]);
 const piece=png(40,40,()=>[198,255,58]);
 
-const MODELLED_AUTH=/^\/auth\/users\/(refresh|logout|session\/discard|login|register|login\/attempts\/[^/]+\/recover|(register|login|password-reset)\/otp\/(send|verify|complete)|oauth\/provider\/(available|start|authorize\/[^/]+|preview-approve|status|complete|link))$/;
+const MODELLED_AUTH=/^\/auth\/users\/(refresh|logout|session\/discard|login|register|login\/attempts\/[^/]+\/recover|(register|login|password-reset)\/otp\/(send|verify|complete)|oauth\/provider\/(available|linked|start|authorize\/[^/]+|preview-approve|status|complete|link))$/;
+
+// Google and Telegram start bound to two preview accounts and confirm sign-in with a code; a binding made in
+// 安全设置 adds a row, so the same identity later signs in to that account.
+const seededIdentities=[
+  {provider:'GOOGLE',subject:String(existing.userId),user:existing,requiresCode:true},
+  {provider:'TELEGRAM',subject:String(demoReferralBuyer.user.userId),user:demoReferralBuyer.user,requiresCode:true},
+];
 
 export function createAuthDemo(state) {
   const flows=new Map(),challenges=new Map(),tickets=new Set(),otps=new Map(),attempts=new Map();
   let savedAttemptSeeded=false;
   const trace=[];
   const ok=data=>({status:200,body:{code:0,message:'OK',data}});
-  const fail=(status,message)=>({status,body:{code:status,message,data:null}});
+  const fail=(status,message,data=null)=>({status,body:{code:status,message,data}});
+  const identities=()=>state.oauthDemoProviderIdentities??=structuredClone(seededIdentities);
+  const linksFor=accountId=>identities().filter(row=>String(row.user.userId)===accountId).map(row=>row.provider);
+  const activeUser=()=>state.authUser??(state.promotionBuyer==='sponsored-new'?demoReferralBuyer.user:existing);
   const receipt=code=>({sponsorCode:code?.startsWith('NX')?code:null,sponsorDisplayName:code?.startsWith('NX')?'M•••':null,sourceEnvironment:'PRODUCTION',giftStatus:'PENDING_REVIEW',giftUsdt:5,giftNex:20});
   function session(user,registrationReceipt) {
     state.authState='signed-in';state.authUser=user;
@@ -62,8 +73,8 @@ export function createAuthDemo(state) {
       return attempt;
     },
     reset(){savedAttemptSeeded=false;attempts.clear();flows.clear();challenges.clear();tickets.clear();otps.clear();signIn.reset();delete state.authUser;clearPreviewAccessToken(state);delete state.captchaInvalidReturned;},
-    // Only the paths modelled below; any other /auth/users/* request (e.g. the linked-provider read) falls
-    // through to the App fixture instead of being answered AUTH_PREVIEW_NOT_MODELLED.
+    // Only the paths modelled below; any other /auth/users/* request falls through to the App fixture instead of
+    // being answered AUTH_PREVIEW_NOT_MODELLED.
     handles(path){return signIn.handles(path)||MODELLED_AUTH.test(path)||path.startsWith('/api/auth/captcha/')||['/api/app/security/phone/challenge','/api/app/security/phone','/api/app/security/two-factor/challenge','/api/app/security/two-factor'].includes(path);},
     handle(url,method,headers,body) {
       const path=url.pathname;
@@ -73,7 +84,7 @@ export function createAuthDemo(state) {
       if(signIn.handles(path))return signIn.handle(path,body);
       if(path==='/auth/users/refresh')
         return state.authState==='signed-in'&&(!headers.authorization||previewAccountId(state,headers))
-          ? session(state.authUser ?? (state.promotionBuyer === 'sponsored-new' ? demoReferralBuyer.user : existing)) : fail(401,'USER_REFRESH_TOKEN_REQUIRED');
+          ? session(activeUser()) : fail(401,'USER_REFRESH_TOKEN_REQUIRED');
       if(['/auth/users/logout','/auth/users/session/discard'].includes(path)){
         if(headers.authorization&&!previewAccountId(state,headers))return fail(401,'AUTH_REQUIRED');
         state.authState='signed-out';delete state.authUser;clearPreviewAccessToken(state);return ok(null);
@@ -120,10 +131,22 @@ export function createAuthDemo(state) {
         return ok({status:'PHONE_BOUND'});
       }
       if(path.endsWith('/oauth/provider/available'))return ok(['GOOGLE','APPLE','TELEGRAM']);
+      if(path.endsWith('/oauth/provider/linked')) {
+        const accountId=previewAccountId(state,headers);
+        return accountId?ok(linksFor(accountId)):fail(401,'AUTH_REQUIRED');
+      }
       if(path.endsWith('/oauth/provider/start')) {
         if(state.oauthState==='start-failed')return fail(503,'OAUTH_PROVIDER_UNAVAILABLE');
+        const intent=body.intent==='LINK'?'LINK':'LOGIN',accountId=intent==='LINK'?previewAccountId(state,headers):null;
+        if(intent==='LINK'&&!accountId)return fail(401,'AUTH_REQUIRED');
+        if(intent==='LINK'&&linksFor(accountId).includes(body.provider))return fail(409,'OAUTH_PROVIDER_ALREADY_LINKED');
+        // 第三方已有账号 authorizes the identity last bound for this provider. Every other result, and a provider
+        // nobody has bound, authorizes an identity no account has bound yet, which opens an account (PRD §4.2).
+        const bound=intent==='LOGIN'&&state.oauthState==='existing'?identities().findLast(row=>row.provider===body.provider):null;
+        const subject=accountId??bound?.subject??'new-'+randomBytes(8).toString('hex');
+        const displayName=accountId?activeUser().nickname:bound?.user.nickname??'Preview identity';
         const flowId='OIDC-'+randomBytes(16).toString('hex'),flowKey=randomBytes(32).toString('base64url'),receipt=randomBytes(32).toString('base64url'),browserState=randomBytes(32).toString('base64url');
-        flows.set(flowId,{flowId,flowKey,receipt,browserState,provider:body.provider,intent:body.intent==='LINK'?'LINK':'LOGIN',sponsorCode:body.sponsorCode,approved:false});
+        flows.set(flowId,{flowId,flowKey,receipt,browserState,provider:body.provider,intent,accountId,subject,displayName,sponsorCode:body.sponsorCode,approved:false});
         return ok({flowId,flowKey,expiresInSec:600,authorizationUrl:url.origin+'/auth/users/oauth/provider/authorize/'+browserState});
       }
       if(path.includes('/oauth/provider/authorize/')) {
@@ -133,18 +156,21 @@ export function createAuthDemo(state) {
       }
       if(path.endsWith('/oauth/provider/preview-approve')) {const flow=flows.get(body.flowId);if(!flow)return fail(404,'OAUTH_FLOW_INVALID');flow.approved=true;return ok(null);}
       if(path.endsWith('/oauth/provider/link')) {
-        // Account linking is its own intent: it never signs in, and adds the provider to the App fixture's linked list.
-        const flow=flows.get(body.flowId);
+        // Account linking is its own intent: it never signs in. It binds the authorized identity to the signed-in
+        // account after the current password (preview Local404Pass!) matches.
+        const flow=flows.get(body.flowId),accountId=previewAccountId(state,headers);
         if(!flow||flow.intent!=='LINK'||flow.flowKey!==body.flowKey||!flow.approved||body.receipt!==flow.receipt)return fail(422,'OAUTH_FLOW_INVALID');
-        if(typeof body.password!=='string'||!body.password)return fail(422,'USER_PASSWORD_INVALID');
-        flows.delete(flow.flowId);state.linkedProviders=[...new Set([...(state.linkedProviders??[]),flow.provider])];
+        if(!accountId||accountId!==flow.accountId)return fail(403,'AUTH_REQUIRED');
+        if(typeof body.password!=='string'||!demoAccountPasswordMatches(state,body.password,accountId))return fail(403,'OAUTH_LINK_PASSWORD_INVALID');
+        if(linksFor(accountId).includes(flow.provider))return fail(409,'OAUTH_PROVIDER_ALREADY_LINKED');
+        flows.delete(flow.flowId);identities().push({provider:flow.provider,subject:flow.subject,user:activeUser()});
         return ok(null);
       }
       if(path.endsWith('/oauth/provider/status')||path.endsWith('/oauth/provider/complete')) {
         const flow=flows.get(body.flowId);
         if(!flow||flow.flowKey!==body.flowKey||(path.endsWith('/complete')&&flow.intent==='LINK'))return fail(422,'OAUTH_FLOW_INVALID');
         const verified=flow.approved&&body.receipt===flow.receipt;
-        if(path.endsWith('/status'))return ok({status:verified?'VERIFIED':'PENDING',provider:flow.provider,displayName:verified?'Preview identity':null});
+        if(path.endsWith('/status'))return ok({status:verified?'VERIFIED':'PENDING',provider:flow.provider,displayName:verified?flow.displayName:null});
         if(flow.expired) {
           const attempt=attempts.get(headers['x-nexgrid-login-attempt-id']);if(attempt)attempt.replayed=true;
           return fail(401,'OAUTH_FLOW_EXPIRED');
@@ -155,7 +181,23 @@ export function createAuthDemo(state) {
         if(state.oauthState==='invite-refused')return fail(422,'USER_REGISTRATION_SPONSOR_INVALID');
         if(state.oauthState==='device-limit')return fail(409,'USER_REGISTRATION_DEVICE_LIMIT');
         if(state.oauthState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
-        if(state.oauthState==='existing')return issueLogin(existing,null,body.deviceName);
+        // A bound identity signs in to its account. The seeded bindings, and an account with two-step verification
+        // on, confirm with a code first.
+        const identity=identities().find(row=>row.provider===flow.provider&&row.subject===flow.subject);
+        if(identity) {
+          const {user}=identity;
+          if(identity.requiresCode||demoSecurityAccount(state,user.userId).twoFactorEnabled) {
+            if(!body.challengeNo&&!body.code) {
+              const deliveryHint='****'+user.phone.slice(-4);
+              flow.challengeNo??='OTP-'+randomBytes(16).toString('hex');
+              return fail(428,'USER_TWO_FACTOR_VERIFICATION_REQUIRED',{accessToken:null,refreshToken:null,tokenType:'Challenge',
+                user:{...user,phone:deliveryHint},challengeNo:flow.challengeNo,deliveryHint});
+            }
+            if(body.challengeNo!==flow.challengeNo||body.code!=='123456')return fail(422,'USER_TWO_FACTOR_CHALLENGE_INVALID');
+          }
+          flows.delete(flow.flowId);
+          return issueLogin(user,null,body.deviceName);
+        }
         if(['lost-unissued','lost-issued'].includes(state.oauthState)) {
           // Accelerated server expiry avoids a ten-minute preview wait. An issued
           // session remains recoverable with its original fingerprint and proof.

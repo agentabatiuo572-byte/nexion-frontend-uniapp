@@ -1306,7 +1306,6 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
           createdAt:new Date(event.ts).toISOString(),unlockAt:new Date(event.unlockAt).toISOString()}))};
   }
   if(pathname==='/auth/users/oauth/provider/available')return ['GOOGLE','APPLE','TELEGRAM'];
-  if(pathname==='/auth/users/oauth/provider/linked')return [...new Set(['GOOGLE',...(state.linkedProviders??[])])];
   if(pathname==='/api/store/catalog') {
     const requested=(url.searchParams.get('locale')?.trim()||state.profile?.language||locale).toLowerCase().split(/[-_]/)[0];
     const language=previewInterfaceLanguages(state.interfaceLanguagesState).includes(requested)?requested:'en';
