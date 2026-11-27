@@ -439,7 +439,7 @@ export const ms: Messages = {
     available: "Sedia untuk pengeluaran",
     unbound: "Tiada akaun penerima",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu pengesahan",
+    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu pengesahan", balanceBelowMin: "Baki yang boleh dikeluarkan di bawah minimum {min}\u00A0USDT.",
     unboundNotice: "Tambah akaun bank atas nama anda sendiri sebelum meneruskan pengeluaran.",
     amountTitle: "Jumlah pengeluaran",
     amountHint: "Masukkan jumlah USDT untuk ditolak, termasuk caj pertukaran.",
@@ -519,7 +519,7 @@ export const ms: Messages = {
     accountStatus: {
       ready: "Akaun penerima disimpan.",
       unavailable: "Akaun penerima ini tidak tersedia.",
-      unverified: "Pengeluaran bank tidak tersedia buat masa ini. Anda masih boleh menyemak pengeluaran yang telah dihantar.",
+      unverified: "Akaun penerima sedang disahkan. Anda boleh mengeluarkan wang selepas selesai.",
     },
     requote: "Batal sebut harga / mula semula",
     title: "Pengeluaran bank",

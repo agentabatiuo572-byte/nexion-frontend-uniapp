@@ -439,7 +439,7 @@ export const id: Messages = {
     available: "Siap untuk penarikan",
     unbound: "Belum ada rekening penerima",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu verifikasi",
+    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu verifikasi", balanceBelowMin: "Saldo yang dapat ditarik di bawah minimum {min}\u00A0USDT.",
     unboundNotice: "Tambahkan rekening bank atas nama Anda sendiri sebelum melanjutkan penarikan.",
     amountTitle: "Jumlah penarikan",
     amountHint: "Masukkan total USDT yang dipotong, termasuk biaya penukaran.",
@@ -519,7 +519,7 @@ export const id: Messages = {
     accountStatus: {
       ready: "Rekening penerima tersimpan.",
       unavailable: "Rekening penerima ini tidak tersedia.",
-      unverified: "Penarikan bank sedang tidak tersedia. Penarikan yang sudah dikirim tetap bisa dicek.",
+      unverified: "Rekening penerima sedang diverifikasi. Anda bisa menarik dana setelah selesai.",
     },
     requote: "Batalkan penawaran / mulai lagi",
     title: "Penarikan bank",

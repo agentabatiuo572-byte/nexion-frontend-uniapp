@@ -155,10 +155,10 @@
       </view>
       <view v-else-if="stillPlaceholder() === 'receipt'" class="first-read" role="status" aria-busy="true" data-testid="bank-receipt-read">
         <text class="vh">{{ c.loading }}</text>
-        <view class="result-head first-read__head" aria-hidden="true"><view class="first-read__dot first-read__dot--head" /><view class="first-read__bar first-read__bar--title" /><view class="first-read__bar first-read__bar--desc" /></view>
+        <view class="result-head first-read__head" aria-hidden="true"><view class="first-read__dot first-read__dot--head" /><view class="first-read__bar first-read__bar--title" /><view class="first-read__bar first-read__bar--desc" /><view class="first-read__bar first-read__bar--desc2" /></view>
         <view class="amount-card" aria-hidden="true"><view class="first-read__bar first-read__bar--muted" /><view class="first-read__bar first-read__bar--money" /></view>
         <view class="account-card" aria-hidden="true"><view class="first-read__bar first-read__bar--muted" /><view class="first-read__bar first-read__bar--account" /></view>
-        <view class="details" aria-hidden="true"><view v-for="n in 5" :key="n" class="row first-read__row"><view class="first-read__bar first-read__bar--k" /><view class="first-read__bar first-read__bar--v" /></view></view>
+        <view class="details" aria-hidden="true"><view v-for="n in 4" :key="n" class="row first-read__row"><view class="first-read__bar first-read__bar--k" /><view class="first-read__bar first-read__bar--v" /></view></view>
         <view class="bar-space bar-space--result" />
       </view>
     </view>
@@ -324,8 +324,11 @@ const configBlockReason = computed(() => {
   if (shown.capacity?.withdrawalEnabled === false) return c.value.unavailable;
   if (shown.capacity?.dailyRemainingCount === 0) return `${c.value.dailyExhausted} ${displayDate(shown.capacity.dailyCountResetAt)}`;
   if (configRefreshFailed.value && shown.beneficiary) return c.value.capacityUnavailable;
-  if (shown.policy && shown.capacity
-      && shown.capacity.maxWithdrawableUsdt < Math.max(shown.policy.minAmountUsd, quote.value?.amountUsdt ?? 0)) return c.value.amountErrors.balance;
+  // Balance reasons need a bound account: unbound, the only action is 添加收款账户.
+  if (shown.beneficiary && shown.policy && shown.capacity && shown.capacity.maxWithdrawableUsdt < shown.policy.minAmountUsd) {
+    return format(c.value.balanceBelowMin, { min: usdt2(shown.policy.minAmountUsd) });
+  }
+  if (shown.beneficiary && shown.capacity && quote.value && shown.capacity.maxWithdrawableUsdt < quote.value.amountUsdt) return c.value.amountErrors.balance;
   return "";
 });
 const submitReason = computed(() => quote.value && !quoteExpired.value ? configBlockReason.value : "");
@@ -880,6 +883,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .first-read__dot--head { width: 56px; height: 56px; }
 .first-read__bar--title { width: 36%; height: 24px; margin: 20px 0 4px; border-radius: 8px; }
 .first-read__bar--desc { width: 56%; margin: 8px 0 4px; }
+.first-read__bar--desc2 { width: 40%; margin: 6px 0 4px; }  /* the result description usually runs to two lines */
 .first-read__bar--muted { width: 28%; margin: 4px 0; }
 .first-read__bar--money { width: 52%; height: 32px; margin: 17px 0 6px; border-radius: 8px; }
 .first-read__bar--account { width: 44%; height: 20px; margin: 11px 0; }

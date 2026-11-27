@@ -439,7 +439,7 @@ export const ru: Messages = {
     available: "Готов к зачислению",
     unbound: "Нет счёта получателя",
     // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
-    tagUnavailable: "Недоступен", tagUnverified: "На проверке",
+    tagUnavailable: "Недоступен", tagUnverified: "На проверке", balanceBelowMin: "Доступный для вывода баланс меньше минимума {min}\u00A0USDT.",
     unboundNotice: "Чтобы продолжить вывод, добавьте банковский счёт на своё имя.",
     amountTitle: "Сумма вывода",
     amountHint: "Введите общую сумму USDT к списанию, включая комиссию за обмен.",
@@ -519,7 +519,7 @@ export const ru: Messages = {
     accountStatus: {
       ready: "Счёт получателя сохранён.",
       unavailable: "Этот счёт получателя недоступен.",
-      unverified: "Вывод на банковский счёт сейчас недоступен. Отправленные заявки можно проверить.",
+      unverified: "Счёт получателя проверяется. Вывести средства можно после проверки.",
     },
     requote: "Отменить расчёт и начать заново",
     title: "Вывод на банковский счёт",
