@@ -14,7 +14,7 @@
 
       <template v-if="order">
         <NxResultHead class="result-head" :tone="resultTone" :icon="outcome === 'held' ? 'shield' : undefined" :title="statusLabel" :description="c.resultNotes[outcome]" title-testid="bank-order-status" :live="!terminal" />
-        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">VND</text></text></view>
+        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">{{ '\u00A0' }}VND</text></text></view>
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
@@ -42,7 +42,7 @@
             <view class="bcard__top">
               <view class="bcard__bk" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M12 3 3 8h18z" /></svg></view>
               <text class="bcard__nm">{{ c.recipientSubtitle }}</text>
-              <view class="bcard__tag" :class="{ warn: !displayConfig.enabled || !displayConfig.beneficiary?.canWithdraw }" data-testid="bank-account-status" role="status"><text>{{ !displayConfig.enabled ? c.tagUnavailable : !displayConfig.beneficiary ? c.unbound : displayConfig.beneficiary.canWithdraw ? c.available : bankAccountNotice(displayConfig.beneficiary) === "unverified" ? c.tagUnverified : c.tagUnavailable }}</text></view>
+              <NxTag class="bcard__tag" :tone="cardTag.tone" :label="cardTag.label" data-testid="bank-account-status" role="status" />
             </view>
             <view class="bcard__bot">
               <view><text class="vh">{{ c.recipientTitle }}</text><text class="bcard__lb">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="bcard__no">{{ recipient ? dots(recipient.maskedAccount) : "—" }}</text></view>
@@ -113,7 +113,7 @@
                 <view class="use-max" role="button" tabindex="0" data-testid="bank-max" :aria-disabled="busy || !canContinue || maxAmount <= 0" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax"><text>{{ c.all }}</text></view>
               </view>
               <view class="amount-input">
-                <input data-testid="bank-amount" v-model="amount" type="text" inputmode="decimal" :disabled="busy || !canContinue" placeholder="0.00" :aria-label="c.amount" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" />
+                <input data-testid="bank-amount" v-model="amount" type="text" inputmode="decimal" :disabled="busy || !canContinue" placeholder="0.00" :aria-label="c.amount" :aria-describedby="quoteReason ? 'bank-quote-reason' : undefined" :aria-invalid="!!amount.trim() && ['format', 'range', 'balance'].includes(amountProblem ?? '') ? 'true' : undefined" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" />
                 <text class="slab__unit">USDT</text>
               </view>
               <!-- Limits that came back missing keep their lines with 「—」 while the system re-reads them (03 §3.4, §3.5.2). -->
@@ -123,11 +123,10 @@
               </view>
             </view>
           </view>
-          <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
+          <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: usdt2(-app.user.usdtBalance) }) }}</text></view>
           <view class="daily" data-testid="bank-daily">
             <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity?.dailyRemainingCount ?? "—", total: displayConfig.capacity?.dailyLimitCount ?? "—" }) }}</text>
           </view>
-          <view v-if="displayConfig.capacity?.dailyRemainingCount === 0" class="notice" role="status"><text>{{ c.dailyExhausted }} {{ displayDate(displayConfig.capacity.dailyCountResetAt) }}</text></view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
           <view class="action text-link" role="button" tabindex="0" :aria-disabled="busy" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
@@ -172,7 +171,7 @@
         </template>
         <template v-else>
           <!-- Grey 「获取报价」: its reason above it (03 §3.1 bottom bar); the amount field no longer repeats it. -->
-          <text v-if="quoteReason" class="nx-tray-note" role="status" data-testid="bank-quote-reason">{{ quoteReason }}</text>
+          <text v-if="quoteReason" id="bank-quote-reason" class="nx-tray-note" role="status" data-testid="bank-quote-reason">{{ quoteNote }}</text>
           <view class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="busy || !canContinue || !!amountProblem" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
         </template>
       </view>
@@ -205,6 +204,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
@@ -288,6 +288,15 @@ const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value &&
   && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
 const displayIntents = computed(() => displayConfig.value?.unresolvedIntent?.state === "MULTIPLE" ? displayConfig.value.unresolvedIntent.intents : []);
+// The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
+const cardTag = computed(() => {
+  const shown = displayConfig.value, c0 = c.value;
+  if (!shown?.enabled) return { tone: "warning", label: c0.tagUnavailable } as const;
+  if (!shown.beneficiary) return { tone: "warning", label: c0.unbound } as const;
+  if (!shown.beneficiary.canWithdraw) return { tone: "warning", label: bankAccountNotice(shown.beneficiary) === "unverified" ? c0.tagUnverified : c0.tagUnavailable } as const;
+  if (shown.capacity && !shown.capacity.withdrawalEnabled) return { tone: "warning", label: c0.tagUnavailable } as const;
+  return { tone: "success", label: c0.available } as const;
+});
 const accountStatus = computed(() => displayConfig.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(displayConfig.value.beneficiary)] : "");
 const outcome = computed(() => order.value ? bankOrderOutcome(order.value) : "review");
 const terminal = computed(() => !!order.value && ["paid", "refunded"].includes(outcome.value));
@@ -331,6 +340,9 @@ const continueReason = computed(() => {
   if (shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
   return shown.capacity && !shown.capacity.withdrawalEnabled ? c.value.unavailable : "";
 });
+// The tray says the daily limit once, with its reset time (03 §3.1); the page no longer repeats it in a notice.
+const quoteNote = computed(() => quoteReason.value === c.value.amountErrors.daily && displayConfig.value?.capacity
+  ? `${c.value.dailyExhausted} ${displayDate(displayConfig.value.capacity.dailyCountResetAt)}` : quoteReason.value);
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
 const rulesMode = ref<"read" | "submit" | null>(null);
@@ -679,8 +691,10 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .row > text:first-child { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .row > text:last-child { flex: none; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .row--code { align-items: center; }
-.money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 500; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.money__unit { margin-left: var(--v5-space-2); color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+/* Result amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38), the page's main amount, at 500 (01.2). The unit follows
+   a no-break space (03 §3.6.1) instead of a margin. */
+.money { display: block; margin-top: 8px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money__unit { margin-left: 4px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
 /* Result: centred head, then the amount; actions sit in the fixed bar. */
 .result-head { margin: var(--v5-space-2) 0 var(--v5-space-1); }
 .intent-code { max-width: 100%; color: inherit; }
@@ -704,8 +718,10 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .bcard__top { position: relative; display: flex; align-items: center; gap: 10px; }
 .bcard__bk { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.10); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
 .bcard__nm { flex: 1; min-width: 0; color: color-mix(in srgb, white 72%, transparent); font: 400 13px/18px var(--font-v5); }
-.bcard__tag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: color-mix(in srgb, var(--bcard-ok) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-ok) 24%, transparent); color: var(--bcard-ok); font: 500 12px/16px var(--font-v5); }
-.bcard__tag.warn { background: color-mix(in srgb, var(--bcard-warn) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-warn) 24%, transparent); color: var(--bcard-warn); }
+/* The card's NxTag (03 §3.8) in the card-face colours, not the theme's (04.4): available green, otherwise amber; 14% fill,
+   24% ring. Size, padding and type stay NxTag's. */
+.bcard .bcard__tag { --bcard-tag: var(--bcard-ok); background: color-mix(in srgb, var(--bcard-tag) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bcard-tag) 24%, transparent); color: var(--bcard-tag); }
+.bcard .bcard__tag.nx-tag--warning { --bcard-tag: var(--bcard-warn); }
 .bcard__bot { position: relative; display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; }
 .bcard__lb { display: block; color: color-mix(in srgb, white 55%, transparent); font: 400 12px/16px var(--font-v5); }
 .bcard__no { display: block; margin-top: 4px; font: 500 26px/32px var(--font-metric); letter-spacing: .08em; text-shadow: 0 1px 0 rgba(0,0,0,.45); }

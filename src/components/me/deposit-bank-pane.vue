@@ -102,7 +102,7 @@
           </view>
           <view class="nx-bank-sum">
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--big">{{ fmtVnd(intent.vndAmount) }}</text></view>
-            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) }} USDT</text></view>
+            <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) + '\u00A0USDT' }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.fx.rateLabel }}</text><text class="nx-bank-sum__v">1 USDT ≈ {{ fmtVnd(intent.fxRate) }}</text></view>
           </view>
           <view v-if="!hostedRejected" class="nx-bank-hint">
@@ -210,7 +210,7 @@
       <view class="nx-bank-done nx-step-in" role="status">
         <view class="nx-bank-done__medal"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5" /></svg></view>
         <text class="nx-bank-done__title">{{ t.bankPane.successTitle }}</text>
-        <text class="nx-bank-done__amt">+{{ formatAmount(creditedUsdt) }}<text class="nx-bank-done__unit">USDT</text></text>
+        <text class="nx-bank-done__amt">+{{ formatAmount(creditedUsdt) }}<text class="nx-bank-done__unit">{{ '\u00A0' }}USDT</text></text>
         <text class="nx-bank-done__line">{{ fmt(t.bankPane.successLine, { rate: fmtVnd(intent.fxRate) }) }}</text>
       </view>
       <view class="nx-bank-sum nx-bank-sum--done">
@@ -245,7 +245,7 @@
         @keydown.enter.prevent="selectExistingPayment(choice)"
         @keydown.space.prevent="selectExistingPayment(choice)"
       >
-        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) }} USDT</text>
+        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) + '\u00A0USDT' }}</text>
       </view>
     </template>
 
@@ -496,7 +496,7 @@ const inRange = computed(() =>
 function usdtLabel(value: number): string {
   return `${formatAmount(value)}\u00A0USDT`;
 }
-function fmtVnd(value: number): string { return `${formatAmount(value, "VND")} ₫`; }
+function fmtVnd(value: number): string { return `${formatAmount(value, "VND")}\u00A0₫`; }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 // Facts well under the amount: unknown values stay "—", never a fabricated 0.
@@ -506,7 +506,7 @@ const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemain
 const feeFact = computed(() => {
   if (!fx.configReady) return "—";
   if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
-  return `${formatAmount(Math.max(fx.feeUsdt, 0))} USDT`;
+  return `${formatAmount(Math.max(fx.feeUsdt, 0))}\u00A0USDT`;
 });
 // Whole numbers for presets and the limit range ("1,000"), keeping cents only when present; the USDT unit is said
 // once, by the amount field and after the range (03 §3.6.1).
@@ -1093,7 +1093,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
 .nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: 600 20px/28px var(--font-v5); }
 .nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-success-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nx-bank-done__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 14px/16px var(--font-v5); letter-spacing: 0; }
+.nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 14px/16px var(--font-v5); letter-spacing: 0; }
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }
 .nx-bank-sum--done .nx-bank-sum__v { font: 500 14px/20px var(--font-v5); }
