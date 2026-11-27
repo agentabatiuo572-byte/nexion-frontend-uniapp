@@ -2799,7 +2799,7 @@ export const fil: Messages = {
     withdrawSubmittedOtherAccountBody: "Nagpalit ng account habang isinusumite. Mag-log in sa orihinal na account para makita ang status ng withdrawal.",
     trackFailedBody: "Hindi natapos ang withdrawal. Makipag-ugnayan sa support.",
     trackEtaPending: "Inaasahan sa loob ng {n} oras",
-    trackExpectedAt: "Tinatayang oras ng proseso: {time}",
+    trackExpectedArrivalDate: "Inaasahang matatanggap ang pondo sa {date}",
     trackEtaTitlePending: "Pinoproseso",
     trackArrivedAt: "Dumating {time}",
     trackContactSupport: "Kontakin ang support",

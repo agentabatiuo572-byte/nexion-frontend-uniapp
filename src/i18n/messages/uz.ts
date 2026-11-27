@@ -2799,7 +2799,7 @@ export const uz: Messages = {
     withdrawSubmittedOtherAccountBody: "Yuborish vaqtida akkaunt almashtirildi. Pul yechish holatini koʻrish uchun avvalgi akkauntga kiring.",
     trackFailedBody: "Pul yechish yakunlanmadi. Yordam xizmatiga murojaat qiling.",
     trackEtaPending: "Taxminan {n} soat ichida",
-    trackExpectedAt: "Taxminiy bajarilish vaqti: {time}",
+    trackExpectedArrivalDate: "Mablagʻ {date} kuni kelib tushishi kutilmoqda",
     trackEtaTitlePending: "Bajarilmoqda",
     trackArrivedAt: "Tushdi: {time}",
     trackContactSupport: "Yordam xizmati",

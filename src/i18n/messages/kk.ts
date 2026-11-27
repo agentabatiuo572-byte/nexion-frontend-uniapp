@@ -2799,7 +2799,7 @@ export const kk: Messages = {
     withdrawSubmittedOtherAccountBody: "Жіберу кезінде аккаунт ауысты. Шығару күйін көру үшін бастапқы аккаунтқа кіріңіз.",
     trackFailedBody: "Шығару аяқталмады. Қолдау қызметіне жазыңыз.",
     trackEtaPending: "{n} сағат ішінде күтіледі",
-    trackExpectedAt: "Болжамды өңдеу уақыты: {time}",
+    trackExpectedArrivalDate: "Қаражат {date} күні түседі деп күтіледі",
     trackEtaTitlePending: "Өңделуде",
     trackArrivedAt: "Түсті: {time}",
     trackContactSupport: "Қолдауға жазу",

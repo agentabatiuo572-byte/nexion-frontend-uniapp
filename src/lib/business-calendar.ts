@@ -45,9 +45,11 @@ export function businessOffsetMinutes(track: BusinessTrack, at: number): number 
   return versionAt(track, at).offsetMinutes;
 }
 
-/** Business calendar date for an instant: shifted UTC fields of the returned Date are the business wall clock. */
-export function businessWallClock(track: BusinessTrack, at: number): Date {
-  return new Date(at + businessOffsetMinutes(track, at) * MINUTE_MS);
+/** Shift an instant to a business wall clock, read through the returned Date's UTC fields. */
+export function businessWallClock(trackOrOffsetMinutes: BusinessTrack | number, at: number): Date {
+  const offsetMinutes = typeof trackOrOffsetMinutes === "number"
+    ? trackOrOffsetMinutes : businessOffsetMinutes(trackOrOffsetMinutes, at);
+  return new Date(at + offsetMinutes * MINUTE_MS);
 }
 
 /** "YYYY-MM-DD" business date, or "" for an invalid instant. */

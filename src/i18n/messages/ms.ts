@@ -2799,7 +2799,7 @@ export const ms: Messages = {
     withdrawSubmittedOtherAccountBody: "Akaun bertukar semasa penghantaran. Log masuk ke akaun asal untuk menyemak status pengeluaran.",
     trackFailedBody: "Pengeluaran tidak selesai. Sila hubungi khidmat pelanggan.",
     trackEtaPending: "Dijangka dalam {n} jam",
-    trackExpectedAt: "Anggaran masa pemprosesan: {time}",
+    trackExpectedArrivalDate: "Dana dijangka dikreditkan pada {date}",
     trackEtaTitlePending: "Diproses",
     trackArrivedAt: "Diterima {time}",
     trackContactSupport: "Hubungi bantuan",

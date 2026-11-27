@@ -2343,7 +2343,7 @@ rankBenefits: "Xem quyền lợi cấp bậc",
 
     trackFailedBody: "Lệnh rút chưa hoàn tất. Vui lòng liên hệ hỗ trợ.",
     trackEtaPending: "Dự kiến trong {n} giờ",
-    trackExpectedAt: "Thời gian xử lý dự kiến: {time}",
+    trackExpectedArrivalDate: "Dự kiến chi trả vào {date}",
 
     trackEtaTitlePending: "Đang xử lý",
 
