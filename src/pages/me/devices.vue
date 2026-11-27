@@ -189,7 +189,7 @@
               <text class="device-phone-card__body">{{ phoneActivationGuidance.body }}</text>
               <NxButton v-if="nativePhoneAvailable" class="device-phone-card__cta" variant="brand" size="medium" :label="t.myDevices.phoneActivationCta" @click="goPhoneActivation" />
             </view>
-            <view class="device-phone-card__art" aria-hidden="true"><image class="device-phone-card__img" src="/static/img/home-glass-20260928/phone.webp" mode="aspectFit" /><view class="device-phone-card__floor" /></view>
+            <view class="device-phone-card__art" aria-hidden="true"><image class="device-phone-card__img" src="/static/img/home-glass-20260928/phone-bare.webp" mode="aspectFit" /><view class="device-phone-card__floor" /></view>
           </view>
         </view>
       </view>

@@ -2929,6 +2929,7 @@ export const ms: Messages = {
     step3of3: "Langkah 3/3",
     calibrationTitle: "Penentukuran telefon",
     calibrationStart: "Mula tentukur",
+    tapToCalibrate: "Ketik untuk mula tentukur",
     phoneBindingReadUnavailableTitle: "Status pemautan telefon tidak tersedia",
     phoneBindingReadUnavailableBody: "Status pemautan telefon ini tidak dapat disahkan. Semak sambungan rangkaian dan cuba lagi.",
     calibrationFailedTitle: "Penentukuran telefon tidak tersedia buat sementara",

@@ -2502,6 +2502,7 @@ rankBenefits: "查看等级权益",
     // 算力校准流程(Step 3 重设计)
     calibrationTitle: "手机算力校准",
     calibrationStart: "开始校准",
+    tapToCalibrate: "轻触开始校准算力",
     phoneBindingReadUnavailableTitle: "暂时无法确认手机绑定",
     phoneBindingReadUnavailableBody: "无法确认当前手机的绑定状态，请检查网络后重试。",
     calibrationFailedTitle: "手机算力校准暂不可用",

@@ -2526,6 +2526,7 @@ rankBenefits: "View rank benefits",
     // Compute calibration flow (Step 3 redesign)
     calibrationTitle: "Phone compute calibration",
     calibrationStart: "Start calibration",
+    tapToCalibrate: "Tap to start calibration",
     phoneBindingReadUnavailableTitle: "Phone binding unavailable",
     phoneBindingReadUnavailableBody: "This phone's binding status could not be confirmed. Check the network connection and retry.",
     calibrationFailedTitle: "Phone calibration unavailable",

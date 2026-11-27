@@ -4,7 +4,7 @@
     <view class="est-hero nx-soft-glass" :class="{ 'anim-up': view === 'detected' }">
       <view class="est-hero__art" aria-hidden="true">
         <view class="est-hero__floor" />
-        <image class="est-hero__img" src="/static/img/home-glass-20260928/phone.webp" mode="aspectFit" />
+        <image class="est-hero__img" src="/static/img/home-glass-20260928/phone-bare.webp" mode="aspectFit" />
       </view>
       <view class="est-hero__body">
         <view class="est-hero__top">

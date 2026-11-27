@@ -2929,6 +2929,7 @@ export const uz: Messages = {
     step3of3: "3/3-qadam",
     calibrationTitle: "Telefon quvvatini kalibrlash",
     calibrationStart: "Kalibrlashni boshlash",
+    tapToCalibrate: "Kalibrlashni boshlash uchun bosing",
     phoneBindingReadUnavailableTitle: "Telefon bogʻlanishini tekshirib boʻlmadi",
     phoneBindingReadUnavailableBody: "Bu telefonning bogʻlanish holatini tasdiqlab boʻlmadi. Internetni tekshirib, qayta urining.",
     calibrationFailedTitle: "Telefonni kalibrlash hozircha imkonsiz",

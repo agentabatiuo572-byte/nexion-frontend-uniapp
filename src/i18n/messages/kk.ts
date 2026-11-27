@@ -2929,6 +2929,7 @@ export const kk: Messages = {
     step3of3: "Қадам 3 / 3",
     calibrationTitle: "Телефон қуатын калибрлеу",
     calibrationStart: "Калибрлеуді бастау",
+    tapToCalibrate: "Калибрлеуді бастау үшін түртіңіз",
     phoneBindingReadUnavailableTitle: "Телефон байланысы қолжетімсіз",
     phoneBindingReadUnavailableBody: "Бұл телефонның байланыс күйі расталмады. Интернет байланысын тексеріп, қайталаңыз.",
     calibrationFailedTitle: "Телефонды калибрлеу уақытша қолжетімсіз",

@@ -2929,6 +2929,7 @@ export const id: Messages = {
     step3of3: "Langkah 3 dari 3",
     calibrationTitle: "Kalibrasi komputasi ponsel",
     calibrationStart: "Mulai kalibrasi",
+    tapToCalibrate: "Ketuk untuk mulai kalibrasi",
     phoneBindingReadUnavailableTitle: "Penautan ponsel tidak tersedia",
     phoneBindingReadUnavailableBody: "Status penautan ponsel ini belum dapat dikonfirmasi. Periksa koneksi, lalu coba lagi.",
     calibrationFailedTitle: "Kalibrasi ponsel sementara tidak tersedia",

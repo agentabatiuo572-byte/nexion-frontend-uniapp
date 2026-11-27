@@ -42,8 +42,11 @@
       <template v-if="dialMode">
         <!-- @vue-ignore: uni supplies dialView in the WebView. -->
         <view :id="dialHost" class="cn-dialwrap" :dial-motion="dialMotion" :change:dial-motion="dialView.update" :style="{ minHeight: dialGeo.min + 'px' }">
-          <view class="cn-score" :class="['cn-score--' + dialMode, { 'cn-score--ready': dialReady, 'cn-score--anim': enterFrom === 'read', 'cn-score--from-scan': enterFrom === 'scan' }]"
-            :role="dialMode === 'idle' ? undefined : 'img'" :aria-hidden="dialMode === 'idle'" :aria-label="dialMode === 'result' ? t.onboarding.resultTitle + ' ' + finalText + ' ' + t.onboarding.phoneComputeUnit : dialMode === 'scan' ? t.onboarding.detecting : undefined"
+          <!-- Start: the dial itself is the button (user 11-27: no 开始校准 button, the prompt sits in the dial). -->
+          <view class="cn-score" :class="['cn-score--' + dialMode, { 'cn-score--ready': dialReady, 'cn-score--anim': enterFrom === 'read', 'cn-score--from-scan': enterFrom === 'scan', 'cn-score--tap': tapToStart }]"
+            :role="tapToStart ? 'button' : dialMode === 'idle' ? undefined : 'img'" :tabindex="tapToStart ? 0 : undefined" :aria-hidden="dialMode === 'idle' && !tapToStart"
+            :aria-label="tapToStart ? t.onboarding.tapToCalibrate : dialMode === 'result' ? t.onboarding.resultTitle + ' ' + finalText + ' ' + t.onboarding.phoneComputeUnit : dialMode === 'scan' ? t.onboarding.detecting : undefined"
+            @click="startByTap" @keydown.enter.prevent="startByTap" @keydown.space.prevent="startByTap"
             :style="{ width: dialSize + 'px', height: dialSize + 'px' }">
             <view class="cn-score__glow" aria-hidden="true" />
             <view class="cn-score__lens" aria-hidden="true" :style="{ width: dialGeo.inner * 2 + 'px', height: dialGeo.inner * 2 + 'px' }" />
@@ -57,6 +60,7 @@
             </svg></view>
             <view class="cn-score__ctr" aria-hidden="true">
               <text v-if="dialMode === 'scan' || enterFrom === 'scan'" class="cn-score__scan-t">{{ t.onboarding.detecting }}</text>
+              <text v-else-if="tapToStart" class="cn-score__tap-t" :style="{ maxWidth: dialGeo.inner * 1.4 + 'px' }">{{ t.onboarding.tapToCalibrate }}</text>
               <svg v-else width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></svg>
             </view>
             <!-- Count while the entrance runs; under reduced motion the final value shows at once. -->
@@ -599,6 +603,8 @@ const dialMode = computed<DialMode | null>(() => !nativePhoneAvailable || isEsti
   : phase.value === "intro" ? "idle"
   : phase.value === "calibrating" ? (readOnlyWait.value ? "idle" : "scan")
   : phase.value === "result" ? "result" : null);
+const tapToStart = computed(() => phase.value === "intro" && dialMode.value === "idle");
+function startByTap() { if (tapToStart.value) void startCalibration(); }
 const resultActive = computed(() => phase.value === "result" && currentPhoneActive.value);
 const estimateShown = computed(() => nativePhoneAvailable && isEstimate.value && phase.value !== "error");
 const estimateView = computed(() => resultReadRecovering.value ? "read-failed" : hasCalibration.value ? "detected" : "loading");
@@ -676,7 +682,7 @@ const bar = computed<Bar>(() => {
     note: isEstimate.value ? o.estimateReadFailed : o.resultReadFailed,
     primary: { label: resultActionLabel.value, run: () => {}, off: true, arrow: !standalone.value && !isEstimate.value },
   };
-  if (phase.value === "intro") return { kind: "float", primary: { label: o.calibrationStart, run: () => { void startCalibration(); } } };
+  if (phase.value === "intro") return { kind: "none" };
   if (phase.value === "calibrating") return readOnlyWait.value
     ? { kind: "float", primary: { label: resultActionLabel.value, run: () => {}, off: true, busy: true, arrow: !standalone.value && !isEstimate.value } } : { kind: "none" };
   if (phase.value === "result") {
@@ -1381,6 +1387,11 @@ export default calibrationDialView;
 .cn-score--scan .cn-score__num { opacity: var(--cn-number-opacity, 0); }
 .cn-score__ctr { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; color: var(--v5-ink-3); }
 .cn-score__scan-t { font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); white-space: nowrap; }
+/* Start: the whole dial is the button; its prompt is the brand-coloured action text in the centre. */
+.cn-score--tap { border-radius: 50%; cursor: pointer; }
+.cn-score--tap:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 4px; }
+.cn-score__tap-t { font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); color: var(--v5-brand); text-align: center; text-wrap: balance; transition: opacity 100ms ease-out; }
+.cn-score--tap:active .cn-score__tap-t { opacity: .6; }
 .cn-score__num { left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; }
 .cn-score__value { display: grid; justify-items: center; }
 /* 10.2 校准结果主数字: JetBrains Mono 500, brand, line-height 1; size from the final string. */

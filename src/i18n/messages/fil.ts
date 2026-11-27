@@ -2929,6 +2929,7 @@ export const fil: Messages = {
     step3of3: "Hakbang 3 sa 3",
     calibrationTitle: "Calibration ng compute ng phone",
     calibrationStart: "Simulan ang calibration",
+    tapToCalibrate: "I-tap para simulan ang calibration",
     phoneBindingReadUnavailableTitle: "Hindi available ang binding ng phone",
     phoneBindingReadUnavailableBody: "Hindi makumpirma ang status ng binding ng phone na ito. Suriin ang koneksyon sa network at subukan ulit.",
     calibrationFailedTitle: "Pansamantalang hindi available ang calibration ng phone",

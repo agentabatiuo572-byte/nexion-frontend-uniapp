@@ -2929,6 +2929,7 @@ export const ru: Messages = {
     step3of3: "Шаг 3 из 3",
     calibrationTitle: "Калибровка мощности",
     calibrationStart: "Начать калибровку",
+    tapToCalibrate: "Нажмите, чтобы начать калибровку",
     phoneBindingReadUnavailableTitle: "Привязка телефона недоступна",
     phoneBindingReadUnavailableBody: "Не удалось подтвердить привязку этого телефона. Проверьте подключение к сети и повторите.",
     calibrationFailedTitle: "Калибровка телефона временно недоступна",
