@@ -2381,7 +2381,7 @@ rankBenefits: "查看等级权益",
 
     trackFailedBody: "提现未完成，请联系客服。",
     trackEtaPending: "预计 {n} 小时内完成",
-    trackExpectedArrivalDate: "预计 {date} 到账",
+    trackExpectedArrivalDate: "预计 {date}到账",
 
     trackEtaTitlePending: "提现处理中",
 
