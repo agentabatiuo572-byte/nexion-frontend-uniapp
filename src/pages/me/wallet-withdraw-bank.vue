@@ -125,11 +125,12 @@
               <text v-if="quoteReason && quoteReason !== c.amountErrors.daily" class="error-text" role="alert">{{ quoteReason }}</text>
             </view>
           </view>
-          <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
+          <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: usdt2(-app.user.usdtBalance) }) }}</text></view>
           <view class="daily">
             <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity?.dailyRemainingCount ?? "—", total: displayConfig.capacity?.dailyLimitCount ?? "—" }) }}</text>
             <view v-if="displayConfig.policy && displayConfig.capacity" class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
           </view>
+          <view v-if="quoteReason === c.amountErrors.daily" class="notice" role="status"><text>{{ quoteNote }}</text></view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
           <view class="action text-link" role="button" tabindex="0" :aria-disabled="navigationLocked" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
@@ -194,7 +195,7 @@
 <script setup lang="ts">
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { formatTruncatedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { toast, type RuleItem } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
