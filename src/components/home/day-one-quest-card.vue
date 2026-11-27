@@ -19,9 +19,9 @@
             <text class="newcomer-task__eyebrow">{{ t.home.dayOneFirstDayReward }}</text>
             <text class="newcomer-task__count">{{ taskCountText }}</text>
           </view>
-          <view v-if="!claimState.empty" class="newcomer-task__reward">
-            <text class="newcomer-task__reward-value">{{ rewardText === "—" ? "—" : `+${rewardText}` }}</text>
-            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">UVT</text>
+          <view v-if="!claimState.empty && !claimState.claimed" class="newcomer-task__reward">
+            <text class="newcomer-task__reward-value">{{ rewardText }}</text>
+            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">{{ "\u00A0" }}UVT</text>
           </view>
         </view>
         <view v-if="!claimState.empty && !questUnavailable && (!remoteApiEnabled || dayOneWindow)" class="newcomer-task__clock" style="text-align: right; flex-shrink: 0">
@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': targetClosed(task) }">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': !!rowReason(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -73,11 +73,11 @@
           </view>
           <view style="min-width: 0">
             <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-              <text :class="isActionable(task) ? 'truncate' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text class="newcomer-task__label--wrap" :style="labelStyle(task)">{{ task.label }}</text>
               <text class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
             </view>
-            <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
-            <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
+            <!-- A pending row that cannot be opened says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
+            <text v-if="rowReason(task)" class="newcomer-task__reason">{{ rowReason(task) }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -160,7 +160,7 @@ interface QuestTask {
   /** 该填充色之上的前景色(勾/序号)。quest 两色恒浅 → on-quest 恒深墨;
    *  brand 随主题翻转 → 必须配同样翻转的 on-brand。用错会在某一主题糊掉。 */
   onColor: string;
-  eligible: boolean;
+  ineligibilityReason: "expired" | null;
 }
 
 const visibility = useDataVisibility();
@@ -196,12 +196,12 @@ const categoryLabel = (category: QuestTaskCategory): string => ({
 })[category];
 
 const fallbackTasks = computed<QuestTask[]>(() => [
-  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)", eligible: true },
-  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
+  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)", ineligibilityReason: null },
+  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
 ]);
 const remoteTasks = computed<QuestTask[]>(() => {
   const palette = [
@@ -219,7 +219,8 @@ const remoteTasks = computed<QuestTask[]>(() => {
       nex: null,
       href: row.actionRoute,
       cat: categoryLabel(row.category),
-      eligible: row.eligible,
+      // The state read sets eligible=false only outside the frozen claim window (AppGrowthEngagementMapper), so the reason is expiry.
+      ineligibilityReason: row.eligible ? null : "expired",
       ...palette[index % palette.length],
     }));
 });
@@ -278,9 +279,10 @@ const toggleLabel = computed(() => questLoadError.value
   : questUnavailable.value ? t.value.home.dayOneLoading
   : expanded.value ? t.value.home.dayOneHideTasks : viewTasksText.value);
 const rewardText = computed(() => {
-  if (!remoteApiEnabled) return formatAmount(mockReward);
-  if (quest.remoteStatus !== "ready") return "—";
-  return quest.dayOneRewardNex > 0 ? formatAmount(quest.dayOneRewardNex) : "—";
+  if (!remoteApiEnabled) return `+${formatAmount(mockReward)}`;
+  if (questUnavailable.value || !claimState.value.verifiable) return "—";
+  const amount = quest.dayOneRewardNex;
+  return amount === 0 ? formatAmount(0) : `+${formatAmount(amount)}`;
 });
 const dayOneWindow = computed(() => quest.remoteQuests.find((row) => row.layer === "DAY_ONE") ?? null);
 
@@ -308,12 +310,28 @@ function onClaim() {
   void quest.claimDayOne();
 }
 
-function isActionable(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
+function taskNavigationState(task: QuestTask): "missing-route" | "closed-target" | "available" {
+  if (!task.href) return "missing-route";
+  return questActionRouteUnavailable(task.href) ? "closed-target" : "available";
 }
 
-function targetClosed(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
+function canActOnTask(task: QuestTask) {
+  return task.ineligibilityReason === null && !dayOneExpired.value && !isDone(task);
+}
+
+function isActionable(task: QuestTask) {
+  return canActOnTask(task) && taskNavigationState(task) === "available";
+}
+
+// Why a pending row cannot be opened: its claim window has passed, its target is closed, or its route did not resolve.
+// A done row needs no reason.
+function rowReason(task: QuestTask): string {
+  if (isDone(task)) return "";
+  if (task.ineligibilityReason === "expired" || dayOneExpired.value) return t.value.questClaim.expired;
+  const navigation = taskNavigationState(task);
+  if (navigation === "missing-route") return t.value.home.dayOneTaskUnreachable;
+  if (navigation === "closed-target") return t.value.questClaim.definitionInactive;
+  return "";
 }
 
 function onRowTap(task: QuestTask) {
@@ -370,7 +388,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : targetClosed(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : rowReason(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
@@ -378,7 +396,9 @@ function labelStyle(task: QuestTask): CSSProperties {
 
 function catStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
-  if (props.missionLayout) return {font:'400 12px/16px var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-nex-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-success-ink)' : 'var(--v5-warning-ink)'};
+  // A category is an attribute, not a status (01 §1.1.1 rule 4, 03 §3.8): the common one stays neutral, the other two take
+  // attribute-tag inks (teal for identity, brand-2 coral for social), each at least 4.5:1 on the card surface.
+  if (props.missionLayout) return {font:'var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-tech-cyan-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-brand-2-tag-ink)' : 'var(--v5-ink-3)'};
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "12px",
@@ -543,7 +563,8 @@ const toggleStyle: CSSProperties = {
 
 
 .newcomer-task--mission .newcomer-task__count { display:inline-flex; align-items:center; height:24px; min-width:38px; box-sizing:border-box; justify-content:center; padding:0 8px; }
-.newcomer-task--mission .newcomer-task__reward { gap:6px; margin-top:17.5px; }
+/* The no-break space before UVT (03 §3.6.1) carries ~3px of the approved 6px gap. */
+.newcomer-task--mission .newcomer-task__reward { gap:3px; margin-top:17.5px; }
 .newcomer-task--mission .newcomer-task__unit { margin-left:0!important; }
 /* The countdown stays in the row, so it keeps its real width (countdown or the expired label) and the title and task count
    wrap beside it; it is centred on the title's first line, 12px down. */

@@ -34,7 +34,7 @@
             <text class="block" :style="claimedLabelStyle">{{ titleOf(q) }}</text>
 
           </view>
-          <view style="text-align:right"><text :style="claimedRewardStyle">+{{ formatAmount(rewardOf(q)) }} UVT</text><text class="block" :style="categoryLabelStyle">{{ t.questClaim.alreadyClaimed }}</text></view>
+          <view style="text-align:right"><text :style="claimedRewardStyle">+{{ formatAmount(rewardOf(q)) }}{{ "\u00A0" }}UVT</text><text class="block" :style="claimedStatusStyle">{{ t.questClaim.alreadyClaimed }}</text></view>
         </view>
 
         <!-- completed: claimable button -->
@@ -64,7 +64,7 @@
             <text v-else class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
           </view>
           <view v-if="!targetClosed(q)" class="flex items-baseline" style="gap: var(--v5-space-1)">
-            <text :style="pendingRewardStyle">+{{ formatAmount(rewardOf(q)) }} UVT</text>
+            <text :style="pendingRewardStyle">+{{ formatAmount(rewardOf(q)) }}{{ "\u00A0" }}UVT</text>
           </view>
           <svg v-if="!rowInactive(q)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: -2px; flex-shrink: 0"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -298,10 +298,16 @@ const periodStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
+// A row's description line (category, ready to claim): list-subtitle role (10 §10.1, 390 13/18).
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12px",
+  font: "var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5)",
+  color: "var(--v5-ink-3)",
+};
+// The status under a row's amount keeps the 12/16 status size (03 §3.8).
+const claimedStatusStyle: CSSProperties = {
+  marginTop: "2px",
+  font: "var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5)",
   color: "var(--v5-ink-3)",
 };
 const claimErrorStyle: CSSProperties = { ...categoryLabelStyle, color: "var(--v5-ink)" };

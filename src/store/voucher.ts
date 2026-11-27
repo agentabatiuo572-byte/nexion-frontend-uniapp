@@ -86,6 +86,7 @@ export const useVoucher = defineStore("voucher", () => {
   const catalogLoadedAt = ref(0);
   const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteError = ref("");
+  const claimingVoucherId = ref<string | null>(null);
   // Display only: runtime invalidation still clears every selectable voucher.
   const presentationOffers = ref<VoucherDef[]>([]);
   const presentationClaimable = ref<VoucherDef[]>([]);
@@ -149,9 +150,8 @@ export const useVoucher = defineStore("voucher", () => {
     request: RemoteAccountRequest,
     runScope: RuntimeRevisionScope,
     generation: number,
-  ): void {
-    if (!remoteRequestIsCurrent(request, runScope, generation)) return;
-    void refreshRemote();
+  ): Promise<boolean> {
+    return remoteRequestIsCurrent(request, runScope, generation) ? refreshRemote() : Promise.resolve(false);
   }
 
   const passiveReadOwner = () => [remoteAccountEpoch.snapshot(), captureRuntimeRevision()];
@@ -212,26 +212,28 @@ export const useVoucher = defineStore("voucher", () => {
       applyRemoteSnapshot(snapshot);
       return true;
     } catch {
-      recoverCurrentRemoteRead(request, runScope, generation);
+      void recoverCurrentRemoteRead(request, runScope, generation);
       return false;
     }
   }
 
   async function claimRemote(id: string, surface: VoucherDef["claimSurfaces"][number]): Promise<boolean> {
-    if (!remoteApiEnabled || Date.now() < retryAt) return false;
+    if (!remoteApiEnabled || claimingVoucherId.value !== null || Date.now() < retryAt) return false;
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
+    claimingVoucherId.value = id;
     try {
       await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
-      if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
-      // A same-key receipt can predate redemption; only the current GET authorizes use.
-      const refreshed = await refreshRemote();
-      return refreshed && remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope)
-        && claimedUnused.value.some((item) => item.id === id);
+      if (!remoteAccountEpoch.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return false;
+      // The receipt confirms the claim. Current usability comes from the voucher catalogue.
+      await refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
     } catch {
-      recoverCurrentRemoteRead(request, runScope, generation);
+      await recoverCurrentRemoteRead(request, runScope, generation);
       return false;
+    } finally {
+      if (remoteAccountEpoch.isCurrent(request)) claimingVoucherId.value = null;
     }
   }
 
@@ -251,6 +253,7 @@ export const useVoucher = defineStore("voucher", () => {
   function bindAccount(rawAccountKey: string) {
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(rawAccountKey);
+      claimingVoucherId.value = null;
       remoteGeneration += 1;
       clearRemoteFacts();
       void refreshRemote();
@@ -439,6 +442,7 @@ export const useVoucher = defineStore("voucher", () => {
     isUsed,
     claim,
     claimRemote,
+    claimingVoucherId,
     markUsed, release,
     refreshRemote,
     revalidateRemote,

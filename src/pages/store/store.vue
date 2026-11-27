@@ -110,7 +110,7 @@ import NxSection from "@/components/ui/nx-section.vue";
 import NxListGroup from "@/components/ui/nx-list-group.vue";
 import NxListRow from "@/components/ui/nx-list-row.vue";
 import { PRODUCTS, type Product } from "@/mock/products";
-import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, productCatalogLanguageReadFailed, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isProductAvailable, isProductReleased, productOutOfStock } from "@/store/product-availability";
@@ -400,7 +400,12 @@ function retryCatalog() {
 }
 const phoneTierReadFailed = () => earnConfig.status.value === "error";
 useAutoRecovery({ active: () => !publicOnly.value, failed: phoneTierReadFailed, retry: earnConfig.refresh });
-useAutoRecovery({ failed: () => catalogStatus.value === "error", retry: () => refreshProductCatalog(true) });
+useAutoRecovery({
+  failed: () => catalogStatus.value === "error" || productCatalogLanguageReadFailed.value,
+  retry: () => refreshProductCatalog(true),
+  repeatMs: 30_000,
+  repeatWhile: () => voucherClaimSheet.open && voucherClaimSheet.surface === "store",
+});
 
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
 // soft bg tint + content color, no border).

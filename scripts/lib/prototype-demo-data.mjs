@@ -6,7 +6,8 @@ import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { trialReceiptOptions } from './trial-lifecycle-preview-fixture.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { quoteBundleAmountUsdt } from '../../src/api/bundle-quote.ts';
-import { fixture as reviewFixture, previewCapacity, previewDayOneInstanceKey, previewDefaultTrialName, previewDefaultTrialSku, previewDeviceProduct, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDeviceProduct, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
+import { claimDemoDayOne, demoDayOneSnapshot } from './prototype-demo-day-one.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mjs';
@@ -36,9 +37,14 @@ const promotionEndsAt = new Date(demoStartedAt + 6 * day - 19 * 60000).toISOStri
 const endedPromotionEndsAt = new Date(demoStartedAt - day).toISOString();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
+const retiredVoucherSku='stellarbox-retired';
 function demoVoucherGrant(state,voucherId,now){
   if(state.dataState==='empty')return null;
   if(voucherId==='V-DESIGN'){
+    if(state.voucherScopeState==='claimed-expired'){
+      const at=state.previewFactsAt??now;
+      return {grantId:'DEMO-GRANT',grantStatus:'EXPIRED',startAt:at-3*day,claimedAt:at-2*day,endAt:at-day};
+    }
     if(state.voucherUsed||!(state.voucherClaimed||['claimed','grace'].includes(state.benefitState)))return null;
     return {grantId:'DEMO-GRANT',claimedAt:now-day,grantStatus:'AVAILABLE',amountUsd:50,minPurchaseUsd:0,maxDiscountUsd:50};
   }
@@ -55,6 +61,8 @@ function demoVoucherGrant(state,voucherId,now){
 function demoVoucherRedemption(state,voucherId,lines,subtotal,now){
   if(!voucherId)return null;
   if(lines.length!==1)refuse('BUNDLE_VOUCHER_UNSUPPORTED');
+  if(voucherId==='V-DESIGN'&&state.voucherScopeState==='single-unnamed'&&lines[0].productNo!==retiredVoucherSku)
+    refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
   const grant=demoVoucherGrant(state,voucherId,now);
   if(grant?.grantStatus!=='AVAILABLE'||subtotal<grant.minPurchaseUsd)refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
   return {voucherId,grantId:grant.grantId,status:'REDEEMED',discountUsdt:Math.min(subtotal,grant.amountUsd,grant.maxDiscountUsd)};
@@ -112,7 +120,7 @@ const demoMilestoneClaimed=(state,id)=>id===1&&demoHasOpeningMilestone(state)||s
   ||state.milestoneClaimReceipts?.some(({result})=>result?.milestoneId===id)
   ||state.walletMovements?.some(row=>row.bizType==='DAILY_MILESTONE'&&row.bizNo===`DAILY-MS:900001:${id}`);
 // Reconciliation can leave an unissued reward in manual review after a refund hold has been released.
-export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',depositFeeState:'zero',withdrawReviewState:'default',withdrawRecoveryState:'off',trialState:'follow',trialNameState:'default',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'pending',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',voucherScopeState:'all',weekEndState:'normal',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',bankLimitsState:'normal',bankAvailabilityState:'normal',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,deviceTaskSampleState:'default',slotReplacementState:'none',...rankPresetDefaults};
+export const demoDefaults = {contentState:'normal',interfaceLanguagesState:'all',accountDeletionState:'follow',checkoutState:'ordinary',trialQuoteState:'default',powerUpState:'default',paymentState:'delivered',topupState:'form',orderTopupState:'off',withdrawNetworksState:'bep20-erc20',depositFeeState:'zero',withdrawReviewState:'default',withdrawRecoveryState:'off',trialState:'follow',trialNameState:'default',trialReadState:'normal',realtimeState:'online',messageSendState:'normal',messageState:'normal',notificationPageState:'normal',supportReadbackState:'missing',machineImageState:'normal',catalogState:'available',quotaState:'unconfigured',taskState:'account',eventState:'mixed',wheelState:'closed',raffleState:'normal',pairingState:'pending',benefitState:'available',voucherScopeState:'all',weekEndState:'normal',dataState:'normal',trustSectionsState:'all',stakingState:'delisted',bankState:'pending',bankLimitsState:'normal',bankAvailabilityState:'normal',billRefsState:'normal',riskState:'accepted',streakState:'normal',ambassadorState:'none',ambassadorIoState:'normal',ambassadorRank:'follow',promotionEligibility:'eligible',promotionBuyer:'returning',repurchaseState:'follow',promotionTiming:'live',promotionRewardType:'reward',promotionRewardState:'CANCELLED',sessionState:'signed-in',savedAttemptState:'none',jobsBaseState:'published',homeDisplayState:'growth',globeShareState:'nodes',highestRank:false,checkedIn:false,offers:true,messages:true,promotions:true,completed:[],read:false,deviceTaskSampleState:'default',slotReplacementState:'none',...rankPresetDefaults};
 Object.assign(demoDefaults,{
   oauthProviderScenario:'normal',
   trialPurchaseListState:'only-trial',trialPurchaseOptionTarget:'rack-p1',trialPurchaseOptionState:'normal',
@@ -150,14 +158,14 @@ export const demoOptions = {
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
   catalogState:[['phased','完整目录（含即将上线）'],['sku-series','S1 系列多件商品（含一件规格不全）'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro'],['trial-h2-yield-updated','S1 日收益已更新']],
-  taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
+  taskState:[['account','按演示账号注册时间'],['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['expired-long','首日任务长名称 · 已过期不可领'],['route-unparseable','路由无法解析'],['actionable-long','可前往的长名称'],['empty','暂无任务'],['legacy','任务信息待补全']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
   raffleState:[['normal','正常开奖'],['small-usdt','微额 USDT 奖励'],['upcoming','1 分钟后开始'],['ending','1 分钟后截止'],['ended','已截止待开奖']],
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
-  voucherScopeState:[['all','全场设备可用'],['single-unnamed','单品券 · 商品已不在目录（无名称）']],
-  weekEndState:[['normal','本周照常'],['ending','本周 1 分钟后结束（页面开着时出现过期行）']],
+  voucherScopeState:[['all','全场设备可用'],['single-unnamed','单品券 · 商品已不在目录（无名称）'],['claimed-expired','已领未使用 · 已过期']],
+  weekEndState:[['normal','本周照常'],['ending','本周 1 分钟后结束（到点后两档未领任务一起移除）']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
   trustSectionsState:[['all','信任资料 · 六个版块'],['missing-narrative','信任资料 · 缺 UVT 说明'],['missing-audits','信任资料 · 缺审计'],['leadership','信任资料 · 仅管理团队'],['none','信任资料 · 无版块']],
   stakingState:[['delisted','功能下架'],['error','质押读取失败（其他正常）']],
@@ -1770,40 +1778,36 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(/^\/api\/promotions\/demo-promo-\d+\/referral-progress$/.test(pathname))return {activityId:pathname.split('/')[3],qualifyingOrders:2,ownRewards:[],serverTime:iso};
   const contentLocale=url.searchParams.get('locale')?.trim().toLowerCase().split('-')[0] || 'en';
+  const skuQuestTargets=state.dayOnePreviewSkuSeries
+    ?{roi:demoS1VariantNo,other:demoSpecsIncompleteNo}:null;
   if(pathname==='/api/growth/day-one/page-observations/s1-roi'&&request?.method()==='POST'){
     const accountId=previewAccountId(state,request.headers());
     const {productNo}=request.postDataJSON();
     const product=productFor(productNo);
-    const recorded=!!accountId&&!empty&&state.catalogState==='sku-series'&&state.taskState==='pending'&&!state.dayOneClaimed
+    const roi=demoDayOneSnapshot(state,accountId,now,contentLocale,skuQuestTargets).quests
+      .find(row=>row.questCode==='view_product_roi');
+    const recorded=!!accountId&&roi?.eligible===true&&roi.status==='PENDING'
       &&product?.seriesCode==='S1'&&product.releaseState==='AVAILABLE'&&product.purchaseBlockedReason!=='PRODUCT_SPECS_UNAVAILABLE'
       &&Number.isFinite(product.dailyEarn)&&product.dailyEarn>0;
     if(recorded){
       const observations=(state.dayOneObservedRoi??={})[accountId]??={};
-      observations[previewDayOneInstanceKey]??=productNo;
+      observations[roi.instanceKey]??=productNo;
     }
     return {accepted:true,recorded};
   }
   if(pathname==='/api/quests/state') {
-    const data=reviewFixture(url,contentLocale,{...state,taskState:state.dayOneClaimed?'claimed':state.taskState},request);
-    if(empty) return {...data,quests:[],dayOneRequiredTaskCount:0,dayOneSnapshotStatus:'EMPTY'};
-    const routes=['/pages/me/devices','/pages/store/store','/pages/earn/earn','/pages/learn/courses','/pages/me/profile','/pages/team/team'];
-    data.quests.forEach((row,i)=>{row.actionRoute=routes[i];row.category=['identity','explore','explore','explore','identity','social'][i];});
+    const accountId=previewAccountId(state,request?.headers?.()??{})??previewSelectedAccountId(state);
+    const data=demoDayOneSnapshot(state,accountId,now,contentLocale,skuQuestTargets);
+    if(empty) return data;
     const weekNames=localized(contentLocale,['了解设备收益','完成一门课程','邀请一位好友','查看账户安全'],['Explore device earnings','Complete one course','Invite a friend','Review account security'],['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']);
-    if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(state.taskState==='expired'?now-1000:state.weekEndState==='ending'&&i>0?(state.weekEndingAt??=now+60000):now+5*day).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
-    if(state.catalogState==='sku-series'&&state.taskState==='pending'){
-      const accountId=previewAccountId(state,request?.headers?.()??{});
-      const roiQuest=data.quests[3];
-      Object.assign(roiQuest,{
-        questCode:'view_product_roi',
-        name:localized(contentLocale,'查看 S1 回本','View S1 ROI','Xem ROI của S1'),
-        actionRoute:'/pages/store/detail?id='+demoS1VariantNo,
-        ...(roiQuest.status==='PENDING'&&accountId&&state.dayOneObservedRoi?.[accountId]?.[roiQuest.instanceKey]
-          ?{status:'COMPLETED'}:{}),
-      });
-      Object.assign(data.quests[4],{
-        name:localized(contentLocale,'查看另一件设备','View another device','Xem thiết bị khác'),
-        actionRoute:'/pages/store/detail?id='+demoSpecsIncompleteNo,
-      });
+    if(state.taskState!=='empty'){
+      const endingAt=state.taskState!=='expired'&&state.weekEndState==='ending'
+        ? (state.weekEndingAt??=now+60_000) : null;
+      const eligibleFrom=new Date((endingAt===null?now:endingAt-60_000)-day).toISOString();
+      const eligibleUntil=new Date(state.taskState==='expired'?now-1000:endingAt??now+5*day).toISOString();
+      data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom,eligibleUntil,eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
+    }
+    if(state.catalogState==='sku-series'&&['account','pending'].includes(state.taskState)){
       data.quests.find(row=>row.questCode==='demo-week-0').actionRoute='/pages/store/detail?id='+demoS1VariantNo;
       data.quests.find(row=>row.questCode==='demo-week-3').actionRoute='/pages/store/detail?id=e-s1-999';
     }
@@ -1811,7 +1815,17 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return data;
   }
   const questClaim=pathname.match(/^\/api\/quests\/([^/]+)\/claim$/);
-  if(questClaim){const code=decodeURIComponent(questClaim[1]);if(code.startsWith('demo-week-')){state.weekClaims||=[];state.weekClaims.push(Number(code.split('-').pop()));}else state.dayOneClaimed=true;return {...authority,questId:code,rewardNex:code.startsWith('demo-week-')?100+Number(code.split('-').pop())*25:500,status:'CLAIMED',instanceKey:code.startsWith('demo-week-')?'WEEK:demo':previewDayOneInstanceKey};}
+  if(questClaim&&request?.method()==='POST'){
+    const code=decodeURIComponent(questClaim[1]);
+    if(!code.startsWith('demo-week-')){
+      const headers=request.headers();
+      return claimDemoDayOne(state,previewAccountId(state,headers),now,code,
+        request.postDataJSON()?.instanceKey,headers['idempotency-key']);
+    }
+    const index=Number(code.split('-').pop());
+    (state.weekClaims??=[]).push(index);
+    return {...authority,questId:code,rewardNex:100+index*25,status:'CLAIMED',instanceKey:'WEEK:demo'};
+  }
   if(pathname==='/api/events'||pathname.startsWith('/api/events/')){
     const spinTickets=demoStreakMilestones.reduce((count,[,type,amount],index)=>
       count+(type==='SPIN'&&demoMilestoneClaimed(state,index+1)?amount:0),0);
@@ -1982,10 +1996,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return pathname.endsWith('/summary')?demoWalletBillSummary(bills,now):demoWalletBillList(bills,url.searchParams);
   }
   if(pathname==='/api/vouchers') {
-    const data=structuredClone(reviewFixture(url,locale,{...state,offers:!empty&&!state.voucherUsed&&state.benefitState!=='finished'},request));
+    const offers=!empty&&(state.voucherScopeState==='claimed-expired'||!state.voucherUsed&&state.benefitState!=='finished');
+    const data=structuredClone(reviewFixture(url,locale,{...state,offers},request));
     data.vouchers=data.vouchers.map(v=>({...v,voucherName:localized(locale,'设备代金券','Device voucher','Phiếu giảm giá thiết bị')}));
     // A single-product voucher whose product left the catalog: the App has no name for it and must not show the number.
-    if(state.voucherScopeState==='single-unnamed')data.vouchers=data.vouchers.map(v=>({...v,applicableSkus:'["stellarbox-retired"]'}));
+    if(state.voucherScopeState==='single-unnamed')data.vouchers=data.vouchers.map(v=>({...v,applicableSkus:[retiredVoucherSku]}));
     const designGrant=demoVoucherGrant(state,'V-DESIGN',now);
     if(designGrant)data.vouchers=data.vouchers.map(v=>({...v,...designGrant,claimable:false}));
     const wheelGrant=demoVoucherGrant(state,wheelVoucherId,now);
@@ -1996,7 +2011,11 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     }
     return data;
   }
-  if(pathname==='/api/vouchers/V-DESIGN/claim'){state.voucherClaimed=true;return {...authority,voucherId:'V-DESIGN',grantId:'DEMO-GRANT',status:'AVAILABLE',replay:false,source:'nx_growth_voucher_grant'};}
+  if(pathname==='/api/vouchers/V-DESIGN/claim'){
+    if(state.voucherScopeState==='claimed-expired')refuse('VOUCHER_NOT_CLAIMABLE_FROM_SURFACE');
+    state.voucherClaimed=true;
+    return {...authority,voucherId:'V-DESIGN',grantId:'DEMO-GRANT',status:'AVAILABLE',replay:false,source:'nx_growth_voucher_grant'};
+  }
   if(pathname==='/api/notifications'||pathname.startsWith('/api/notifications/')) {
     const notificationRows=()=>{
       if(empty)return [];

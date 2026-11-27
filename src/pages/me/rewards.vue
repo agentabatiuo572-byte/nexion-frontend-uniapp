@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { formatAmount } from "@/lib/amount-display";
-import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch, type CSSProperties } from "vue";
 import { onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -58,6 +58,8 @@ import { useApp } from "@/store/app";
 import { navTo } from "@/lib/route";
 import { fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useVoucherTargetAvailability } from "@/composables/use-voucher-target-availability";
+import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import { registerActivePageRefresh } from "@/lib/active-page-refresh";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import type { RewardsCat } from "./course-reward-link";
@@ -111,15 +113,16 @@ onShow(() => {
 });
 
 const voucherReady = computed(() => !remoteApiEnabled || voucher.remoteStatus === "ready");
-const remoteAvailableCount = computed<number | null>(() => voucherReady.value ? voucher.claimedUnused.length : null);
 const remoteExpiredCount = computed<number | null>(() => voucherReady.value ? voucher.expiredVouchers.length : null);
-// Voucher re-reads happen on every return from a detail page. Keep the last
-// successful counts so the cards never flash "-" for values already known.
-const lastAvailableCount = ref<number | null>(null);
+// Keep confirmed rows across voucher re-reads so the count can still follow the product catalog.
+const lastClaimedVouchers = shallowRef<VoucherDef[] | null>(null);
+watch(() => voucherReady.value ? voucher.claimedUnused : null,
+  (rows) => { if (rows !== null) lastClaimedVouchers.value = rows; }, { immediate: true });
+const claimedVouchers = computed(() => voucherReady.value ? voucher.claimedUnused : lastClaimedVouchers.value);
+const voucherTargetStatus = useVoucherTargetAvailability(() => claimedVouchers.value?.some(isSingleSkuVoucher) ?? false);
+const availableCount = computed(() => claimedVouchers.value?.filter(row => voucherTargetStatus(row) !== "unavailable").length ?? null);
 const lastExpiredCount = ref<number | null>(null);
-watch(remoteAvailableCount, (value) => { if (value !== null) lastAvailableCount.value = value; }, { immediate: true });
 watch(remoteExpiredCount, (value) => { if (value !== null) lastExpiredCount.value = value; }, { immediate: true });
-const availableCount = computed(() => remoteAvailableCount.value ?? lastAvailableCount.value);
 const expiredCount = computed(() => remoteExpiredCount.value ?? lastExpiredCount.value);
 
 // Reward totals per symbol — same reward-family predicate as the dot and
@@ -149,7 +152,7 @@ const displayNexTotal = computed(() =>
 );
 
 watch(() => app.accountBindingEpoch, () => {
-  lastAvailableCount.value = null;
+  lastClaimedVouchers.value = null;
   lastExpiredCount.value = null;
   lastUsdtTotal.value = null;
   lastNexTotal.value = null;
@@ -254,7 +257,7 @@ const displayCats = computed(() => ['usdt', 'uvt', 'voucher', 'promotion'].map(k
 // wait for its own voucher/summary reads instead of showing the former account.
 watch(() => [app.accountKey, app.accountBindingEpoch], () => {
   rewardViewRequest++;
-  lastAvailableCount.value = null;
+  lastClaimedVouchers.value = null;
   lastExpiredCount.value = null;
   lastUsdtTotal.value = null;
   lastNexTotal.value = null;
