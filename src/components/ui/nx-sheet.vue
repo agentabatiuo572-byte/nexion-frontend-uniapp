@@ -4,7 +4,7 @@
          targets, so @click.self never matched and a mask tap closed nothing. Taps on the sheet never reach this layer. -->
     <view class="nx-sheet-scrim" aria-hidden="true" @click="!persistent && $emit('close')" />
     <view :id="id" class="nx-glass-sheet nx-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="title">
-      <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" round @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
+      <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" round :disabled="!!closeLockedBy" :aria-describedby="closeLockedBy" @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
       <view class="nx-sheet__body"><slot /></view>
       <view v-if="$slots.footer" class="nx-sheet__footer"><slot name="footer" /></view>
     </view>
@@ -17,7 +17,9 @@ import NxIcon from './nx-icon.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 // persistent: a mask tap does not close the sheet (forms whose typed input a stray tap would throw away, 03 §3.5); ✕, Esc and back still do.
-const props = defineProps<{ open: boolean; title: string; nativeBack?: boolean; persistent?: boolean }>();
+// closeLockedBy: while an action in the sheet is under way, the id of the line that says why closing waits; the close shows
+// disabled and points at it. Mask, Esc and back still emit close, so the owner's guard decides.
+const props = defineProps<{ open: boolean; title: string; nativeBack?: boolean; persistent?: boolean; closeLockedBy?: string }>();
 const emit = defineEmits<{ (event: 'close'): void }>();
 const copy = useAuditUiCopy();
 const id = `nx-sheet-${getCurrentInstance()?.uid}`;

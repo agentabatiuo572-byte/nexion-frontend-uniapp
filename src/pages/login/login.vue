@@ -114,13 +114,13 @@
       <!-- Primary CTA -->
       <!-- Incomplete fields still allow a tap to show their reason. A missing challenge disables the CTA.
            Busy shows NxButton's spinner and takes no taps. While the third-party panel is open the CTA is disabled, not
-           busy: the panel's confirm is the only primary in view (03 §3.1), and the panel's copy describes the button. -->
-      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !localLoading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="localLoading" :disabled="otpChallengeMissing || oauthBusy" :aria-disabled="!canPrimary || loading" :aria-describedby="oauthBusy ? 'oauth-panel-copy' : !canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
+           busy: the panel's confirm is the only primary in view (03 §3.1), and the reason line below says to finish or cancel it. -->
+      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !localLoading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="localLoading" :disabled="otpChallengeMissing || oauthBusy" :aria-disabled="!canPrimary || loading" :aria-describedby="oauthBusy ? 'lg-cta-reason' : !canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
            directly above is showing, that line carries the reason and the button points to it instead. The recovery view
            has the same line under its own button (lg-retry-reason). The line keeps its height when it has
            nothing to say, hidden from view and from screen readers, so nothing below jumps. -->
-      <text v-if="!loginRecoveryPending" id="lg-cta-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': canPrimary || loading || !!error }" :aria-hidden="canPrimary || loading || error ? 'true' : undefined">{{ primaryDisabledReason }}</text>
+      <text v-if="!loginRecoveryPending" id="lg-cta-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': !oauthBusy && (canPrimary || loading || !!error) }" :aria-hidden="!oauthBusy && (canPrimary || loading || error) ? 'true' : undefined">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
       <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
@@ -424,6 +424,7 @@ const canPrimary = computed(() => {
   return pwdMatch.value && !loading.value;
 });
 const primaryDisabledReason = computed(() => {
+  if (oauthBusy.value) return t.value.thirdParty.finishFirst;
   if (step.value === 1) {
     // Shown from the first frame, so it reads as a next step, not a format error (the hint under the field says that).
     if (!phoneOk.value) return t.value.register.ctaDisabledPhone;

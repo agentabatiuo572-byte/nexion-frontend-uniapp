@@ -126,7 +126,8 @@
       <!-- Primary CTA -->
       <!-- Incomplete fields still allow a tap to show their reason. A missing challenge or an unresolved result
            disables the CTA. Busy shows NxButton's spinner and takes no taps. While the third-party panel is open the CTA
-           is disabled, not busy: the panel's confirm is the only primary in view (03 §3.1). -->
+           is disabled, not busy: the panel's confirm is the only primary in view (03 §3.1), and the reason line says to finish
+           or cancel it. -->
       <NxButton
         class="rg-cta"
         :class="{ 'rg-cta--off': !ctaEnabled && !ctaBusy }"
@@ -383,6 +384,7 @@ const blockingStatusReason = computed(() => {
   return "";
 });
 const ctaDisabledReason = computed(() => {
+  if (oauthBusy.value) return t.value.thirdParty.finishFirst;
   if (blockingStatusReason.value) return blockingStatusReason.value;
   if (waitingToResend.value) return resendInText.value;
   if (otpChallengeMissing.value) return resendLeft.value > 0 ? resendInText.value : t.value.authOtp.errorOtpExpired;
@@ -392,7 +394,7 @@ const ctaDisabledReason = computed(() => {
 });
 const inlineError = computed(() => error.value === blockingStatusReason.value ? null : error.value);
 const ctaDescriptionId = computed(() => {
-  if (oauthBusy.value) return "oauth-panel-copy";
+  if (oauthBusy.value) return "rg-cta-reason";
   if (ctaEnabled.value || busy.value) return undefined;
   if (blockingStatusReason.value) return "rg-status-reason";
   return inlineError.value ? "rg-error" : "rg-cta-reason";

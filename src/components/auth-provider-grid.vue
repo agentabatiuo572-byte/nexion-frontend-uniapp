@@ -1,5 +1,7 @@
 <template>
-  <view class="auth-provider-grid" :class="{ 'auth-provider-grid--linked': linked.length, 'auth-provider-grid--stable': preserveAppearance }" :aria-label="t.authOtp.alternativeSignInMethods">
+  <view class="auth-provider-grid" :class="{ 'auth-provider-grid--linked': linked.length, 'auth-provider-grid--stable': preserveAppearance }" :aria-label="t.authOtp.alternativeSignInMethods" :aria-busy="placeholders ? 'true' : undefined">
+    <!-- placeholders: static tiles of the final size while the provider list is first read (03 §3.4 初始加载). -->
+    <view v-for="n in placeholders" :key="'placeholder-' + n" class="auth-provider auth-provider--placeholder" aria-hidden="true" />
     <view v-if="providers.includes('Passkey')" class="auth-provider" data-provider="Passkey" :class="{ 'auth-provider--linked': linked.includes('Passkey') }" role="button" :tabindex="linked.includes('Passkey') ? -1 : 0" :aria-label="ariaLabel('Passkey')" :aria-disabled="busy || linked.includes('Passkey')" @click="activate('Passkey')" @keydown.enter.prevent="activate('Passkey')" @keydown.space.prevent="activate('Passkey')">
       <view class="auth-provider__icon auth-provider__icon--ink">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="10" r="5" /><path d="M13 10h8M17 10v4M20 10v3" /></svg>
@@ -41,8 +43,8 @@ import { useT } from "@/i18n/use-t";
 type AuthProviderLabel = "Passkey" | "Google" | "Apple" | "Telegram";
 
 const t = useT();
-const props = withDefaults(defineProps<{ busy?: boolean; preserveAppearance?: boolean; development?: boolean; providers?: AuthProviderLabel[]; linked?: AuthProviderLabel[]; unavailableReason?: string }>(), {
-  busy: false, preserveAppearance: false,
+const props = withDefaults(defineProps<{ busy?: boolean; preserveAppearance?: boolean; development?: boolean; providers?: AuthProviderLabel[]; linked?: AuthProviderLabel[]; unavailableReason?: string; placeholders?: number }>(), {
+  busy: false, preserveAppearance: false, placeholders: 0,
   linked: () => [],
   providers: () => ["Passkey", "Google", "Apple", "Telegram"],
   development: false,
@@ -69,6 +71,7 @@ function activate(provider: AuthProviderLabel) {
 .auth-provider-grid--stable .auth-provider[aria-disabled="true"] { opacity: 1; }
 .auth-provider-grid--linked .auth-provider { height: 82px; }
 .auth-provider--linked[aria-disabled="true"] { opacity: 1; }
+.auth-provider--placeholder { pointer-events: none; }
 .auth-provider__status { font-size: 12px; line-height: 14px; color: var(--v5-ink-3); }
 .auth-provider__icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex: 0 0 20px; }
 .auth-provider__icon--ink { color: var(--v5-ink-2); }
