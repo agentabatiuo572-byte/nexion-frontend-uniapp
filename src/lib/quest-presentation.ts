@@ -4,6 +4,7 @@ import type { LocaleCode } from "@/i18n";
 import type { Messages } from "@/i18n/messages/en";
 import { zh } from "@/i18n/messages/zh";
 import { platformDisplayText } from "./brand-copy";
+import { parseProductNo } from "./product-number";
 
 const APP_QUEST_ROUTES = new Set([
   "/pages/missions/missions",
@@ -25,7 +26,9 @@ const APP_QUEST_ROUTES = new Set([
 ]);
 
 export function questProductNo(route: string): string | null {
-  return /^\/pages\/store\/detail\?id=([A-Za-z0-9-]+)$/.exec(route)?.[1] ?? null;
+  const prefix = "/pages/store/detail?id=";
+  if (!route.startsWith(prefix)) return null;
+  return parseProductNo(route.slice(prefix.length)) ?? null;
 }
 
 export function normalizeQuestActionRoute(value: string): string {

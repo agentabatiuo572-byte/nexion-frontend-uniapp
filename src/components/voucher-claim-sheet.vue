@@ -72,6 +72,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { voucherTargetStatus } from "@/composables/use-voucher-target-availability";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 
@@ -123,6 +124,7 @@ function hide() {
 }
 async function onClaim(v: VoucherDef) {
   if (remoteApiEnabled) {
+    if (voucher.claimingVoucherId !== null) return;
     if (await voucher.claimRemote(v.id, sheet.surface)) toast.success(t.value.voucher.claimedToast);
     else toast.error(voucher.remoteStatus === 'ready' ? t.value.promotion.eventVoucherUnavailable : t.value.authOtp.errorServiceUnavailable);
     return;
@@ -137,6 +139,7 @@ async function onClaim(v: VoucherDef) {
   }
 }
 function onUse(v: VoucherDef) {
+  if (voucherTargetStatus(v) === "unavailable") return;
   sheet.hide();
   if (isSingleSkuVoucher(v)) {
     // navTo() per project convention (maps /store/detail → /pages/store/detail).

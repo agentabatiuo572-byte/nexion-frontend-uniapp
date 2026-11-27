@@ -148,16 +148,17 @@ function specimenQuests(payload, fixture, now, locale) {
   }] : [];
   const group = fixture.dayOne;
   const status = instanceStatus(group, now);
+  const eligible = group != null && now < Date.parse(group.eligibleUntil);
   if (group) quests.push({
     questCode: dayOneQuestCode, name: locale === 'zh' ? '浏览商城' : 'Visit the store',
     layer: 'DAY_ONE', rewardNex: 0, category: 'explore', actionRoute: '/pages/store/store',
     instanceKey: group.instanceKey, eligibleFrom: group.eligibleFrom, eligibleUntil: group.eligibleUntil,
-    eligible: status !== 'EXPIRED' && status !== 'CLAIMED', status,
+    eligible, status,
   });
   return {
     ...payload, quests, serverTime: new Date(now).toISOString(),
     questBonusMultiplier: 1,
-    dayOneRewardNex: group && status !== 'EXPIRED' ? dayOneRewardNex : 0,
+    dayOneRewardNex: eligible ? dayOneRewardNex : 0,
     dayOneSnapshotStatus: group ? 'SNAPSHOT' : 'EMPTY',
     dayOneRequiredTaskCount: group ? 1 : 0,
   };

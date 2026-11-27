@@ -83,6 +83,7 @@ import { useTrialConfig } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { useTrialPresentation } from '@/composables/use-trial-presentation';
+import { useVoucherTargetAvailability } from '@/composables/use-voucher-target-availability';
 import { useT } from "@/i18n/use-t";
 import { useAuditUiCopy } from '@/i18n/audit-ui';
 import { useTrialLifecycleCopy, formatTrialCountdown, formatTrialRemaining } from '@/i18n/trial-lifecycle';
@@ -95,7 +96,7 @@ import { navTo } from '@/lib/route';
 import { remoteApiEnabled } from '@/api/runtime';
 import { productCatalogPresentation, productCatalogState } from '@/store/product-catalog';
 import { productOutOfStock } from '@/store/product-availability';
-import type { VoucherDef } from "@/mock/vouchers";
+import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 
 const COUPON_ART = '/static/img/home-glass-20260928/coupon.webp';
 const copy = useAuditUiCopy(), t = useT(), lifecycleCopy = useTrialLifecycleCopy();
@@ -105,9 +106,12 @@ const visibility = useDataVisibility();
 
 // Voucher: same remote/local sources as the previous home banner, split into claimable and claimed.
 const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(row => voucherSupportsSurface(row, 'home')));
-const voucherClaimed = computed(() => remoteApiEnabled
+const claimedVouchers = computed(() => remoteApiEnabled
   ? voucher.presentationOffers.filter(row => !voucher.presentationClaimable.some(item => item.id === row.id))
   : voucher.claimedUnused);
+const voucherTargetStatus = useVoucherTargetAvailability(() =>
+  voucherClaimable.value.some(isSingleSkuVoucher) || claimedVouchers.value.some(isSingleSkuVoucher));
+const voucherClaimed = computed(() => claimedVouchers.value.filter(row => voucherTargetStatus(row) !== "unavailable"));
 const voucherOffer = computed(() => voucherClaimable.value.length > 0);
 const voucherPending = computed(() => voucherClaimed.value.length > 0);
 function faceValue(rows: VoucherDef[]) {

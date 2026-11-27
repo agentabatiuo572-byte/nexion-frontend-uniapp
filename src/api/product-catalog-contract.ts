@@ -1,4 +1,5 @@
 import { parseEstimateRange } from "./estimate-range";
+import { parseProductNo } from "@/lib/product-number";
 import { isLiteProduct } from "@/lib/lite-scope";
 import type { Product, ProductBadgeKind, ProductSeriesCode, ProductTaskLevel, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
@@ -199,7 +200,7 @@ function product(value: unknown): CatalogProduct {
   const taskLevels: unknown[] = Array.isArray(source.taskLevels) ? source.taskLevels : [];
 
   return {
-    id: nonEmptyString(source.id),
+    id: parseProductNo(nonEmptyString(source.id)) ?? invalid(),
     name: nonEmptyString(source.name),
     storeSortRank: optionalInteger(source.storeSortRank),
     tier: tier as Product["tier"],

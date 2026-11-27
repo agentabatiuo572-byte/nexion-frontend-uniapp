@@ -2,6 +2,7 @@ import { parseEstimateRange, type EstimateRange } from "./estimate-range";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 import { productMediaUrl } from "./product-catalog-contract";
+import { parseProductNo } from "@/lib/product-number";
 import type { DeviceKind, TaskCategory } from "@/store/types";
 import type { ApiEnvironment } from "./runtime-config";
 
@@ -142,7 +143,7 @@ function ranking(v: unknown): AppHomeDeviceRanking {
   const dailyUsdt = v.dailyUsdt == null ? null : nonNegative(v.dailyUsdt);
   if (rank === null || rank < 1 || (v.kind != null && kind === null) || (v.dailyUsdt != null && dailyUsdt === null)) return invalid();
   return { rank, name: text(v.name), kind, dailyUsdt, dailyUsdtRange: dailyUsdtRange(v),
-    imageUrl: productMediaUrl(v.imageUrl), productNo: text(v.productNo) ?? undefined };
+    imageUrl: productMediaUrl(v.imageUrl), productNo: parseProductNo(text(v.productNo)) };
 }
 function client(v: unknown): AppHomeOnGridClient {
   if (!isRow(v)) return invalid();

@@ -145,6 +145,7 @@ import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { resolveWalletBillMemo } from "@/lib/wallet-bill-display";
 import { useCourseRewardTitles } from "@/composables/use-course-reward-titles";
+import { useVoucherTargetAvailability } from "@/composables/use-voucher-target-availability";
 import { useVoucher } from "@/store/voucher";
 import { useBills, isRewardBill, type Bill, type BillType } from "@/store/bills";
 import { courseRewardId, rewardsListCategory, type RewardsCat } from "./course-reward-link";
@@ -203,6 +204,8 @@ const pageTitle = computed(() =>
 
 // ── vouchers ──
 const available = computed<VoucherDef[]>(() => voucher.claimedUnused);
+const voucherTargetStatus = useVoucherTargetAvailability(() =>
+  cat.value === "voucher" && remoteSessionReady.value && available.value.some(isSingleSkuVoucher));
 const expired = computed<VoucherDef[]>(() => voucher.expiredVouchers);
 const voucherInitialLoading = computed(() => remoteApiEnabled
   && (voucher.remoteStatus === "idle" || voucher.remoteStatus === "loading")
@@ -319,6 +322,7 @@ function openCourseReward(bill: Bill) {
   if (id) navTo(courseRewardHref(id));
 }
 function onUse(v: VoucherDef) {
+  if (voucherTargetStatus(v) === "unavailable") return;
   if (isSingleSkuVoucher(v)) {
     navTo(`/store/detail?id=${v.applicableSkus[0]}`);
   } else {

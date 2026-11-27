@@ -5,6 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
+import { seedDemoDayOneClaim, selectDemoDayOneAccount } from './lib/prototype-demo-day-one.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { demoChainDepositAddress, demoChainDepositPolicyFee, demoWalletUsdt, initializeDemoWalletHistory, initializeLegacyStreakSavers, postDemoWalletEntries, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
@@ -60,9 +61,11 @@ if(process.env.DEMO_STATE_FILE){
   }
 }else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
+if (state.dayOnePreviewSkuTarget === undefined) selectDemoDayOneAccount(state,startedAt);
 if(state.dataState==='empty')state.withdrawLimitState='open';
 else if(state.withdrawLimitState==='used')state.withdrawLimitCreatedAt??=startedAt;
 initializeDemoWalletHistory(state,state.previewFactsAt);
+seedDemoDayOneClaim(state,previewSelectedAccountId(state),startedAt);
 seedLongBankOrder(state,startedAt,unreservedBankQuote);
 let locale='zh';
 demoFleetFacts(new URL('http://127.0.0.1:'+port),locale,state);
@@ -267,6 +270,10 @@ const server=http.createServer(async(req,res)=>{
         if(optionChanges.slotReplacementState==='pending')optionChanges.fleetState='full';
         else if(optionChanges.fleetState&&optionChanges.fleetState!=='full')optionChanges.slotReplacementState='none';
         const projected={...(update.reset?demoDefaults:state),...optionChanges};
+        const taskSelection='taskState' in optionChanges;
+        const dayOneSelection=taskSelection||('dayOneTargetState' in optionChanges
+          &&projected.taskState==='pending'&&projected.catalogState==='sku-series');
+        if(update.reset||dayOneSelection||'scopeState' in optionChanges)selectDemoDayOneAccount(projected,now);
         selectDemoPaymentState(projected,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
         const paymentMode=demoPaymentScenario(projected);
         const promotionBuyerChanged=projected.promotionBuyer!==wasPromotionBuyer;
@@ -275,7 +282,7 @@ const server=http.createServer(async(req,res)=>{
         // A scenario change reseeds account facts; check B84 against the same prospective scenario before any mutation.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(projected.trialQuoteState);
         const tradeinRecoverySelection=tradeinRecoveryStates.includes(update.tradeinRecoveryState)?update.tradeinRecoveryState:null;
-        const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||projected.contentState!==wasContent||['fleetState','slotReplacementState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(projected.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
+        const scenarioChange=dayOneSelection||Boolean(tradeinRecoverySelection)||promotionBuyerChanged||projected.contentState!==wasContent||['fleetState','slotReplacementState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState','scopeState','computeState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(projected.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         const scenarioFields=['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','withdrawLimitCreatedAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','slotReplacements','slotReplacementTasks','stoppedDevices','computeAnchor','computeTaskSnapshots','computeCycleStarts','computeResumeAt','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview',
           'rankSalaryClaims','rankSalaryCommands','rankSalaryTransitions','rankSalaryExpirations','dayOneObservedRoi'];
         if(scenarioChange)for(const key of scenarioFields)delete projected[key];
@@ -317,6 +324,7 @@ const server=http.createServer(async(req,res)=>{
         }
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
         Object.assign(state,optionChanges);
+        if(update.reset||dayOneSelection||'scopeState' in optionChanges)selectDemoDayOneAccount(state,now);
         if(optionChanges.weekEndState)delete state.weekEndingAt;
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
         if(state.dataState==='empty')state.withdrawLimitState='open';
@@ -370,7 +378,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.trialStartReceiptState==='normal')trialLifecycle.release('start');
         if(update.trialStartReceiptState&&update.trialStartReceiptState!=='rejected')delete state.trialStartPhaseClosed;
         if(update.trialCancelReceiptState==='normal')trialLifecycle.release('cancel');
-        if(update.taskState)for(const key of ['weekClaims','dayOneClaimed','dayOneObservedRoi'])delete state[key];
+        if(taskSelection)delete state.weekClaims;
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.
         const replaceStreak=wasStreak!==state.streakState&&!state.walletLegacySeed
@@ -384,6 +392,7 @@ const server=http.createServer(async(req,res)=>{
           state.milestoneClaims=[];
           initializeDemoWalletHistory(state,state.previewFactsAt??startedAt);
         }
+        if(update.reset||scenarioChange)seedDemoDayOneClaim(state,previewSelectedAccountId(state),now);
         if(state.withdrawLimitState==='used'&&(update.reset||scenarioChange||update.withdrawLimitState==='used'))
           state.withdrawLimitCreatedAt=Date.now();
         if(typeof update.allCoursesDone==='boolean'){delete state.learningResults;delete state.learningReceipts;}

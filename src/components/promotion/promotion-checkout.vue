@@ -647,7 +647,7 @@ useAutoRecovery({
   quiet:false,
 });
 async function claimEventVoucher(){
-  if(!eventVoucherId||eventVoucherStatus.value!=='claimable'||busy.value||!visible.value||!current()||openedOriginal||session.record.pending||order.value)return;
+  if(!eventVoucherId||eventVoucherStatus.value!=='claimable'||voucher.claimingVoucherId!==null||busy.value||!visible.value||!current()||openedOriginal||session.record.pending||order.value)return;
   const generation=readGeneration;
   let claimed=false;
   await run(async()=>{claimed=await voucher.claimRemote(eventVoucherId,'store');if(!claimed&&readCurrent(generation))throw new Error('VOUCHER_CLAIM_FAILED');});

@@ -125,7 +125,7 @@ export function demoH4Account(state,now=Date.now(),presetDates=[]) {
       .filter(at=>Number.isFinite(at)&&at>0&&at<=now);
     state.accountCreatedAt=Math.min(now-42*day,...dates.map(at=>at-1));
   }
-  return {createdAt:state.accountCreatedAt,rank:state.dataState==='empty'?0:state.ambassadorRank==='v5'?5:state.highestRank?8:2};
+  return {createdAt:state.dayOnePreviewCreatedAt??state.accountCreatedAt,rank:state.dataState==='empty'?0:state.ambassadorRank==='v5'?5:state.highestRank?8:2};
 }
 
 function wheelAward(at,sourceType,spins=[],sample=false) {

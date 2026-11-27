@@ -19,8 +19,8 @@
             <text class="newcomer-task__eyebrow">{{ t.home.dayOneFirstDayReward }}</text>
             <text class="newcomer-task__count">{{ taskCountText }}</text>
           </view>
-          <view v-if="!claimState.empty" class="newcomer-task__reward">
-            <text class="newcomer-task__reward-value">{{ rewardText === "—" ? "—" : `+${rewardText}` }}</text>
+          <view v-if="!claimState.empty && !claimState.claimed" class="newcomer-task__reward">
+            <text class="newcomer-task__reward-value">{{ rewardText }}</text>
             <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">UVT</text>
           </view>
         </view>
@@ -78,8 +78,7 @@
               <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
               <text v-else :style="catStyle(task)">{{ task.cat }}</text>
             </view>
-            <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
-            <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
+            <text v-if="rowReason(task)" class="newcomer-task__reason">{{ rowReason(task) }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -275,7 +274,7 @@ function recoverObservation(task: QuestTask): void {
 const claimState = computed(() => dayOneClaimState(
   quest.remoteQuests, quest.dayOneRequiredTaskCount, quest.dayOneSnapshotStatus, nowTick.value * 1000,
 ));
-watch(() => [expanded.value, props.active, questUnavailable.value, unavailableLabel.value, claimState.value.claimCode, claimState.value.empty, quest.dayOneClaiming,
+watch(() => [expanded.value, props.active, questUnavailable.value, unavailableLabel.value, claimState.value.claimCode, claimState.value.empty, claimState.value.claimed, quest.dayOneClaiming,
   quest.dayOneClaimError, tasks.value.length, t.value.home.dayOneClaimReward, t.value.home.dayOneClaimUnconfirmed,
   t.value.home.dayOneNoActiveTasks, t.value.home.dayOneFirstDayReward],
   () => emit("content-resize"), { flush: "post", immediate: true });
@@ -297,9 +296,10 @@ const toggleLabel = computed(() => questLoadError.value
   : questUnavailable.value ? t.value.home.dayOneLoading
   : expanded.value ? t.value.home.dayOneHideTasks : viewTasksText.value);
 const rewardText = computed(() => {
-  if (!remoteApiEnabled) return formatAmount(mockReward);
-  if (questUnavailable.value) return "—";
-  return quest.dayOneRewardNex > 0 ? formatAmount(quest.dayOneRewardNex) : "—";
+  if (!remoteApiEnabled) return `+${formatAmount(mockReward)}`;
+  if (questUnavailable.value || !claimState.value.verifiable) return "—";
+  const amount = quest.dayOneRewardNex;
+  return amount === 0 ? formatAmount(0) : `+${formatAmount(amount)}`;
 });
 const dayOneWindow = computed(() => quest.remoteQuests.find((row) => row.layer === "DAY_ONE") ?? null);
 
@@ -327,13 +327,29 @@ function onClaim() {
   void quest.claimDayOne();
 }
 
+function taskNavigationState(task: QuestTask): "app-only" | "missing-route" | "closed-target" | "available" {
+  if (task.appOnly) return "app-only";
+  if (!task.href) return "missing-route";
+  return questActionRouteUnavailable(task.href) ? "closed-target" : "available";
+}
+
 function isActionable(task: QuestTask) {
-  return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
+  return task.eligible && !dayOneExpired.value && !isDone(task) && taskNavigationState(task) === "available";
 }
 
 // A pending web row whose target the catalog shows closed (an App-only row already says why with its tag).
 function targetClosed(task: QuestTask) {
   return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
+}
+
+function rowReason(task: QuestTask): string {
+  if (isDone(task)) return "";
+  // Day-One eligibility follows the frozen claim window.
+  if (!task.eligible || dayOneExpired.value) return t.value.questClaim.expired;
+  const navigation = taskNavigationState(task);
+  if (navigation === "missing-route") return t.value.home.dayOneTaskUnreachable;
+  if (navigation === "closed-target") return t.value.questClaim.definitionInactive;
+  return "";
 }
 
 const appOnlyPending = computed(() => !dayOneExpired.value && tasks.value.some((task) => task.appOnly && task.eligible && !isDone(task)));

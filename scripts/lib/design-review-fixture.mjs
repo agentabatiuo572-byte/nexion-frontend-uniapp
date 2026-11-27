@@ -11,7 +11,6 @@ export function previewInterfaceLanguages(mode = 'all') {
 const platform = { interfaceLanguages: previewInterfaceLanguages(), featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: true, homeWeeklyPromoEnabled: false }, share: { baseUrl: "https://ui-probe.invalid/ref/", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } }, publicStats: { version: 1, ...authority, source: "server:nx_config_item,nx_user", realUserCount: 4, networkPulse: {registeredUsers:12480} }, onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 }, computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }], coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }], yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }], gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: `UI ${id}`, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: `UI ${id}` }] })), download: { url: "https://ui-probe.invalid/agent-fixture.zip", zhTitle: "测试下载入口", zhGuide: "前端验收数据，不下载或安装", enTitle: "UI fixture download", enGuide: "Frontend fixture; no installer download or native execution" }, sources: ["e6.compute_config"] }, updatedAt: iso };
 export const previewDefaultTrialSku = 'stellarbox-s1';
 export const previewDefaultTrialName = 'UVELBox S1';
-export const previewDayOneInstanceKey = 'DAY_ONE:design-review';
 
 export function previewTrialProductConfig(product) {
   return {
@@ -180,13 +179,6 @@ export function previewHomeDisplaySample(state, at = Date.now()) {
 }
 
 function fixture(url, locale, state, request, onlineDevices=3206) {
-  if (url.pathname === '/api/quests/state') {
-    const mode = state.taskState || 'pending';
-    if (mode === 'error') return {};
-    const names = locale === 'zh' ? ['绑定手机', '查看设备', '了解收益', '阅读课程', '完善账户', '了解邀请'] : locale === 'vi' ? ['Kết nối điện thoại', 'Xem thiết bị', 'Tìm hiểu thu nhập', 'Đọc bài học', 'Hoàn tất tài khoản', 'Tìm hiểu lời mời'] : ['Connect a phone', 'View devices', 'Explore earnings', 'Read a course', 'Complete your account', 'Explore invitations'];
-    const quests = mode === 'empty' ? [] : names.map((name, i) => ({ questCode: `review-task-${i+1}`, name, layer:'DAY_ONE', rewardNex:0, status:mode === 'claimed' ? 'CLAIMED' : mode === 'expired' ? 'EXPIRED' : mode === 'complete' ? 'CLAIMABLE' : i < 3 ? 'COMPLETED' : 'PENDING', category:'explore', actionRoute:'/pages/learn/courses', instanceKey:previewDayOneInstanceKey, eligibleFrom:new Date(now-6*3600000).toISOString(), eligibleUntil:new Date(mode === 'expired' ? now-1000 : now+18*3600000).toISOString(), eligible:!['claimed','expired'].includes(mode) }));
-    return { ...authority, quests, dayOneRewardNex:500, dayOneRequiredTaskCount:mode === 'empty' ? 0 : mode === 'legacy' ? null : 6, dayOneSnapshotStatus:mode === 'empty' ? 'EMPTY' : mode === 'legacy' ? 'LEGACY_UNVERIFIED' : 'SNAPSHOT', promoBanner:null, questBonusMultiplier:1, rhythmMonth:1, source:'nx_mission + nx_user_mission' };
-  }
   if (url.pathname === '/api/orders/quote' && request) {
     const input = request.postDataJSON();
     const items = input.items.map((item,index) => {
