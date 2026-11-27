@@ -205,7 +205,7 @@ export const demoChainDepositMinimum = '5';
 const historicalChainDepositFee = '0.123456';
 
 export function demoChainDepositPolicyFee(state) {
-  return { half: '0.5', default: historicalChainDepositFee }[state.depositFeeState] ?? '0';
+  return { tiny: '0.005', half: '0.5', default: historicalChainDepositFee }[state.depositFeeState] ?? '0';
 }
 
 export function demoChainDepositAddress(state, network, allocate = false, accountId = demoPurchasingAccountId(state)) {

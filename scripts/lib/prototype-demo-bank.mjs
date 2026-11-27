@@ -14,21 +14,27 @@ const bankConfigUrl = new URL('http://127.0.0.1/api/withdrawals/bank/config');
 
 function bankConfig(state, now) {
   const base = secondaryDemo(bankConfigUrl, state);
-  const beneficiary = state.bankDemo?.beneficiary ?? base.beneficiary;
+  let beneficiary = state.bankDemo?.beneficiary ?? base.beneficiary;
+  if (beneficiary && state.bankAvailabilityState === 'routing-unverified') {
+    beneficiary = { ...beneficiary, bankRoutingVerified: false };
+  } else if (beneficiary && state.bankAvailabilityState === 'account-unavailable') {
+    beneficiary = { ...beneficiary, canWithdraw: false };
+  }
   return { ...base, beneficiary, unresolvedIntent: demoBankWithdrawalIntent(state, now) };
 }
 
-function canQuote({ beneficiary, policy, capacity }, amountUsdt) {
-  return beneficiary?.canWithdraw && Number.isFinite(amountUsdt)
+function canQuote({ enabled, beneficiary, policy, capacity }, amountUsdt) {
+  return enabled && beneficiary?.canWithdraw && beneficiary.bankRoutingVerified && capacity?.withdrawalEnabled
+    && Number.isFinite(amountUsdt)
     && amountUsdt >= policy.minAmountUsd && amountUsdt <= policy.maxAmountUsd
     && amountUsdt <= capacity.maxWithdrawableUsdt;
 }
 
 function saveQuote(demo, { beneficiary: bank, policy }, amountUsdt, now, quoteNo = 'BQ-' + randomBytes(16).toString('hex')) {
-  // BankWithdrawalPricing rounds the fee up to whole micro-USDT and the payout down to whole VND.
+  // BankWithdrawalPricing clamps the configured fee before rounding up to micro-USDT.
   const amountMicros = Math.round(amountUsdt * 1e6);
-  const feeMicros = Math.max(policy.feeMinUsd * 1e6,
-    Math.min(policy.feeMaxUsd * 1e6, Math.ceil(amountMicros * policy.feeRatePct / 100)));
+  const feeMicros = Math.ceil(Math.min(policy.feeMaxUsd * 1e6,
+    Math.max(policy.feeMinUsd * 1e6, amountMicros * policy.feeRatePct / 100)));
   const netMicros = amountMicros - feeMicros;
   const rateVnd = 25000;
   const quote = { quoteNo, amountUsdt, feeUsdt: feeMicros / 1e6, netUsdt: netMicros / 1e6,
@@ -57,7 +63,7 @@ function reserveBankOrder(state, demo, row, beneficiaryNo, withdrawalNo, now) {
 export function seedLongBankOrder(state, now, quoteNo) {
   if (!demoHasLongContent(state) || state.bankDemo?.orders?.[longBankOrderNo]) return;
   const config = bankConfig(state, now), amountUsdt = 5000;
-  if (config.unresolvedIntent || !config.capacity.dailyRemainingCount || !canQuote(config, amountUsdt)) return;
+  if (config.unresolvedIntent || !config.capacity?.dailyRemainingCount || !canQuote(config, amountUsdt)) return;
   const demo = state.bankDemo ??= { quotes: {}, orders: {}, commands: {} };
   const row = saveQuote(demo, config, amountUsdt, now, quoteNo);
   reserveBankOrder(state, demo, row, config.beneficiary.beneficiaryNo, longBankOrderNo, now);

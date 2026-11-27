@@ -34,7 +34,7 @@
         <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount, 'nx-modal__row--code': row.fullCode }">
           <text class="nx-modal__k">{{ row.label }}</text>
           <NxCodeValue v-if="row.fullCode" class="nx-modal__code" :value="row.fullCode" :label="row.label" full :copyable="false" />
-          <text v-else-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
+          <text v-else-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text><text class="nx-modal__unit">{{ amountAnatomy(row.value)[3] }}</text></text>
           <text v-else class="nx-modal__v">{{ row.value }}</text>
         </view>
       </view>
@@ -104,10 +104,10 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 const ui = useUI();
 const t = useT();
 // Last enqueued confirm renders on top (LIFO), matching the original.
-// "$999.00" → ["$", "999", ".00"] so the currency sign and cents can sit in ink-3 (amount anatomy).
-function amountAnatomy(value: string): [string, string, string] {
-  const match = /^(\$?)(.*?)(\.\d+)?$/.exec(value);
-  return match ? [match[1], match[2], match[3] ?? ""] : ["", value, ""];
+// "$999.00" → ["$", "999", ".00", ""], "49.00 USDT" → ["", "49", ".00", " USDT"]: the sign, cents and unit sit in ink-3 (amount anatomy).
+function amountAnatomy(value: string): [string, string, string, string] {
+  const match = /^(\$?)(.*?)(\.\d+)?(\s[A-Z]+)?$/.exec(value);
+  return match ? [match[1], match[2], match[3] ?? "", match[4] ?? ""] : ["", value, "", ""];
 }
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
 const PAYMENT_RESUME_ENTRY_ROUTES: Record<string, true> = {
@@ -180,7 +180,7 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   text-align: center;
 }
 .nx-modal > * { flex-shrink: 0; }
-.nx-modal__title { font: 600 20px/28px var(--font-v5); color: var(--v5-ink); }
+.nx-modal__title { font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); }
 .nx-modal__msg {
   margin-top: 8px;
   font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
@@ -213,6 +213,8 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-modal--detail { padding: 24px 20px 12px; }
 .nx-modal__cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
 .nx-modal__dec { color: var(--v5-ink-3); }
+/* Under 30px an amount's unit is the 辅助数值 role (01 §1.2). */
+.nx-modal__unit { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; }
 .nx-modal__glyph { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; background: var(--v5-brand-soft); color: var(--v5-brand); }
 .nx-modal__glyph--warn { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); color: var(--v5-warning); }
 .nx-modal__glyph--danger { background: color-mix(in srgb, var(--v5-danger) 14%, transparent); color: var(--v5-danger); }
@@ -222,13 +224,14 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 [data-theme="light"] .nx-modal__rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .nx-modal__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
 .nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
-.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
-.nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
 /* A code row (payout address): the whole string on its own line under the label, mono, wrapping evenly (03 §3.6.1). */
 .nx-modal__row--code { flex-direction: column; align-items: stretch; gap: 4px; }
 .nx-modal__row--code .nx-modal__k { max-width: none; }
 .nx-modal__code { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); }
-.nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
+/* The amount received is the dialog's key figure: card-figure role in the amount face, main ink (success is for status only, 01 §1.1.1). */
+.nx-modal__row--amount .nx-modal__v { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
 /* Rules under the rows: the dialog stops scrolling as a whole; the rows and rules scroll between a fixed head and actions. */
 .nx-modal--rules { overflow: hidden; }

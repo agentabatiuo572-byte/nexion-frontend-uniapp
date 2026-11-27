@@ -65,17 +65,17 @@
         </view>
       </view>
 
-      <!-- P-45: withdrawable balance card — amount anatomy ($ and cents in ink-3) plus what is held back. -->
+      <!-- P-45: withdrawable balance card — amount anatomy (cents and the USDT unit in ink-3) plus what is held back. -->
       <view class="wd-bal mx-4">
         <text class="wd-k">{{ t.wallet.withdrawableLabel }}</text>
-        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt"><text class="wd-cur">$</text>{{ amountParts(formatTruncatedAmount(maxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[1] }}</text></text>
+        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[1] }}</text><text class="wd-unit">{{ '\u00A0USDT' }}</text></text>
         <text v-else class="wd-bal__amt">—</text>
         <view v-if="withdrawalFactsDisplayable && heldBuckets" class="wd-locks">
-          <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">${{ formatTruncatedAmount(heldBuckets.review) }}</text></view>
-          <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">${{ formatTruncatedAmount(heldBuckets.locked) }}</text></view>
+          <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">{{ formatTruncatedAmount(heldBuckets.review) + '\u00A0USDT' }}</text></view>
+          <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">{{ formatTruncatedAmount(heldBuckets.locked) + '\u00A0USDT' }}</text></view>
           <text>{{ t.wallet.heldNotYet }}</text>
         </view>
-        <view v-if="withdrawalFactsDisplayable && app.user.usdtBalance < 0" class="wd-debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ fmt(t.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
+        <view v-if="withdrawalFactsDisplayable && app.user.usdtBalance < 0" class="wd-debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ fmt(t.me.walletDebtNote, { amount: formatTruncatedAmount(-app.user.usdtBalance) }) }}</text></view>
       </view>
 
       <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
@@ -89,7 +89,6 @@
             </view>
           </view>
           <view class="wd-amtrow">
-            <text class="wd-amtrow__cur">$</text>
             <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="remoteSessionReady ? amount : ''" :placeholder="remoteSessionReady ? '0.00' : ''" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
             <text class="wd-amtrow__unit">USDT</text>
           </view>
@@ -195,10 +194,10 @@
         <view class="inline-flex items-center" style="gap: 2px">
           <text class="wd-k">{{ t.walletV3.feeConfirmRow }}</text>
           <view class="grid place-items-center active:opacity-60" style="min-width: 44px; min-height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true"  @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
         </view>
-        <text class="wd-fee__v">−${{ formatTruncatedAmount(networkConfirmUsd) }}</text>
+        <text class="wd-fee__v">−{{ formatTruncatedAmount(networkConfirmUsd) + '\u00A0USDT' }}</text>
       </view>
       </template>
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关)。🔴 费率不可用时整块隐藏:凡是吃费用数据的区块都挂 feeConfigUsable 门。 -->
@@ -219,9 +218,7 @@
 
             @keydown.enter.prevent="toggleOffset" @keydown.space.prevent="toggleOffset"
           >
-            <view :style="switchTrackStyle">
-              <view :style="switchKnobStyle" />
-            </view>
+            <NxSwitch :checked="offsetWithNex" />
           </view>
         </view>
         <text class="wd-fee__hint">{{ offsetHintText }}</text>
@@ -233,15 +230,15 @@
       <template v-if="withdrawalPolicyCurrent && feeDetailReady">
         <view v-if="nexBurned > 0" class="wd-fee__r">
           <text class="wd-k wd-k--brand">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="wd-fee__v wd-fee__v--brand">+${{ formatTruncatedAmount(feeWaived) }} · {{ fmtNex(nexBurned) + '\u00A0UVT' }}</text>
+          <text class="wd-fee__v wd-fee__v--brand">+{{ formatTruncatedAmount(feeWaived) + '\u00A0USDT' }} · {{ fmtNex(nexBurned) + '\u00A0UVT' }}</text>
         </view>
         <view v-if="offsetWithNex" class="wd-fee__r">
           <text class="wd-k">{{ t.walletV3.feeCharged }}</text>
-          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">${{ formatTruncatedAmount(fee) }}</text>
+          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">{{ formatTruncatedAmount(fee) + '\u00A0USDT' }}</text>
         </view>
         <view class="wd-fee__r wd-fee__r--net">
           <text class="wd-k">{{ t.wallet.receiveLabel }}</text>
-          <text class="wd-fee__net"><text class="wd-cur">$</text>{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] }}</text></text>
+          <text class="wd-fee__net">{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] }}</text><text class="wd-unit">{{ '\u00A0USDT' }}</text></text>
         </view>
       </template>
       </view>
@@ -308,6 +305,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxSwitch from "@/components/ui/nx-switch.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxRulesList from "@/components/ui/nx-rules-list.vue";
 import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
@@ -1449,36 +1447,36 @@ async function handleSubmit() {
   submittingNexBalance.value = app.user.nexBalance;
   // FEAT-WD02 ⑥「提交提现 → 现有确认弹窗」:金额 / 单行网络确认费 / NEX 抵扣消耗(开了才显)
   // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。
-  // 新提现用明细行(ConfirmOptions.rows);重放仍是纯文本说明。
+  // 新提现和重放都用明细行(ConfirmOptions.rows);重放另有一句只发这一笔。
   // The same frozen quote as rows: amount, network fee, UVT offset (only when used), network, address, received.
+  // Amounts show two decimals cut off, never rounded; the address is shown whole to be checked (03 §3.6.1).
+  const amountRow = { label: t.value.walletV3.withdrawRowAmount, value: `${formatTruncatedAmount(snap.amount)}\u00A0USDT` };
+  const networkRow = { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label };
+  const addressRow = { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address };
   const confirmRows = [
-    { label: t.value.walletV3.withdrawRowAmount, value: `$${formatTruncatedAmount(snap.amount)}\u00A0USDT` },
-    { label: t.value.walletV3.feeConfirmRow, value: `−$${formatTruncatedAmount(snap.quote.networkConfirmUsd)}` },
-    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+$${formatTruncatedAmount(snap.quote.feeWaived)} · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
-    { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label },
-    { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address },
-    { label: t.value.wallet.receiveLabel, value: `$${formatTruncatedAmount(snap.quote.netReceive)}`, amount: true },
+    amountRow,
+    { label: t.value.walletV3.feeConfirmRow, value: `−${formatTruncatedAmount(snap.quote.networkConfirmUsd)}\u00A0USDT` },
+    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+${formatTruncatedAmount(snap.quote.feeWaived)}\u00A0USDT · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
+    networkRow,
+    addressRow,
+    { label: t.value.wallet.receiveLabel, value: `${formatTruncatedAmount(snap.quote.netReceive)}\u00A0USDT`, amount: true },
   ];
   // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
   // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,
-  // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。
-  const resendBody = pending
-    ? fmt(t.value.walletV3.withdrawResendBody, {
-        amount: formatTruncatedAmount(snap.amount),
-        network: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label,
-        address: maskAddressMid(snap.address),
-      })
-    : "";
+  // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。地址整行显示供核对,同新提交的 code 行(03 §3.6.1)。
+  const resendRows = [amountRow, networkRow, addressRow];
   confirmingSubmit.value = true;
   let confirmed = false;
   try {
     confirmed = await uiConfirm({
       title: pending ? t.value.walletV3.withdrawResendTitle : t.value.walletV3.withdrawConfirmTitle,
-      // A new withdrawal shows the frozen quote as a detail list (P-45); the replay keeps its own wording.
-      message: pending ? resendBody : undefined,
-      rows: pending ? undefined : confirmRows,
+      // A new withdrawal shows the frozen quote as a detail list (P-45); the replay lists only its amount, network and
+      // address, under one sentence that only this withdrawal is sent.
+      message: pending ? t.value.walletV3.withdrawResendBody : undefined,
+      rows: pending ? resendRows : confirmRows,
+      glyph: "withdraw",
+      // A new withdrawal carries the withdrawal rules under its rows, from the same frozen network and fee; the replay does not.
       rules: pending ? undefined : { title: t.value.walletV3.withdrawRules.title, items: withdrawRulesItems(snap.network, snap.quote.networkConfirmUsd) },
-      glyph: pending ? undefined : "withdraw",
       confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
     });
   } finally {
@@ -1739,32 +1737,8 @@ const freezeIconStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 16%, transparent)",
 };
 // 抵扣面板:soft tint 无描边(卡内嵌套禁 border);开着且全额抵扣 → brand,其余 → brand-2。
-// 自绘开关:外层热区 ≥44pt(负 margin 不撑行高),内层 track 44×26 + knob 20。
+// 开关:外层热区 ≥44pt(负 margin 不撑行高),里面是全站共用的 NxSwitch(03 §3.3);不可用时整颗 50%(03 §3.1)。
 const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", margin: "-9px -6px" };
-const switchTrackStyle = computed<CSSProperties>(() => ({
-  width: "44px",
-  height: "26px",
-  borderRadius: "999px",
-  padding: "3px",
-  boxSizing: "border-box",
-  transition: "background 160ms ease",
-  background: offsetToggleDisabled.value
-    ? "var(--v5-surface-2)"
-    : offsetWithNex.value
-      ? "var(--v5-brand)"
-      : "var(--v5-surface-3)",
-  opacity: offsetToggleDisabled.value ? 0.55 : 1,
-}));
-const switchKnobStyle = computed<CSSProperties>(() => ({
-  width: "20px",
-  height: "20px",
-  borderRadius: "999px",
-  // Hardware-white knob on both themes (board .sw), dimmed only when the toggle cannot be used.
-  background: offsetToggleDisabled.value ? "var(--v5-ink-4)" : "white",
-  boxShadow: "0 1px 3px rgba(0,0,0,.3)",
-  transform: offsetWithNex.value ? "translateX(18px)" : "translateX(0)",
-  transition: "transform 160ms ease",
-}));
 
 
 
@@ -1776,7 +1750,8 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
 /* P-45 USDT withdrawal: balance card, amount on liquid glass, route card, recessed fee well, quota pips, fixed submit. */
 .wd-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .wd-k--brand { color: var(--v5-brand); }
-.wd-cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
+/* USDT after the amount (06 §6.2, not a $ prefix): 01.2 unit, max(12px, .4em), 500, secondary ink. */
+.wd-unit { color: var(--v5-ink-3); font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; }
 .wd-dec { color: var(--v5-ink-3); }
 .wd-bal { margin-top: 15px; padding: 16px 16px 14px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .wd-bal > .wd-k { padding-top: 3px; }
@@ -1801,7 +1776,6 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
 /* Locked: the shared 50% disabled state of in-card text actions (03 §3.1 P-67). */
 .wd-max[aria-disabled="true"] { opacity: .5; cursor: default; }
 .wd-amtrow { display: flex; align-items: baseline; margin-top: 4px; }
-.wd-amtrow__cur { margin-right: 2px; color: var(--v5-ink-3); font: 500 22px/48px var(--font-amount); }
 .wd-amtrow__input { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 64px); height: 48px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .wd-amtrow__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
 .wd-min { margin-top: 2px; }
@@ -1826,6 +1800,7 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
 .wd-fee { margin-top: 12px; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .wd-fee { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .wd-fee__r { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; border-top: 1px solid var(--v5-border); }
+.nx-fee-offset-switch[aria-disabled="true"] { opacity: .5; }
 .wd-fee > .wd-fee__r:first-child, .wd-fee > .wd-fee__offset:first-child > .wd-fee__r, .wd-fee__r--net { border-top: 0; }
 .wd-fee__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-fee__v--brand { color: var(--v5-brand); }

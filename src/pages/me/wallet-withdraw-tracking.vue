@@ -36,7 +36,7 @@
           <view class="tr-ticket">
             <view class="tr-tk">
               <view class="tr-row1"><text class="tr-k">{{ t.wallet.trackAmountLabel }}</text><text class="tr-tag" :class="`tr-tag--${statusTone}`">{{ statusTag }}</text></view>
-              <text class="tr-amt"><text class="tr-cur">$</text>{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] }}</text></text>
+              <text class="tr-amt">{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] }}</text><text class="tr-unit">{{ '\u00A0USDT' }}</text></text>
               <text class="tr-note">{{ viaLine }}</text>
               <NxCodeValue class="tr-addr" :value="wd.address" :label="t.wallet.withdrawAddressLabel" />
               <view class="tr-id"><text class="tr-k">{{ t.bankWithdrawal.orderNumber }}</text><NxCodeValue class="tr-id__v" :value="wd.id" :label="t.bankWithdrawal.orderNumber" fill /></view>
@@ -633,7 +633,7 @@ const againReasonStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink
 .tr-tag--warn { background: var(--v5-warning-soft); color: var(--v5-warning-ink); }
 .tr-tag--bad { background: var(--v5-danger-soft); color: var(--v5-danger); }
 .tr-amt { display: block; margin-top: 6px; color: var(--v5-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tr-cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
+.tr-unit { color: var(--v5-ink-3); font: 500 max(12px, .4em)/1 var(--font-v5); letter-spacing: 0; }
 .tr-dec { color: var(--v5-ink-3); }
 .tr-note { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 /* Address and withdrawal number are long codes: one line, middle ellipsis, copy gives the whole code (NxCodeValue). */
