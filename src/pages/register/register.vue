@@ -32,15 +32,6 @@
 
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
-      <!-- Status notice: the sign-in notice's shared tint, the sentence left and its text action right (03 §3.6.1). -->
-      <view v-if="registrationNeedsLogin" class="rg-status nx-tint" role="status">
-        <text id="rg-status-reason" class="rg-status__t">{{ t.register.registrationSignInRequired }}</text>
-        <NxButton variant="text" size="small" :label="t.register.signIn" @click="goLogin" />
-      </view>
-      <view v-else-if="registrationResultPending" class="rg-status nx-tint" role="status">
-        <text id="rg-status-reason" class="rg-status__t">{{ blockingStatusReason }}</text>
-        <NxButton variant="text" size="small" :label="t.login.recoverAttempt" @click="recoverOriginalLogin" />
-      </view>
       <NxTag v-if="modeLabel" class="rg-mode-badge" tone="warning" data-testid="auth-runtime-label">{{ modeLabel }}</NxTag>
       <text class="rg-subtitle">
         <!-- 奖励金额护栏(包 zm T1):配置未到位/被中毒清零时金额句整体让位,$0 永不上转化首屏 -->
@@ -121,6 +112,16 @@
         <text class="rg-error__t">{{ inlineError }}</text>
       </view>
 
+      <!-- Status notice: the condition panel right above the CTA it blocks (03 §3.1), so the greyed button's reason and
+           its way forward sit next to it. Shared tint, the sentence left and its text action right (03 §3.6.1). -->
+      <view v-if="registrationNeedsLogin" class="rg-status nx-tint" role="status">
+        <text id="rg-status-reason" class="rg-status__t">{{ t.register.registrationSignInRequired }}</text>
+        <NxButton variant="text" size="small" :label="t.register.signIn" @click="goLogin" />
+      </view>
+      <view v-else-if="registrationResultPending" class="rg-status nx-tint" role="status">
+        <text id="rg-status-reason" class="rg-status__t">{{ blockingStatusReason }}</text>
+        <NxButton variant="text" size="small" :label="t.login.recoverAttempt" @click="recoverOriginalLogin" />
+      </view>
       <!-- Primary CTA -->
       <!-- A greyed CTA still takes the tap, so onCta can put the reason in the error line: no `disabled` prop, only the
            50% look and aria-disabled (03 §3.1). Busy shows NxButton's spinner and takes no taps. -->

@@ -22,6 +22,8 @@
         <text>{{ t.ui.cancel }}</text>
       </view>
     </component>
+    <!-- 03 §3.5.1: operation results are toasts. This line keeps only states: a sign-in result still unknown (the host
+         page's recovery owns it) and providers that could not be listed for linking. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
     <ServerCaptchaSlider v-if="showCaptcha" scene="LOGIN" phone="" @success="captchaComplete" @close="showCaptcha = false" />
   </view>
@@ -133,7 +135,7 @@ function sponsorRefused(cause: unknown): boolean {
       || !["USER_REGISTRATION_SPONSOR_NOT_FOUND", "USER_REGISTRATION_SPONSOR_INVALID"].includes(cause.message)) return false;
   cancel();
   if (props.sponsorRejected) props.sponsorRejected(sentSponsorCode);
-  else message.value = t.value.register.inviteInvalid;
+  else toast.error(t.value.register.inviteInvalid);
   return true;
 }
 async function start(name: string) {
@@ -148,7 +150,7 @@ async function start(name: string) {
   // Reserve a popup synchronously during the click; never use an embedded provider WebView.
   // #ifdef H5
   popup = window.open("about:blank", "_blank");
-  if (!popup) { message.value = t.value.thirdParty.popupBlocked; submitting.value = false; emit("busy", false); return; }
+  if (!popup) { toast.error(t.value.thirdParty.popupBlocked); submitting.value = false; emit("busy", false); return; }
   // #endif
   try {
     // The popup above is only a blank reservation; a veto closes it before any provider page loads.
@@ -162,11 +164,11 @@ async function start(name: string) {
     // #endif
     // #ifdef APP-PLUS
     plus.runtime.openURL(next.authorizationUrl, () => {
-      if (current === generation) { cancel(); message.value = t.value.thirdParty.failed; }
+      if (current === generation) { cancel(); toast.error(t.value.thirdParty.failed); }
     });
     // #endif
     void poll(current);
-  } catch (cause) { if (!sponsorRefused(cause)) { cancel(); message.value = errorMessage(cause); } }
+  } catch (cause) { if (!sponsorRefused(cause)) { cancel(); toast.error(errorMessage(cause)); } }
   finally { submitting.value = false; }
 }
 async function poll(current: number) {
@@ -174,7 +176,7 @@ async function poll(current: number) {
   const request = ++pollVersion;
   if (timer) clearTimeout(timer);
   if (Date.now() >= expiresAt || !sameSession()) {
-    cancel(); message.value = t.value.thirdParty.expired; return;
+    cancel(); toast.error(t.value.thirdParty.expired); return;
   }
   try {
     const status = await api.status(flow.value);
@@ -186,11 +188,11 @@ async function poll(current: number) {
         verified.value = true; popup?.close(); popup = null; return;
       }
     }
-    else if (status.status !== "PENDING") { cancel(); message.value = t.value.thirdParty.failed; return; }
+    else if (status.status !== "PENDING") { cancel(); toast.error(t.value.thirdParty.failed); return; }
   } catch (cause) {
     if (disposed || current !== generation || request !== pollVersion || verified.value) return;
     if (!(cause instanceof ApiError) || cause.kind !== "network") {
-      cancel(); message.value = errorMessage(cause); return;
+      cancel(); toast.error(errorMessage(cause)); return;
     }
   }
   if (!verified.value && request === pollVersion) timer = setTimeout(() => { void poll(current); }, 2000);
@@ -203,7 +205,7 @@ async function complete(captchaTicket?: string) {
   if (!flow.value || !verified.value || completionDisabled.value || disposed) return;
   const current = generation;
   if (Date.now() >= expiresAt || !sameSession()) {
-    cancel(); message.value = t.value.thirdParty.expired; return;
+    cancel(); toast.error(t.value.thirdParty.expired); return;
   }
   submitting.value = true; message.value = "";
   try {
@@ -212,7 +214,7 @@ async function complete(captchaTicket?: string) {
       if (disposed || current !== generation) return;
       // POST is the binding result. A failed optional list refresh must not turn it into a failed mutation.
       if (!linked.value.includes(selected.value)) linked.value.push(selected.value);
-      cancel(); message.value = t.value.thirdParty.linkSuccess;
+      cancel(); toast.success(t.value.thirdParty.linkSuccess);
     } else {
       const result = await api.complete(selected.value, flow.value, revision,
         challengeNo.value || undefined, code.value || undefined, captchaTicket);
@@ -253,9 +255,9 @@ async function complete(captchaTicket?: string) {
         // ambiguous completion, including recovery after this flow has expired.
         cancel(); message.value = t.value.login.unknownAttempt;
       } else if (cause instanceof ApiError && cause.message === "OAUTH_LOGIN_EXPIRED") {
-        cancel(); message.value = errorMessage(cause);
+        cancel(); toast.error(errorMessage(cause));
       } else if (cause instanceof ApiError && ["USER_CAPTCHA_REQUIRED", "USER_CAPTCHA_TICKET_INVALID"].includes(cause.message)) showCaptcha.value = true;
-      else if (!sponsorRefused(cause)) message.value = errorMessage(cause);
+      else if (!sponsorRefused(cause)) toast.error(errorMessage(cause));
     }
   } finally { submitting.value = false; password.value = ""; }
 }
