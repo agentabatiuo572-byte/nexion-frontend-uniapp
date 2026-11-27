@@ -4525,7 +4525,7 @@ export const ru: Messages = {
     feeOffsetToggle: "Оплатить комиссию в UVT",
     feeOffsetOffHint: "Включите, чтобы оплатить эту комиссию в UVT. У вас {n}\u00A0UVT.",
     feeOffsetOnFull: "Будет списано {nex}\u00A0UVT · комиссия покрыта полностью (0.00\u00A0USDT).",
-    feeOffsetOnPartial: "Будет списано {nex}\u00A0UVT · покрывает {waived}\u00A0USDT, к оплате ещё {rest}\u00A0USDT.",
+    feeOffsetOnPartial: "Будет списано {nex}\u00A0UVT · покрывает {waived}\u00A0USDT, к оплате ещё {rest}.",
     feeOffsetNoNex: "Нет UVT для оплаты комиссии. UVT начисляются за отметки и задачи устройств.",
     feeOffsetFreeNetwork: "В этой сети сейчас нет комиссии — оплачивать нечего.",
     feeWhyTitle: "О комиссии",

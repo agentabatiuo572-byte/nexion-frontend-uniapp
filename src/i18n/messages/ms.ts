@@ -4525,7 +4525,7 @@ export const ms: Messages = {
     feeOffsetToggle: "Bayar caj dengan UVT",
     feeOffsetOffHint: "Hidupkan untuk menampung caj ini dengan UVT. Anda memegang {n}\u00A0UVT.",
     feeOffsetOnFull: "Akan guna {nex}\u00A0UVT · caj ditampung sepenuhnya (0.00\u00A0USDT).",
-    feeOffsetOnPartial: "Akan guna {nex}\u00A0UVT · menampung {waived}\u00A0USDT, {rest}\u00A0USDT masih perlu dibayar.",
+    feeOffsetOnPartial: "Akan guna {nex}\u00A0UVT · menampung {waived}\u00A0USDT, {rest} masih perlu dibayar.",
     feeOffsetNoNex: "Tiada UVT untuk menampung caj. Dapatkan UVT daripada daftar masuk dan tugasan peranti.",
     feeOffsetFreeNetwork: "Rangkaian ini tidak mengenakan caj buat masa ini — tiada apa perlu ditampung.",
     feeWhyTitle: "Tentang caj",

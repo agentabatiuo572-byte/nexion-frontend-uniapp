@@ -4525,7 +4525,7 @@ export const uz: Messages = {
     feeOffsetToggle: "Haqni UVT bilan toʻlash",
     feeOffsetOffHint: "Bu haqni UVT bilan qoplash uchun yoqing. Sizda {n}\u00A0UVT bor.",
     feeOffsetOnFull: "{nex}\u00A0UVT ishlatiladi · haq toʻliq qoplanadi (0.00\u00A0USDT).",
-    feeOffsetOnPartial: "{nex}\u00A0UVT ishlatiladi · {waived}\u00A0USDT qoplanadi, {rest}\u00A0USDT toʻlash kerak.",
+    feeOffsetOnPartial: "{nex}\u00A0UVT ishlatiladi · {waived}\u00A0USDT qoplanadi, {rest} toʻlash kerak.",
     feeOffsetNoNex: "Haqni qoplash uchun UVT yoʻq. UVTni belgilanish va qurilma vazifalaridan oling.",
     feeOffsetFreeNetwork: "Bu tarmoqda hozir haq olinmaydi — qoplash shart emas.",
     feeWhyTitle: "Haq haqida",

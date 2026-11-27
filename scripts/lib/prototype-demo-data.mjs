@@ -176,7 +176,7 @@ export const demoOptions = {
   withdrawRecoveryState:withdrawRecoveryOptions,
   depositFeeState:[['zero','充值手续费 · 0（上线配置）'],['tiny','充值手续费 · 0.005（不足 0.01）'],['half','充值手续费 · 0.5'],['default','充值手续费 · 0.123456（多位小数）']],
   withdrawReviewState:[['default','USDT 提现审核 · 上线默认（每笔都审核）'],['all','USDT 提现审核 · 小额免审线 0（每笔都审核）'],['hold','USDT 提现审核 · 每笔审核 + 合规等待 7 天'],['legacy-fast-pass','USDT 提现审核 · 旧配置（100 USDT 及以下免审）'],['payout-dates','USDT 提现记录 · 周五和周二提交（处理中）']],
-  withdrawQuoteState:[['normal','报价不变'],['change-once','UVT 抵扣开启后，首笔提交报价变化（409）']],
+  withdrawQuoteState:[['normal','报价不变'],['change-once','UVT 抵扣开启后，首笔提交报价变化（409）'],['net-zero','BEP20 网络确认费等于最低提现额']],
   withdrawNetworksState:[['bep20-erc20','提现网络 · BEP20 和 ERC20'],['bep20','提现网络 · 仅 BEP20'],['erc20','提现网络 · 仅 ERC20'],['closed','提现网络 · 全部关闭']],
   billRefsState:[['normal','账单 · 默认'],['long-refs','账单 · 真实长单号（订单、退款、学习奖励）'],['b84-deposit','账单 · 双网 USDT 精确入账及详情缺失']],
   contentState:contentOptions,

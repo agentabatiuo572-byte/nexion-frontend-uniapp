@@ -4525,7 +4525,7 @@ export const id: Messages = {
     feeOffsetToggle: "Bayar biaya dengan UVT",
     feeOffsetOffHint: "Aktifkan untuk menutup biaya ini dengan UVT. Anda punya {n}\u00A0UVT.",
     feeOffsetOnFull: "Akan memakai {nex}\u00A0UVT · biaya tertutup penuh (0.00\u00A0USDT).",
-    feeOffsetOnPartial: "Akan memakai {nex}\u00A0UVT · menutup {waived}\u00A0USDT, sisa {rest}\u00A0USDT tetap dibayar.",
+    feeOffsetOnPartial: "Akan memakai {nex}\u00A0UVT · menutup {waived}\u00A0USDT, sisa {rest} tetap dibayar.",
     feeOffsetNoNex: "Tidak ada UVT untuk menutup biaya. Dapatkan UVT dari check-in dan tugas perangkat.",
     feeOffsetFreeNetwork: "Jaringan ini sedang bebas biaya — UVT tidak perlu digunakan.",
     feeWhyTitle: "Tentang biaya",

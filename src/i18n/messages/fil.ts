@@ -4525,7 +4525,7 @@ export const fil: Messages = {
     feeOffsetToggle: "Gamitin ang UVT sa fee",
     feeOffsetOffHint: "I-on para bayaran ang fee na ito gamit ang UVT. May {n}\u00A0UVT ka.",
     feeOffsetOnFull: "Gagamit ng {nex}\u00A0UVT · sagot na lahat ng fee (0.00\u00A0USDT).",
-    feeOffsetOnPartial: "Gagamit ng {nex}\u00A0UVT · sagot ang {waived}\u00A0USDT, {rest}\u00A0USDT pa ang babayaran.",
+    feeOffsetOnPartial: "Gagamit ng {nex}\u00A0UVT · sagot ang {waived}\u00A0USDT, {rest} pa ang babayaran.",
     feeOffsetNoNex: "Walang UVT na pambayad sa fee. Kumita ng UVT sa check-in at device task.",
     feeOffsetFreeNetwork: "Walang fee sa network na ito ngayon — walang kailangang bayaran.",
     feeWhyTitle: "Tungkol sa fee",

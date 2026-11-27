@@ -38,7 +38,7 @@ export function demoWithdrawalPolicy(state, facts) {
     // The launch config closes the small-amount fast lane (threshold 0): every USDT withdrawal goes to review.
     smallAmountThresholdUsd: state.withdrawReviewState === 'legacy-fast-pass' ? 100 : 0, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
     // The withdrawal policy contract requires a fee field for the inactive network.
-    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 1 }, nexFeeOffsetRate: .1,
+    networkConfirmFeeUsd: { trc20: 1, bep20: state.withdrawQuoteState === 'net-zero' ? minWithdrawal : 1, erc20: 1 }, nexFeeOffsetRate: .1,
     // 'hold' turns on the compliance review with its 7-day window for amounts above 1 (the policy contract needs a threshold > 0).
     cooldownDays: 7, complianceHoldEnabled: state.withdrawReviewState === 'hold',
     complianceReviewThresholdUsdt: state.withdrawReviewState === 'hold' ? 1 : 1000, withdrawalEnabled: true, enabledNetworks: demoWithdrawalNetworks(state),
