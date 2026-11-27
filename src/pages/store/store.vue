@@ -113,7 +113,7 @@ import { PRODUCTS, type Product } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, productCatalogDisplayProof, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { ensureServerProductPhase, refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
+import { isProductAvailable, isProductReleased, productOutOfStock } from "@/store/product-availability";
 import { useEarnConfig } from "@/store/earn-config";
 import { buildStoreYieldAuthority } from "@/lib/store-yield-authority";
 import StoreHero from "@/components/store/store-hero.vue";
@@ -307,13 +307,13 @@ const yieldAuthority = computed(() => {
 const unlockedProducts = computed(() =>
   displayProducts.value.filter((p) => {
     if (!mounted.value) return false;
-    return isProductAvailable(p, phase.value);
+    return isProductReleased(p, phase.value);
   }),
 );
 const lockedProducts = computed(() =>
   displayProducts.value.filter((p) => {
     if (!mounted.value) return false;
-    return !isProductAvailable(p, phase.value);
+    return !isProductReleased(p, phase.value);
   }),
 );
 
@@ -327,7 +327,8 @@ const bundleSelectedProducts = computed(() => cart.items
   .map((id) => bundleHardware.value.find((p) => p.id === id))
   .filter((p): p is Product => !!p));
 
-const purchasableProducts = computed(() => unlockedProducts.value.filter(product => !productOutOfStock(product)));
+const purchasableProducts = computed(() => unlockedProducts.value.filter(product =>
+  isProductAvailable(product, phase.value) && !productOutOfStock(product)));
 const upgrade = computed(() => storeUpgrade(purchasableProducts.value, ownedDevices.value));
 const upgradeBaseProduct = computed(() => findDeviceCatalogProduct(displayProducts.value, upgrade.value?.base.productCode));
 const upgradeBaseImageUrl = computed(() => upgrade.value?.base.imageUrl ?? upgradeBaseProduct.value?.imageUrl);

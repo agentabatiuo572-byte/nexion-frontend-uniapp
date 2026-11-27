@@ -1,12 +1,12 @@
-import { isSingleSkuVoucher, type VoucherDef, type VoucherSurface } from "@/mock/vouchers";
+import type { VoucherDef, VoucherSurface } from "@/mock/vouchers";
 import { fmt } from "@/i18n/format";
 import type { Messages } from "@/i18n/messages/en";
 import { productDisplayName } from "./product-display-name";
 
 export function voucherScopeText(voucher: VoucherDef, copy: Messages["voucher"]): string {
-  if (!isSingleSkuVoucher(voucher)) return copy.scopeAll;
-  // Without a name the scope stays a single product, said as one sentence (no product number, no stand-in noun).
-  const name = productDisplayName(voucher.applicableSkus[0], "");
+  const skus = voucher.applicableSkus;
+  if (skus.length === 0) return copy.scopeAll;
+  const name = skus.length === 1 ? productDisplayName(skus[0], "") : "";
   return name ? fmt(copy.scopeSingle, { name }) : copy.scopeSingleUnnamed;
 }
 

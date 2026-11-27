@@ -143,7 +143,6 @@ import { selectHomeQuestRows } from "./home-quest-source";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
 import { dayOneQuestDisplayName } from "@/lib/quest-presentation";
 import { questActionRouteUnavailable } from "@/composables/use-quest-target-availability";
-import { productCatalogState } from "@/store/product-catalog";
 import { dayOneObservationRecovery } from "@/lib/day-one-observation-recovery";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { useApp } from "@/store/app";
@@ -313,10 +312,8 @@ function isActionable(task: QuestTask) {
   return task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
 }
 
-// Only a pending row whose target the read catalog confirms closed; while the catalog is unread the row stays quiet.
 function targetClosed(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task) && productCatalogState.status === "ready"
-    && questActionRouteUnavailable(task.href);
+  return task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
 }
 
 function onRowTap(task: QuestTask) {

@@ -6,7 +6,7 @@ import { demoPaymentScenario } from './prototype-demo-payment-mode.mjs';
 import { trialReceiptOptions } from './trial-lifecycle-preview-fixture.mjs';
 import { derivedRegisteredUsers } from '../../src/lib/platform-stats.ts';
 import { quoteBundleAmountUsdt } from '../../src/api/bundle-quote.ts';
-import { fixture as reviewFixture, previewCapacity, previewDefaultTrialName, previewDefaultTrialSku, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
+import { fixture as reviewFixture, previewCapacity, previewDayOneInstanceKey, previewDefaultTrialName, previewDefaultTrialSku, previewDeviceProduct, previewDoTheMath, previewInterfaceLanguages, previewActiveJobsBase, previewHomeDisplay, previewHomeDisplaySample } from './design-review-fixture.mjs';
 import { secondaryDemo } from './prototype-demo-secondary.mjs';
 import { withDemoShareChannels } from './prototype-demo-share.mjs';
 import { demoLongLearningBill, learningDemo } from './prototype-demo-learning.mjs';
@@ -216,10 +216,10 @@ const catalogTaglineFallbacks = {
   'Fully managed device': {zh:'全托管设备',ru:'Устройство с полным обслуживанием'},
 };
 const demoSeriesCodes=['S1','PRO','PRO_V2','RACK_P1','RACK_P2','CLOUD_SHARE'];
-const demoS1VariantNo='E-S1-002';
-const demoTradeinSourceNo='E-S1-003';
-const demoSpecsIncompleteNo='E-S1-004';
-const demoTradeinTargetNo='P-PRO-002';
+const demoS1VariantNo='e-s1-002';
+const demoTradeinSourceNo='e-s1-003';
+const demoSpecsIncompleteNo='e-s1-004';
+const demoTradeinTargetNo='p-pro-002';
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},
   {badge:'Best seller',badgeKind:'bestSeller'},
@@ -639,7 +639,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   const purchasedAt=Math.max(baseDevice.purchasedAt,minimumPurchaseAt);
   const template={...baseDevice,purchasedAt,activatedAt:Math.max(baseDevice.activatedAt,purchasedAt)};
   const clone=(id,code,name,daily,paid,extra)=>({...template,id,instanceNo:'DEMO-'+id,name,productCode:code,dailyUsdt:daily,
-    dailyNex:products.find(product=>product.id.toUpperCase()===code).dailyEarnNEX*previewCapacity({...template,productCode:code,...extra},capacitySchedule,Date.now()).capacityPct/100,
+    dailyNex:previewDeviceProduct(products,code).dailyEarnNEX*previewCapacity({...template,productCode:code,...extra},capacitySchedule,Date.now()).capacityPct/100,
     actualPaidUsdt:paid,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,...extra});
   const live=device=>!retired.includes(device.id);
   if(state.dataState==='empty'||state.promotionBuyer==='sponsored-new')return [];
@@ -652,7 +652,7 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   if(state.fleetState==='earning-credit'){
     devices.push(clone(43,'STELLARRACK-P1','UVELRack Pacific Research Compute Cluster International West 0043',45,12999,{}));
     devices=devices.map(device=>{
-      const product=products.find(row=>row.id.toUpperCase()===device.productCode);
+      const product=previewDeviceProduct(products,device.productCode);
       if(product?.productType!=='DEVICE')return device;
       return {...device,earningPurchase:{dailyUvt:product.dailyEarnNEX,
         monthlyUsdt:device.productCode==='STELLARBOX-PRO'?0:product.monthlyEstimateUsdt,capacitySchedule}};
@@ -686,7 +686,7 @@ export function demoPurchasedOrderDevices(state, orders, products, template) {
     // A session device starts its own purchase history at its paid order.
     // Saved conversions made before the separate snapshot stored the claim name on the order.
     const name=order.trialPurchasedDevice?.name??(order.trialSettlement?(order.trialClaimedDeviceName??order.productName):product.name);
-    devices.push({...template,id,instanceNo,name,productCode:product.id.toUpperCase(),dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
+    devices.push({...template,id,instanceNo,name,productCode:product.id,dailyUsdt:product.dailyEarn,dailyNex:product.dailyEarnNEX,
       activatedAt:inInventory ? null : (order.activatedAt ?? order.inventoryUsedAt),purchasedAt:order.paidAt,todayEarningsUsdt:0,todayEarningsNex:0,cumulativeOutputUsdt:0,
       ...(order.trialPurchasedDevice&&{imageUrl:order.trialPurchasedDevice.imageUrl,deviceType:product.productType,
         gpuModel:product.gpu,vramTotalGb:Number.parseInt(product.vram,10)||0,basePowerW:Number.parseInt(product.power,10)||0,
@@ -764,7 +764,7 @@ export function demoFleetFacts(url,locale,state,eventOwner) {
     ?demoReceiptTodayByDevice(demoWithEarningReceiptTasks(state,demoSettledTasks(state,state.previewFactsAt)),now)
     :null;
   const devices=roster.map(seedDevice=>{
-    const product=products.find(product=>product.id.toUpperCase()===seedDevice.productCode);
+    const product=previewDeviceProduct(products,seedDevice.productCode);
     const share=product.productType==='SHARE'
       ? {deviceType:'SHARE',gpuModel:product.gpu,vramTotalGb:0,basePowerW:0} : {};
     const device={...seedDevice,...state.deviceActivations?.[seedDevice.id],...share};
@@ -814,11 +814,11 @@ function completeDemoSlotReplacement(state,oldDevice,newDevice,at){
 
 export function demoCapacityReplacementSource(fleet, products) {
   if (fleet.slotsUsed < fleet.slotCap) return undefined;
-  const shareSkus = new Set(products.filter(product => product.productType === 'SHARE').map(product => product.id.toUpperCase()));
+  const shareSkus = new Set(products.filter(product => product.productType === 'SHARE').map(product => product.id));
   return fleet.devices.filter(device => device.activatedAt != null && device.deactivatedAt == null
     && ['ACTIVE', 'ONLINE'].includes(device.status) && (device.ownershipStatus ?? 'OWNED') === 'OWNED'
     && !device.pendingDeactivate && device.sourceChannel !== 'PROMOTION_GIFT'
-    && !['SHARE', 'CLOUD'].includes(device.deviceType) && !shareSkus.has(device.productCode))
+    && !['SHARE', 'CLOUD'].includes(device.deviceType) && !shareSkus.has(device.productCode?.toLowerCase()))
     .sort((a, b) => (a.dailyUsdt ?? 0) - (b.dailyUsdt ?? 0) || a.id - b.id)[0];
 }
 
@@ -1281,17 +1281,17 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'ALL',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:30,source:'server'};
   // All rows in the preview account's fleet are its own unless ownership says otherwise.
   const isTradeinSource=device=>{
-    const sku=products.find(product=>product.id.toUpperCase()===device.productCode);
+    const sku=previewDeviceProduct(products,device.productCode);
     if(sku?.productType!=='DEVICE'||['SHARE','CLOUD'].includes(device.deviceType)
       ||(device.ownershipStatus??'OWNED')!=='OWNED'||device.pendingDeactivate||device.sourceChannel==='PROMOTION_GIFT')return false;
     if(device.activatedAt!=null)
       return device.deactivatedAt==null&&['ACTIVE','ONLINE','BUSY','RUNNING','OFFLINE'].includes(device.status);
     return ['INACTIVE','INVENTORY','DEACTIVATED','PENDING_ACTIVATION'].includes(device.status);
   };
-  const tradeinSourcePrice=device=>products.find(product=>product.id.toUpperCase()===device.productCode)?.price??0;
+  const tradeinSourcePrice=device=>previewDeviceProduct(products,device.productCode)?.price??0;
   const tradeinSourceReason=(device,product)=>{
     if(!(device.actualPaidUsdt>0))return 'SOURCE_PAID_PRICE_UNAVAILABLE';
-    if(device.productCode===product.id.toUpperCase())return 'TARGET_MUST_DIFFER';
+    if(device.productCode?.toLowerCase()===product.id)return 'TARGET_MUST_DIFFER';
     const sourcePrice=tradeinSourcePrice(device);
     if(sourcePrice<=0)return 'SOURCE_CURRENT_PRICE_UNAVAILABLE';
     return product.price>sourcePrice?'OK':'HIGHER_PRICE_REQUIRED';
@@ -1377,7 +1377,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const replacement=keepingCapacity?null:checkReplacementSource(quote.sourceDeviceId,Boolean(paid));
     const currentTask=replacement?.assignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
-    const sourceSku=products.find(p=>p.id.toUpperCase()===replacement?.source?.productCode);
+    const sourceSku=previewDeviceProduct(products,replacement?.source?.productCode);
     const computePoints=Math.max(0,product.computePoints-(sourceSku?.computePoints??0));
     if(paid&&Number(quote.payableUsdt).toFixed(6)!==paid.businessAmountUsdt)refuse('PURCHASE_PAYMENT_PRICING_CHANGED');
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true,paid?.quotaHold);
@@ -1771,10 +1771,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const accountId=previewAccountId(state,request.headers());
     const {productNo}=request.postDataJSON();
     const product=productFor(productNo);
-    const recorded=!!accountId&&!empty&&state.catalogState==='sku-series'&&state.taskState==='pending'
-      &&productNo===demoS1VariantNo&&product?.seriesCode==='S1'&&product.available===true
-      &&product.price>0&&product.dailyEarn>0;
-    if(recorded)(state.dayOneObservedRoi??={})[accountId]=productNo;
+    const recorded=!!accountId&&!empty&&state.catalogState==='sku-series'&&state.taskState==='pending'&&!state.dayOneClaimed
+      &&product?.seriesCode==='S1'&&product.releaseState==='AVAILABLE'&&product.purchaseBlockedReason!=='PRODUCT_SPECS_UNAVAILABLE'
+      &&Number.isFinite(product.dailyEarn)&&product.dailyEarn>0;
+    if(recorded){
+      const observations=(state.dayOneObservedRoi??={})[accountId]??={};
+      observations[previewDayOneInstanceKey]??=productNo;
+    }
     return {accepted:true,recorded};
   }
   if(pathname==='/api/quests/state') {
@@ -1786,11 +1789,12 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(state.taskState==='expired'?now-1000:state.weekEndState==='ending'&&i>0?(state.weekEndingAt??=now+60000):now+5*day).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
     if(state.catalogState==='sku-series'&&state.taskState==='pending'){
       const accountId=previewAccountId(state,request?.headers?.()??{});
-      Object.assign(data.quests[3],{
+      const roiQuest=data.quests[3];
+      Object.assign(roiQuest,{
         questCode:'view_product_roi',
         name:localized(contentLocale,'查看 S1 回本','View S1 ROI','Xem ROI của S1'),
         actionRoute:'/pages/store/detail?id='+demoS1VariantNo,
-        ...(data.quests[3].status==='PENDING'&&accountId&&state.dayOneObservedRoi?.[accountId]===demoS1VariantNo
+        ...(roiQuest.status==='PENDING'&&accountId&&state.dayOneObservedRoi?.[accountId]?.[roiQuest.instanceKey]
           ?{status:'COMPLETED'}:{}),
       });
       Object.assign(data.quests[4],{
@@ -1798,13 +1802,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         actionRoute:'/pages/store/detail?id='+demoSpecsIncompleteNo,
       });
       data.quests.find(row=>row.questCode==='demo-week-0').actionRoute='/pages/store/detail?id='+demoS1VariantNo;
-      data.quests.find(row=>row.questCode==='demo-week-3').actionRoute='/pages/store/detail?id=E-S1-999';
+      data.quests.find(row=>row.questCode==='demo-week-3').actionRoute='/pages/store/detail?id=e-s1-999';
     }
     data.promoBanner={bannerCode:'demo-weekly',baseReward:300,multiplier:1,countdownDays:5,countdownHours:0,targetDevice:'UVELBox Pro',targetDaily:22.4,status:'active'};
     return data;
   }
   const questClaim=pathname.match(/^\/api\/quests\/([^/]+)\/claim$/);
-  if(questClaim){const code=decodeURIComponent(questClaim[1]);if(code.startsWith('demo-week-')){state.weekClaims||=[];state.weekClaims.push(Number(code.split('-').pop()));}else state.dayOneClaimed=true;return {...authority,questId:code,rewardNex:code.startsWith('demo-week-')?100+Number(code.split('-').pop())*25:500,status:'CLAIMED',instanceKey:code.startsWith('demo-week-')?'WEEK:demo':'DAY_ONE:design-review'};}
+  if(questClaim){const code=decodeURIComponent(questClaim[1]);if(code.startsWith('demo-week-')){state.weekClaims||=[];state.weekClaims.push(Number(code.split('-').pop()));}else state.dayOneClaimed=true;return {...authority,questId:code,rewardNex:code.startsWith('demo-week-')?100+Number(code.split('-').pop())*25:500,status:'CLAIMED',instanceKey:code.startsWith('demo-week-')?'WEEK:demo':previewDayOneInstanceKey};}
   if(pathname==='/api/events'||pathname.startsWith('/api/events/')){
     const spinTickets=demoStreakMilestones.reduce((count,[,type,amount],index)=>
       count+(type==='SPIN'&&demoMilestoneClaimed(state,index+1)?amount:0),0);
@@ -1965,7 +1969,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const assignments=active.length?read(demoReplacementAssignmentsPath(state)).devices:[];
     const busyIds=new Set(assignments.filter(demoActiveSlotReplacementTask).map(row=>row.deviceId));
     data.devices=facts.devices.map(device=>({
-      ...device,imageUrl:device.imageUrl??products.find(product=>product.id.toUpperCase()===device.productCode)?.imageUrl??null,
+      ...device,imageUrl:device.imageUrl??previewDeviceProduct(products,device.productCode)?.imageUrl??null,
       ...(device.activatedAt!==null&&{slotReplacementTiming:busyIds.has(device.id)?'PENDING':'IMMEDIATE'}),
     }));
     return data;

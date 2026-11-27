@@ -1992,7 +1992,8 @@ const recoveryNotice = computed(() => {
   const newName = targetProductLabel(newKind, quote?.targetProductName);
   // Where the new device goes follows the quote, as on checkout (inheritActiveHint / inheritInventoryHint).
   const newFate = quote?.targetDeviceStatus === "INACTIVE" ? t.value.tradein.recoveryTargetInventoryFate
-    : quote ? t.value.tradein.recoveryTargetActiveFate : "—";
+    : quote?.targetDeviceStatus === "ACTIVE" ? t.value.tradein.recoveryTargetActiveFate
+      : quote ? t.value.myDevices.inventorySectionActivationUnconfirmed : "—";
   return { oldDevice, oldName, newKind, newName, newFate, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
     due: quote ? amountParts(quote.payableUsdt, 6) : null };
 });

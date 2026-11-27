@@ -11,6 +11,7 @@ export function previewInterfaceLanguages(mode = 'all') {
 const platform = { interfaceLanguages: previewInterfaceLanguages(), featureFlags: { computeShareEnabled: true, homeNewcomerTasksEnabled: true, homeWeeklyPromoEnabled: false }, share: { baseUrl: "https://ui-probe.invalid/ref/", channels: [], appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "", version: "", releaseNotes: { zh: "", en: "" }, source: "unavailable" } }, publicStats: { version: 1, ...authority, source: "server:nx_config_item,nx_user", realUserCount: 4, networkPulse: {registeredUsers:12480} }, onlineBonus: { h5BaseFactor: 0.6, continuityFullHours: 24 }, computerCompute: { domain: "E6", flags: [{ key: "computeShareEnabled", enabled: true }], coefficients: [{ key: "h5BaseFactor", value: 0.6 }, { key: "continuityFullHours", value: 24 }], yieldEstimate: [{ key: "topsBaseline", value: 100 }, { key: "dailyUsdtPerBaseline", value: 0.24 }, { key: "nexPerUsdt", value: 10 }], gpuTiers: ["G1", "G2", "G3", "G4", "G5", "G6"].map((id, i) => ({ id, label: `UI ${id}`, tops: (i + 1) * 100, keywords: [{ slot: "keyword1", value: `UI ${id}` }] })), download: { url: "https://ui-probe.invalid/agent-fixture.zip", zhTitle: "测试下载入口", zhGuide: "前端验收数据，不下载或安装", enTitle: "UI fixture download", enGuide: "Frontend fixture; no installer download or native execution" }, sources: ["e6.compute_config"] }, updatedAt: iso };
 export const previewDefaultTrialSku = 'stellarbox-s1';
 export const previewDefaultTrialName = 'UVELBox S1';
+export const previewDayOneInstanceKey = 'DAY_ONE:design-review';
 
 export function previewTrialProductConfig(product) {
   return {
@@ -31,12 +32,17 @@ const voucher = { voucherId: 'V-DESIGN', voucherName: 'Device voucher', voucherT
 
 const capacitySchedule = { stageEarlyEnd: '3', stageMidEnd: '8', capacityFloorPct: '22', capacitySubsidyDays: '30', capacityBand1DeltaPct: '-4', capacityBand2DeltaPct: '-6', capacityBand3DeltaPct: '-23.7', capacityApplyToPhone: 'false', capacityApplyToCloudShare: 'false', capacityApplyToPcGpu: 'false', capacityApplyToS1: 'true', capacityApplyToPro: 'true', capacityApplyToProV2: 'true', capacityApplyToRackP1: 'true', capacityApplyToRackP2: 'true' };
 
-const capacityKeys = { 'STELLARBOX-S1': 'capacityApplyToS1', 'E-S1-002': 'capacityApplyToS1', 'E-S1-003': 'capacityApplyToS1',
-    'STELLARBOX-PRO': 'capacityApplyToPro', 'P-PRO-002': 'capacityApplyToPro',
-    'STELLARBOX-PRO-V2': 'capacityApplyToProV2', 'STELLARRACK-P1': 'capacityApplyToRackP1',
-    'STELLARRACK-P2': 'capacityApplyToRackP2', 'CLOUD-SHARE': 'capacityApplyToCloudShare',
-    'MOBILE-CLOUD-SHARE': 'capacityApplyToCloudShare', 'PHONE': 'capacityApplyToPhone', 'MOBILE': 'capacityApplyToPhone',
-    'PHONE-BASIC': 'capacityApplyToPhone', 'IPHONE15': 'capacityApplyToPhone' };
+const capacityKeys = { 'stellarbox-s1': 'capacityApplyToS1', 'e-s1-002': 'capacityApplyToS1', 'e-s1-003': 'capacityApplyToS1',
+    'stellarbox-pro': 'capacityApplyToPro', 'p-pro-002': 'capacityApplyToPro',
+    'stellarbox-pro-v2': 'capacityApplyToProV2', 'stellarrack-p1': 'capacityApplyToRackP1',
+    'stellarrack-p2': 'capacityApplyToRackP2', 'cloud-share': 'capacityApplyToCloudShare',
+    'mobile-cloud-share': 'capacityApplyToCloudShare', phone: 'capacityApplyToPhone', mobile: 'capacityApplyToPhone',
+    'phone-basic': 'capacityApplyToPhone', iphone15: 'capacityApplyToPhone' };
+
+// Older fixture devices retain uppercase codes, while catalogue identifiers are lowercase.
+export function previewDeviceProduct(products, productCode) {
+  return products.find(product => product.id === productCode?.toLowerCase());
+}
 
 const upgradeLadder = [
   'phone', 'stellarbox-s1', 'stellarbox-pro', 'stellarbox-pro-v2', 'stellarrack-p1', 'stellarrack-p2',
@@ -61,7 +67,7 @@ export function previewDoTheMath(devices, products, canPurchase) {
 
   const next = products
     .map(product => {
-      const kind = upgradeKinds[capacityKeys[product.id.toUpperCase()]];
+      const kind = upgradeKinds[capacityKeys[product.id]];
       return { product, kind, rank: upgradeLadder.indexOf(kind) };
     })
     .filter(({ product, rank }) => rank > baseRank && product.dailyEarn > current.dailyUsdt && product.price > 0)
@@ -69,7 +75,7 @@ export function previewDoTheMath(devices, products, canPurchase) {
     .find(({ product }) => canPurchase(product));
   if (!next) return null;
 
-  const ownedProduct = products.find(product => product.id.toUpperCase() === current.productCode);
+  const ownedProduct = previewDeviceProduct(products, current.productCode);
   return {
     basis: 'OWNED_DEVICE_TO_NEXT_CATALOG_PRODUCT',
     base: { kind: baseKind, productNo: ownedProduct?.id ?? current.productCode, name: current.name, imageUrl: ownedProduct?.imageUrl ?? null, dailyUsdt: current.dailyUsdt,
@@ -93,7 +99,7 @@ export function previewCapacity(device, schedule, at) {
   anniversary.setUTCDate(Math.min(purchased.getUTCDate(), lastDay));
   if (anniversary > current) months--;
   const capacityAgeMonths = Math.max(0, months);
-  const capacityConfigKey = capacityKeys[device.productCode];
+  const capacityConfigKey = capacityKeys[device.productCode?.toLowerCase()];
   const early = Number(schedule.stageEarlyEnd), mid = Number(schedule.stageMidEnd);
   const capacityPct = schedule[capacityConfigKey] === 'true'
     ? Number(Math.max(Number(schedule.capacityFloorPct), 100
@@ -176,7 +182,7 @@ function fixture(url, locale, state, request, onlineDevices=3206) {
     const mode = state.taskState || 'pending';
     if (mode === 'error') return {};
     const names = locale === 'zh' ? ['绑定手机', '查看设备', '了解收益', '阅读课程', '完善账户', '了解邀请'] : locale === 'vi' ? ['Kết nối điện thoại', 'Xem thiết bị', 'Tìm hiểu thu nhập', 'Đọc bài học', 'Hoàn tất tài khoản', 'Tìm hiểu lời mời'] : ['Connect a phone', 'View devices', 'Explore earnings', 'Read a course', 'Complete your account', 'Explore invitations'];
-    const quests = mode === 'empty' ? [] : names.map((name, i) => ({ questCode: `review-task-${i+1}`, name, layer:'DAY_ONE', rewardNex:0, status:mode === 'claimed' ? 'CLAIMED' : mode === 'expired' ? 'EXPIRED' : mode === 'complete' ? 'CLAIMABLE' : i < 3 ? 'COMPLETED' : 'PENDING', category:'explore', actionRoute:'/pages/learn/courses', instanceKey:'DAY_ONE:design-review', eligibleFrom:new Date(now-6*3600000).toISOString(), eligibleUntil:new Date(mode === 'expired' ? now-1000 : now+18*3600000).toISOString(), eligible:!['claimed','expired'].includes(mode) }));
+    const quests = mode === 'empty' ? [] : names.map((name, i) => ({ questCode: `review-task-${i+1}`, name, layer:'DAY_ONE', rewardNex:0, status:mode === 'claimed' ? 'CLAIMED' : mode === 'expired' ? 'EXPIRED' : mode === 'complete' ? 'CLAIMABLE' : i < 3 ? 'COMPLETED' : 'PENDING', category:'explore', actionRoute:'/pages/learn/courses', instanceKey:previewDayOneInstanceKey, eligibleFrom:new Date(now-6*3600000).toISOString(), eligibleUntil:new Date(mode === 'expired' ? now-1000 : now+18*3600000).toISOString(), eligible:!['claimed','expired'].includes(mode) }));
     return { ...authority, quests, dayOneRewardNex:500, dayOneRequiredTaskCount:mode === 'empty' ? 0 : mode === 'legacy' ? null : 6, dayOneSnapshotStatus:mode === 'empty' ? 'EMPTY' : mode === 'legacy' ? 'LEGACY_UNVERIFIED' : 'SNAPSHOT', promoBanner:null, questBonusMultiplier:1, rhythmMonth:1, source:'nx_mission + nx_user_mission' };
   }
   if (url.pathname === '/api/orders/quote' && request) {

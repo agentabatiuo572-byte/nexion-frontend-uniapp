@@ -10,7 +10,7 @@ import type { CanonicalQuest } from "@/api/quest-api";
 import { STAKING_TERMS } from "@/store/staking";
 import { questProductNo } from "@/lib/quest-presentation";
 import { getProduct } from "@/mock/products";
-import { productCatalogPresentation, productCatalogState, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
+import { isProductCatalogDisplayCurrent, productCatalogPresentation, productCatalogState, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { onShow } from "./use-tab-page-lifecycle";
 import { useAutoRecovery } from "./use-auto-recovery";
 import { isProductAvailable } from "@/store/product-availability";
@@ -25,8 +25,9 @@ export function questActionRouteUnavailable(route: string): boolean {
     const product = getProduct(productNo);
     return !product || !isProductAvailable(product, resolveActivePhase(useApp().user.joinedAt));
   }
-  return productCatalogState.status === "ready"
-    && !productCatalogPresentation.value?.products.some(product => product.id === productNo && product.releaseState === "AVAILABLE");
+  const catalog = productCatalogPresentation.value;
+  return catalog !== null && (productCatalogState.status === "ready" || isProductCatalogDisplayCurrent())
+    && !catalog.products.some(product => product.id === productNo && product.releaseState === "AVAILABLE");
 }
 
 export function useQuestCatalogRead(needed: () => boolean) {
