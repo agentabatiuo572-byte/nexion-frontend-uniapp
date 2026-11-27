@@ -9,7 +9,7 @@
       <text v-if="busy && !silentRead" class="muted loading" role="status">{{ c.loading }}</text>
       <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
         <text>{{ c.resumeUsdt }}</text>
-        <view class="action secondary" role="button" tabindex="0" data-testid="bank-resume-usdt" :aria-disabled="busy" @click="openUsdt" @keydown.enter.prevent="openUsdt" @keydown.space.prevent="openUsdt"><text>USDT</text></view>
+        <NxButton class="page-action" variant="secondary" label="USDT" data-testid="bank-resume-usdt" :disabled="busy" @click="openUsdt" />
       </view>
 
       <template v-if="order">
@@ -30,8 +30,8 @@
       <template v-else-if="uncertain || displayIntents.length || (displayConfig && displayConfig.unresolvedIntent === undefined)">
         <text class="screen-title">{{ c.title }}</text>
         <view v-if="!busy || !uncertain" class="notice" role="alert"><text>{{ displayIntents.length ? c.multipleIntents : uncertain ? c.unknown : c.recoveryUnavailable }}</text></view>
-        <view v-for="intent in displayIntents" :key="intent.quoteNo" class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="openIntent(intent)" @keydown.enter.prevent="openIntent(intent)" @keydown.space.prevent="openIntent(intent)"><NxCodeValue class="intent-code" :value="intent.withdrawalNo || intent.quoteNo" :label="c.orderNumber" :copyable="false" /></view>
-        <view v-if="!uncertain" class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
+        <NxButton v-for="intent in displayIntents" :key="intent.quoteNo" class="page-action page-action--intent" variant="secondary" :disabled="busy" @click="openIntent(intent)"><NxCodeValue class="intent-code" :value="intent.withdrawalNo || intent.quoteNo" :label="c.orderNumber" :copyable="false" /></NxButton>
+        <NxButton v-if="!uncertain" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
       </template>
 
       <template v-else-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote)">
@@ -97,7 +97,7 @@
           <text v-if="displayConfig.capacity" class="hint pad">{{ format(c.dailyLabel, { remaining: displayConfig.capacity.dailyRemainingCount, total: displayConfig.capacity.dailyLimitCount }) }}</text>
           <view v-if="!quoteExpired" class="consent" role="checkbox" tabindex="0" data-testid="bank-consent" :aria-checked="accepted" :aria-disabled="busy" @click="toggleConsent" @keydown.enter.prevent="toggleConsent" @keydown.space.prevent="toggleConsent"><view class="checkbox" :class="{ checked: accepted }" aria-hidden="true"><svg v-if="accepted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view><text>{{ c.consent }}</text></view>
           <text class="hint pad">{{ c.confirmNotice }}</text>
-          <view class="action text-link" role="button" tabindex="0" data-testid="bank-abandon" :aria-disabled="busy" @click="abandon" @keydown.enter.prevent="abandon" @keydown.space.prevent="abandon"><text>{{ c.backToAmount }}</text></view>
+          <NxButton class="page-text-action" variant="text" size="small" :label="c.backToAmount" data-testid="bank-abandon" :disabled="busy" @click="abandon" />
         </template>
 
         <template v-else-if="formStep === 'account'">
@@ -129,9 +129,9 @@
           </view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
-          <view class="action text-link" role="button" tabindex="0" :aria-disabled="navigationLocked" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
+          <NxButton class="page-text-action" variant="text" size="small" :label="c.backToAccount" :disabled="navigationLocked" @click="goBack" />
         </template>
-        <view v-if="error" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
+        <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
       </template>
@@ -140,39 +140,39 @@
         <text class="intro">{{ formStep === 'amount' ? c.amountHint : c.recipientSubtitle }}</text>
         <template v-if="formStep === 'account'">
           <view class="account-card"><text class="muted">{{ c.recipientTitle }}</text><text class="account-number">—</text><text class="bank-name">—</text></view>
-          <view class="action primary is-placeholder" aria-hidden="true" data-testid="bank-continue"><text>{{ c.continueWithdrawal }}</text></view>
+          <NxButton class="page-action page-action--primary" variant="primary" :label="c.continueWithdrawal" disabled aria-hidden="true" data-testid="bank-continue" />
         </template>
         <template v-else>
           <text class="field-label">{{ c.totalDebit }} · USDT</text>
           <view class="amount-input"><input data-testid="bank-amount" type="text" inputmode="decimal" disabled placeholder="—" :aria-label="c.amount" /><NxButton variant="text" size="small" :label="c.all" disabled aria-hidden="true" /></view>
           <view class="notice notice--info"><text>{{ c.feeIncluded }}</text></view>
-          <view class="action primary is-placeholder" aria-hidden="true" data-testid="bank-quote"><text>{{ c.quote }}</text></view>
-          <view class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="goBack"><text>{{ c.backToAccount }}</text></view>
+          <NxButton class="page-action page-action--primary" variant="primary" :label="c.quote" disabled aria-hidden="true" data-testid="bank-quote" />
+          <NxButton class="page-text-action" variant="text" size="small" :label="c.backToAccount" :disabled="busy" @click="goBack" />
         </template>
-        <view v-if="error" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
+        <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
       </template>
-      <view v-else-if="error" class="action primary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
+      <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
     </view>
     <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm; result → new withdrawal + back to wallet. -->
     <template #pageFixed>
       <view v-if="remoteSessionReady && order" class="bar bar--result nx-glass-bar">
-        <view v-if="terminal" class="action secondary nx-tray-text" role="button" tabindex="0" data-testid="bank-new" :aria-disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" @keydown.enter.prevent="startNew" @keydown.space.prevent="startNew"><text>{{ c.newWithdrawal }}</text></view>
-        <view class="action primary" role="button" tabindex="0" :aria-disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" @keydown.enter.prevent="backToWallet" @keydown.space.prevent="backToWallet"><text>{{ c.backToWallet }}</text></view>
+        <NxButton v-if="terminal" variant="secondary" :label="c.newWithdrawal" data-testid="bank-new" :disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" />
+        <NxButton variant="primary" :label="c.backToWallet" :disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" />
       </view>
       <view v-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote) && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
         <template v-if="quote">
-          <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="confirmSubmit" @keydown.enter.prevent="confirmSubmit" @keydown.space.prevent="confirmSubmit"><text>{{ c.confirm }}</text></view>
+          <NxButton v-if="!quoteExpired" variant="primary" :label="c.confirm" data-testid="bank-submit" :disabled="busy || !canSubmit" @click="confirmSubmit" />
         </template>
         <template v-else-if="formStep === 'account'">
           <!-- Grey 「继续提现」: its reason above both buttons (03 §3.1 bottom bar), as on the amount step. -->
           <text v-if="continueReason" class="nx-tray-note" role="status" data-testid="bank-continue-reason">{{ continueReason }}</text>
-          <view class="action secondary nx-tray-text" role="button" tabindex="0" :aria-disabled="navigationLocked" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ displayConfig.beneficiary ? c.changeAccount : c.addAccount }}</text></view>
-          <view v-if="displayConfig.beneficiary" class="action primary" role="button" tabindex="0" data-testid="bank-continue" :aria-disabled="busy || !canContinue" @click="continueWithdrawal" @keydown.enter.prevent="continueWithdrawal" @keydown.space.prevent="continueWithdrawal"><text>{{ c.continueWithdrawal }}</text></view>
+          <NxButton variant="secondary" :label="displayConfig.beneficiary ? c.changeAccount : c.addAccount" :disabled="navigationLocked" @click="manageBank" />
+          <NxButton v-if="displayConfig.beneficiary" variant="primary" :label="c.continueWithdrawal" data-testid="bank-continue" :disabled="busy || !canContinue" @click="continueWithdrawal" />
         </template>
         <template v-else>
           <!-- Grey 「获取报价」: its reason above it (03 §3.1 bottom bar); the amount field no longer repeats it. -->
           <text v-if="quoteReason" id="bank-quote-reason" class="nx-tray-note" role="status" data-testid="bank-quote-reason">{{ quoteNote }}</text>
-          <view class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="quoteDisabled" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
+          <NxButton variant="primary" :label="c.quote" data-testid="bank-quote" :disabled="quoteDisabled" @click="getQuote" />
         </template>
       </view>
     </template>
@@ -677,18 +677,24 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .notice { --notice-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 8v4M12 16h.01'/%3E%3C/svg%3E"); display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; color: var(--v5-ink-2); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); margin: 20px 0; }
 .notice::before { content: ""; flex: none; width: 16px; height: 16px; margin-top: calc((var(--ui-type-note-lh) - 16px) / 2); background: var(--v5-warning-ink); -webkit-mask: var(--notice-glyph) center / contain no-repeat; mask: var(--notice-glyph) center / contain no-repeat; }
 .notice > text { flex: 1 1 0; min-width: 0; overflow-wrap: break-word; }
-.notice > .action { flex: 1 1 100%; }
+.notice > .page-action { flex: 1 1 100%; }
 .notice.danger::before { background: var(--v5-danger); }
 .notice--info { --notice-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5m0-9h.01'/%3E%3C/svg%3E"); }
 .notice--info::before { background: var(--v5-ink-3); }
 @media (forced-colors: active) { .notice::before { forced-color-adjust: none; background: CanvasText; } }
 .danger { color: var(--v5-danger); }
 .warn { color: var(--v5-warning); }
-.action { min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 20px; border-radius: 999px; font-size: var(--ui-type-button); font-weight: 600; cursor: pointer; box-sizing: border-box; }
-.primary { background: var(--v5-brand); color: var(--v5-on-brand); margin-top: 24px; }
-.secondary { background: var(--v5-surface-2); color: var(--v5-ink); margin-top: 12px; }
-[aria-disabled="true"]:not(.nx-button), .is-placeholder { opacity: .4; cursor: default; }
-.action:focus-visible, .consent:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+/* In-page buttons are the shared NxButton (03 §3.1); the page sets only layout. Full-width: the USDT entry, the intent
+   rows (neutral glass L) and the loading placeholders of the bar's primary. Text buttons (reload, 重新填写金额,
+   返回收款账户) sit centred on their label line with the shared 44px hit layer. */
+.page-action { width: 100%; margin-top: 12px; }
+.page-action--primary { margin-top: 24px; }
+.bank-withdraw .page-action--intent { min-width: 0; }
+.bank-withdraw .page-text-action { display: flex; width: max-content; margin: 21px auto 13px; }
+/* Margins collapse, so a second text button right below takes 34: the two 44px hit layers keep 8 between them. */
+.bank-withdraw .page-text-action + .page-text-action { margin-top: 34px; }
+[aria-disabled="true"]:not(.nx-button) { opacity: .4; cursor: default; }
+.consent:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .field-label { display: block; font-size: 12px; color: var(--v5-ink-2); margin: 18px 0 6px; }
 .amount-input { display: flex; align-items: center; gap: 8px; border: 1px solid var(--v5-border-strong); border-radius: 12px; padding: 8px 12px; }
 .amount-input input { flex: 1; min-width: 0; font-size: 26px; height: 44px; color: var(--v5-ink); }
@@ -800,7 +806,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .cfm-v { flex: none; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .cfm-row--amount .cfm-v { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
 .cfm-rules-title { display: block; margin: 20px 0 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
-.text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }
 /* A reason above the button makes the tray taller: up to two note lines over the 48 button (04 §4.0 clearance). */
@@ -810,8 +815,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .bar > .nx-tray-note { flex: 1 1 100%; }
 /* Buttons size to their words so no label wraps; when two labels cannot share one row (long languages at 360), the bar stacks them. */
 .bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
-.bar .action { flex: 1 1 0; min-width: max-content; min-height: 48px; margin: 0; padding: 0 16px; font: 500 15px/20px var(--font-v5); }
-/* uni-text sets white-space: pre-line on itself; nowrap goes on the text. */
-.bar .action > text { white-space: nowrap; }
+.bar > .nx-button { flex: 1 1 0; }
 @media (prefers-reduced-motion: reduce) { .bcard::after { animation: none; opacity: 0; } .cdw__val { transition: none; } }
 </style>
