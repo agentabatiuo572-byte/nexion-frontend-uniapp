@@ -13,7 +13,7 @@
       </view>
       <text :id="id + '-title'" class="nx-notice__title" role="heading" :tabindex="focusTitle ? -1 : undefined">{{ title }}</text>
       <text v-if="body" class="nx-notice__body">{{ body }}</text>
-      <view v-if="scrollBody" class="nx-notice__scroll"><slot /></view>
+      <view v-if="scrollBody" class="nx-notice__scroll" role="region" tabindex="0" :aria-label="fmt(t.ui.scrollRegion, { title })"><slot /></view>
       <slot v-else />
       <view class="nx-notice__actions">
         <NxButton :class="{ 'nx-notice__primary--danger': primaryTone === 'danger' }" :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
@@ -26,6 +26,8 @@
 import { computed, getCurrentInstance } from 'vue';
 import NxButton from './nx-button.vue';
 import { useDialogA11y } from '@/composables/use-dialog-a11y';
+import { useT } from '@/i18n/use-t';
+import { fmt } from '@/i18n/format';
 // Centered notice (DS 03 §3.5 居中确认框, the same anatomy as the global confirm()): icon, title, one short explanation,
 // a solid primary and an optional secondary exit below it as a brand text button.
 const props = withDefaults(defineProps<{ open: boolean; title: string; body?: string; primary: string; secondary?: string;
@@ -47,6 +49,7 @@ const props = withDefaults(defineProps<{ open: boolean; title: string; body?: st
   dismissible?: boolean }>(), { icon: 'alert', tone: 'warning' });
 const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void; (event: 'dismiss'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
+const t = useT();
 let sheetTap = false;
 function maskExit() {
   const inside = sheetTap;
@@ -84,4 +87,7 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => {
 .nx-notice--scroll { overflow: hidden; }
 .nx-notice--scroll .nx-notice__title, .nx-notice--scroll .nx-notice__actions { flex: none; }
 .nx-notice__scroll { align-self: stretch; min-height: 0; margin-top: 16px; overflow-y: auto; overscroll-behavior: contain; text-align: left; }
+/* The scrolling body is a keyboard stop (03 §3.5): the shared focus ring for keyboard use, none for a tap. */
+.nx-notice__scroll:focus { outline: none; }
+.nx-notice__scroll:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 </style>

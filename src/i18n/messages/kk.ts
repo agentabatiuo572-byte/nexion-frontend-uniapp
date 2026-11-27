@@ -3209,6 +3209,7 @@ export const kk: Messages = {
     notFoundMessage: "Сіз іздеген бет көшірілген немесе жоқ.",
     notFoundCta: "Басты бетке",
     navigationFailed: "Бұл бетті қазір ашу мүмкін болмады. Қайталап көріңіз.",
+    scrollRegion: "{title}, айналдыруға болады",
   },
   profile: {
     copyUid: "UID көшіру",

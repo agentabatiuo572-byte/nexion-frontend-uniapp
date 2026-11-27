@@ -635,7 +635,7 @@ function isRiskHold(r: PaneDepositRecord): boolean {
 }
 function rowAmount(r: PaneDepositRecord): string {
   const value = r.status === "reorg_reversed" || isRiskHold(r) || r.creditedUsdt > 0 ? r.creditedUsdt : r.grossAmountUsdt;
-  return formatAmount("grossExact" in r ? (value === r.creditedUsdt ? r.creditedExact : r.grossExact) : value);
+  return formatTruncatedAmount("grossExact" in r ? (value === r.creditedUsdt ? r.creditedExact : r.grossExact) : value);
 }
 function netShort(c: DepositChannel): string {
   return CHANNEL_SHORT[c];

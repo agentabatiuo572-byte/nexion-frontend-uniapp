@@ -3209,6 +3209,7 @@ export const ru: Messages = {
     notFoundMessage: "Страница, которую вы ищете, перемещена или не существует.",
     notFoundCta: "На главную",
     navigationFailed: "Не удалось открыть страницу. Повторите попытку.",
+    scrollRegion: "{title}, можно прокрутить",
   },
   profile: {
     copyUid: "Копировать UID",

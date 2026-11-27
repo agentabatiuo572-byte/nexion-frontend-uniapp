@@ -2755,6 +2755,7 @@ autoDetect: "tự động nhận diện sắp ra mắt",
     notFoundMessage: "Trang bạn tìm đã chuyển đi hoặc không tồn tại.",
     notFoundCta: "Về trang chủ",
     navigationFailed: "Không thể mở trang lúc này, hãy thử lại.",
+    scrollRegion: "{title}, có thể cuộn",
   },
   profile: {
     copyUid: "Sao chép UID",
