@@ -193,6 +193,7 @@ function product(value: unknown): CatalogProduct {
   return {
     id: nonEmptyString(source.id),
     name: nonEmptyString(source.name),
+    storeSortRank: optionalInteger(source.storeSortRank),
     tier: tier as Product["tier"],
     tagline: requiredString(source.tagline),
     badge: optionalString(source.badge),
