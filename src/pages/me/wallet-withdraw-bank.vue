@@ -1,14 +1,12 @@
 <template>
   <AppChassis active="me">
     <SubPageHeader back="/pages/me/wallet-withdraw-method" :title="c.title" :back-action="goBack" />
-    <view v-if="!remoteSessionReady" class="bank-withdraw" aria-busy="true">
-      <text class="muted loading" role="status">{{ c.loading }}</text>
-    </view>
-    <view v-else class="bank-withdraw" :aria-busy="busy">
+    <view class="bank-withdraw" :aria-busy="!remoteSessionReady || busy">
+      <template v-if="remoteSessionReady">
       <!-- Not on the first-read failure below: its centred result already says it once. -->
       <view v-if="error && (order || uncertain || displayIntents.length || displayConfig || requestedOrder !== null || pendingAttempt)" class="notice danger" role="alert"><text>{{ error }}</text></view>
-      <!-- Not on the first config read below: its placeholder already carries the loading status in the loaded layout's place. -->
-      <text v-if="busy && !silentRead && (displayConfig || order || uncertain || requestedOrder !== null || pendingAttempt)" class="muted loading" role="status">{{ c.loading }}</text>
+      <!-- Not while a still placeholder below stands in: it already carries the loading status in the loaded layout's place. -->
+      <text v-if="busy && !silentRead && !stillPlaceholder()" class="muted loading" role="status">{{ c.loading }}</text>
       <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
         <text>{{ c.resumeUsdt }}</text>
         <NxButton class="page-action" variant="secondary" label="USDT" data-testid="bank-resume-usdt" :disabled="busy" @click="openUsdt" />
@@ -137,27 +135,37 @@
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitReason : formStep === 'amount' && !!quoteReason }" />
       </template>
-      <!-- First config read with no snapshot (03 §3.4, §3.5.2): while it runs, a still placeholder at the bound account step's
-           size (card, binding note, bar clearance) and an empty tray in the bar, no grey main-action buttons; when it fails,
-           the page's one centred result and its one 重新加载. -->
+      <!-- First config read with no snapshot (03 §3.4, §3.5.2): when it fails, the page's one centred result and its one
+           重新加载; while it runs, the still placeholder below. -->
       <template v-else-if="requestedOrder === null && !pendingAttempt">
         <EmptyState v-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
-        <view v-else class="first-read" role="status" aria-busy="true" data-testid="bank-first-read">
-          <text class="vh">{{ c.loading }}</text>
-          <view class="first-read__card" aria-hidden="true">
-            <view class="first-read__top"><view class="first-read__dot" /><view class="first-read__bar first-read__bar--name" /><view class="first-read__bar first-read__bar--tag" /></view>
-            <view class="first-read__bot"><view class="first-read__bar first-read__bar--label" /><view class="first-read__bar first-read__bar--no" /></view>
-          </view>
-          <view class="first-read__bar first-read__bar--note" aria-hidden="true" />
-          <view class="bar-space bar-space--result" />
-        </view>
       </template>
       <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
+      </template>
+      <!-- Session restore and first reads (03 §3.4): a still placeholder at the size of the layout the read lands on, the bound
+           account step or the ?order= receipt, with an empty tray in the bar; no grey main-action buttons. -->
+      <view v-if="stillPlaceholder() === 'account'" class="first-read" role="status" aria-busy="true" data-testid="bank-first-read">
+        <text class="vh">{{ c.loading }}</text>
+        <view class="first-read__card" aria-hidden="true">
+          <view class="first-read__top"><view class="first-read__dot" /><view class="first-read__bar first-read__bar--name" /><view class="first-read__bar first-read__bar--tag" /></view>
+          <view class="first-read__bot"><view class="first-read__bar first-read__bar--label" /><view class="first-read__bar first-read__bar--no" /></view>
+        </view>
+        <view class="first-read__bar first-read__bar--note" aria-hidden="true" />
+        <view class="bar-space bar-space--result" />
+      </view>
+      <view v-else-if="stillPlaceholder() === 'receipt'" class="first-read" role="status" aria-busy="true" data-testid="bank-receipt-read">
+        <text class="vh">{{ c.loading }}</text>
+        <view class="result-head first-read__head" aria-hidden="true"><view class="first-read__dot first-read__dot--head" /><view class="first-read__bar first-read__bar--title" /><view class="first-read__bar first-read__bar--desc" /></view>
+        <view class="amount-card" aria-hidden="true"><view class="first-read__bar first-read__bar--muted" /><view class="first-read__bar first-read__bar--money" /></view>
+        <view class="account-card" aria-hidden="true"><view class="first-read__bar first-read__bar--muted" /><view class="first-read__bar first-read__bar--account" /></view>
+        <view class="details" aria-hidden="true"><view v-for="n in 5" :key="n" class="row first-read__row"><view class="first-read__bar first-read__bar--k" /><view class="first-read__bar first-read__bar--v" /></view></view>
+        <view class="bar-space bar-space--result" />
+      </view>
     </view>
     <!-- Main actions in the fixed bottom bar (DS-30): account → change + continue; amount → quote; quote → confirm; result → new withdrawal + back to wallet. -->
     <template #pageFixed>
-      <!-- First config read: the tray in its place, empty until the read lands (the first-read placeholder above). -->
-      <view v-if="remoteSessionReady && !displayConfig && !order && !uncertain && requestedOrder === null && !pendingAttempt && !error" class="bar bar--first-read nx-glass-bar" aria-hidden="true"><view class="bar__hold" /></view>
+      <!-- While a still placeholder stands in: the tray in its place, empty until the read lands. -->
+      <view v-if="stillPlaceholder()" class="bar bar--first-read nx-glass-bar" aria-hidden="true"><view class="bar__hold" /></view>
       <view v-if="remoteSessionReady && order" class="bar bar--result nx-glass-bar">
         <NxButton v-if="terminal" variant="secondary" :label="c.newWithdrawal" data-testid="bank-new" :disabled="busy || !newWithdrawalAllowed" :style="{ opacity: silentRead ? 1 : undefined }" @click="startNew" />
         <NxButton variant="primary" :label="c.backToWallet" :disabled="busy" :style="{ opacity: silentRead ? 1 : undefined }" @click="backToWallet" />
@@ -274,6 +282,12 @@ const displayConfig = computed(() => {
   return config.value ?? (busy.value && !error.value ? snapshot.value : null);
 });
 const uncertain = ref(false);
+// Which loaded layout a still placeholder stands in for while nothing can show yet (03 §3.4): the ?order= receipt, else the
+// account step; none once there is content or a failure to show. A function, not a computed: requestedOrder is a plain let.
+function stillPlaceholder(): "receipt" | "account" | null {
+  if (remoteSessionReady.value && (order.value || uncertain.value || displayConfig.value || error.value || (requestedOrder === null && pendingAttempt.value))) return null;
+  return requestedOrder === null ? "account" : "receipt";
+}
 const pendingQuoteNo = ref<string | null>(null);
 const amount = ref("");
 const formStep = ref<"account" | "amount">("account");
@@ -861,6 +875,17 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .first-read__bar--label { width: 30%; }
 .first-read__bar--no { width: 62%; height: 28px; border-radius: 8px; }
 .first-read__bar--note { width: 62%; margin: 17px 4px 0; }
+/* Receipt first read: the result head, amount card, account card and detail rows at their loaded sizes. */
+.first-read__head { display: flex; flex-direction: column; align-items: center; padding-top: 8px; }
+.first-read__dot--head { width: 56px; height: 56px; }
+.first-read__bar--title { width: 36%; height: 24px; margin: 20px 0 4px; border-radius: 8px; }
+.first-read__bar--desc { width: 56%; margin: 8px 0 4px; }
+.first-read__bar--muted { width: 28%; margin: 4px 0; }
+.first-read__bar--money { width: 52%; height: 32px; margin: 17px 0 6px; border-radius: 8px; }
+.first-read__bar--account { width: 44%; height: 20px; margin: 11px 0; }
+.first-read__row { align-items: center; height: 38.5px; box-sizing: border-box; }
+.first-read__bar--k { width: 22%; }
+.first-read__bar--v { width: 30%; }
 .bar--first-read .bar__hold { flex: 1 1 100%; height: 48px; }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }
