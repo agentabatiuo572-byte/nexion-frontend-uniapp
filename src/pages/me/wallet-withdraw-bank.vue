@@ -134,7 +134,7 @@
         </template>
         <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
-        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
+        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitReason : formStep === 'amount' && !!quoteReason }" />
       </template>
       <!-- First config read with no snapshot (03 §3.4, §3.5.2): while it runs, only the page's loading line above; when it
            fails, the page's one centred result and its one 重新加载. No form skeleton and no grey main-action placeholders;
@@ -152,6 +152,7 @@
       </view>
       <view v-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote) && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
         <template v-if="quote">
+          <text v-if="submitReason" class="nx-tray-note" role="status" data-testid="bank-submit-reason">{{ submitReason }}</text>
           <NxButton v-if="!quoteExpired" variant="primary" :label="c.confirm" data-testid="bank-submit" :disabled="busy || !canSubmit" @click="confirmSubmit" />
         </template>
         <template v-else-if="formStep === 'account'">
@@ -208,6 +209,7 @@ import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { apiClient, apiRuntimeConfig, remoteApiEnabled, sessionVault } from "@/api/runtime";
+import { isApiRefusal } from "@/api/errors";
 import { binarySessionReady } from "@/lib/binary-session-ready";
 import { readWithdrawAttempt } from "@/lib/withdraw-attempt";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
@@ -265,6 +267,7 @@ const accepted = ref(false);
 const now = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | undefined;
 let requestedOrder: string | null = null;
+let capacityRefusalQuoteNo: string | null = null;
 let lastCapacityResetRead = "";
 let revision = 0;
 let alive = true;
@@ -279,7 +282,7 @@ const money = (value: number) => formatAmount(value);
 const usdt2 = (value: number) => formatTruncatedAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
-const canSubmit = computed(() => newWithdrawalAllowed.value && !configRefreshFailed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
+const canSubmit = computed(() => newWithdrawalAllowed.value && !configBlockReason.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
   && config.value.unresolvedIntent !== undefined && config.value.unresolvedIntent?.state !== "MULTIPLE"
   && bankBeneficiaryReady(config.value.beneficiary) && hasVerifiedBankIdentity(quote.value));
 const multipleIntents = computed(() => config.value?.unresolvedIntent?.state === "MULTIPLE" ? config.value.unresolvedIntent.intents : []);
@@ -290,17 +293,21 @@ const configBlockReason = computed(() => {
   if (!shown.enabled) return c.value.unavailable;
   if (shown.beneficiary && !bankBeneficiaryReady(shown.beneficiary)) return c.value.accountStatus[bankAccountNotice(shown.beneficiary)];
   if (shown.beneficiary && (!shown.policy || !shown.capacity)) return c.value.capacityUnavailable;
+  if (shown.capacity?.withdrawalEnabled === false) return c.value.unavailable;
   if (shown.capacity?.dailyRemainingCount === 0) return `${c.value.dailyExhausted} ${displayDate(shown.capacity.dailyCountResetAt)}`;
-  if (shown.capacity && !shown.capacity.withdrawalEnabled) return c.value.unavailable;
-  return configRefreshFailed.value && shown.beneficiary ? c.value.capacityUnavailable : "";
+  if (configRefreshFailed.value && shown.beneficiary) return c.value.capacityUnavailable;
+  if (shown.policy && shown.capacity
+      && shown.capacity.maxWithdrawableUsdt < Math.max(shown.policy.minAmountUsd, quote.value?.amountUsdt ?? 0)) return c.value.amountErrors.balance;
+  return "";
 });
+const submitReason = computed(() => quote.value && !quoteExpired.value ? configBlockReason.value : "");
 // The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
 const cardTag = computed(() => {
   const shown = displayConfig.value, c0 = c.value;
+  if (readingConfig.value) return { tone: "warning", label: c0.loading } as const;
   if (!shown?.enabled) return { tone: "warning", label: c0.tagUnavailable } as const;
   if (!shown.beneficiary) return { tone: "warning", label: c0.unbound } as const;
   if (!bankBeneficiaryReady(shown.beneficiary)) return { tone: "warning", label: bankAccountNotice(shown.beneficiary) === "unverified" ? c0.tagUnverified : c0.tagUnavailable } as const;
-  // While a read is in flight the tray says 加载中 above the grey button; the tag only follows real blockers, so it does not flash.
   if (configBlockReason.value) return { tone: "warning", label: c0.tagUnavailable } as const;
   return { tone: "success", label: c0.available } as const;
 });
@@ -414,11 +421,13 @@ async function loadConfig(recoverConfig: boolean) {
   await run(async current => {
     const owner = app.accountKey, epoch = app.accountBindingEpoch;
     const readingReceipt = requestedOrder !== null || !!order.value;
-    const pending = readingReceipt ? null : readPendingQuoteNo();
+    const displayedQuote = quote.value;
+    const storedPending = readingReceipt ? null : readPendingQuoteNo();
+    const pending = storedPending === displayedQuote?.quoteNo ? null : storedPending;
     const warmRead = !readingReceipt && !pending && config.value !== null;
     readingConfig.value = !readingReceipt && !pending && (warmRead || recoverConfig);
     if (!readingConfig.value) config.value = null;
-    if (!recoverConfig || !readingConfig.value) accepted.value = false;
+    if (!displayedQuote || pending) accepted.value = false;
     if (readingReceipt) {
       const orderNo = requestedOrder ?? order.value!.withdrawalNo;
       if (!/^WD-[A-Z0-9]+$/.test(orderNo)) throw new Error("BANK_ORDER_ROUTE_INVALID");
@@ -448,6 +457,7 @@ async function loadConfig(recoverConfig: boolean) {
     configPresentation.value = { owner, epoch, value: loaded };
     if (loaded.unresolvedIntent?.state === "MULTIPLE") { quote.value = null; uncertain.value = true; return; }
     const intent = loaded.unresolvedIntent?.intents[0];
+    if (displayedQuote && !pending && (!intent || (intent.state === "NOT_SUBMITTED" && intent.quoteNo === displayedQuote.quoteNo))) return;
     if (intent) {
       uncertain.value = true; pendingQuoteNo.value = intent.quoteNo;
       const recovered = await api.recover(intent.quoteNo); if (!current()) return;
@@ -498,13 +508,15 @@ function pollOrder(): Promise<void> {
     } else if (quoteNo) {
       const recovered = await api.recover(quoteNo);
       if (!current()) return;
-      if (recovered.state !== "COMMITTED" && !config.value) {
+      const refreshCapacity = recovered.state === "NOT_SUBMITTED" && capacityRefusalQuoteNo === quoteNo;
+      if (recovered.state !== "COMMITTED" && (!config.value || refreshCapacity)) {
         const loaded = await api.config();
         if (!current()) return;
         config.value = loaded; configPresentation.value = { owner, epoch, value: loaded };
       }
+      capacityRefusalQuoteNo = null;
       const switched = applyRecovery(recovered, quoteNo); error.value = "";
-      if (!switched) {
+      if (!switched && !(recovered.state === "NOT_SUBMITTED" && configBlockReason.value)) {
         const title = recovered.state === "COMMITTED" ? c.value[bankOrderOutcome(recovered)]
           : recovered.state === "NOT_SUBMITTED" ? c.value.confirmTitle : c.value.intentClosed;
         toast.info(title, recovered.state === "NOT_SUBMITTED" ? c.value.confirmHint : undefined);
@@ -524,7 +536,7 @@ useAutoRecovery({
 });
 // Re-read missing limits and failed refreshes through the same recovery owner (03 §3.5.2).
 const limitsMissing = computed(() => !!config.value?.enabled && !!config.value.beneficiary && (!config.value.policy || !config.value.capacity));
-const canRereadConfig = () => !order.value && !uncertain.value && (configRefreshFailed.value || (limitsMissing.value && !quote.value));
+const canRereadConfig = () => !order.value && !uncertain.value && (configRefreshFailed.value || limitsMissing.value);
 useAutoRecovery({
   failed: () => canReadVisibleBankPage() && canRereadConfig() && !busy.value,
   retry: () => loadConfig(true),
@@ -602,9 +614,14 @@ async function submit() {
     uni.setStorageSync(pendingKey(), no); // Recovery reference only; never persist bank details, OTPs or balances.
     if (uni.getStorageSync(pendingKey()) !== no) throw new Error("BANK_RECOVERY_NOT_DURABLE");
     uncertain.value = true; pendingQuoteNo.value = no;
-    const value = await api.submit(no, `bank-submit:${no}`);
-    if (!current()) return;
-    applyRecovery(value, no);
+    try {
+      const value = await api.submit(no, `bank-submit:${no}`);
+      if (current()) applyRecovery(value, no);
+    } catch (cause) {
+      if (!current() || !isApiRefusal(cause, 409, "WITHDRAWAL_BALANCE_LIMIT_EXCEEDED",
+        "WITHDRAWAL_RELEASE_BUCKET_INSUFFICIENT", "WITHDRAWAL_DAILY_LIMIT_EXCEEDED")) throw cause;
+      capacityRefusalQuoteNo = no;
+    }
   });
 }
 async function abandon() {
@@ -645,7 +662,7 @@ function startNew() {
   order.value = null; quote.value = null; requestedOrder = null; amount.value = ""; formStep.value = "account"; accepted.value = false; void load();
 }
 function clearScope() {
-  pendingQuoteNo.value = null; orderReadGeneration++;
+  pendingQuoteNo.value = null; capacityRefusalQuoteNo = null; orderReadGeneration++;
   revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingConfig.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }
