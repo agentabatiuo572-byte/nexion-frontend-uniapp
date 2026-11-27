@@ -288,10 +288,11 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/app/deposits/vietqr/receipts") return { items: [], nextOffset: null };
   if (p === "/api/deposits/policy" || p === "/api/deposits/address") {
     // Policy and address share the same terms and existing payment availability switches.
+    const feeExact = { zero: '0', half: '0.5' }[state.depositFeeState] ?? demoChainDepositFee;
     const networks = ['BEP20', 'ERC20'].map(network => {
       const disabledReason = demoChainDepositDisabledReason(state, network);
       return { network, enabled: disabledReason === null, disabledReason, confirmations: 15,
-        feeUsdt: Number(demoChainDepositFee), feeUsdtExact: demoChainDepositFee,
+        feeUsdt: Number(feeExact), feeUsdtExact: feeExact,
         minDepositUsdt: Number(demoChainDepositMinimum), minDepositUsdtExact: demoChainDepositMinimum };
     });
     if (p === "/api/deposits/policy") return { networks };
