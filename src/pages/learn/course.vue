@@ -145,10 +145,8 @@ const error = ref<CourseError>("");
 
 const errorText = computed(() => error.value ? t.value.learning[error.value] : "");
 const startFailureText = computed(() => startFailure.value?.reason === "onboarding" ? t.value.learning.courseStartSetup
-  : startFailure.value?.reason === "terms" ? t.value.learning.courseStartTerms
   : startFailure.value?.reason === "network" ? t.value.learning.courseStartNetwork : t.value.learning.courseStartUnconfirmed);
-const startRecoveryLabel = computed(() => startFailure.value?.reason === "onboarding" ? t.value.home.dayOneObservationSetupAction
-  : startFailure.value?.reason === "terms" ? t.value.conversations.contactSupport : t.value.ui.retry);
+const startRecoveryLabel = computed(() => startFailure.value?.reason === "onboarding" ? t.value.home.dayOneObservationSetupAction : t.value.ui.retry);
 const allAnswered = computed(() => !!course.value
   && validAnswersForCourse(course.value, answers.value));
 const resultDetails = computed(() => answeringAgain.value && !result.value ? null : learningResultDetails(course.value, result.value));
@@ -389,7 +387,6 @@ function retryCourse() { invalidateLearningContent(); return load(); }
 function recoverStart() {
   if (!mounted || loading.value || startState.value !== "unconfirmed" || !displayCourse.value) return;
   const reason = startFailure.value?.reason;
-  if (reason === "terms") return navTo("/pages/support/messages");
   if (reason !== "onboarding") return retryCourse();
   let web = false;
   // #ifdef H5
