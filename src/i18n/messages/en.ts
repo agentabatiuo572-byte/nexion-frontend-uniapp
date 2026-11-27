@@ -162,7 +162,7 @@ export const en = {
     quoteExpired: "This quote has expired. Refresh or cancel it to get a new quote.",
     refundAmount: "Returned amount (USDT)", confirmedAt: "Confirmed at", refunded: "Returned to your wallet",
     accountStatus: {
-      ready: "Receiving account saved.", unavailable: "This receiving account is unavailable. Please reload.", unverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
+      ready: "Receiving account saved.", unavailable: "This receiving account is unavailable.", unverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
     },
     requote: "Cancel unused quote / start again",
     title: "Bank withdrawal", unavailable: "Bank withdrawals are currently unavailable. Please try again later.",

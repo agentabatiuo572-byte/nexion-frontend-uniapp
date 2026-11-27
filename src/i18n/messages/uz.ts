@@ -519,7 +519,7 @@ export const uz: Messages = {
     refunded: "Hamyoningizga qaytarildi",
     accountStatus: {
       ready: "Qabul qiluvchi hisob saqlandi.",
-      unavailable: "Bu hisobdan hozircha foydalanib boʻlmaydi. Qayta yuklang.",
+      unavailable: "Bu hisobdan hozircha foydalanib boʻlmaydi.",
       unverified: "Bankka pul yechish hozir mavjud emas. Yuborilgan soʻrovlarni koʻrishingiz mumkin.",
     },
     requote: "Narxni bekor qilib, qaytadan boshlash",

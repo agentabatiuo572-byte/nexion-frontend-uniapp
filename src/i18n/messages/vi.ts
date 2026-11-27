@@ -163,7 +163,7 @@ export const vi: Messages = {
     quoteExpired: "Báo giá đã hết hạn. Tải lại hoặc hủy để lấy báo giá mới.",
     refundAmount: "Số tiền đã hoàn (USDT)", confirmedAt: "Thời gian xác nhận", refunded: "Đã hoàn tiền về ví",
     accountStatus: {
-      ready: "Đã liên kết tài khoản nhận tiền.", unavailable: "Chưa thể sử dụng tài khoản nhận tiền này. Vui lòng tải lại.", unverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
+      ready: "Đã liên kết tài khoản nhận tiền.", unavailable: "Chưa thể sử dụng tài khoản nhận tiền này.", unverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
     },
     requote: "Hủy báo giá chưa dùng / nhập lại",
     title: "Rút tiền về ngân hàng", unavailable: "Hiện chưa thể rút tiền về ngân hàng. Vui lòng thử lại sau.",

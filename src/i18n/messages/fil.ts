@@ -519,7 +519,7 @@ export const fil: Messages = {
     refunded: "Naibalik sa wallet mo",
     accountStatus: {
       ready: "Na-save ang account na tatanggap.",
-      unavailable: "Hindi available ang account na ito. I-reload.",
+      unavailable: "Hindi available ang account na ito.",
       unverified: "Hindi available ngayon ang bank withdrawal. Masusubaybayan mo pa rin ang mga naisumiteng withdrawal.",
     },
     requote: "I-cancel ang quote / magsimula ulit",

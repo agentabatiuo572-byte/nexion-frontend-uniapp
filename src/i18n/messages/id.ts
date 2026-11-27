@@ -519,7 +519,7 @@ export const id: Messages = {
     refunded: "Dikembalikan ke dompet Anda",
     accountStatus: {
       ready: "Rekening penerima tersimpan.",
-      unavailable: "Rekening penerima ini tidak tersedia. Muat ulang.",
+      unavailable: "Rekening penerima ini tidak tersedia.",
       unverified: "Penarikan bank sedang tidak tersedia. Penarikan yang sudah dikirim tetap bisa dicek.",
     },
     requote: "Batalkan penawaran / mulai lagi",

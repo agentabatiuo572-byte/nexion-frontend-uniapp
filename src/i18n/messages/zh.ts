@@ -163,7 +163,7 @@ export const zh: Messages = {
     quoteExpired: "报价已过期，请刷新或取消后重新获取报价。",
     refundAmount: "已退回金额（USDT）", confirmedAt: "确认时间", refunded: "已退回钱包",
     accountStatus: {
-      ready: "收款账户已绑定。", unavailable: "暂时无法使用此收款账户，请重新加载。", unverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
+      ready: "收款账户已绑定。", unavailable: "暂时无法使用此收款账户。", unverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
     },
     requote: "取消未提交报价／重新填写",
     title: "银行卡提现", unavailable: "银行卡提现暂不可用，请稍后再试。",

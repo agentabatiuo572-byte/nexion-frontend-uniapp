@@ -519,7 +519,7 @@ export const ms: Messages = {
     refunded: "Dikembalikan ke dompet anda",
     accountStatus: {
       ready: "Akaun penerima disimpan.",
-      unavailable: "Akaun penerima ini tidak tersedia. Sila muat semula.",
+      unavailable: "Akaun penerima ini tidak tersedia.",
       unverified: "Pengeluaran bank tidak tersedia buat masa ini. Anda masih boleh menyemak pengeluaran yang telah dihantar.",
     },
     requote: "Batal sebut harga / mula semula",
