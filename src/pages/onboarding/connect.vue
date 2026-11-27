@@ -291,13 +291,11 @@ async function acceptCalibration(result: OnboardingCalibration, options: ReturnT
     phase.value = "error";
     return;
   }
-  // The entrance starts from the read-wait dial, which stays hidden until its first measure: the result waits for it (bounded,
-  // and without an entrance if the measure is late) so the bar never turns live over an empty centre.
-  if (!dialReady.value) {
+  // The entrance starts from the read-wait dial, which stays hidden until its first measure: the result waits for it (the
+  // measure's callback always sets dialReady), so the bar never turns live over an empty centre.
+  if (phase.value === "calibrating" && !dialReady.value) {
     await new Promise<void>((resolve) => {
-      const done = () => { clearTimeout(timer); stop(); resolve(); };
-      const timer = setTimeout(done, 1500);
-      const stop = watch(dialReady, (ready) => { if (ready) done(); });
+      const stop = watch(dialReady, (ready) => { if (ready) { stop(); resolve(); } });
     });
     if (!options.isCurrent()) return;
   }
