@@ -73,8 +73,8 @@
           </view>
           <view style="min-width: 0">
             <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-              <text :class="targetClosed(task) ? 'newcomer-task__label--wrap' : 'truncate'" :style="labelStyle(task)">{{ task.label }}</text>
-              <text :style="catStyle(task)">{{ task.cat }}</text>
+              <text :class="isActionable(task) ? 'truncate' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
             </view>
             <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
             <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
@@ -431,6 +431,7 @@ const toggleStyle: CSSProperties = {
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__reason { display: block; margin-top: 2px; overflow-wrap: break-word; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .newcomer-task__label--wrap { min-width: 0; overflow-wrap: break-word; }
+.newcomer-task__cat { flex-shrink: 0; white-space: nowrap; }
 .newcomer-task__circle--closed { opacity: .5; }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
 .newcomer-task__observation-item { margin-top: var(--v5-space-2); }
