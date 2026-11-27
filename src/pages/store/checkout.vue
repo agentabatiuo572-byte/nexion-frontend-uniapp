@@ -409,7 +409,7 @@ import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { readCheckoutOrderPointer, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, hasKnownCheckoutTradeinStatus, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
-import { readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
+import { checkoutCreateRequest, readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
@@ -3214,6 +3214,13 @@ function openClosedOriginal() {
   const orderNo = createdCheckoutOrder.value?.orderNo;
   void navTo(originalCheckoutClosed.value === 'missing' || !orderNo ? '/pages/store/orders' : '/pages/store/order-detail?id=' + encodeURIComponent(orderNo));
 }
+function reviewChangedOrderAmount() {
+  step.value = 'select-payment';
+  toast.warn(t.value.store.coTotalQuoteChanged);
+  refreshVisibleCheckout(true, 'read-only');
+  void voucher.refreshRemote();
+}
+
 async function retryOriginalCheckout() {
   if (serverOrderRecovery.value || checkoutLeaving.value) return;
   if (originalOrderNavigationFailed.value) {
@@ -3229,7 +3236,7 @@ async function retryOriginalCheckout() {
   try {
     // A submitted replay is uncertain again until the server confirms its result.
     confirmedMissingCreateKey.value = null;
-    const created = await orderApi.create(pendingCreate.request);
+    const created = await orderApi.create(checkoutCreateRequest(pendingCreate));
     if (!isCurrentCheckoutRoute(scope)) return;
     rememberCheckoutOrder(scope.accountKey, { productNo: scope.productNo, orderNo: created.orderNo, intent: pendingCreate.intent, commandKey: pendingCreate.request.idempotencyKey });
     createdCheckoutOrder.value = created;
@@ -3237,8 +3244,14 @@ async function retryOriginalCheckout() {
     forgetCheckoutCreate(scope.accountKey, pendingCreate);
     pendingCheckoutCreate.value = null;
     await navigateOriginalCheckoutOrder(`/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}`, scope);
-  } catch {
-    if (isCurrentCheckoutRoute(scope)) toast.warn(t.value.store.coPendingCreateTitle);
+  } catch (error) {
+    if (!isCurrentCheckoutRoute(scope)) return;
+    if (isApiRefusal(error, 409, 'ORDER_AMOUNT_CHANGED')) {
+      retireRemoteOrderKey(pendingCreate.intent, scope.accountKey, pendingCreate.request.idempotencyKey);
+      forgetCheckoutCreate(scope.accountKey, pendingCreate);
+      pendingCheckoutCreate.value = null;
+      reviewChangedOrderAmount();
+    } else toast.warn(t.value.store.coPendingCreateTitle);
   } finally {
     if (attempt === checkoutLeaveAttempt) {
       pendingCreateReplayBusy.value = false;
@@ -3693,6 +3706,10 @@ async function readPendingCheckoutCreate() {
     pendingCheckoutCreate.value = null;
     step.value = 'select-payment';
     const failure = new ApiError({ kind: 'http', status: result.code, code: result.code, message: result.message });
+    if (isApiRefusal(failure, 409, 'ORDER_AMOUNT_CHANGED')) {
+      reviewChangedOrderAmount();
+      return;
+    }
     const outOfStock = isApiRefusal(failure, 409, 'PRODUCT_OUT_OF_STOCK');
     recoveredCreateRefusal.value = !ordinaryCheckoutInitialized.value;
     if (outOfStock) checkoutStockRefused.value = true;
@@ -3767,6 +3784,8 @@ async function submitRemoteOrder(): Promise<void> {
   const submissionScope = captureCheckoutRoute();
   const scopeIsCurrent = () => isCurrentCheckoutRoute(submissionScope);
   const reviewedTotal = confirmationTotal.value;
+  const reviewedSubtotal = purchaseSubtotal.value;
+  const reviewedDiscount = voucherDiscount.value;
   const reviewedTrialVersion = trialView.value.quoteVersion;
   if (await resumePendingRemoteTradein(submissionScope)
       || (!hasOriginalCheckout.value && recoverCapacityBeforePurchase([submissionScope.productNo], true))) { confirming = false; return; }
@@ -3836,7 +3855,7 @@ async function submitRemoteOrder(): Promise<void> {
     const existingOrder = createdCheckoutOrder.value;
     const creation = pendingCheckoutCreate.value ?? {
       request: { productNo: p.id, quantity: 1, voucherId: requestedVoucherId, idempotencyKey: remoteOrderKey() },
-      intent: remoteOrderIntent(), subtotal: purchaseSubtotal.value, discount: voucherDiscount.value, amount: reviewedTotal,
+      intent: remoteOrderIntent(), subtotal: reviewedSubtotal, discount: reviewedDiscount, amount: reviewedTotal,
       productName: p.name, voucherName: voucher.catalog.find(offer => offer.id === requestedVoucherId)?.name,
     };
     if (!existingOrder) {
@@ -3844,7 +3863,7 @@ async function submitRemoteOrder(): Promise<void> {
       confirmedMissingCreateKey.value = null;
       pendingCheckoutCreate.value = creation;
     }
-    const created = existingOrder ?? await orderApi.create(creation.request);
+    const created = existingOrder ?? await orderApi.create(checkoutCreateRequest(creation));
     if (!scopeIsCurrent()) return;
     createdCheckoutOrder.value = created;
     canonicalOrderCommitted = true;
@@ -3949,13 +3968,19 @@ async function submitRemoteOrder(): Promise<void> {
     const apiError = asApiError(error);
     const rejection = orderPaymentRejection(error, locale.code);
     // Known purchase refusals settle the create. An ambiguous response keeps the original command.
-    const keepForReadback = !checkoutCreateBlock(error)
+    const amountChanged = !canonicalOrderCommitted && !remoteTradeinRecoveryRequired.value
+      && isApiRefusal(error, 409, 'ORDER_AMOUNT_CHANGED');
+    const keepForReadback = !amountChanged && !checkoutCreateBlock(error)
       && !(rejection && isApiRefusal(error, 409, apiError.message))
       && (isAmbiguousEnvelopeOutcome(error) || apiError.message === "IDEMPOTENCY_RESULT_UNKNOWN");
     if (!remoteTradeinRecoveryRequired.value && !keepForReadback && !canonicalOrderCommitted) {
       if (pendingCheckoutCreate.value) forgetCheckoutCreate(submissionScope.accountKey, pendingCheckoutCreate.value);
       pendingCheckoutCreate.value = null;
       retireRemoteOrderKey();
+    }
+    if (amountChanged) {
+      reviewChangedOrderAmount();
+      return;
     }
     // An existing order stays unpaid after a definitive payment refusal.
     const walletShort = recoveryOrderNo && apiError.message === "ORDER_WALLET_INSUFFICIENT";
