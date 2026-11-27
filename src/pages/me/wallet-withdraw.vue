@@ -65,17 +65,6 @@
         </view>
       </view>
 
-      <!-- Compliance-hold banner (P5+) -->
-      <view v-if="complianceHoldEnabled" class="mx-4 mb-3 flex items-start" :style="holdBannerStyle">
-        <view class="grid place-items-center shrink-0" :style="holdIconStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-        </view>
-        <view class="flex-1 min-w-0" style="margin-left: 10px">
-          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ t.walletV3.complianceHoldTitle }}</text>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ holdBody }}</text>
-        </view>
-      </view>
-
       <!-- P-45: withdrawable balance card — amount anatomy ($ and cents in ink-3) plus what is held back. -->
       <view class="wd-bal mx-4">
         <text class="wd-k">{{ t.wallet.withdrawableLabel }}</text>
@@ -114,13 +103,14 @@
         </view>
       </view>
 
-      <view v-if="withdrawalRiskNotice" class="mx-4 mt-3 flex items-start" :style="holdBannerStyle">
-        <view class="grid place-items-center shrink-0" :style="holdIconStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M12 17h.01" /><circle cx="12" cy="12" r="10" /></svg>
+      <!-- 审核提示(小额免审线为 0,每笔都审核):只说结果和去哪看,不说判定机制;拒绝路由仍写它自己的标题和原因。 -->
+      <view v-if="reviewNoticeVisible" class="wd-notice mx-4" :style="holdBannerStyle" role="status">
+        <view class="wd-notice__icon grid place-items-center shrink-0" :style="holdIconStyle" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M12 17h.01" /><circle cx="12" cy="12" r="10" /></svg>
         </view>
-        <view class="flex-1 min-w-0" style="margin-left: 10px">
-          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ riskNoticeTitle }}</text>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ riskNoticeBody }}</text>
+        <view class="wd-notice__main">
+          <text v-if="rejectNotice" class="wd-notice__title">{{ riskNoticeTitle }}</text>
+          <text class="wd-notice__t" :class="{ 'wd-notice__t--sub': rejectNotice }">{{ rejectNotice ? riskNoticeBody : t.walletV3.withdrawReviewNotice }}</text>
         </view>
       </view>
 
@@ -256,34 +246,34 @@
       </template>
       </view>
 
-      <!-- 当日额度:圆点 = 每日笔数(已用为实心);「有没有这句话」与「闸生不生效」同一个条件(limitCount ≤0 不显示)。 -->
+      <!-- 当日额度:圆点 = 每日笔数(已用为实心);「有没有这句话」与「闸生不生效」同一个条件(limitCount ≤0 不显示)。
+           「提现说明 ›」在这一行右端,放不下时整个链接换到下一行右对齐;没有额度句时这一行只有链接。 -->
       <template v-if="withdrawalPolicyCurrent">
-        <view v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="wd-quota mx-4">
-          <view v-for="i in Math.min(dailyFacts.limitCount, 10)" :key="i" class="wd-quota__pip" :class="{ 'wd-quota__pip--used': i <= limitFacts.dailyUsedCount }" aria-hidden="true" />
-          <text>{{ dailyUsageText }}</text>
+        <view v-if="(dailyFactsDisplayable && limitFacts.dailyLimitConfigured) || rulesReady" class="wd-quota mx-4">
+          <view v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="wd-quota__use">
+            <view v-for="i in Math.min(dailyFacts.limitCount, 10)" :key="i" class="wd-quota__pip" :class="{ 'wd-quota__pip--used': i <= limitFacts.dailyUsedCount }" aria-hidden="true" />
+            <text>{{ dailyUsageText }}</text>
+          </view>
+          <NxButton v-if="rulesReady" class="wd-rules-link" variant="link" icon="chevron-right" :label="t.walletV3.withdrawRules.title" aria-haspopup="dialog" @click="rulesOpen = true" />
         </view>
       </template>
 
       <!-- Reverse-talk staking alternative -->
       <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
 
-      <!-- 费用说明半屏(规格 ⑥ 新增):仅网络确认费含义 + NEX 抵扣规则,无按金额比例的旧费率段落。
-           范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
-      <view v-if="feeWhyOpen" class="nx-withdraw-fee-dialog" role="dialog" aria-modal="true" :aria-label="t.walletV3.feeWhyTitle">
-        <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" @click="feeWhyOpen = false" />
-        <view class="nx-glass-sheet nx-sheet-slide-up" :style="feeWhySheetStyle">
-          <view class="flex items-start justify-between" style="gap: 12px">
-            <text class="block" :style="feeWhyTitleStyle">{{ t.walletV3.feeWhyTitle }}</text>
-            <view class="grid place-items-center shrink-0 active:opacity-60" :style="feeWhyCloseStyle" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyClose" @click="feeWhyOpen = false"  @keydown.enter.prevent="feeWhyOpen = false" @keydown.space.prevent="feeWhyOpen = false">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-            </view>
-          </view>
-          <text class="block" :style="feeWhySectionTitleStyle">{{ t.walletV3.feeWhyNetworkTitle }}</text>
-          <text class="block" :style="feeWhyBodyStyle">{{ t.walletV3.feeWhyNetworkBody }}</text>
-          <text class="block" :style="feeWhySectionTitleStyle">{{ t.walletV3.feeWhyOffsetTitle }}</text>
-          <text class="block" :style="feeWhyBodyStyle">{{ t.walletV3.feeWhyOffsetBody }}</text>
+      <!-- 费用说明:用户点「?」主动查看的说明,底部 sheet(03 §3.5.1 选择级),共享 NxSheet 的标题、圆形关闭和退出。 -->
+      <NxSheet :open="feeWhyOpen" :title="t.walletV3.feeWhyTitle" @close="feeWhyOpen = false">
+        <view class="wd-why">
+          <view class="wd-why__i"><text class="wd-why__t">{{ t.walletV3.feeWhyNetworkTitle }}</text><text class="wd-why__d">{{ t.walletV3.feeWhyNetworkBody }}</text></view>
+          <view class="wd-why__i"><text class="wd-why__t">{{ t.walletV3.feeWhyOffsetTitle }}</text><text class="wd-why__d">{{ t.walletV3.feeWhyOffsetBody }}</text></view>
         </view>
-      </view>
+      </NxSheet>
+
+      <!-- 提现说明(只读):居中弹窗,只有正文滚动,「确认」关闭。提交时同样的条目放进提交确认框(handleSubmit)。 -->
+      <NxNoticeDialog :open="rulesOpen && rulesReady" :title="t.walletV3.withdrawRules.title" :primary="t.ui.confirm" icon="none" scroll-body dismissible focus-title
+        @primary="rulesOpen = false" @dismiss="rulesOpen = false">
+        <NxRulesList :items="rulesItems" />
+      </NxNoticeDialog>
 
       <view class="wd-bar-space" />
     </view>
@@ -315,6 +305,11 @@ import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import NxRulesList from "@/components/ui/nx-rules-list.vue";
+import { USDT_WITHDRAWAL_DISPLAY_MAX } from "@/lib/withdrawal-display-limits";
 import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
@@ -345,8 +340,7 @@ import { mockServerNow } from "@/store/server-time";
 import { evaluateWithdrawal, requestWithdrawalEligibility, type WithdrawalEligibility } from "@/store/withdrawal-eligibility";
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { confirm as uiConfirm, toast } from "@/store/ui";
+import { confirm as uiConfirm, toast, type RuleItem } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 
@@ -942,19 +936,6 @@ const complianceHoldEnabled = computed(() =>
   !pendingAttempt.value
   && (remoteEligibility.value?.complianceReviewRequired ?? withdrawalPolicy.value?.complianceHoldEnabled === true),
 );
-const holdBody = computed(() => {
-  const policy = withdrawalPolicy.value;
-  if (!policy || amountNum.value <= 0) return t.value.walletV3.complianceReviewBody;
-  // This is policy-based guidance until the server returns this amount's decision.
-  // Submission continues to require a fresh eligibility response.
-  const applies = remoteEligibility.value?.complianceHoldApplies
-    ?? amountNum.value > policy.complianceReviewThresholdUsdt;
-  const days = remoteEligibility.value?.complianceHoldDays ?? (applies ? policy.cooldownDays : 0);
-  return days > 0
-    ? fmt(t.value.walletV3.complianceHoldBody, { days })
-    : t.value.walletV3.complianceReviewNoHoldBody;
-});
-
 // ── Fee model (FEAT-WD02): fixed per-network confirm fee + OPT-IN NEX offset ──
 // fee = withdrawRules.networkConfirmFeeUsd[network](后台 D5 单源,[0,25]);
 // 开关 offsetWithNex 默认关 —— 关着一枚 NEX 都不烧;开着烧 min(userNex, ceil(fee/offsetRate))。
@@ -1242,6 +1223,29 @@ const feeDetailReady = computed(() => !feeConfigLoading.value && (pendingAttempt
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
+// One review notice under the amount: the risk route's, or the policy's compliance review before the route is read.
+const reviewNoticeVisible = computed(() => withdrawalRiskNotice.value || complianceHoldEnabled.value);
+const rejectNotice = computed(() => withdrawalRiskNotice.value && eligibility.value.route === "reject");
+// ── 提现说明:只在拿到 policy 且当前网络开放时出现;金额全部读 policy(单笔最高是展示常量)。──
+const rulesOpen = ref(false);
+const rulesReady = computed(() => withdrawalPolicyCurrent.value && !!withdrawalPolicy.value && !networkClosed.value);
+function withdrawRulesItems(net: CryptoNetwork, networkFee: number): RuleItem[] {
+  const r = t.value.walletV3.withdrawRules;
+  const usdt = (value: number) => `${formatGroupedAmount(value, "full")}\u00A0USDT`;
+  const label = ALL_NETWORKS.find((nw) => nw.id === net)!.label;
+  return [
+    { title: r.amountTitle, body: r.amountBody, figures: { min: usdt(minWithdrawable.value), max: usdt(USDT_WITHDRAWAL_DISPLAY_MAX) } },
+    { title: r.etaTitle, body: r.etaBody },
+    formatGroupedAmount(networkFee, "full") === "0"
+      ? { title: r.feeTitle, body: r.feeFreeBody, values: { network: label } }
+      : { title: r.feeTitle, body: r.feeBody, values: { network: label }, figures: { fee: usdt(networkFee) } },
+    { title: r.addressTitle, body: r.addressBody },
+    { title: r.networkTitle, body: r.networkBody, values: { network: label } },
+  ];
+}
+const rulesItems = computed(() => rulesReady.value
+  ? withdrawRulesItems(network.value, withdrawalPolicy.value!.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]])
+  : []);
 /** reject = 永不建单,和「进入审核队列」是两回事,标题必须分开说。 */
 const riskNoticeTitle = computed(() =>
   eligibility.value.route === "reject" ? t.value.wallet.withdrawRouteRejectTitle : t.value.wallet.withdrawRouteReviewTitle,
@@ -1461,6 +1465,8 @@ async function handleSubmit() {
       message: pending ? resendBody : undefined,
       rows: pending ? undefined : confirmRows,
       glyph: pending ? undefined : "withdraw",
+      // A new withdrawal carries the withdrawal rules under its rows, from the same frozen network and fee; the replay does not.
+      rules: pending ? undefined : { title: t.value.walletV3.withdrawRules.title, items: withdrawRulesItems(snap.network, snap.quote.networkConfirmUsd) },
       confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
     });
   } finally {
@@ -1747,56 +1753,6 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
   transform: offsetWithNex.value ? "translateX(18px)" : "translateX(0)",
   transition: "transform 160ms ease",
 }));
-// 费用说明半屏(scrim z790 + panel z800,同 device-deactivate-sheet 范式)。
-// 🔴 原写的是 79/80 —— 那个「少一位数」的笔误跟着「范式」一起被抄了过来,低于里程碑
-// 庆祝(780):费用说明弹出时被庆祝盖住并吞掉关闭按钮,而这里正是提现路径。2026-08-17 归位。
-const feeWhyScrimStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 790,
-  background: "rgba(8,8,12,0.45)",
-  backdropFilter: "blur(8px) saturate(150%)",
-};
-const feeWhySheetStyle: CSSProperties = { borderRadius: "var(--nx-glass-radius) var(--nx-glass-radius) 0 0", boxShadow: "var(--nx-glass-edge)",
-  position: "fixed",
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 800,
-  borderTopLeftRadius: "var(--nx-glass-radius)",
-  borderTopRightRadius: "var(--nx-glass-radius)",
-  background: "var(--nx-glass-fill)",
-  borderTop: "none",
-  padding: "18px 16px var(--nx-overlay-bottom)",
-  boxSizing: "border-box",
-  maxHeight: "calc(100% - var(--nx-overlay-top))",
-  overflowY: "auto",
-};
-const feeWhyTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-card-title)",
-  fontWeight: "var(--ui-type-card-title-weight)",
-  color: "var(--v5-ink)",
-};
-const feeWhyCloseStyle: CSSProperties = {
-  width: "32px",
-  height: "32px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-};
-const feeWhySectionTitleStyle: CSSProperties = {
-  marginTop: "14px",
-  fontSize: "13px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const feeWhyBodyStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.5,
-};
-useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () => { feeWhyOpen.value = false; });
 
 
 
@@ -1866,7 +1822,23 @@ useDialogA11y(computed(() => feeWhyOpen.value), ".nx-withdraw-fee-dialog", () =>
 .wd-fee__msg, .wd-fee__sk { padding: 12px 0; }
 .wd-fee__sk { display: flex; flex-direction: column; gap: 8px; }
 .wd-warn { display: block; color: var(--v5-warning-ink); font: 400 12px/18px var(--font-v5); }
-.wd-quota { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 0 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-quota { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; margin-top: 14px; padding: 0 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.wd-quota__use { display: flex; align-items: center; gap: 8px; }
+/* The link keeps the row's right end; when it does not fit beside the quota line it moves whole to the next line, still right. */
+.wd-rules-link { flex: none; margin-left: auto; }
+.wd-rules-link :deep(text) { white-space: nowrap; }
+/* Review notice: one line in main ink at the 辅助说明 size, warning-ink icon (the 12px warning-colour title failed contrast). */
+.wd-notice { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; }
+.wd-notice__icon { color: var(--v5-warning-ink); }
+.wd-notice__main { flex: 1; min-width: 0; padding-top: calc((28px - var(--ui-type-description-lh)) / 2); }
+.wd-notice__title { display: block; color: var(--v5-ink); font: 500 var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.wd-notice__t { display: block; color: var(--v5-ink); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); overflow-wrap: break-word; }
+.wd-notice__t--sub { color: var(--v5-ink-3); }
+/* Fee sheet items: 小标题 + 长篇规则 (10.1), 16px apart. */
+.wd-why { display: flex; flex-direction: column; gap: 16px; }
+.wd-why__i { display: flex; flex-direction: column; gap: 4px; }
+.wd-why__t { color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
+.wd-why__d { color: var(--v5-ink-2); font: var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); overflow-wrap: break-word; }
 .wd-quota__pip { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
 .wd-quota__pip--used { background: var(--v5-ink-3); box-shadow: none; }
 .wd-bar-space { height: 120px; }

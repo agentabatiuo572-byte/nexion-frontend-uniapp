@@ -39,6 +39,17 @@ export interface ConfirmOptions {
   devices?: { name: string; code?: string; fate: string; image?: string | null }[];
   /** One consequence line under the device block (10.2 弹层提示行: warning icon, ink text). */
   note?: string;
+  /** A titled list of numbered rules under the detail rows (the withdrawal confirm carries its rules, user 2026-11-27).
+   *  With it, only the rows and the rules scroll; the glyph, title and actions stay on screen. */
+  rules?: { title: string; items: RuleItem[] };
+}
+
+/** One numbered rule: {placeholders} in body take a figures value (ink 500, kept on one line) or a plain values value. */
+export interface RuleItem {
+  title: string;
+  body: string;
+  figures?: Record<string, string>;
+  values?: Record<string, string>;
 }
 
 interface ConfirmInternal extends ConfirmOptions {

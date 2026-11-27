@@ -35,7 +35,8 @@ export function demoPayoutAddresses(state, now = Date.now()) {
 export function demoWithdrawalPolicy(state, facts) {
   const policy = {
     minAmount: minWithdrawal, dailyLimitCount: facts.dailyLimitCount, balanceMaxRatio: facts.balanceMaxRatio,
-    smallAmountThresholdUsd: 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
+    // The launch config closes the small-amount fast lane (threshold 0): every USDT withdrawal goes to review.
+    smallAmountThresholdUsd: state.withdrawReviewState === 'all' ? 0 : 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
     // The withdrawal policy contract requires a fee field for the inactive network.
     networkConfirmFeeUsd: { trc20: 0, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1,
     cooldownDays: 7, complianceHoldEnabled: false,
