@@ -37,7 +37,7 @@ export function demoWithdrawalPolicy(state, facts) {
   const policy = {
     minAmount: minWithdrawal, dailyLimitCount: facts.dailyLimitCount, balanceMaxRatio: facts.balanceMaxRatio,
     // The launch config closes the small-amount fast lane (threshold 0): every USDT withdrawal goes to review.
-    smallAmountThresholdUsd: ['all', 'hold'].includes(state.withdrawReviewState) ? 0 : 100, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
+    smallAmountThresholdUsd: state.withdrawReviewState === 'legacy-fast-pass' ? 100 : 0, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
     // The withdrawal policy contract requires a fee field for the inactive network.
     networkConfirmFeeUsd: { trc20: 0, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1,
     // 'hold' turns on the compliance review with its 7-day window for amounts above 1 (the policy contract needs a threshold > 0).
