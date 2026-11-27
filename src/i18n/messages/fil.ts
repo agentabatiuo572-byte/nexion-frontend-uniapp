@@ -767,7 +767,6 @@ export const fil: Messages = {
   login: {
     recoverAttempt: "Suriin ang resulta ng pag-log in",
     retryOriginal: "Mag-log in ulit",
-    retryOriginalHint: "Ilagay ulit ang password o code sa pag-verify para sa pag-log in na ito.",
     retryCode: "Code sa pag-verify",
     unknownAttempt: "Hindi natapos ang pag-log in. Subukan ulit.",
     verificationPending: "Kailangan ng verification para matapos ang pag-log in.",

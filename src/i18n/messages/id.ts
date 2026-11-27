@@ -767,7 +767,6 @@ export const id: Messages = {
   login: {
     recoverAttempt: "Cek hasil masuk",
     retryOriginal: "Coba masuk lagi",
-    retryOriginalHint: "Masukkan lagi kata sandi atau kode verifikasi untuk proses masuk ini.",
     retryCode: "Kode verifikasi",
     unknownAttempt: "Proses masuk belum selesai. Coba lagi.",
     verificationPending: "Selesaikan verifikasi untuk masuk.",

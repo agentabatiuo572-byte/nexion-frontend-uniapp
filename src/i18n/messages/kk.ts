@@ -767,7 +767,6 @@ export const kk: Messages = {
   login: {
     recoverAttempt: "Кіру нәтижесін тексеру",
     retryOriginal: "Кіруді қайталау",
-    retryOriginalHint: "Осы кіруге арналған құпиясөзді немесе растау кодын қайта енгізіңіз.",
     retryCode: "Растау коды",
     unknownAttempt: "Кіру аяқталмады. Қайталап көріңіз.",
     verificationPending: "Кіруді аяқтау үшін растау қажет.",

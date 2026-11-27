@@ -401,7 +401,6 @@ export const zh: Messages = {
   login: {
     recoverAttempt: "查询登录结果",
     retryOriginal: "重试登录",
-    retryOriginalHint: "请重新输入本次登录所需的密码或验证码。",
     retryCode: "验证码",
     unknownAttempt: "登录未完成，请重试。",
     verificationPending: "完成验证后即可登录。",

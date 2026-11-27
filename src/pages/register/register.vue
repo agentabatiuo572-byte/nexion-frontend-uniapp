@@ -80,7 +80,7 @@
           <view class="rg-resend">
             <NxButton variant="text" size="small" :label="t.register.changeNumber" @click="back" />
             <text v-if="resendLeft > 0" class="rg-resend__count">{{ resendInText }}</text>
-            <NxButton v-else variant="text" size="small" :label="t.register.resend" @click="resend" />
+            <NxButton v-else variant="text" size="small" :label="t.register.resend" :disabled="otpActionsBlocked" @click="resend" />
           </view>
         </view>
 
@@ -123,8 +123,8 @@
         <NxButton variant="text" size="small" :label="t.login.recoverAttempt" @click="recoverOriginalLogin" />
       </view>
       <!-- Primary CTA -->
-      <!-- A greyed CTA still takes the tap, so onCta can put the reason in the error line: no `disabled` prop, only the
-           50% look and aria-disabled (03 §3.1). Busy shows NxButton's spinner and takes no taps. -->
+      <!-- Incomplete fields still allow a tap to show their reason. A missing challenge or an unresolved result
+           disables the CTA. Busy shows NxButton's spinner and takes no taps. -->
       <NxButton
         class="rg-cta"
         :class="{ 'rg-cta--off': !ctaEnabled && !busy }"
@@ -132,7 +132,7 @@
         variant="primary"
         :label="ctaLabel"
         :busy="busy"
-        :disabled="registrationResultPending"
+        :disabled="registrationResultPending || otpChallengeMissing"
         :aria-disabled="!ctaEnabled || busy"
         :aria-describedby="ctaDescriptionId"
         @click="onCta"
@@ -274,6 +274,7 @@ const registrationRisk = ref<RegistrationAssessment | null>(null);
 // OTP + K1 评估进行中(⑤ 加载态): CTA 显示「校验中」,拦重复提交。
 const verifying = ref(false);
 const completing = ref(false);
+const registrationInFlight = ref(false);
 const otpRequestId = ref<string | null>(null);
 const verifiedToken = ref<string | null>(null);
 let verifiedRegistrationCode: string | null = null;
@@ -340,20 +341,23 @@ const developmentOtpEnabled = computed(() =>
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
+const otpChallengeMissing = computed(() => step.value === 2 && !otpRequestId.value && !verifiedToken.value);
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
 const oauthBusy = ref(false);
-const busy = computed(() => verifying.value || completing.value || oauthBusy.value || checkingInvite.value);
+const formBusy = computed(() => verifying.value || completing.value || oauthBusy.value || checkingInvite.value);
+const busy = computed(() => formBusy.value || registrationInFlight.value);
 // The durable attempt is pending even while its original POST is in flight.
 const registrationResultPending = ref(false);
 function syncRegistrationResult() {
   registrationResultPending.value = !busy.value && authApi.pendingLogin();
 }
 onShow(syncRegistrationResult);
-watch(busy, syncRegistrationResult, { immediate: true, flush: "sync" });
+watch(formBusy, syncRegistrationResult, { immediate: true, flush: "sync" });
+const otpActionsBlocked = computed(() => registrationInFlight.value || registrationResultPending.value);
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 const waitingToResend = computed(() => step.value === 1 && !otpRequestId.value && resendLeft.value > 0);
-const ctaEnabled = computed(() => !registrationNeedsLogin.value && !registrationResultPending.value && !waitingToResend.value
+const ctaEnabled = computed(() => !registrationNeedsLogin.value && !registrationResultPending.value && !waitingToResend.value && !otpChallengeMissing.value
   && (step.value === 1 ? phoneOk.value : step.value === 2 ? codeOk.value : pwdMatch.value));
 const ctaLabel = computed(() =>
   step.value === 2 && verifiedToken.value
@@ -377,6 +381,7 @@ const blockingStatusReason = computed(() => {
 const ctaDisabledReason = computed(() => {
   if (blockingStatusReason.value) return blockingStatusReason.value;
   if (waitingToResend.value) return resendInText.value;
+  if (otpChallengeMissing.value) return resendLeft.value > 0 ? resendInText.value : t.value.authOtp.errorOtpExpired;
   if (step.value === 1) return t.value.register.ctaDisabledPhone;
   if (step.value === 2) return t.value.register.ctaDisabledCode;
   return t.value.register.ctaDisabledPassword;
@@ -501,6 +506,7 @@ function onPhone(e: Event) {
 function onInvite(e: Event) { invite.value = inputVal(e); inviteInvalid.value = false; error.value = null; registrationRisk.value = null; }
 function onCode(value: string) {
   code.value = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
+  if (otpChallengeMissing.value || otpActionsBlocked.value) return;
   error.value = null;
   if (codeOk.value) verifyCode();
 }
@@ -584,7 +590,7 @@ function rejectSponsorCode(sent: string | null) {
 }
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
-  if (verifying.value) return;
+  if (verifying.value || otpActionsBlocked.value) return;
   devBackendDown.value = false;
   if (step.value === 1 && refreshResend() > 0) {
     if (!otpRequestId.value) return;
@@ -651,7 +657,7 @@ function onCaptchaOk(ticket: string) {
   void requestCode(ticket);
 }
 function resend() {
-  if (refreshResend() > 0) return;
+  if (otpActionsBlocked.value || refreshResend() > 0) return;
   error.value = null;
   void requestCode();
 }
@@ -702,13 +708,13 @@ function recoverRejectedRegistration(cause: unknown, sentSponsorCode: string | n
     rejectSponsorCode(sentSponsorCode);
     return true;
   }
-  error.value = invalidOtp ? t.value.authOtp.errorOtpInvalidOrExpired
+  error.value = invalidOtp ? null
     : cause.message === "USER_REGISTRATION_DEVICE_LIMIT" ? t.value.register.errorDeviceSignupLimited : t.value.register.errorSignupLimited;
   return true;
 }
 
 async function verifyCode() {
-  if (verifying.value) return;
+  if (verifying.value || otpChallengeMissing.value || otpActionsBlocked.value) return;
   error.value = null;
   if (!remoteApiEnabled && verifiedToken.value) {
     verifying.value = true;
@@ -840,7 +846,7 @@ async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flo
   }
 }
 async function finish() {
-  if (completing.value || registrationNeedsLogin.value) return;
+  if (completing.value || registrationInFlight.value || registrationNeedsLogin.value) return;
   if (requiresOriginalRegistrationRecovery(authApi, { countryCode: country.value, phone: phoneClean.value })) {
     error.value = t.value.login.unknownAttempt;
     return;
@@ -851,7 +857,6 @@ async function finish() {
   if (remoteApiEnabled) {
     const challengeNo = otpRequestId.value;
     if (!challengeNo) {
-      error.value = t.value.authOtp.errorOtpExpired;
       step.value = 2;
       return;
     }
@@ -869,9 +874,14 @@ async function finish() {
       sponsorCode: currentSponsorCode(),
       language: useLocaleStore().code,
     };
+    registrationInFlight.value = true;
     completing.value = true;
     const registration = await registerAndLogin(authApi, registrationRequest,
-      () => isCurrentRemoteRegistrationAttempt(registrationAttempt), pendingRegistrationRecovery !== null);
+      () => isCurrentRemoteRegistrationAttempt(registrationAttempt), pendingRegistrationRecovery !== null)
+      .finally(() => {
+        registrationInFlight.value = false;
+        syncRegistrationResult();
+      });
     if (registration.kind === "stale" || !isCurrentRemoteRegistrationAttempt(registrationAttempt)) return;
     if (registration.kind === "recovery_required") {
       completing.value = false;
