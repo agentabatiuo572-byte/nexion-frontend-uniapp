@@ -80,7 +80,7 @@
           <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
           <view class="nx-dep-trio">
             <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">${{ formatAmount(minDeposit) }}</text></view>
-            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatGroupedAmount(feeUsdt, 'full') + '\u00A0USDT' }}</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ feeAmountText(feeUsdt) + '\u00A0USDT' }}</text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
@@ -165,7 +165,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount as formatBaseAmount, formatGroupedAmount } from "@/lib/amount-display";
+import { formatAmount as formatBaseAmount, formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { exactDepositAmount, type CregisNetworkPolicy } from "@/api/cregis-deposit-api";
 const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
@@ -511,8 +511,12 @@ const qrImage = computed(() => {
 function isFreeFee(fee: string | number | null | undefined): boolean {
   return fee != null && formatBaseAmount(fee, "full") === "0";
 }
+/** Fee shown to the user: two places at most, cut not rounded (user 2026-11-27), trailing zeros dropped (0, 0.5, 0.12). */
+function feeAmountText(fee: string | number | null | undefined): string {
+  return formatTruncatedAmount(fee).replace(/\.?0+$/, "");
+}
 function netFeeText(fee: string | number | null | undefined): string {
-  return fmt(t.value.topupChrome.netFee, { fee: formatGroupedAmount(fee, "full") });
+  return fmt(t.value.topupChrome.netFee, { fee: feeAmountText(fee) });
 }
 
 // ── 充值说明:只在拿到有效策略且所选网络开放时出现,金额取所选网络的这条策略(和网络行、票据同一个值)──
@@ -539,7 +543,7 @@ const rulesItems = computed(() => {
     { title: r.addressTitle, parts: rulesParts(r.addressBody, {}) },
     { title: r.etaTitle, parts: rulesParts(r.etaBody, { eta: r.eta }) },
     { title: r.issueTitle, parts: rulesParts(r.issueBody, {}) },
-    { title: r.feeTitle, parts: isFreeFee(policy.feeUsdtExact) ? rulesParts(r.feeFreeBody, {}) : rulesParts(r.feeBody, { fee: usdt(policy.feeUsdtExact) }) },
+    { title: r.feeTitle, parts: isFreeFee(policy.feeUsdtExact) ? rulesParts(r.feeFreeBody, {}) : rulesParts(r.feeBody, { fee: `${feeAmountText(policy.feeUsdtExact)}\u00A0USDT` }) },
   ];
 });
 // The rules dialog can use this state once its markup is available. Only confirmation records a read.

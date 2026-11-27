@@ -24,10 +24,11 @@ function canQuote({ beneficiary, policy, capacity }, amountUsdt) {
     && amountUsdt <= capacity.maxWithdrawableUsdt;
 }
 
-function saveQuote(demo, bank, amountUsdt, now, quoteNo = 'BQ-' + randomBytes(16).toString('hex')) {
-  // BankWithdrawalPricing rounds the 1% fee up to whole micro-USDT and the payout down to whole VND.
+function saveQuote(demo, { beneficiary: bank, policy }, amountUsdt, now, quoteNo = 'BQ-' + randomBytes(16).toString('hex')) {
+  // BankWithdrawalPricing rounds the fee up to whole micro-USDT and the payout down to whole VND.
   const amountMicros = Math.round(amountUsdt * 1e6);
-  const feeMicros = Math.max(1e6, Math.min(100e6, Math.ceil(amountMicros / 100)));
+  const feeMicros = Math.max(policy.feeMinUsd * 1e6,
+    Math.min(policy.feeMaxUsd * 1e6, Math.ceil(amountMicros * policy.feeRatePct / 100)));
   const netMicros = amountMicros - feeMicros;
   const rateVnd = 25000;
   const quote = { quoteNo, amountUsdt, feeUsdt: feeMicros / 1e6, netUsdt: netMicros / 1e6,
@@ -58,7 +59,7 @@ export function seedLongBankOrder(state, now, quoteNo) {
   const config = bankConfig(state, now), amountUsdt = 5000;
   if (config.unresolvedIntent || !config.capacity.dailyRemainingCount || !canQuote(config, amountUsdt)) return;
   const demo = state.bankDemo ??= { quotes: {}, orders: {}, commands: {} };
-  const row = saveQuote(demo, config.beneficiary, amountUsdt, now, quoteNo);
+  const row = saveQuote(demo, config, amountUsdt, now, quoteNo);
   reserveBankOrder(state, demo, row, config.beneficiary.beneficiaryNo, longBankOrderNo, now);
 }
 
@@ -144,7 +145,7 @@ export function bankDemo(url, state, request) {
     if (demoBankWithdrawalIntent(state, now)) fail('BANK_WITHDRAWAL_UNRESOLVED_INTENT');
     const current = config(), amountUsdt = Number(input().amountUsdt);
     if (!canQuote(current, amountUsdt)) fail('BANK_QUOTE_NOT_AVAILABLE', 400);
-    return snapshot(saveQuote(demo, current.beneficiary, amountUsdt, now).quote);
+    return snapshot(saveQuote(demo, current, amountUsdt, now).quote);
   }
   const quoteMatch = path.match(/^\/api\/withdrawals\/bank\/quotes\/(BQ-[a-f0-9]{32})(\/abandon)?$/);
   if (quoteMatch) {

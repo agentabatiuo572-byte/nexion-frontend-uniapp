@@ -201,8 +201,12 @@ export function demoTeamWeek(at) {
 export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
   ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
-export const demoChainDepositFee = '0.123456';
-export const demoChainDepositMinimum = '50';
+export const demoChainDepositMinimum = '5';
+const historicalChainDepositFee = '0.123456';
+
+export function demoChainDepositPolicyFee(state) {
+  return { half: '0.5', default: historicalChainDepositFee }[state.depositFeeState] ?? '0';
+}
 
 export function demoChainDepositAddress(state, network, allocate = false, accountId = demoPurchasingAccountId(state)) {
   if (accountId !== demoPurchasingAccountId(state)) {
@@ -222,7 +226,7 @@ function demoCreditedDeposits(state) {
   const original = demoCreditedDeposit(state);
   if (!original) return [];
   const deposit = (network, marker, grossAmountUsdt, creditedUsdt) => ({ network, txHash: '0x' + marker.repeat(64),
-    grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt });
+    grossAmountUsdt, feeUsdt: historicalChainDepositFee, creditedUsdt });
   const history = [{ ...original, deposit: deposit('BEP20', 'a', '50.123456', '50') }];
   if (state.billRefsState !== 'b84-deposit') return history;
   return [
@@ -245,10 +249,11 @@ export function demoChainDeposits(state, accountId) {
   return [...(state.chainDepositEvents ?? [])].reverse().concat(history);
 }
 
-export function recordDemoChainDeposit(state, { network, grossAmountUsdt, creditedUsdt, createdAt }) {
+export function recordDemoChainDeposit(state, { network, grossAmountUsdt, creditedUsdt: requestedCredit, createdAt }) {
   const events = state.chainDepositEvents ??= [];
   const sequence = events.length + 1, depositId = 'CR-' + (1000 + sequence);
   const txHash = '0x' + sequence.toString(16).padStart(64, '0');
+  const creditedUsdt = Number(grossAmountUsdt) >= Number(demoChainDepositMinimum) ? requestedCredit : '0';
   const credited = Number(creditedUsdt) > 0;
   const event = {
     depositId, network, txHash, address: demoChainDepositAddress(state, network, true), createdAt,
@@ -262,7 +267,7 @@ export function recordDemoChainDeposit(state, { network, grossAmountUsdt, credit
   postDemoWalletEntries(state, {
     bizNo: depositId, bizType: 'CHAIN_TOPUP', asset: 'USDT', direction: 'IN', category: 'topup', at: createdAt,
     amount: Number(creditedUsdt), amountExact: creditedUsdt, network,
-    deposit: { network, txHash, grossAmountUsdt, feeUsdt: demoChainDepositFee, creditedUsdt },
+    deposit: { network, txHash, grossAmountUsdt, feeUsdt: demoChainDepositPolicyFee(state), creditedUsdt },
   });
   return event;
 }

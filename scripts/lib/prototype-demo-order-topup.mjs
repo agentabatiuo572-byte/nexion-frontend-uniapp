@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { demoAccountOrders, demoAssignablePurchaseSlots, demoOrderTimedOut, demoProducts, demoTimedOutOrder, paymentWindow } from './prototype-demo-data.mjs';
 import { demoChainDepositDisabledReason } from './prototype-demo-deposit-network.mjs';
 import { demoPurchasingAccountId, previewAccountId } from './prototype-demo-identity.mjs';
-import { demoChainDepositAddress, demoChainDepositFee as FEE, demoChainDepositMinimum as MIN, demoWalletUsdt,
+import { demoChainDepositAddress, demoChainDepositPolicyFee, demoChainDepositMinimum as MIN, demoWalletUsdt,
   postDemoWalletEntries, recordDemoChainDeposit } from './prototype-demo-wallet.mjs';
 
 const MICRO = 1000000n;
@@ -50,7 +50,8 @@ const decimal = units => {
 };
 const max = (a, b) => a > b ? a : b;
 const min = (a, b) => a < b ? a : b;
-const minCredit = micro(MIN) - micro(FEE);
+const minCredit = state => micro(MIN) - micro(demoChainDepositPolicyFee(state));
+const belowMinimum = micro(MIN) / 2n;
 const ok = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
 const refuse = (status, message) => ({ status, body: { code: status, message, data: null } });
 export const orderTopupResetRequired = 'PREVIEW_ORDER_TOPUP_RESET_REQUIRED';
@@ -61,13 +62,14 @@ function postWalletMovement(state, bizNo, bizType, category, direction, amount, 
 }
 
 function creditDeposit(state, net, createdAt) {
-  return recordDemoChainDeposit(state, { network: 'BEP20', grossAmountUsdt: decimal(net + micro(FEE)),
+  const fee = micro(demoChainDepositPolicyFee(state));
+  return recordDemoChainDeposit(state, { network: 'BEP20', grossAmountUsdt: decimal(net + fee),
     creditedUsdt: decimal(net), createdAt });
 }
 
 function fundWallet(state, target, orderNo, now) {
   const gap = target - micro(demoWalletUsdt(state));
-  if (gap > 0n) creditDeposit(state, max(gap, minCredit), now);
+  if (gap > 0n) creditDeposit(state, max(gap, minCredit(state)), now);
   const surplus = micro(demoWalletUsdt(state)) - target;
   if (surplus > 0n) {
     postWalletMovement(state, `DEMO-ADJ-${orderNo}-${now}`, 'ADJUSTMENT', 'other', 'OUT', surplus, now);
@@ -86,10 +88,10 @@ function applyWalletStory(state, scene, order, sample, now) {
       asset: 'USDT', category: 'clawback', direction: 'OUT', amount: Number(decimal(reward)), amountExact: decimal(reward),
       presentationCode: 'rewardClawback', publicReference: null, at: now });
   }
-  if (scene === 'min-floor') fundWallet(state, max(0n, due - micro('10')), order.orderNo, now);
-  if (scene === 'covered' && balance < due) creditDeposit(state, max(due - balance, minCredit), now);
+  if (scene === 'min-floor') fundWallet(state, max(0n, due - belowMinimum), order.orderNo, now);
+  if (scene === 'covered' && balance < due) creditDeposit(state, max(due - balance, minCredit(state)), now);
   if (scene === 'partial') {
-    const credit = min(micro('250'), max(minCredit, due / 2n));
+    const credit = min(micro('250'), max(minCredit(state), due / 2n));
     const opening = min(micro('120.5'), due - credit - 1n);
     if (sample.depositId && balance === opening + credit) return;
     fundWallet(state, opening, order.orderNo, now);
@@ -100,7 +102,7 @@ function applyWalletStory(state, scene, order, sample, now) {
   }
   if (scene === 'below-min' && !sample.depositId) {
     sample.depositId = recordDemoChainDeposit(state,
-      { network: 'BEP20', grossAmountUsdt: '20', creditedUsdt: '0', createdAt: now }).depositId;
+      { network: 'BEP20', grossAmountUsdt: decimal(belowMinimum), creditedUsdt: '0', createdAt: now }).depositId;
   }
 }
 
@@ -219,6 +221,7 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, checkou
   const owner = previewAccountId(state, headers);
   const owns = owner === demoPurchasingAccountId(state);
   const network = url.searchParams.get('network');
+  const fee = demoChainDepositPolicyFee(state);
   if (path === '/api/deposits/policy') {
     if (scenario === 'policy-error') return refuse(503, 'CREGIS_DEPOSIT_POLICY_UNAVAILABLE');
   }
@@ -229,7 +232,7 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, checkou
     if (scenario === 'paused' && network === state.orderTopupPreview?.network) {
       const address = demoChainDepositAddress(state, network);
       return ok({ enabled: !!address, creditEnabled: false, network, ...(address && { address }), reason: 'CREGIS_DEPOSIT_PAUSED',
-        confirmations: 15, feeUsdt: Number(FEE), feeUsdtExact: FEE, minDepositUsdt: Number(MIN), minDepositUsdtExact: MIN });
+        confirmations: 15, feeUsdt: Number(fee), feeUsdtExact: fee, minDepositUsdt: Number(MIN), minDepositUsdtExact: MIN });
     }
   }
   const match = path.match(/^\/api\/app\/orders\/([^/]+)\/usdt-topup$/);
@@ -257,14 +260,14 @@ export function demoOrderTopupResponse(url, state, locale, now, headers, checkou
   const due = micro(order.amountUsdt);
   const balance = micro(demoWalletUsdt(state));
   const shortfall = payable && due > 0n ? max(0n, due - balance) : 0n;
-  const suggested = shortfall === 0n ? 0n : max(micro(MIN), shortfall + micro(FEE));
+  const suggested = shortfall === 0n ? 0n : max(micro(MIN), shortfall + micro(fee));
   const paidAt = paid ? order.paidAt ?? payment?.at : null;
   return ok({
     orderNo, network, state: paid ? 'PAID' : pending ? 'PENDING' : 'CLOSED',
     canonicalStatus: order.canonicalStatus,
     payable, deadlineAt: deadline === null ? null : new Date(deadline).toISOString(),
     amountDueUsdt: decimal(due), walletAvailableUsdt: decimal(balance), shortfallUsdt: decimal(shortfall),
-    minDepositUsdt: MIN, depositFeeUsdt: FEE, suggestedTransferUsdt: decimal(suggested),
+    minDepositUsdt: MIN, depositFeeUsdt: fee, suggestedTransferUsdt: decimal(suggested),
     blocker, openIntent, reviewReason,
     paidAt: paidAt != null ? new Date(paidAt).toISOString() : null,
     paidAmountUsdt: payment?.amount ?? null,

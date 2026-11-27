@@ -6,7 +6,7 @@ import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRe
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
-import { demoChainDepositAddress, demoChainDepositFee, demoWalletUsdt, initializeDemoWalletHistory, initializeLegacyStreakSavers, postDemoWalletEntries, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
+import { demoChainDepositAddress, demoChainDepositPolicyFee, demoWalletUsdt, initializeDemoWalletHistory, initializeLegacyStreakSavers, postDemoWalletEntries, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
 import { disabledLongOptions, normalizeDemoLongContent } from './lib/prototype-demo-long-content.mjs';
 import { restoreDemoBankWithdrawals, updateDemoBankWithdrawals } from './lib/prototype-demo-secondary.mjs';
@@ -393,7 +393,7 @@ const server=http.createServer(async(req,res)=>{
         if(Number.isFinite(update.trialTopupDepositUsdt)&&Number(update.trialTopupDepositUsdt.toFixed(6))===update.trialTopupDepositUsdt
           &&update.trialTopupDepositUsdt>0&&update.trialTopupDepositUsdt<=1000000){
           recordDemoChainDeposit(state,{network:'BEP20',
-            grossAmountUsdt:(update.trialTopupDepositUsdt+Number(demoChainDepositFee)).toFixed(6),
+            grossAmountUsdt:(update.trialTopupDepositUsdt+Number(demoChainDepositPolicyFee(state))).toFixed(6),
             creditedUsdt:update.trialTopupDepositUsdt.toFixed(6),createdAt:now});
         }
         if(Number.isSafeInteger(update.trialWalletDebitUsdt)&&update.trialWalletDebitUsdt>0&&update.trialWalletDebitUsdt<=demoWalletUsdt(state)){
