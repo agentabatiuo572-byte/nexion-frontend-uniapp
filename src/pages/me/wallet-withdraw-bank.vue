@@ -147,7 +147,7 @@
         <template v-else>
           <text class="field-label">{{ c.totalDebit }} · USDT</text>
           <view class="amount-input"><input data-testid="bank-amount" type="text" inputmode="decimal" disabled placeholder="—" :aria-label="c.amount" /><view class="use-max is-placeholder" aria-hidden="true"><text>{{ c.all }}</text></view></view>
-          <view class="notice"><text>{{ c.feeIncluded }}</text></view>
+          <view class="notice notice--info"><text>{{ c.feeIncluded }}</text></view>
           <view class="action primary is-placeholder" aria-hidden="true" data-testid="bank-quote"><text>{{ c.quote }}</text></view>
           <view class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="goBack"><text>{{ c.backToAccount }}</text></view>
         </template>
@@ -635,7 +635,16 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .account-number { display: block; font-family: var(--font-metric); font-size: 20px; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin: 6px 0; overflow-wrap: break-word; }
 .bank-name { font-size: var(--ui-type-body); }
 .chip { display: inline-block; border-radius: 999px; background: var(--v5-surface-2); color: var(--v5-brand); padding: 4px 10px; font-size: 12px; }
-.notice { border-left: 2px solid var(--v5-warning); padding-left: 12px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.7; margin: 20px 0; }
+/* Page notices (pending, unknown result, routing, limits, daily count): a 16px status icon before the text instead of a
+   side stripe (design-rules: warnings in the warning colour with an icon); errors in the error colour, plain facts neutral. */
+.notice { --notice-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 8v4M12 16h.01'/%3E%3C/svg%3E"); display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; color: var(--v5-ink-2); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); margin: 20px 0; }
+.notice::before { content: ""; flex: none; width: 16px; height: 16px; margin-top: calc((var(--ui-type-note-lh) - 16px) / 2); background: var(--v5-warning-ink); -webkit-mask: var(--notice-glyph) center / contain no-repeat; mask: var(--notice-glyph) center / contain no-repeat; }
+.notice > text { flex: 1 1 0; min-width: 0; overflow-wrap: break-word; }
+.notice > .action { flex: 1 1 100%; }
+.notice.danger::before { background: var(--v5-danger); }
+.notice--info { --notice-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5m0-9h.01'/%3E%3C/svg%3E"); }
+.notice--info::before { background: var(--v5-ink-3); }
+@media (forced-colors: active) { .notice::before { forced-color-adjust: none; background: CanvasText; } }
 .danger { color: var(--v5-danger); }
 .warn { color: var(--v5-warning); }
 .action { min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 20px; border-radius: 999px; font-size: var(--ui-type-button); font-weight: 600; cursor: pointer; box-sizing: border-box; }
@@ -655,10 +664,10 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .details { margin: 20px 0; }
 .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--v5-border); font-size: var(--ui-type-list-subtitle); }
 /* The label wraps before a value is squeezed: amounts and dates stay on one line, the code ellipsizes in the middle. */
-.row > text:first-child { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font-size: 12px; }
+.row > text:first-child { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .row > text:last-child { flex: none; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .row--code { align-items: center; }
-.money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.money { font-family: var(--font-amount); display: block; margin-top: 8px; font-size: 34px; font-weight: 500; line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .money__unit { margin-left: var(--v5-space-2); color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
 /* Result: centred head, then the amount; actions sit in the fixed bar. */
 .result-head { margin: var(--v5-space-2) 0 var(--v5-space-1); }
@@ -726,7 +735,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .cdw__s { color: var(--v5-ink); font: 500 13px/18px var(--font-metric); }
 .ticket__rows { padding: 0 16px 12px; }
 .qrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
-.qrow__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; }
+.qrow__v { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .tear { position: relative; height: 0; margin: 0 18px; border-top: 1.5px dashed var(--v5-border-strong); }
 .tear::before, .tear::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--v5-bg); }
 .tear::before { left: -28px; } .tear::after { right: -28px; }
@@ -746,7 +755,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .cfm-row + .cfm-row { border-top: 1px solid var(--v5-border); }
 .cfm-k { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .cfm-v { flex: none; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
-.cfm-row--amount .cfm-v { color: var(--v5-success-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
+.cfm-row--amount .cfm-v { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
 .cfm-rules-title { display: block; margin: 20px 0 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }

@@ -195,7 +195,7 @@
         <view class="inline-flex items-center" style="gap: 2px">
           <text class="wd-k">{{ t.walletV3.feeConfirmRow }}</text>
           <view class="grid place-items-center active:opacity-60" style="min-width: 44px; min-height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true"  @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
         </view>
         <text class="wd-fee__v">−${{ formatTruncatedAmount(networkConfirmUsd) }}</text>
@@ -219,9 +219,7 @@
 
             @keydown.enter.prevent="toggleOffset" @keydown.space.prevent="toggleOffset"
           >
-            <view :style="switchTrackStyle">
-              <view :style="switchKnobStyle" />
-            </view>
+            <NxSwitch :checked="offsetWithNex" />
           </view>
         </view>
         <text class="wd-fee__hint">{{ offsetHintText }}</text>
@@ -307,6 +305,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
+import NxSwitch from "@/components/ui/nx-switch.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxRulesList from "@/components/ui/nx-rules-list.vue";
 import { USDT_WITHDRAWAL_DISPLAY_MAX } from "@/lib/withdrawal-display-limits";
@@ -1739,32 +1738,8 @@ const freezeIconStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 16%, transparent)",
 };
 // 抵扣面板:soft tint 无描边(卡内嵌套禁 border);开着且全额抵扣 → brand,其余 → brand-2。
-// 自绘开关:外层热区 ≥44pt(负 margin 不撑行高),内层 track 44×26 + knob 20。
+// 开关:外层热区 ≥44pt(负 margin 不撑行高),里面是全站共用的 NxSwitch(03 §3.3);不可用时整颗 50%(03 §3.1)。
 const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", margin: "-9px -6px" };
-const switchTrackStyle = computed<CSSProperties>(() => ({
-  width: "44px",
-  height: "26px",
-  borderRadius: "999px",
-  padding: "3px",
-  boxSizing: "border-box",
-  transition: "background 160ms ease",
-  background: offsetToggleDisabled.value
-    ? "var(--v5-surface-2)"
-    : offsetWithNex.value
-      ? "var(--v5-brand)"
-      : "var(--v5-surface-3)",
-  opacity: offsetToggleDisabled.value ? 0.55 : 1,
-}));
-const switchKnobStyle = computed<CSSProperties>(() => ({
-  width: "20px",
-  height: "20px",
-  borderRadius: "999px",
-  // Hardware-white knob on both themes (board .sw), dimmed only when the toggle cannot be used.
-  background: offsetToggleDisabled.value ? "var(--v5-ink-4)" : "white",
-  boxShadow: "0 1px 3px rgba(0,0,0,.3)",
-  transform: offsetWithNex.value ? "translateX(18px)" : "translateX(0)",
-  transition: "transform 160ms ease",
-}));
 
 
 
@@ -1826,6 +1801,7 @@ const switchKnobStyle = computed<CSSProperties>(() => ({
 .wd-fee { margin-top: 12px; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .wd-fee { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .wd-fee__r { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; border-top: 1px solid var(--v5-border); }
+.nx-fee-offset-switch[aria-disabled="true"] { opacity: .5; }
 .wd-fee > .wd-fee__r:first-child, .wd-fee > .wd-fee__offset:first-child > .wd-fee__r, .wd-fee__r--net { border-top: 0; }
 .wd-fee__v { color: var(--v5-ink); font: 500 14px/20px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wd-fee__v--brand { color: var(--v5-brand); }

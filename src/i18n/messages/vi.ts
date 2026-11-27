@@ -5588,7 +5588,7 @@ openSeaErrorPool: {
     step3Title: "Dán địa chỉ nạp chuyên biệt",
     step3Body: "Sao chép địa chỉ chuyên biệt từ trang nạp và dán làm địa chỉ rút. Kiểm tra ký tự đầu và cuối trước khi xác nhận.",
     step4Title: "Chờ tiền vào tài khoản",
-    step4Body: "Thời gian nhận tiền tùy thuộc vào mạng và nhà cung cấp. Khi tiền về, giao dịch sẽ hiển thị trong mục Khoản nạp gần đây trên trang nạp tiền.",
+    step4Body: "Thời gian nhận tiền tùy thuộc vào mạng và nhà cung cấp. Khi tiền về, giao dịch sẽ hiển thị trong mục Nạp gần đây trên trang nạp tiền.",
     noteTitle: "Trước khi chuyển",
     noteBody: "Chỉ chuyển USDT qua đúng mạng đã chọn. Chuyển sai mạng hoặc sai loại tài sản có thể gây thất thoát; vui lòng liên hệ hỗ trợ ngay.",
     backCta: "Quay lại nạp tiền",

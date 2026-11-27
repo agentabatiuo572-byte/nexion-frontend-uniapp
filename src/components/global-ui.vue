@@ -195,7 +195,7 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
   text-align: center;
 }
 .nx-modal > * { flex-shrink: 0; }
-.nx-modal__title { font: 600 20px/28px var(--font-v5); color: var(--v5-ink); }
+.nx-modal__title { font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); color: var(--v5-ink); }
 .nx-modal__msg {
   margin-top: 8px;
   font: var(--ui-type-body-weight, 400) var(--ui-type-body)/var(--ui-type-body-lh) var(--font-v5);
@@ -237,13 +237,14 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 [data-theme="light"] .nx-modal__rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .nx-modal__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
 .nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
-.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
-.nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+.nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
 /* A code row (payout address): the whole string on its own line under the label, mono, wrapping evenly (03 §3.6.1). */
 .nx-modal__row--code { flex-direction: column; align-items: stretch; gap: 4px; }
 .nx-modal__row--code .nx-modal__k { max-width: none; }
 .nx-modal__code { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); }
-.nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
+/* The amount received is the dialog's key figure: card-figure role in the amount face, main ink (success is for status only, 01 §1.1.1). */
+.nx-modal__row--amount .nx-modal__v { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
 /* Rules under the rows: the dialog stops scrolling as a whole; the rows and rules scroll between a fixed head and actions. */
 .nx-modal--rules { overflow: hidden; }

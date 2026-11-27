@@ -8,7 +8,7 @@
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/me" :title="orderNet ? payCopy.topupFor : t.wallet.addFunds" :subtitle="orderNet ? undefined : t.wallet.topUp" />
+      <SubPageHeader back="/pages/me/me" :title="orderNet ? payCopy.topupFor : t.me.topup" />
 
       <!-- An ordinary order paid with USDT (plan C.2): the network is fixed by the payment sheet, so no channel switch or bank pane. -->
       <template v-if="orderNet">
