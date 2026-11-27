@@ -13,7 +13,7 @@ export const en = {
     linkTitle: "Linked sign-in accounts",
     finishFirst: "Finish or cancel third-party sign-in first.",
     linkedLoading: "Checking linked accounts. You can link one once this finishes.",
-    submitLocked: "Processing. You can cancel once it finishes.",
+    submitLocked: "Processing. This can't be cancelled until it finishes.",
     unavailable: "Third-party sign-in is currently unavailable.",
     linked: "Linked",
     browserPrompt: "Complete authorization in your browser, then return here to continue.",
