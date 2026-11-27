@@ -616,6 +616,7 @@ function clearSecurityAccountState(keepPresentation = false) {
   }
   if (!keepPresentation) {
     securityPresentation.value = null;
+    remoteSecurityReadFailed.value = false;
     deletionStatus.value = null;
     phonePolicy.value = null;
     overviewReadback.value = null;
@@ -629,7 +630,6 @@ function clearSecurityAccountState(keepPresentation = false) {
   ui.clearConfirmsBy(securityConfirmOwner);
   securityBusy.value = false;
   remoteSecurityLoading.value = false;
-  remoteSecurityReadFailed.value = false;
   sessionPageLoading.value = false;
   remoteSecurity.value = null;
   restoredPasswordReceipt.value = null;
