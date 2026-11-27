@@ -4483,7 +4483,7 @@ export const fil: Messages = {
     withdrawEarlierOutcome: "Naunang request: {outcome}",
     withdrawOtherPending: "Ibang withdrawal na kasalukuyang pinoproseso ang ipinapakita ngayon sa page. Pakisuri ito.",
     withdrawResendTitle: "I-submit ulit ang withdrawal na ito nang walang binago?",
-    withdrawResendBody: "Isusumite ulit nang walang binago ang ${amount} na withdrawal sa {network} address {address}. Ito lang ang ipapadala, walang bagong withdrawal.",
+    withdrawResendBody: "Ito lang ang ipapadala, walang bagong withdrawal.",
     withdrawResendCta: "I-submit ulit",
     withdrawOutcomeUnknownTitle: "Hindi kumpirmado ang withdrawal",
     withdrawAbandonAttemptCta: "I-abandon",

@@ -1447,36 +1447,36 @@ async function handleSubmit() {
   submittingNexBalance.value = app.user.nexBalance;
   // FEAT-WD02 ⑥「提交提现 → 现有确认弹窗」:金额 / 单行网络确认费 / NEX 抵扣消耗(开了才显)
   // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。
-  // 新提现用明细行(ConfirmOptions.rows);重放仍是纯文本说明。
+  // 新提现和重放都用明细行(ConfirmOptions.rows);重放另有一句只发这一笔。
   // The same frozen quote as rows: amount, network fee, UVT offset (only when used), network, address, received.
+  // Amounts show two decimals cut off, never rounded; the address is shown whole to be checked (03 §3.6.1).
+  const amountRow = { label: t.value.walletV3.withdrawRowAmount, value: `${formatTruncatedAmount(snap.amount)}\u00A0USDT` };
+  const networkRow = { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label };
+  const addressRow = { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address };
   const confirmRows = [
-    { label: t.value.walletV3.withdrawRowAmount, value: `${formatTruncatedAmount(snap.amount)}\u00A0USDT` },
+    amountRow,
     { label: t.value.walletV3.feeConfirmRow, value: `−${formatTruncatedAmount(snap.quote.networkConfirmUsd)}\u00A0USDT` },
     ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+${formatTruncatedAmount(snap.quote.feeWaived)}\u00A0USDT · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
-    { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label },
-    { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address },
+    networkRow,
+    addressRow,
     { label: t.value.wallet.receiveLabel, value: `${formatTruncatedAmount(snap.quote.netReceive)}\u00A0USDT`, amount: true },
   ];
   // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
   // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,
-  // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。
-  const resendBody = pending
-    ? fmt(t.value.walletV3.withdrawResendBody, {
-        amount: formatTruncatedAmount(snap.amount),
-        network: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label,
-        address: maskAddressMid(snap.address),
-      })
-    : "";
+  // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。地址整行显示供核对,同新提交的 code 行(03 §3.6.1)。
+  const resendRows = [amountRow, networkRow, addressRow];
   confirmingSubmit.value = true;
   let confirmed = false;
   try {
     confirmed = await uiConfirm({
       title: pending ? t.value.walletV3.withdrawResendTitle : t.value.walletV3.withdrawConfirmTitle,
-      // A new withdrawal shows the frozen quote as a detail list (P-45); the replay keeps its own wording.
-      message: pending ? resendBody : undefined,
-      rows: pending ? undefined : confirmRows,
+      // A new withdrawal shows the frozen quote as a detail list (P-45); the replay lists only its amount, network and
+      // address, under one sentence that only this withdrawal is sent.
+      message: pending ? t.value.walletV3.withdrawResendBody : undefined,
+      rows: pending ? resendRows : confirmRows,
+      glyph: "withdraw",
+      // A new withdrawal carries the withdrawal rules under its rows, from the same frozen network and fee; the replay does not.
       rules: pending ? undefined : { title: t.value.walletV3.withdrawRules.title, items: withdrawRulesItems(snap.network, snap.quote.networkConfirmUsd) },
-      glyph: pending ? undefined : "withdraw",
       confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
     });
   } finally {

@@ -4483,7 +4483,7 @@ export const id: Messages = {
     withdrawEarlierOutcome: "Permintaan sebelumnya: {outcome}",
     withdrawOtherPending: "Halaman ini sekarang menampilkan penarikan lain yang sedang diproses. Silakan periksa.",
     withdrawResendTitle: "Kirim ulang penarikan ini tanpa perubahan?",
-    withdrawResendBody: "Penarikan ${amount} ke alamat {network} {address} akan dikirim ulang tanpa perubahan. Hanya penarikan ini yang dikirim, tidak ada penarikan baru.",
+    withdrawResendBody: "Hanya penarikan ini yang dikirim, tidak ada penarikan baru.",
     withdrawResendCta: "Kirim ulang",
     withdrawOutcomeUnknownTitle: "Hasil penarikan belum terkonfirmasi",
     withdrawAbandonAttemptCta: "Tutup permintaan",
