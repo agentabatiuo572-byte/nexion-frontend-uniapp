@@ -101,8 +101,8 @@
 
         <template v-else-if="formStep === 'account'">
           <view class="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-9h.01" /></svg><text>{{ displayConfig.beneficiary ? c.bindingNotice : c.unboundNotice }}</text></view>
-          <view v-if="displayConfig.enabled && displayConfig.beneficiary && (!displayConfig.policy || !displayConfig.capacity)" class="notice" role="status"><text>{{ c.capacityUnavailable }}</text></view>
-          <view v-else-if="displayConfig.capacity && !displayConfig.capacity.withdrawalEnabled" class="notice"><text>{{ c.unavailable }}</text></view>
+          <view v-if="continueReason === c.capacityUnavailable" class="notice" role="status"><text>{{ continueReason }}</text></view>
+          <view v-else-if="continueReason" class="notice"><text>{{ continueReason }}</text></view>
         </template>
 
         <template v-else>
@@ -315,6 +315,13 @@ const amountError = computed(() => {
   // Missing limits are a read the system is retrying; a closed channel is not.
   if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
+});
+// Why 「继续提现」 is grey on the account step: missing limits or a closed channel.
+const continueReason = computed(() => {
+  const shown = displayConfig.value;
+  if ((busy.value && !silentRead.value) || !shown?.enabled || !shown.beneficiary) return "";
+  if (!shown.policy || !shown.capacity) return c.value.capacityUnavailable;
+  return shown.capacity.withdrawalEnabled ? "" : c.value.unavailable;
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
