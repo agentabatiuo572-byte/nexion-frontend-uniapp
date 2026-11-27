@@ -113,8 +113,9 @@
       <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
            directly above is showing, that line carries the reason and the button points to it instead. In the recovery
-           view the hint above the inputs is that condition panel (lg-retry-hint). -->
-      <text v-if="!loginRecoveryPending && !canPrimary && !loading && !error && primaryDisabledReason" id="lg-cta-reason" class="lg-cta-reason">{{ primaryDisabledReason }}</text>
+           view the hint above the inputs is that condition panel (lg-retry-hint). The line keeps its height when it has
+           nothing to say, hidden from view and from screen readers, so nothing below jumps. -->
+      <text v-if="!loginRecoveryPending" id="lg-cta-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': canPrimary || loading || !!error }" :aria-hidden="canPrimary || loading || error ? 'true' : undefined">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
       <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
@@ -1102,7 +1103,7 @@ onUnmounted(() => cleanup());
 .lg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .lg-dots { margin-top: 28px; display: flex; align-items: center; gap: 6px; }
 /* Upcoming step: foreground 8%, the step-track tone of 04 (onboarding track), so it reads on both page floors. */
-.lg-dot { height: 4px; width: 16px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); transition: all 0.3s; }
+.lg-dot { height: 4px; width: 16px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .lg-dot--active { width: 32px; background: var(--v5-brand); }
 .lg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
@@ -1145,7 +1146,8 @@ onUnmounted(() => cleanup());
 .lg-cta { margin-top: 24px; }
 .lg-cta--off { opacity: .5; }
 /* 03 §3.1 禁用: the greyed CTA names its reason in one neutral line right under it (description role, ink-3). */
-.lg-cta-reason { display: block; margin-top: 8px; text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lg-cta-reason { display: block; min-height: var(--ui-type-description-lh); margin-top: 8px; text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.lg-cta-reason--off { visibility: hidden; }
 /* min-height 18→44 会多占 26px,margin-top 12→4 抵消一半,视觉间距 12→17px 基本不变 */
 .lg-switch { margin-top: 4px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .lg-switch__t { font-size: var(--ui-type-list-subtitle); color: var(--v5-brand); font-weight: 500; }
