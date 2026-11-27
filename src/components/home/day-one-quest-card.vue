@@ -75,7 +75,7 @@
             <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : isActionable(task) ? undefined : { flexWrap: 'wrap' }">
               <!-- An App-only row opens nothing, so its whole name stays readable and the tag drops below when both don't fit. -->
               <text :class="task.appOnly ? 'newcomer-task__app-name' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
-              <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
+              <NxTag v-if="task.appOnly && !isDone(task) && !rowReason(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
               <text v-else class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
             </view>
             <!-- A pending row that cannot be opened says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
