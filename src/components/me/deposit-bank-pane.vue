@@ -25,9 +25,9 @@
       <!-- An unconfigured bank channel is not shown: the page hides this segment and moves to USDT. -->
       <view v-if="bankRailAvailable" :style="fxUsable ? undefined : disabledWrapStyle" :aria-disabled="!fxUsable">
         <view v-if="dailyCapacityExhausted" class="flex" :style="warnRowStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 3px" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v5" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
-            <text class="block" :style="warnTextStyle" style="font-weight: 600">{{ t.bankPane.dailyCapacityExhaustedTitle }}</text>
+            <text class="block" :style="warnTextStyle" style="font-weight: 500">{{ t.bankPane.dailyCapacityExhaustedTitle }}</text>
             <text class="block" :style="warnTextStyle" style="margin-top: 2px">{{ fmt(t.bankPane.dailyCapacityExhaustedBody, { remaining: todayRemainingLabel, min: minLabel }) }}</text>
           </view>
         </view>
@@ -194,9 +194,7 @@
     <template v-else-if="paneView === 'waiting'">
       <!-- Waiting, expired and mismatch open with the shared result head (03 §3.6.1), as credited does. -->
       <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" :title="t.bankPane.waitingTitle" :description="t.bankPane.waitingBody" /></view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
-      </view>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
     </template>
 
     <!-- ── 成功(credited)── -->
@@ -221,22 +219,14 @@
       <!-- Closed by timeout: neutral with the clock glyph, as the checkout's expired order (03 §3.8). -->
       <view class="nx-bank-state nx-step-in"><NxResultHead tone="neutral" icon="clock" :title="t.bankPane.expiredTitle" :description="fmt(t.bankPane.expiredBody, { min: lockMinText })" /></view>
       <view v-if="intent.receivedVnd" class="flex" :style="warnRowStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 3px" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
         <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.bankPane.lateNote }}</text></view>
       </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
-      </view>
-      <view
-        v-for="choice in existingPaymentChoices" :key="choice.intentId"
-        class="nx-bank-existing-order-cta w-full grid place-items-center"
-        :style="ghostBtnStyle" role="button" tabindex="0"
-        :aria-disabled="!canSelectExistingPayment(choice)"
-        @click="selectExistingPayment(choice)"
-        @keydown.enter.prevent="selectExistingPayment(choice)"
-        @keydown.space.prevent="selectExistingPayment(choice)"
-      >
-        <text :style="ghostTextStyle">{{ t.store.viewDetails }} · {{ t.store.pendingBarLabel }} · {{ formatAmount(choice.usdtAmount) + '\u00A0USDT' }}</text>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
+      <view v-for="choice in existingPaymentChoices" :key="choice.intentId" class="nx-bank-link-row">
+        <NxButton class="nx-bank-existing-order-cta" variant="link" icon="chevron-right"
+          :label="`${t.store.viewDetails} · ${t.store.pendingBarLabel} · ${formatAmount(choice.usdtAmount)}\u00A0USDT`"
+          :disabled="!canSelectExistingPayment(choice)" @click="selectExistingPayment(choice)" />
       </view>
     </template>
 
@@ -247,19 +237,14 @@
       <view style="margin-top: 10px">
         <view class="flex items-center justify-between" :style="bankRowStyle">
           <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.expectedLabel }}</text></view>
-          <view class="min-w-0"><text class="tabular-nums" :style="bankValStyle" style="white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
+          <view class="min-w-0"><text class="nx-bank-fig">{{ fmtVnd(intent.vndAmount) }}</text></view>
         </view>
         <view class="flex items-center justify-between" :style="bankRowStyle">
           <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.receivedLabel }}</text></view>
-          <view class="min-w-0"><text class="tabular-nums" :style="bankValStyle" style="white-space: nowrap">{{ fmtVnd(intent.receivedVnd ?? 0) }}</text></view>
+          <view class="min-w-0"><text class="nx-bank-fig">{{ fmtVnd(intent.receivedVnd ?? 0) }}</text></view>
         </view>
       </view>
-      <view class="nx-bank-new-topup-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="startNewTopup">
-        <text :style="ghostTextStyle">{{ t.bankPane.newTopupCta }}</text>
-      </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
-        <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
-      </view>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
     </template>
   </view>
 </template>
@@ -274,6 +259,7 @@ import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from
 import { onShow, onHide, onUnload, useVisibleInterval } from "@/composables/use-tab-page-lifecycle";
 import FxRateLine from "@/components/me/fx-rate-line.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
+import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
@@ -938,10 +924,11 @@ const warnRowStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-warning-soft)",
 };
+// Warning notice rows in the 辅助说明 role (10.1; 10.2 提示行) in warning ink, 4.74:1 on warning-soft (01 §1.1.1).
 const warnTextStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-warning)",
-  lineHeight: 1.45,
+  fontSize: "var(--ui-type-description)",
+  lineHeight: "var(--ui-type-description-lh)",
+  color: "var(--v5-warning-ink)",
 };
 
 // ── Main actions for the page's fixed bottom bar (DS-30): one per stage, plus the credited stage's bills link. ──
@@ -959,6 +946,7 @@ const primaryAction = computed<PaneAction | null>(() => {
   }
   if (paneView.value === "credited" && it) return { className: "nx-bank-done-cta", label: copy.doneCta, enabled: true, busy: false, external: false, run: () => { void finishCreditedFlow(); } };
   if (paneView.value === "expired" && it) return regenAction(!creating.value);
+  if (paneView.value === "mismatch" && it) return { className: "nx-bank-new-topup-cta", label: copy.newTopupCta, enabled: true, busy: false, external: false, run: startNewTopup };
   return null;
 });
 const secondaryAction = computed<PaneAction | null>(() => paneView.value === "credited" && intent.value
@@ -1040,6 +1028,10 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); letter-spacing: 0; }
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }
+/* Result-state entries to the next layer: the shared text link (03 §3.9), centred under the head, 44px target row. */
+.nx-bank-link-row { display: flex; justify-content: center; align-items: center; min-height: 44px; margin-top: 6px; }
+/* Mismatch expected/received values: the 10.1 行内数值 role (as the withdrawal quote rows). */
+.nx-bank-fig { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 /* Credited details: the same role, in the interface face (01.2 plain figures). */
 .nx-bank-sum--done .nx-bank-sum__v { font-family: var(--font-v5); }
 @media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring :deep(.nx-bank-ring__value) { transition: none; } }
