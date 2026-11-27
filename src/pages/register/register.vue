@@ -34,11 +34,11 @@
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
       <!-- Status notice: the sign-in notice's shared tint, the sentence left and its text action right (03 §3.6.1). -->
       <view v-if="registrationNeedsLogin" class="rg-status nx-tint" role="status">
-        <text class="rg-status__t">{{ t.register.registrationSignInRequired }}</text>
+        <text id="rg-status-reason" class="rg-status__t">{{ t.register.registrationSignInRequired }}</text>
         <NxButton variant="text" size="small" :label="t.register.signIn" @click="goLogin" />
       </view>
       <view v-else-if="authApi.pendingLogin()" class="rg-status nx-tint" role="status">
-        <text class="rg-status__t">{{ t.login.unknownAttempt }}</text>
+        <text id="rg-status-reason" class="rg-status__t">{{ t.login.unknownAttempt }}</text>
         <NxButton variant="text" size="small" :label="t.login.recoverAttempt" @click="recoverOriginalLogin" />
       </view>
       <NxTag v-if="modeLabel" class="rg-mode-badge" tone="warning" data-testid="auth-runtime-label">{{ modeLabel }}</NxTag>
@@ -116,9 +116,9 @@
         <text class="rg-review__body">{{ reviewNoticeBody }}</text>
       </view>
       <!-- Error -->
-      <view v-if="error" id="rg-error" class="rg-error" role="alert" aria-live="assertive">
+      <view v-if="inlineError" id="rg-error" class="rg-error" role="alert" aria-live="assertive">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-        <text class="rg-error__t">{{ error }}</text>
+        <text class="rg-error__t">{{ inlineError }}</text>
       </view>
 
       <!-- Primary CTA -->
@@ -132,13 +132,13 @@
         :label="ctaLabel"
         :busy="busy"
         :aria-disabled="!ctaEnabled || busy"
-        :aria-describedby="!ctaEnabled && !busy ? (error ? 'rg-error' : 'rg-cta-reason') : undefined"
+        :aria-describedby="ctaDescriptionId"
         @click="onCta"
       />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
            directly above is showing, that line carries the reason and the button points to it instead. The line keeps its height
            when it has nothing to say, hidden from view and from screen readers, so nothing below jumps. -->
-      <text id="rg-cta-reason" class="rg-cta-reason" :class="{ 'rg-cta-reason--off': ctaEnabled || busy || !!error }" :aria-hidden="ctaEnabled || busy || error ? 'true' : undefined">{{ ctaDisabledReason }}</text>
+      <text id="rg-cta-reason" class="rg-cta-reason" :class="{ 'rg-cta-reason--off': !showCtaReason }" :aria-hidden="showCtaReason ? undefined : 'true'">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
       <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" :before-start="manualInviteAccepted" :sponsor-rejected="rejectSponsorCode" @busy="oauthBusy = $event" />
@@ -342,7 +342,7 @@ const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.va
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
 const oauthBusy = ref(false);
 const busy = computed(() => verifying.value || completing.value || oauthBusy.value || checkingInvite.value);
-const originalRegistrationRecoveryRequired = computed(() => requiresOriginalRegistrationRecovery(authApi,
+const originalRegistrationRecoveryRequired = computed(() => !busy.value && requiresOriginalRegistrationRecovery(authApi,
   { countryCode: country.value, phone: phoneClean.value }));
 const ctaEnabled = computed(() => !registrationNeedsLogin.value && !originalRegistrationRecoveryRequired.value
   && (step.value === 1 ? phoneOk.value : step.value === 2 ? codeOk.value : pwdMatch.value));
@@ -359,13 +359,24 @@ const ctaLabel = computed(() =>
         ? t.value.register.verify
         : t.value.register.finish,
 );
-const ctaDisabledReason = computed(() => {
+const blockingStatusReason = computed(() => {
   if (registrationNeedsLogin.value) return t.value.register.registrationSignInRequired;
   if (originalRegistrationRecoveryRequired.value) return t.value.login.unknownAttempt;
+  return "";
+});
+const ctaDisabledReason = computed(() => {
+  if (blockingStatusReason.value) return blockingStatusReason.value;
   if (step.value === 1) return t.value.register.ctaDisabledPhone;
   if (step.value === 2) return t.value.register.ctaDisabledCode;
   return t.value.register.ctaDisabledPassword;
 });
+const inlineError = computed(() => error.value === blockingStatusReason.value ? null : error.value);
+const ctaDescriptionId = computed(() => {
+  if (ctaEnabled.value || busy.value) return undefined;
+  if (blockingStatusReason.value) return "rg-status-reason";
+  return inlineError.value ? "rg-error" : "rg-cta-reason";
+});
+const showCtaReason = computed(() => ctaDescriptionId.value === "rg-cta-reason");
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 function showOauthUnavailable(provider: string) {
   toast.info(fmt(t.value.register.oauthUnavailableTitle, { provider }), t.value.register.oauthUnavailableBody);
@@ -432,17 +443,18 @@ const reviewNoticeBody = computed(() => {
   const bare = c.reasons.includes("bare-identity") || c.reasons.includes("unbound-free-slot");
   return !dup && bare ? t.value.register.rewardReviewBodyUnbound : t.value.register.rewardReviewBody;
 });
-// Seeds: primary button bottom − input bottom + 12, measured on each step's default layout (same at 360 and 390).
+// Seeds include the reason line's 28px slot below the button.
 const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
-  root: ".rg-root", form: ".rg-wrap", primary: ".rg-cta",
+  root: ".rg-root", form: ".rg-wrap", primary: ".rg-cta", primaryDescription: "#rg-cta-reason",
   inputs: {
-    phone: { selector: ".rg-phone__in", seed: 181 },
-    invite: { selector: "#rg-invite", seed: 80 },
-    otp: { selector: ".rg-otp", seed: 116 },
-    password: { selector: "#rg-password", seed: 148 },
-    confirmPassword: { selector: "#rg-confirm-password", seed: 80 },
+    phone: { selector: ".rg-phone__in", seed: 209 },
+    invite: { selector: "#rg-invite", seed: 108 },
+    otp: { selector: ".rg-otp", seed: 144 },
+    password: { selector: "#rg-password", seed: 176 },
+    confirmPassword: { selector: "#rg-confirm-password", seed: 108 },
   },
-  layout: () => [step.value, error.value, reviewNotice.value && reviewNoticeBody.value, inviteInvalid.value, devBackendDown.value,
+  layout: () => [step.value, inlineError.value, blockingStatusReason.value, ctaDisabledReason.value,
+    reviewNotice.value && reviewNoticeBody.value, inviteInvalid.value, devBackendDown.value,
     lockedRef.value, !!sponsorPreview.value, phoneFormatMessage.value, developmentOtpEnabled.value],
 });
 
@@ -563,8 +575,7 @@ function rejectSponsorCode(sent: string | null) {
 async function requestCode(captchaTicket?: string) {
   if (verifying.value) return;
   devBackendDown.value = false;
-  const remaining = refreshResend();
-  if (step.value === 1 && (otpRequestId.value || remaining > 0)) {
+  if (step.value === 1 && refreshResend() > 0) {
     focusCode();
     step.value = 2;
     return;

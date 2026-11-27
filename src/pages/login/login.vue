@@ -403,21 +403,6 @@ const developmentOtpEnabled = computed(() =>
   apiRuntimeConfig.environment === "dev"
   && /^\d{6}$/.test(developmentOtpCode)
 );
-// Seeds: primary button bottom − input bottom + 12, measured on each step's default layout (same at 360 and 390).
-const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
-  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta",
-  inputs: {
-    phone: { selector: ".lg-phone__in", seed: 235 },
-    password: { selector: "#lg-password", seed: 141 },
-    otp: { selector: ".lg-otp", seed: 116 },
-    newPassword: { selector: "#lg-new-password", seed: 153 },
-    confirmPassword: { selector: "#lg-confirm-password", seed: 85 },
-    retryPassword: { selector: "#lg-retry-password", seed: 164 },
-    retryCode: { selector: "#lg-retry-code", seed: 96 },
-  },
-  layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
-    error.value, phoneFormatMessage.value, developmentOtpEnabled.value],
-});
 const primaryText = computed(() => {
   if (step.value === 1) return mode.value === "password" ? t.value.login.signIn : t.value.login.sendCode;
   if (step.value === 2) return t.value.login.verify;
@@ -435,9 +420,27 @@ const primaryDisabledReason = computed(() => {
     if (mode.value === "password" && !pwdOk.value) return t.value.login.errorInvalidPassword;
   }
   if (step.value === 2 && !codeOk.value) return t.value.login.errorInvalidCode;
-  if (step.value === 3 && !newPwdOk.value) return t.value.login.errorWeakPassword;
-  if (step.value === 3 && !pwdMatch.value) return t.value.login.passwordMismatch;
+  if (step.value === 3) {
+    if (!newPwdOk.value) return t.value.login.errorWeakPassword;
+    if (!confirmPwd.value) return t.value.login.confirmPasswordPlaceholder;
+    if (!pwdMatch.value) return t.value.login.passwordMismatch;
+  }
   return "";
+});
+// Seeds include the reason line's 28px slot on the form. Recovery has no reason line below its button.
+const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
+  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta", primaryDescription: "#lg-cta-reason",
+  inputs: {
+    phone: { selector: ".lg-phone__in", seed: 263 },
+    password: { selector: "#lg-password", seed: 169 },
+    otp: { selector: ".lg-otp", seed: 144 },
+    newPassword: { selector: "#lg-new-password", seed: 181 },
+    confirmPassword: { selector: "#lg-confirm-password", seed: 113 },
+    retryPassword: { selector: "#lg-retry-password", seed: 164 },
+    retryCode: { selector: "#lg-retry-code", seed: 96 },
+  },
+  layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
+    error.value, primaryDisabledReason.value, phoneFormatMessage.value, developmentOtpEnabled.value],
 });
 const resendInText = computed(() => (t.value.login.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 function showOauthUnavailable(provider: string) {
@@ -678,8 +681,7 @@ function finishVerifiedOtpSignIn(verifyToken: string, context: OtpFlowContext) {
 // resendAfterSec 为准,client 不再持有 60s 业务常量。
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
-  const remaining = refreshResend();
-  if (mode.value === "reset" && step.value === 1 && (otpRequestId.value || remaining > 0)) {
+  if (step.value === 1 && refreshResend() > 0) {
     focusCode();
     step.value = 2;
     return;
@@ -990,8 +992,7 @@ async function verifyCode() {
 async function finishReset() {
   if (loading.value || signInTimer) return;
   error.value = null;
-  if (!newPwdOk.value) { error.value = t.value.login.errorWeakPassword; return; }
-  if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
+  if (!pwdMatch.value) { error.value = primaryDisabledReason.value; return; }
   const challengeNo = otpRequestId.value;
   if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
   const resetAttempt: PasswordResetAttemptContext = {
@@ -1034,8 +1035,8 @@ async function finishReset() {
 
 function onPrimary() {
   if (authApi.pendingLogin()) { loginRecoveryPending.value = true; void recoverLoginResult(); return; }
-  if (step.value === 1 && phone.value && !phoneOk.value) {
-    error.value = t.value.register.ctaDisabledPhone;
+  if (step.value === 1 && !phoneOk.value) {
+    error.value = primaryDisabledReason.value;
     return;
   }
   if (step.value === 1) { if (mode.value === "password") signInWithPassword(); else goSendCode(); }
@@ -1061,7 +1062,10 @@ function goReset() {
   mode.value = "reset";
 }
 function back() {
-  const preserveSmsChallenge = mode.value === "reset" && step.value > 1;
+  if (step.value === 2 && remoteTwoFactorChallenge.value && !authApi.pendingLogin()) {
+    authApi.cancelLoginChallenge();
+  }
+  const preserveSmsChallenge = mode.value !== "password" && step.value > 1;
   invalidateOtpFlow(preserveSmsChallenge);
   error.value = null;
   code.value = ["", "", "", "", "", ""];
