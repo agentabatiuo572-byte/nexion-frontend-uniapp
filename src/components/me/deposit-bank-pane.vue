@@ -210,7 +210,7 @@
       <view class="nx-bank-done nx-step-in" role="status">
         <view class="nx-bank-done__medal"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5" /></svg></view>
         <text class="nx-bank-done__title">{{ t.bankPane.successTitle }}</text>
-        <text class="nx-bank-done__amt">+{{ formatAmount(creditedUsdt) }}<text class="nx-bank-done__unit">{{ '\u00A0' }}USDT</text></text>
+        <text class="nx-bank-done__amt">+{{ formatTruncatedAmount(creditedUsdt).replace(/\.\d*$/, "") }}<text class="nx-bank-done__dec">{{ formatTruncatedAmount(creditedUsdt).replace(/^[^.]*/, "") }}</text><text class="nx-bank-done__unit">{{ '\u00A0' }}USDT</text></text>
         <text class="nx-bank-done__line">{{ fmt(t.bankPane.successLine, { rate: fmtVnd(intent.fxRate) }) }}</text>
       </view>
       <view class="nx-bank-sum nx-bank-sum--done">
@@ -284,7 +284,7 @@
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { useLocaleStore } from "@/store/locale";
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
@@ -1093,8 +1093,10 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
 .nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
 /* The credited amount is the result's main amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38) at 500 (01.2), in
-   main ink; success colour is for status only (01 §1.1.1 rule 4). Unit max(12px, .4em), 500, secondary ink (01.2). */
+   main ink; success colour is for status only (01 §1.1.1 rule 4). Decimals in secondary ink, unit max(12px, .4em), 500,
+   secondary ink (01.2). Cut to two places, not rounded (06 §6.2). */
 .nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-ink); font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-done__dec { color: var(--v5-ink-3); }
 .nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); letter-spacing: 0; }
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }

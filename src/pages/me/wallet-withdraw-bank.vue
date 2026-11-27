@@ -65,7 +65,7 @@
             <view class="aura" aria-hidden="true"><view /><view /></view>
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
-              <text class="slab__amt">{{ usdt2(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
+              <text class="slab__amt">{{ usdt2(quote.amountUsdt).replace(/\.\d*$/, "") }}<text class="slab__dec">{{ usdt2(quote.amountUsdt).replace(/^[^.]*/, "") }}</text><text class="slab__unit">USDT</text></text>
               <!-- Balance and single limit on two lines, as on the amount step, so the range never breaks at its dash. -->
               <view v-if="displayConfig.policy && displayConfig.capacity" class="limits">
                 <text>{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
@@ -714,7 +714,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 /* Result amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38), the page's main amount, at 500 (01.2). The unit follows
    a no-break space (03 §3.6.1) instead of a margin. */
 .money { display: block; margin-top: 8px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.money__unit { margin-left: 4px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); }
+.money__unit { margin-left: 4px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); }
 /* Result: centred head, then the amount; actions sit in the fixed bar. */
 .result-head { margin: var(--v5-space-2) 0 var(--v5-space-1); }
 .intent-code { max-width: 100%; color: inherit; }
@@ -766,6 +766,11 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .slab__head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .slab__amt { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
+/* The quote amount follows the 01.2 anatomy: integer in main ink, decimals and unit in secondary ink, unit max(12px, .4em).
+   The unit beside the amount input keeps 12/16 (10.2: the amount input is outside the type roles). Descendant, not child:
+   uni-text puts nested text inside its own span. */
+.slab__dec { color: var(--v5-ink-3); }
+.slab__amt .slab__unit { font-size: max(12px, .4em); }
 .slab .amount-input { display: flex; align-items: baseline; gap: 0; margin-top: 4px; padding: 0; border: 0; border-radius: 0; }
 .slab .amount-input input { flex: 0 1 auto; max-width: calc(100% - 48px); height: 48px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .slab .limits { gap: 0; margin-top: 4px; font: 400 12px/18px var(--font-v5); }
