@@ -165,7 +165,7 @@ export const demoOptions = {
   pairingState:[['pending','等待连接'],['connected','配对完成'],['expired','配对已过期']],
   benefitState:[['available','福利待领取'],['claimed','券已领取·试用中'],['grace','试用待抵扣'],['finished','福利已使用']],
   voucherScopeState:[['all','全场设备可用'],['single-unnamed','单品券 · 商品已不在目录（无名称）'],['claimed-expired','已领未使用 · 已过期']],
-  weekEndState:[['normal','本周照常'],['ending','本周 1 分钟后结束（页面开着时出现过期行）']],
+  weekEndState:[['normal','本周照常'],['ending','本周 1 分钟后结束（到点后两档未领任务一起移除）']],
   dataState:[['normal','正常数据'],['empty','空数据'],['loading','慢速加载（5 秒）'],['error','加载失败']],
   trustSectionsState:[['all','信任资料 · 六个版块'],['missing-narrative','信任资料 · 缺 UVT 说明'],['missing-audits','信任资料 · 缺审计'],['leadership','信任资料 · 仅管理团队'],['none','信任资料 · 无版块']],
   stakingState:[['delisted','功能下架'],['error','质押读取失败（其他正常）']],
