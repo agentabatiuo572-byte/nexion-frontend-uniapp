@@ -192,13 +192,8 @@
 
     <!-- ── 等待回调(仅 UI 等待提示,单仍 awaiting;到点过期由 store 引擎翻面)── -->
     <template v-else-if="paneView === 'waiting'">
-      <view class="flex flex-col items-center nx-step-in" style="padding: 36px 0 8px">
-        <view class="nx-bank-pulse grid place-items-center" :style="waitIconStyle">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-        </view>
-        <view><text class="block text-center" :style="stateTitleStyle">{{ t.bankPane.waitingTitle }}</text></view>
-        <view><text class="block text-center" :style="stateBodyStyle">{{ t.bankPane.waitingBody }}</text></view>
-      </view>
+      <!-- Waiting, expired and mismatch open with the shared result head (03 §3.6.1), as credited does. -->
+      <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" :title="t.bankPane.waitingTitle" :description="t.bankPane.waitingBody" /></view>
       <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
         <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
       </view>
@@ -223,13 +218,8 @@
 
     <!-- ── 过期(expired;迟到转账已登记时加人工核对行)── -->
     <template v-else-if="paneView === 'expired' && intent">
-      <view class="flex flex-col items-center nx-step-in" style="padding: 32px 0 8px">
-        <view class="grid place-items-center" :style="expiredIconStyle">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-        </view>
-        <view><text class="block text-center" :style="stateTitleStyle">{{ t.bankPane.expiredTitle }}</text></view>
-        <view><text class="block text-center" :style="stateBodyStyle">{{ fmt(t.bankPane.expiredBody, { min: lockMinText }) }}</text></view>
-      </view>
+      <!-- Closed by timeout: neutral with the clock glyph, as the checkout's expired order (03 §3.8). -->
+      <view class="nx-bank-state nx-step-in"><NxResultHead tone="neutral" icon="clock" :title="t.bankPane.expiredTitle" :description="fmt(t.bankPane.expiredBody, { min: lockMinText })" /></view>
       <view v-if="intent.receivedVnd" class="flex" :style="warnRowStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
         <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.bankPane.lateNote }}</text></view>
@@ -252,16 +242,8 @@
 
     <!-- ── 金额不符(mismatch_review 黄警示态)── -->
     <template v-else-if="paneView === 'mismatch' && intent">
-      <view class="flex flex-col items-center nx-step-in" style="padding: 32px 0 8px">
-        <view class="grid place-items-center" :style="waitIconStyle">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-        </view>
-        <view><text class="block text-center" :style="stateTitleStyle">{{ t.bankPane.mismatchTitle }}</text></view>
-      </view>
-      <view class="flex" :style="warnRowStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-        <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ t.bankPane.mismatchBody }}</text></view>
-      </view>
+      <!-- The check that follows is the head's line, so no second warning row repeats the head's warning (03 §3.6.1). -->
+      <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" icon="alert" :title="t.bankPane.mismatchTitle" :description="t.bankPane.mismatchBody" /></view>
       <view style="margin-top: 10px">
         <view class="flex items-center justify-between" :style="bankRowStyle">
           <view class="shrink-0"><text :style="bankKeyStyle">{{ t.bankPane.expectedLabel }}</text></view>
@@ -949,32 +931,6 @@ const stepNumStyle: CSSProperties = {
   borderRadius: "50%",
   background: "var(--v5-brand-soft)",
 };
-const stateTitleStyle: CSSProperties = {
-  marginTop: "12px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "var(--ui-type-card-title)",
-  fontWeight: "var(--ui-type-card-title-weight)",
-  color: "var(--v5-ink)",
-};
-const stateBodyStyle: CSSProperties = {
-  marginTop: "6px",
-  fontSize: "13px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.55,
-  maxWidth: "280px",
-};
-const waitIconStyle: CSSProperties = {
-  width: "52px",
-  height: "52px",
-  borderRadius: "50%",
-  background: "var(--v5-warning-soft)",
-};
-const expiredIconStyle: CSSProperties = {
-  width: "52px",
-  height: "52px",
-  borderRadius: "50%",
-  background: "var(--v5-surface-2)",
-};
 const warnRowStyle: CSSProperties = {
   marginTop: "8px",
   padding: "10px 12px",
@@ -1011,24 +967,6 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 </script>
 
 <style scoped>
-/* 等待回调脉冲(规格 ⑤ 加载态「等待到账确认」脉冲;匹配形状,非通用转圈) */
-.nx-bank-pulse {
-  animation: nx-bank-pulse 1.6s ease-in-out infinite;
-}
-@keyframes nx-bank-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.06);
-    opacity: 0.72;
-  }
-}
-</style>
-
-<style scoped>
 /* P-44 top-up form: amount on a tinted slab over a two-tone aura, presets, and a recessed facts well. */
 .nx-bank-stage { position: relative; margin: 4px -2px 0; }
 .nx-bank-stage__aura { position: absolute; inset: -8px -6px; pointer-events: none; }
@@ -1039,7 +977,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 [data-theme="light"] .nx-bank-stage__aura > view:last-child { background: color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent); }
 /* The slab keeps its amber as one uniform tint (.nx-tint); the aura's cyan shows around it. */
 .nx-bank-slab { --nx-tint: var(--v5-warning); position: relative; padding: 23px 20px 20px; border-radius: 24px; }
-.nx-bank-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
+.nx-bank-k { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 .nx-bank-amt { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 74px); height: 52px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand);
   font: 500 44px/52px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
@@ -1085,11 +1023,13 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-sum { margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); overflow: hidden; }
 .nx-bank-sum__r { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; }
 .nx-bank-sum__r + .nx-bank-sum__r { border-top: 1px solid var(--v5-border); }
-.nx-bank-sum__v { min-width: 0; color: var(--v5-ink); font: 500 15px/20px var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.nx-bank-sum__v--big { font-family: var(--font-amount); font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
-.nx-bank-sum__v--text { font: 500 14px/20px var(--font-v5); }
+/* Summary values in the 10.1 list title role (390 15/20, 360 14/20) at its 500; the amount to pay is the card's main number
+   below 30px, so the card figure role in the amount face (as the withdrawal confirm's bank amount). */
+.nx-bank-sum__v { min-width: 0; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-metric); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.nx-bank-sum__v--big { font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
+.nx-bank-sum__v--text { font-family: var(--font-v5); }
 /* Credited: the shared result head over a soft success glow behind its title and amount (01 §1.1.2 page effects). */
-.nx-bank-done { position: relative; margin-top: -5px; padding: 20px 20px 8px; }
+.nx-bank-done, .nx-bank-state { position: relative; margin-top: -5px; padding: 20px 20px 8px; }
 .nx-bank-done::before { content: ""; position: absolute; left: 50%; top: 54px; width: 300px; height: 180px; margin-left: -150px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 20%, transparent), transparent); pointer-events: none; }
 .nx-bank-done > .nx-result-head { position: relative; }
 /* The credited amount is the result's main amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38) at 500 (01.2), in
@@ -1100,6 +1040,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); letter-spacing: 0; }
 .nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }
-.nx-bank-sum--done .nx-bank-sum__v { font: 500 14px/20px var(--font-v5); }
+/* Credited details: the same role, in the interface face (01.2 plain figures). */
+.nx-bank-sum--done .nx-bank-sum__v { font-family: var(--font-v5); }
 @media (prefers-reduced-motion: reduce) { .nx-bank-chip { transition: none; } .nx-bank-chip:not([aria-disabled="true"]):active { transform: none; } .nx-bank-ring :deep(.nx-bank-ring__value) { transition: none; } }
 </style>
