@@ -746,12 +746,13 @@ const retryBtnStyle: CSSProperties = {
 @media (max-width: 374px) { .nx-dep-net { min-height: 56px; } }
 .nx-dep-net:active { transform: scale(.97); }
 .nx-dep-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
+/* 03 §3.5 单选行: selected = brand 10% fill + 1.5px brand inner stroke; unselected ring 1.5px 辅助色 (ink-3). */
+.nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
 .nx-dep-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .nx-dep-net__name { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-dep-net--on .nx-dep-net__name { color: var(--v5-brand); }
 .nx-dep-net__sub { min-width: 0; overflow: hidden; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); text-overflow: ellipsis; white-space: nowrap; }
-.nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
+.nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); }
 .nx-dep-net--on .nx-dep-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .nx-dep-net--on .nx-dep-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
@@ -780,7 +781,7 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-link { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--v5-ink); cursor: pointer; }
-.nx-dep-link__t { flex: 1; min-width: 0; font: 400 15px/20px var(--font-v5); }
+.nx-dep-link__t { flex: 1; min-width: 0; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
 .nx-dep-link > svg, .nx-dep-link > .nx-native-svg { flex: none; color: var(--v5-ink-4); }
 .nx-dep-link:active { opacity: .7; }
