@@ -920,11 +920,11 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-amtrow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 .nx-bank-amt { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 74px); height: 52px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--v5-ink); caret-color: var(--v5-brand);
   font: 500 44px/52px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.nx-bank-unit { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 500 12px/16px var(--font-v5); }
-.nx-bank-vnd { display: block; margin-top: 2px; color: var(--v5-ink-3); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-unit { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px; background: var(--v5-surface-3); color: var(--v5-ink-2); font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-bank-vnd { display: block; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nx-bank-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
 .nx-bank-chip { position: relative; height: 36px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--v5-ink) 6%, transparent);
-  color: var(--v5-ink-2); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+  color: var(--v5-ink-2); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
 .nx-bank-chip::after { content: ""; position: absolute; inset: -4px 0; }
 /* Selected preset: flat brand tint, no glass rim or sheen inside the tinted slab (P-67). */
 .nx-bank-chip--on { color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 14%, transparent); }
@@ -959,7 +959,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-ring :deep(.nx-bank-ring__value) { fill: none; stroke: var(--v5-brand); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 427; stroke-dashoffset: var(--nx-bank-ring-offset); transition: stroke-dashoffset 1s linear; }
 .nx-bank-ring__c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .nx-bank-ring__t { color: var(--v5-ink); font: 500 32px/38px var(--font-metric); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.nx-bank-cd { display: block; margin-top: 16px; color: var(--v5-ink-2); font: 400 13px/20px var(--font-v5); }
+.nx-bank-cd { display: block; margin-top: 16px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-cd__time { color: var(--v5-ink); font-family: var(--font-metric); font-weight: 500; font-variant-numeric: tabular-nums; }
 /* Manual order (10.1 roles): countdown in 辅助说明; the amount to transfer at the 10.2 待付金额 size (page-title role) in
    Montserrat 500 (01.2: amounts never 600); the credit and scan lines in 辅助数值. */
