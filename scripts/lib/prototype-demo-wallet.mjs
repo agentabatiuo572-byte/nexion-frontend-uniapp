@@ -199,8 +199,8 @@ export function demoTeamWeek(at) {
 export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
   ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
-export const demoChainDepositFee = '0.123456';
-export const demoChainDepositMinimum = '50';
+export const demoChainDepositFee = '0';
+export const demoChainDepositMinimum = '5';
 
 export function demoChainDepositAddress(state, network, allocate = false) {
   const existing = state.chainDepositAddresses?.[network]

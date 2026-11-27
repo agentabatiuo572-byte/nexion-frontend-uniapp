@@ -9,9 +9,9 @@ const money = amount => Number(amount.toFixed(6));
 const exchangeDay = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
 });
-const minWithdrawal = 20; // AppWithdrawalService.MIN_WITHDRAWAL, shared by policy and eligibility.
+const minWithdrawal = 3; // D5 launch minimum (B142), shared by policy and eligibility.
 // HdPayHostedDepositService / AppVietQrIntentService: hosted capacity is unknown, not a manual bank pool.
-const bankConfig={enabled:true,paymentMode:'hosted',dailyCapacityKnown:false,minDepositUsdt:50,maxDepositUsdt:5000,todayRemainingDepositUsdt:0,todayRemainingVnd:0,toleranceVnd:1000,graceMinutes:10,version:1,feeVnd:0,feeUsdt:0};
+const bankConfig={enabled:true,paymentMode:'hosted',dailyCapacityKnown:false,minDepositUsdt:5,maxDepositUsdt:5000,todayRemainingDepositUsdt:0,todayRemainingVnd:0,toleranceVnd:1000,graceMinutes:10,version:1,feeVnd:0,feeUsdt:0};
 const bankFx={baseRateVndPerUsdt:25000,buySpreadPct:0,quoteRateVndPerUsdt:25000,lockWindowMinutes:15,version:1};
 const refuse=(status,message)=>{throw Object.assign(new Error(message),{status});};
 export const demoUsdtWithdrawalNetworks = ["USDT-BEP20", "USDT-ERC20"];
@@ -38,7 +38,7 @@ export function demoWithdrawalPolicy(state, facts) {
     // The launch config closes the small-amount fast lane (threshold 0): every USDT withdrawal goes to review.
     smallAmountThresholdUsd: state.withdrawReviewState === 'legacy-fast-pass' ? 100 : 0, strongReviewThresholdUsdt: 5000, payoutSlaHours: 24,
     // The withdrawal policy contract requires a fee field for the inactive network.
-    networkConfirmFeeUsd: { trc20: 0, bep20: 1, erc20: 5 }, nexFeeOffsetRate: .1,
+    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 1 }, nexFeeOffsetRate: .1,
     // 'hold' turns on the compliance review with its 7-day window for amounts above 1 (the policy contract needs a threshold > 0).
     cooldownDays: 7, complianceHoldEnabled: state.withdrawReviewState === 'hold',
     complianceReviewThresholdUsdt: state.withdrawReviewState === 'hold' ? 1 : 1000, withdrawalEnabled: true, enabledNetworks: demoWithdrawalNetworks(state),
@@ -289,7 +289,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     // Policy and address share the same terms and existing payment availability switches.
     const paymentMode = demoPaymentScenario(state);
     // The fee knob changes only what the policy and address report; ledger demos keep demoChainDepositFee.
-    const feeExact = { zero: '0', half: '0.5' }[state.depositFeeState] ?? demoChainDepositFee;
+    const feeExact = { zero: '0', half: '0.5', default: '0.123456' }[state.depositFeeState] ?? demoChainDepositFee;
     const networks = ['BEP20', 'ERC20'].map(network => {
       const enabled = paymentMode !== 'usdt-off' && !(paymentMode === 'erc20-off' && network === 'ERC20');
       return { network, enabled, disabledReason: enabled ? null : 'NETWORK_SWITCH_OFF', confirmations: 15,
