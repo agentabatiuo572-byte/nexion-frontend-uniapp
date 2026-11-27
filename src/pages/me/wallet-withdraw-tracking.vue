@@ -527,7 +527,7 @@ const etaSub = computed(() => {
   const weekday = date.getUTCDay();
   const daysUntilPayout = weekday >= 5 ? 8 - weekday : 1;
   date.setUTCDate(date.getUTCDate() + daysUntilPayout);
-  return fmt(t.value.wallet.trackExpectedAt, { time: formatWalletCalendarDay(date, dateLocale()) });
+  return fmt(t.value.wallet.trackExpectedArrivalDate, { date: formatWalletCalendarDay(date, dateLocale()) });
 });
 
 /** 按界面语言显示包含年份的本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */

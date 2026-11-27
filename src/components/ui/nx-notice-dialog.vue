@@ -1,7 +1,7 @@
 <template>
   <view v-if="open" class="nx-notice-mask nx-sheet-fade-in" @click="maskExit">
-    <view :id="id" class="nx-glass-sheet nx-notice nx-dialog-pop-in" role="alertdialog" aria-modal="true" :aria-label="title" :class="`nx-notice--${tone}`" @click="sheetTap = true">
-      <view class="nx-notice__icon" aria-hidden="true">
+    <view :id="id" class="nx-glass-sheet nx-notice nx-dialog-pop-in" role="alertdialog" aria-modal="true" :aria-label="title" :class="[`nx-notice--${tone}`, { 'nx-notice--no-icon': icon === 'none', 'nx-notice--scroll': scrollBody }]" @click="sheetTap = true">
+      <view v-if="icon !== 'none'" class="nx-notice__icon" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <template v-if="icon === 'clock'"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></template>
           <template v-else-if="icon === 'shield'"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="M12 8v4" /><path d="M12 16h.01" /></template>
@@ -13,7 +13,8 @@
       </view>
       <text :id="id + '-title'" class="nx-notice__title" role="heading" :tabindex="focusTitle ? -1 : undefined">{{ title }}</text>
       <text v-if="body" class="nx-notice__body">{{ body }}</text>
-      <slot />
+      <view v-if="scrollBody" class="nx-notice__scroll"><slot /></view>
+      <slot v-else />
       <view class="nx-notice__actions">
         <NxButton :class="{ 'nx-notice__primary--danger': primaryTone === 'danger' }" :label="primary" variant="primary" :busy="busy" @click="$emit('primary')" />
         <NxButton v-if="secondary" :label="secondary" variant="text" :disabled="busy && !secondaryWhileBusy" @click="$emit('secondary')" />
@@ -28,7 +29,7 @@ import { useDialogA11y } from '@/composables/use-dialog-a11y';
 // Centered notice (DS 03 §3.5 居中确认框, the same anatomy as the global confirm()): icon, title, one short explanation,
 // a solid primary and an optional secondary exit below it as a brand text button.
 const props = withDefaults(defineProps<{ open: boolean; title: string; body?: string; primary: string; secondary?: string;
-  icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info' | 'trash'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean;
+  icon?: 'alert' | 'clock' | 'shield' | 'failed' | 'info' | 'trash' | 'none'; tone?: 'warning' | 'danger' | 'brand' | 'neutral'; busy?: boolean;
   // A busy primary that only reads (no write in flight) can still be left: the quiet exit, Esc and back stay live (03 §3.5.2).
   secondaryWhileBusy?: boolean;
   // A decision whose primary is the destructive step (03 §3.1: the last step of a confirm may use the error colour).
@@ -38,8 +39,13 @@ const props = withDefaults(defineProps<{ open: boolean; title: string; body?: st
   // A tap on the mask takes the quiet exit, like Esc and back; only flows that allow it opt in (03 §3.5). A tap inside the
   // sheet marks itself on the way up instead (uni H5 normalizes event.target, so a .self check never matches, and stopping
   // propagation would hide the tap from document listeners).
-  maskSecondary?: boolean }>(), { icon: 'alert', tone: 'warning' });
-const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void }>();
+  maskSecondary?: boolean;
+  // A long list (a rules explainer): only the content between title and actions scrolls, so both stay on screen.
+  scrollBody?: boolean;
+  // A notice whose one exit is the primary but that may still be put away unanswered: Esc and Android back emit dismiss
+  // (the primary alone records an answer). The mask tap still does nothing.
+  dismissible?: boolean }>(), { icon: 'alert', tone: 'warning' });
+const emit = defineEmits<{ (event: 'primary'): void; (event: 'secondary'): void; (event: 'dismiss'): void }>();
 const id = `nx-notice-${getCurrentInstance()?.uid}`;
 let sheetTap = false;
 function maskExit() {
@@ -50,7 +56,10 @@ function maskExit() {
 // Esc / Android back take the quiet action when there is one; a notice without one must be answered. With focusTitle the
 // layer's first focus is the title itself (no control is focused first); Tab still cycles through the buttons (the title
 // has tabindex -1 and is no Tab stop).
-useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary'); }, true, 6,
+useDialogA11y(computed(() => props.open), `#${id}`, () => {
+  if (props.secondary && (!props.busy || props.secondaryWhileBusy)) emit('secondary');
+  else if (!props.secondary && props.dismissible && !props.busy) emit('dismiss');
+}, true, 6,
   () => props.focusTitle ? document.getElementById(`${id}-title`) : null);
 </script>
 <style scoped>
@@ -70,4 +79,9 @@ useDialogA11y(computed(() => props.open), `#${id}`, () => { if (props.secondary 
    light #99443B / white, about 7:1). Disabled, busy and pressed states stay NxButton's. */
 .nx-notice__primary--danger :deep(.nx-button__surface) { background: var(--v5-danger); color: var(--v5-on-brand); }
 .nx-notice__title:focus { outline: none; }
+.nx-notice--no-icon .nx-notice__title { margin-top: 0; }
+/* Title and actions stay put; the content between them scrolls when it is taller than the screen allows. */
+.nx-notice--scroll { overflow: hidden; }
+.nx-notice--scroll .nx-notice__title, .nx-notice--scroll .nx-notice__actions { flex: none; }
+.nx-notice__scroll { align-self: stretch; min-height: 0; margin-top: 16px; overflow-y: auto; overscroll-behavior: contain; text-align: left; }
 </style>

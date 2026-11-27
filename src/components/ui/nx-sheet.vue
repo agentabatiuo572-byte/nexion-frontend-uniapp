@@ -4,7 +4,7 @@
          targets, so @click.self never matched and a mask tap closed nothing. Taps on the sheet never reach this layer. -->
     <view class="nx-sheet-scrim" aria-hidden="true" @click="!persistent && $emit('close')" />
     <view :id="id" class="nx-glass-sheet nx-sheet nx-sheet-slide-up" role="dialog" aria-modal="true" :aria-label="title">
-      <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
+      <view class="nx-sheet__header"><text class="nx-sheet__title">{{ title }}</text><NxButton :label="copy.close" size="medium" round @click="$emit('close')"><NxIcon name="close" :size="18" /></NxButton></view>
       <view class="nx-sheet__body"><slot /></view>
       <view v-if="$slots.footer" class="nx-sheet__footer"><slot name="footer" /></view>
     </view>

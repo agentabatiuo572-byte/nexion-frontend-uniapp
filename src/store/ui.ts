@@ -30,11 +30,13 @@ export interface ConfirmOptions {
   icon?: "danger" | "warn" | "info" | "success" | null;
   /** 谁开的框(如页面实例的 owner 标记)—— 页面卸载时只收自己开的,不碰别人排队中的框。 */
   owner?: string;
-  /** Optional detail list (label/value rows) — switches the dialog to the centred detail layout. */
+  /** Optional detail list (label/value rows) — switches the dialog to the centred detail layout.
+   *  `fullCode`: a string to check character by character (a payout address), shown whole under its label (03 §3.6.1). */
   rows?: { label: string; value: string; amount?: boolean; fullCode?: string }[];
   /** Badge above the title in the detail layout. */
   glyph?: "withdraw";
-  /** Rule data carried with a confirmation snapshot. */
+  /** A titled list of numbered rules under the detail rows (the withdrawal confirm carries its rules, user 2026-11-27).
+   *  With it, only the rows and the rules scroll; the glyph, title and actions stay on screen. */
   rules?: { title: string; items: RuleItem[] };
 }
 
