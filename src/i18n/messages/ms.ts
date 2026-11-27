@@ -4475,6 +4475,7 @@ export const ms: Messages = {
   },
   walletV3: {
     withdrawFeeStale: "Kadar caj telah dikemas kini — sila cuba lagi",
+    withdrawQuoteChanged: "Sebut harga telah berubah. Sila semak dan sahkan semula.",
     withdrawContextStale: "Akaun atau alamat penerima anda telah berubah — sila hantar semula",
     withdrawHandledElsewhere: "Permintaan pengeluaran asal telah dikendalikan di halaman lain. Semak sejarah pengeluaran anda.",
     withdrawEarlierOutcome: "Permintaan terdahulu: {outcome}",

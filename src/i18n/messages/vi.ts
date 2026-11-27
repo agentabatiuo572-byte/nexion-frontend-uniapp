@@ -4044,6 +4044,7 @@ timeHoursAgo: "{n} giờ",
 
   walletV3: {
     withdrawFeeStale: "Mức phí đã được cập nhật, vui lòng thử lại",
+    withdrawQuoteChanged: "Báo giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại.",
     withdrawContextStale: "Tài khoản hoặc địa chỉ nhận đã thay đổi, vui lòng gửi lại",
     withdrawHandledElsewhere: "Yêu cầu rút tiền ban đầu đã được xử lý ở trang khác. Vui lòng kiểm tra lịch sử rút tiền.",
     withdrawEarlierOutcome: "Yêu cầu trước đó: {outcome}",

@@ -4124,6 +4124,7 @@ timeHoursAgo: "{n}h ago",
 
   walletV3: {
     withdrawFeeStale: "The fee rate has been updated — please try again",
+    withdrawQuoteChanged: "The quote has changed. Please review and confirm again.",
     withdrawContextStale: "Your account or payout address changed — please submit again",
     withdrawHandledElsewhere: "The original withdrawal request was handled on another page. Check your withdrawal history.",
     withdrawEarlierOutcome: "Earlier request: {outcome}",

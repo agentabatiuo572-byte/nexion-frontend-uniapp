@@ -1,5 +1,6 @@
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { isVisibleUsdtNetwork } from "@/lib/usdt-network-options";
+import { parseWithdrawalQuote, type WithdrawalQuote } from "@/api/withdrawal-api";
 import type { Withdrawal } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 
@@ -25,12 +26,14 @@ type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 export interface WithdrawAttempt {
   /** 随请求上送的 Idempotency-Key。 */
   key: string;
-  /** 以下五项 = POST /api/withdrawals 的请求体,重放时逐字段原样重发。 */
+  /** 原始 POST /api/withdrawals 请求体，重放时逐字段原样重发。 */
   amount: number;
   network: CryptoNetwork;
   address: string;
   policyVersion: string;
   offset: boolean;
+  /** B147 前已落盘的请求没有该字段，重放时同样省略。 */
+  confirmedQuote?: WithdrawalQuote;
 }
 
 const TABLE_KEY = "nexgrid-withdraw-attempt-accounts-v1"; // { [accountKey]: WithdrawAttempt }
@@ -48,7 +51,9 @@ export function readWithdrawAttempt(accountKey: string, throwOnReadError = false
   if (typeof address !== "string" || !address) return null;
   if (typeof policyVersion !== "string" || !policyVersion) return null;
   if (typeof offset !== "boolean") return null;
-  return { key, amount, network: network as CryptoNetwork, address, policyVersion, offset };
+  const confirmedQuote = parseWithdrawalQuote(row.confirmedQuote);
+  if (row.confirmedQuote !== undefined && (!confirmedQuote || Number(confirmedQuote.netReceive) <= 0)) return null;
+  return { key, amount, network: network as CryptoNetwork, address, policyVersion, offset, confirmedQuote: confirmedQuote ?? undefined };
 }
 
 /**

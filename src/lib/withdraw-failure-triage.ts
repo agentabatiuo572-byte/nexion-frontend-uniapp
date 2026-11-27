@@ -21,6 +21,7 @@ export type TriageKind =
   | "daily-limit"        // 今日笔数已达上限
   | "geo"                // 地区策略拒绝(有专属话术)
   | "business"           // 服务端完整应答的业务拒绝
+  | "quote-changed"      // 原报价已被服务端拒绝，需确认新的报价
   | "declined"           // 其它定局拒绝
   | "resend-declined"    // 重放被拒,但先前那笔状态仍未知
   | "unknown";           // 结果未知:请求可能已落库
@@ -49,6 +50,12 @@ export interface TriageDecision {
 
 export function triageWithdrawFailure(err: unknown, ctx: TriageInput): TriageDecision {
   const { isReplay, isDailyLimit, isGeo } = ctx;
+  if (isApiRefusal(err, 409, "WITHDRAWAL_QUOTE_CHANGED")) {
+    return { fate: "retire", kind: "quote-changed", refreshPolicy: false };
+  }
+  if (isApiRefusal(err, 422, "WITHDRAWAL_CONFIRMED_QUOTE_INVALID")) {
+    return { fate: "retire", kind: "declined", refreshPolicy: false };
+  }
   if (isDailyLimit && isApiRefusal(err, 409, "WITHDRAWAL_DAILY_LIMIT_EXCEEDED")) {
     return { fate: isReplay ? "keep" : "retire", kind: "daily-limit", refreshPolicy: false };
   }

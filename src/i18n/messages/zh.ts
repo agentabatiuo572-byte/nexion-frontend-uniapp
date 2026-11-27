@@ -4057,6 +4057,7 @@ timeHoursAgo: "{n}小时前",
 
   walletV3: {
     withdrawFeeStale: "费率已更新,请重试",
+    withdrawQuoteChanged: "报价已更新，请重新确认。",
     withdrawContextStale: "账户或收款地址已变化,请重新提交",
     withdrawHandledElsewhere: "原提现请求已在其他页面处理，请查看提现记录。",
     withdrawEarlierOutcome: "先前请求：{outcome}",

@@ -310,6 +310,7 @@ const server=http.createServer(async(req,res)=>{
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState','trialOriginalPurchaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
         const taskSelection=demoOptions.taskState.some(([value])=>value===update.taskState);
         if(taskSelection)selectDemoDayOneAccount(state,Date.now());
+        if (demoOptions.withdrawQuoteState.some(([value]) => value === update.withdrawQuoteState)) state.withdrawQuoteChangeConsumed = false;
         // A waiting slot replacement is a full-fleet scene.
         if(update.slotReplacementState==='pending')state.fleetState='full';
         else if(state.fleetState!=='full')state.slotReplacementState='none';
