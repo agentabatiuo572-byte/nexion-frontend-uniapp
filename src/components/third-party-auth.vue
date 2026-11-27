@@ -32,8 +32,10 @@
         :class="{ 'oauth-reason--off': !completionReason || submitting }"
         :aria-hidden="completionReason && !submitting ? undefined : 'true'">{{ completionReason }}</text>
       <!-- While confirm is submitting there is nothing to cancel yet (mask, Esc and back keep the same guard), so 取消 steps out
-           of the way instead of sitting greyed far from its reason; the status line above and confirm's spinner say what is under way. -->
-      <NxButton v-if="!submitting" class="oauth-action" variant="secondary" :label="t.ui.cancel" @click="cancelFromUser" />
+           of the way instead of sitting greyed far from its reason; the status line above and confirm's spinner say what is under way.
+           It keeps its place (hidden from view, focus and screen readers), so the card and the sheet do not change height. -->
+      <NxButton class="oauth-action" :class="{ 'oauth-action--held': submitting }" variant="secondary" :label="t.ui.cancel"
+        :disabled="submitting" @click="cancelFromUser" />
     </component>
     <!-- The host page owns recovery of an unknown sign-in result. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
@@ -330,6 +332,7 @@ onUnmounted(() => {
 .oauth-input { box-sizing: border-box; min-height: 44px; width: 100%; padding: 10px 12px; border-radius: var(--ui-radius-icon); color: var(--v5-ink); background: var(--v5-surface-3); font: var(--ui-type-input-weight) var(--ui-type-input)/var(--ui-type-input-lh) var(--font-v5); margin: var(--v5-space-3) 0; }
 .oauth-label + .oauth-input { margin-top: 4px; }
 .oauth-action { display: flex; width: 100%; margin-top: var(--v5-space-3); }
+.oauth-action--held { visibility: hidden; }
 .oauth-action + .oauth-action, .oauth-reason + .oauth-action { margin-top: var(--v5-space-2); }
 .oauth-reason { display: block; min-height: var(--ui-type-description-lh); margin-top: var(--v5-space-2); text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 .oauth-reason--off { visibility: hidden; }
