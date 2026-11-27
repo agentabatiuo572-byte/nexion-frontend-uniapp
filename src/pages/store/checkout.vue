@@ -1703,6 +1703,7 @@ async function reAddTradein() {
   }
 }
 
+const ordinaryOrderAmount = computed(() => confirmedOrderAmountUsdt(purchaseSubtotal.value, voucherMatch.value?.def));
 const netPrice = computed(() => {
   if (createdCheckoutOrder.value) return createdCheckoutOrder.value.amountUsdt;
   if (pendingCheckoutCreate.value) return pendingCheckoutCreate.value.amount;
@@ -1712,6 +1713,7 @@ const netPrice = computed(() => {
   // Re-adding its parts here would round it in binary before confirmationTotal.
   const trialAmount = exactTrialDue.value;
   if (trialAmount !== undefined) return trialAmount;
+  if (remoteApiEnabled && isConfirmedOrdinaryProduct()) return Number(ordinaryOrderAmount.value);
   return Math.max(
     0,
     +(
@@ -3761,6 +3763,7 @@ async function submitRemoteOrder(): Promise<void> {
   const reviewedTotal = confirmationTotal.value;
   const reviewedSubtotal = purchaseSubtotal.value;
   const reviewedDiscount = voucherDiscount.value;
+  const reviewedOrderAmount = ordinaryOrderAmount.value;
   const reviewedVoucher = voucher.catalog.find(offer => offer.id === voucherQuote.id);
   const reviewedTrialVersion = trialView.value.quoteVersion;
   if (await resumePendingRemoteTradein(submissionScope)
@@ -3832,7 +3835,7 @@ async function submitRemoteOrder(): Promise<void> {
     const creation = pendingCheckoutCreate.value ?? {
       request: { productNo: p.id, quantity: 1, voucherId: requestedVoucherId, idempotencyKey: remoteOrderKey() },
       intent: remoteOrderIntent(), subtotal: reviewedSubtotal, discount: reviewedDiscount, amount: reviewedTotal,
-      expectedAmountUsdt: confirmedOrderAmountUsdt(reviewedSubtotal, reviewedVoucher),
+      expectedAmountUsdt: reviewedOrderAmount,
       productName: p.name, voucherName: reviewedVoucher?.name,
     };
     if (!existingOrder) {
