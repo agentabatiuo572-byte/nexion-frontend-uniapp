@@ -217,6 +217,7 @@ const catalogTaglineFallbacks = {
 const demoSeriesCodes=['S1','PRO','PRO_V2','RACK_P1','RACK_P2','CLOUD_SHARE'];
 const demoS1VariantNo='E-S1-002';
 const demoTradeinSourceNo='E-S1-003';
+const demoSpecsIncompleteNo='E-S1-004';
 const demoTradeinTargetNo='P-PRO-002';
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},
@@ -250,7 +251,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const optionTarget=trialPurchaseOptionSku(state);
   const definitions=[...skuDefinitions];
   if(state.catalogState==='sku-series')
-    definitions.push([demoS1VariantNo,'UVELBox S1 96 GB','Entry',999,150,2,'4 × RTX 4090','96 GB',1200]);
+    definitions.push(
+      [demoS1VariantNo,'UVELBox S1 96 GB','Entry',999,150,2,'4 × RTX 4090','96 GB',1200],
+      [demoSpecsIncompleteNo,'UVELBox S1 Compact','Entry',1199,165,2,null,'64 GB',1000],
+    );
   if(state.fleetState==='tradein-variant')
     definitions.push(
       [demoTradeinSourceNo,'UVELBox S1 Plus','Entry',1599,210,4,'4 × RTX 4090','96 GB',1200],
@@ -266,6 +270,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
     const price=priceChange?Math.max(0.01,Number((basePrice+priceChange).toFixed(6))):basePrice;
     const optionState=id===optionTarget?state.trialPurchaseOptionState:'normal';
     const share=tier==='Share', upcoming=state.catalogState==='phased'&&[2,4].includes(index);
+    const specsIncomplete=id===demoSpecsIncompleteNo;
     const bought=(state.createdOrders??[]).filter(order=>(order.inventoryUsedAt??order.quotaUsedAt)!=null&&demoPaidPurchase(order))
       .flatMap(order=>order.lineItems).filter(line=>line.sku===id).reduce((sum,line)=>sum+line.quantity,0);
     const dailyEarn=demoDailyUsdt(monthlyEstimateUsdt),b=demoBandPct/100;
@@ -274,7 +279,7 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
-    const variantBase=id===demoTradeinTargetNo?1:id===demoS1VariantNo||id===demoTradeinSourceNo?0:index;
+    const variantBase=id===demoTradeinTargetNo?1:id===demoS1VariantNo||id===demoTradeinSourceNo||specsIncomplete?0:index;
     const imageSku=skuDefinitions[variantBase][0];
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
       seriesCode:demoSeriesCodes[variantBase],seriesRepresentative:false,
@@ -283,10 +288,10 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:optionState==='unlisted'?'legacy':'active',
-      available:!upcoming&&optionState!=='unlisted',
+      available:!upcoming&&optionState!=='unlisted'&&!specsIncomplete,
       releaseState:upcoming?'E1_PHASE_NOT_REACHED':optionState==='unlisted'?'PRODUCT_NOT_RELEASED':'AVAILABLE',releasePhaseId:upcoming?'2':null,unlocksAtPhase:null,
       purchaseGate:optionState==='ineligible'||(state.catalogState==='restricted'&&id==='stellarbox-s1')?{mode:'all',enforce:true,rankMin:8}:null,
-      purchaseBlocked:stock===0,purchaseBlockedReason:stock===0?'PRODUCT_OUT_OF_STOCK':null,
+      purchaseBlocked:specsIncomplete||stock===0,purchaseBlockedReason:specsIncomplete?'PRODUCT_SPECS_UNAVAILABLE':stock===0?'PRODUCT_OUT_OF_STOCK':null,
       // B75 USDT follows the backend's six-decimal HALF_UP projection. UVT remains simulated (B75-BE-02).
       dailyEstimateLowUsdt:demoDailyUsdt(monthlyEstimateUsdt,100-demoBandPct),dailyEstimateHighUsdt:demoDailyUsdt(monthlyEstimateUsdt,100+demoBandPct),
       dailyEstimateLowNex:Math.round(dailyEarnNEX*(100-demoBandPct)*10_000)/1e6,
@@ -1783,7 +1788,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       });
       Object.assign(data.quests[4],{
         name:localized(contentLocale,'查看另一件设备','View another device','Xem thiết bị khác'),
-        actionRoute:'/pages/store/detail?id=E-S1-999',
+        actionRoute:'/pages/store/detail?id='+demoSpecsIncompleteNo,
       });
       data.quests.find(row=>row.questCode==='demo-week-0').actionRoute='/pages/store/detail?id='+demoS1VariantNo;
       data.quests.find(row=>row.questCode==='demo-week-3').actionRoute='/pages/store/detail?id=E-S1-999';

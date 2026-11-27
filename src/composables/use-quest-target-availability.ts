@@ -25,8 +25,8 @@ export function questActionRouteUnavailable(route: string): boolean {
     const product = getProduct(productNo);
     return !product || !isProductAvailable(product, resolveActivePhase(useApp().user.joinedAt));
   }
-  return productCatalogState.status !== "ready"
-    || !productCatalogPresentation.value?.products.some(product => product.id === productNo && product.available === true);
+  return productCatalogState.status === "ready"
+    && !productCatalogPresentation.value?.products.some(product => product.id === productNo && product.releaseState === "AVAILABLE");
 }
 
 export function useQuestCatalogRead(needed: () => boolean) {

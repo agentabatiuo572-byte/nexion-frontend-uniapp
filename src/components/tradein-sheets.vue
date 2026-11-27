@@ -378,6 +378,7 @@ import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
+import { productDisplayName } from "@/lib/product-display-name";
 import { fmt } from "@/i18n/format";
 import { apiClient, apiRuntimeConfig, deviceE3Api, orderApi, purchaseEligibilityApi, remoteApiEnabled } from "@/api/runtime";
 import type { PurchaseEligibilitySnapshot } from "@/api/purchase-eligibility-api";
@@ -777,7 +778,7 @@ function sourceDeviceLabel(device: Device | null | undefined, quoteName?: string
 }
 
 function targetProductLabel(productNo: string, quoteName?: string): string {
-  return getProduct(productNo)?.name || quoteName?.trim() || kindLabel(productNo as DeviceKind);
+  return productDisplayName(productNo, t.value.headerTitles.storeProduct, quoteName);
 }
 
 /** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
