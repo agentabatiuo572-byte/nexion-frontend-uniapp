@@ -14,26 +14,29 @@ import { onShow } from "./use-tab-page-lifecycle";
 
 type VoucherTargetStatus = "available" | "unavailable" | "unknown";
 
+const catalogReadFailed = () => productCatalogState.status === "error" || productCatalogLanguageReadFailed.value;
+
+export function voucherTargetStatus(voucher: VoucherDef): VoucherTargetStatus {
+  if (!isSingleSkuVoucher(voucher)) return "available";
+  const catalog = productCatalogPresentation.value;
+  if (!remoteApiEnabled || !catalog || productCatalogState.status !== "ready" || catalogReadFailed()) return "unknown";
+  return catalog.products.some(product => product.id === voucher.applicableSkus[0]) ? "available" : "unavailable";
+}
+
 export function useVoucherTargetAvailability(needed: () => boolean) {
   const active = () => remoteApiEnabled && needed();
   const read = () => {
     if (active()) void revalidateProductCatalog();
   };
-  const failed = () => productCatalogState.status === "error" || productCatalogLanguageReadFailed.value;
   watch(active, read, { immediate: true });
   onShow(read);
   useAutoRecovery({
     active,
-    failed,
+    failed: catalogReadFailed,
     retry: () => refreshProductCatalog(),
     repeatMs: 30_000,
     repeatWhile: () => !hasVisiblePullRefresh(),
   });
 
-  return (voucher: VoucherDef): VoucherTargetStatus => {
-    if (!isSingleSkuVoucher(voucher)) return "available";
-    const catalog = productCatalogPresentation.value;
-    if (!remoteApiEnabled || !catalog || productCatalogState.status !== "ready" || failed()) return "unknown";
-    return catalog.products.some(product => product.id === voucher.applicableSkus[0]) ? "available" : "unavailable";
-  };
+  return voucherTargetStatus;
 }

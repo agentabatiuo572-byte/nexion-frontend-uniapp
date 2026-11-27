@@ -45,7 +45,7 @@
                  04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
                  text action with a trailing arrow into the next page. The same node stays, and the slot keeps the 44px row. -->
             <view class="vcs-cta">
-              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :disabled="voucher.isClaimed(v.id) ? voucherTargetStatus(v) === 'unavailable' : voucher.claimingVoucherId !== null" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
@@ -73,7 +73,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { useVoucherTargetAvailability } from "@/composables/use-voucher-target-availability";
+import { voucherTargetStatus } from "@/composables/use-voucher-target-availability";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 
@@ -91,7 +91,6 @@ const vouchers = computed<VoucherDef[]>(() => {
     sheet.surface,
   );
 });
-const voucherTargetStatus = useVoucherTargetAvailability(() => sheet.open && vouchers.value.some(isSingleSkuVoucher));
 
 const dismissLabel = computed(() => vouchers.value.length > 0 && vouchers.value.every(v => voucher.isClaimed(v.id))
   ? t.value.voucher.closeAria : t.value.voucher.dismissCta);
@@ -126,6 +125,7 @@ function hide() {
 }
 async function onClaim(v: VoucherDef) {
   if (remoteApiEnabled) {
+    if (voucher.claimingVoucherId !== null) return;
     if (await voucher.claimRemote(v.id, sheet.surface)) toast.success(t.value.voucher.claimedToast);
     else toast.error(voucher.remoteStatus === 'ready' ? t.value.promotion.eventVoucherUnavailable : t.value.authOtp.errorServiceUnavailable);
     return;

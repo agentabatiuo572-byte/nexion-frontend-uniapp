@@ -5,6 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { handlesWithdrawalRequest, restoreDemoWithdrawalOrders, seedWithdrawalRecovery, withdrawalRecoveryResponse } from './lib/prototype-demo-withdraw-recovery.mjs';
 import { installFormalProbeSession } from './lib/formal-probe-session.mjs';
 import { demoDefaults, demoFixture, demoFleetFacts, demoOptions, demoProducts, demoPromotionResponse, initializeDemoPreviewAccount, setDemoPromotionReward } from './lib/prototype-demo-data.mjs';
+import { seedDemoDayOneClaim, selectDemoDayOneAccount } from './lib/prototype-demo-day-one.mjs';
 import { previewInterfaceLanguages, updatePreviewHomeDisplay } from './lib/design-review-fixture.mjs';
 import { demoChainDepositAddress, demoChainDepositFee, demoWalletUsdt, initializeDemoWalletHistory, initializeLegacyStreakSavers, postDemoWalletEntries, recordDemoChainDeposit, seedDemoRewardClawback } from './lib/prototype-demo-wallet.mjs';
 import { removeUnreservedLongBankOrder, seedLongBankOrder } from './lib/prototype-demo-bank.mjs';
@@ -54,6 +55,7 @@ if(process.env.DEMO_STATE_FILE){
 }else state.catalogAvailableAt=startedAt;
 initializeDemoPreviewAccount(state,startedAt);
 initializeDemoWalletHistory(state,state.previewFactsAt);
+seedDemoDayOneClaim(state,previewSelectedAccountId(state),startedAt);
 seedLongBankOrder(state,startedAt,unreservedBankQuote);
 let locale='zh';
 demoFleetFacts(new URL('http://127.0.0.1:'+port),locale,state);
@@ -306,6 +308,8 @@ const server=http.createServer(async(req,res)=>{
         if(['normal','device-limit'].includes(update.registrationState))state.registrationState=update.registrationState;
         if(['none','overview','deletion','phone-policy','next-page'].includes(update.securityReadFailure))state.securityReadFailure=update.securityReadFailure;
         for(const [key,options] of Object.entries(demoOptions)) if(!['promotionRewardState','homeDisplayState','jobsBaseState','supportReadbackState','orderTopupState','trialOriginalPurchaseState'].includes(key)&&options.some(([value])=>value===update[key]))state[key]=update[key];
+        const taskSelection=demoOptions.taskState.some(([value])=>value===update.taskState);
+        if(taskSelection)selectDemoDayOneAccount(state,Date.now());
         // A waiting slot replacement is a full-fleet scene.
         if(update.slotReplacementState==='pending')state.fleetState='full';
         else if(state.fleetState!=='full')state.slotReplacementState='none';
@@ -324,7 +328,7 @@ const server=http.createServer(async(req,res)=>{
         // Precision <-> precision-repriced only changes live promo policy: keep the confirmed claim and page epoch.
         const quotePolicyChange=['precision','precision-repriced'].includes(wasTrialQuote)&&['precision','precision-repriced'].includes(state.trialQuoteState);
         const tradeinRecoverySelection=tradeinRecoveryStates.includes(update.tradeinRecoveryState)?update.tradeinRecoveryState:null;
-        const scenarioChange=Boolean(tradeinRecoverySelection)||promotionBuyerChanged||state.contentState!==wasContent||['fleetState','slotReplacementState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
+        const scenarioChange=taskSelection||Boolean(tradeinRecoverySelection)||promotionBuyerChanged||state.contentState!==wasContent||['fleetState','slotReplacementState','checkoutState','trialState','benefitState','trialQuoteState','accountDeletionState','repurchaseState'].some(key=>key in update&&(key!=='trialQuoteState'||!quotePolicyChange))||(state.dataState==='empty')!==wasEmpty||accountPayment(paymentMode)!==accountPayment(wasPaymentMode);
         if(scenarioChange)for(const key of ['fleetSeed','deviceActivations','deviceActivationReceipts','sampleOrdersAt','withdrawalSamplesAt','createdOrders','orderStatuses','retiredDeviceIds','cancelledReplacementTasks','slotReplacements','slotReplacementTasks','deviceIds','deviceSequence','promotionGift','promotionGiftVersion','promotionRewardAt','commands','quotes','walletBalance','walletNexBalance','walletUsdtCheckpoint','walletLegacySeed','walletNexCheckpoint','walletMovements','withdrawalOrders','withdrawRecoveryDemo','walletOpeningMilestoneAt','walletOpeningStreak','streakSaverBalance','walletPurchaseDebits','milestoneClaimReceipts','trialRow','trialCommands','trialStartFailed','trialOrderNo','lastTrialConversion','lastTrialPaymentQuote','intentOrders','bankTopupDemo','ambassadorDemo','chainDepositEvents','chainDepositAddresses','orderTopupSamples','orderTopupPreview'])delete state[key];
         if(scenarioChange){
           delete state.trialLifecycleAdvanceDays;
@@ -368,7 +372,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.trialStartReceiptState==='normal')trialLifecycle.release('start');
         if(update.trialStartReceiptState&&update.trialStartReceiptState!=='rejected')delete state.trialStartPhaseClosed;
         if(update.trialCancelReceiptState==='normal')trialLifecycle.release('cancel');
-        if(update.taskState)for(const key of ['weekClaims','dayOneClaimed','dayOneObservedRoi'])delete state[key];
+        if(taskSelection)for(const key of ['weekClaims','dayOneObservedRoi'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.
         const replaceStreak=wasStreak!==state.streakState&&!state.walletLegacySeed
@@ -387,6 +391,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.eventState)delete state.raffleEntries;
         if(update.raffleState){state.raffleScenarioAt=Date.now();delete state.raffleEntries;}
         const now=Date.now();
+        if(scenarioChange||update.reset)seedDemoDayOneClaim(state,previewSelectedAccountId(state),now);
         // Preview-only provider callback for trial checkout funding without a store order.
         if(Number.isFinite(update.trialTopupDepositUsdt)&&Number(update.trialTopupDepositUsdt.toFixed(6))===update.trialTopupDepositUsdt
           &&update.trialTopupDepositUsdt>0&&update.trialTopupDepositUsdt<=1000000){
