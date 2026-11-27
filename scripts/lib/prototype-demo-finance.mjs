@@ -267,12 +267,30 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const bank=state.bankTopupDemo??={items:[],commands:{}};
     if(!bank.seeded){
       bank.seeded=true;
-      if(!empty&&['paying','credited'].includes(state.topupState)){
-        const settling=state.topupState==='credited',created=now-28000;
-        bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:500*bankFx.quoteRateVndPerUsdt,
-          status:'awaiting_payment',expiresAt:new Date(created+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:new Date(created).toISOString(),
-          creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:0,paymentMode:'hosted',providerStatus:settling?'pending':'created',
-          ...(settling?{}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})});
+      const preset = state.topupState;
+      const reviewStatus = { mismatch: 'mismatch_review', receipt: 'receipt_review', late: 'late_review' }[preset];
+      if (!empty && (reviewStatus || ['paying', 'manual', 'credited', 'expired'].includes(preset))) {
+        const settling = preset === 'credited', expiring = preset === 'expired';
+        const lockMs = bankFx.lockWindowMinutes * 60000;
+        const late = reviewStatus === 'late_review';
+        const receivedAt = now - 10000;
+        // The pane adopts a live order and shows expiry when its normal read sees that order expire.
+        let expiresAt = expiring ? now + 2000 : now - 28000 + lockMs;
+        // The late receipt arrived after the grace window, on an order already marked expired.
+        if (late) expiresAt = receivedAt - bankConfig.graceMinutes * 60000 - 60000;
+        const vndAmount = 500 * bankFx.quoteRateVndPerUsdt;
+        const payment = preset === 'manual' || reviewStatus ? {
+          paymentMode:'manual',memoCode:'DEMO-P44',
+          bankAccount:{accountName:'演示收款户名',accountNumber:'0000000000',bankName:'演示银行'},
+        }:{paymentMode:'hosted',providerStatus:settling?'pending':'created',
+          ...(settling?{}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})};
+        bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount,
+          status:reviewStatus ?? 'awaiting_payment',expiresAt:new Date(expiresAt).toISOString(),createdAt:new Date(expiresAt-lockMs).toISOString(),
+          creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:late?2:reviewStatus?1:0,...payment,
+          ...(reviewStatus ? {
+            receivedVnd: preset === 'mismatch' ? vndAmount - bankConfig.toleranceVnd - 1000 : vndAmount,
+            matchedAt: new Date(receivedAt).toISOString(),
+          } : {})});
         if(settling)bank.settlingPreset=bank.items[0].intentNo;
       }
     }else if(method==='GET'&&bank.settlingPreset){
@@ -290,8 +308,25 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       if(!/^[A-Za-z0-9:_-]{8,64}$/.test(intentNo))refuse(422,'VIETQR_INTENT_NO_INVALID');
       const item=bank.items.find(row=>row.intentNo===intentNo);
       if(!item)refuse(404,'VIETQR_INTENT_NOT_FOUND');
-      // A submitted HDPAY order cannot be cancelled, even when the client sends the current version.
-      if(method==='POST'&&bankIntent[2])refuse(409,'HDPAY_PROVIDER_ORDER_NOT_CANCELLABLE');
+      if (method === 'POST' && bankIntent[2]) {
+        const key = (request.headers()['idempotency-key'] ?? '').trim();
+        if (!/^[A-Za-z0-9:_-]{8,128}$/.test(key)) refuse(400, 'IDEMPOTENCY_KEY_INVALID');
+        const expectedVersion = request.postDataJSON()?.expectedVersion;
+        if (!Number.isInteger(expectedVersion) || expectedVersion < 0) refuse(422, 'VIETQR_EXPECTED_VERSION_REQUIRED');
+        if (item.paymentMode === 'hosted') refuse(409, 'HDPAY_PROVIDER_ORDER_NOT_CANCELLABLE');
+        if (item.status === 'cancelled') {
+          if (bank.cancelKeys?.[intentNo] === key && expectedVersion === item.version - 1) return item;
+          refuse(409, 'VIETQR_INTENT_ALREADY_CANCELLED');
+        }
+        if (item.status !== 'awaiting_payment' || Date.parse(item.expiresAt) <= now) {
+          refuse(409, 'VIETQR_INTENT_NOT_CANCELLABLE');
+        }
+        if (expectedVersion !== item.version) refuse(409, 'VIETQR_INTENT_VERSION_CONFLICT');
+        (bank.cancelKeys ??= {})[intentNo] = key;
+        item.status = 'cancelled';
+        item.version++;
+        return item;
+      }
       if(method==='GET'&&!bankIntent[2])return item;
     }else if(method==='POST'){
       // Lite's unconfigured bank channel fails before recording or replaying a create command.
