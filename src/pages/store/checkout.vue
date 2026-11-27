@@ -409,7 +409,7 @@ import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { acquireAccountCommandKey, readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { readCheckoutOrderPointer, rememberCheckoutOrder, recoverCheckoutOrder, forgetCheckoutOrder, readCheckoutTradein, finishCheckoutTradein, hasKnownCheckoutTradeinStatus, type CheckoutTradeinRecovery } from "@/lib/checkout-order-recovery";
-import { checkoutCreateRequest, readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
+import { checkoutCreateRequest, confirmedOrderAmountUsdt, readCheckoutCreate, rememberCheckoutCreate, forgetCheckoutCreate, completeFailedCheckoutCreate, type PendingCheckoutCreate } from '@/lib/checkout-create-recovery';
 import { orderPaymentRejection, tradeinPaymentRejection, tradeinRejectionKey, TRADEIN_RUNTIME_RECOVERING } from '@/lib/order-payment-rejection';
 import { CheckoutRouteFence, type CheckoutRouteScope } from "@/lib/checkout-route-fence";
 import { postMoneyBill, postReceiptOnce, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
@@ -3761,6 +3761,7 @@ async function submitRemoteOrder(): Promise<void> {
   const reviewedTotal = confirmationTotal.value;
   const reviewedSubtotal = purchaseSubtotal.value;
   const reviewedDiscount = voucherDiscount.value;
+  const reviewedVoucher = voucher.catalog.find(offer => offer.id === voucherQuote.id);
   const reviewedTrialVersion = trialView.value.quoteVersion;
   if (await resumePendingRemoteTradein(submissionScope)
       || (!hasOriginalCheckout.value && recoverCapacityBeforePurchase([submissionScope.productNo], true))) { confirming = false; return; }
@@ -3831,14 +3832,16 @@ async function submitRemoteOrder(): Promise<void> {
     const creation = pendingCheckoutCreate.value ?? {
       request: { productNo: p.id, quantity: 1, voucherId: requestedVoucherId, idempotencyKey: remoteOrderKey() },
       intent: remoteOrderIntent(), subtotal: reviewedSubtotal, discount: reviewedDiscount, amount: reviewedTotal,
-      productName: p.name, voucherName: voucher.catalog.find(offer => offer.id === requestedVoucherId)?.name,
+      expectedAmountUsdt: confirmedOrderAmountUsdt(reviewedSubtotal, reviewedVoucher),
+      productName: p.name, voucherName: reviewedVoucher?.name,
     };
     if (!existingOrder) {
       rememberCheckoutCreate(submissionScope.accountKey, creation);
       confirmedMissingCreateKey.value = null;
       pendingCheckoutCreate.value = creation;
     }
-    const created = existingOrder ?? await orderApi.create(checkoutCreateRequest(creation));
+    const createRequest = checkoutCreateRequest(creation);
+    const created = existingOrder ?? await orderApi.create(createRequest);
     if (!scopeIsCurrent()) return;
     createdCheckoutOrder.value = created;
     canonicalOrderCommitted = true;
@@ -3880,7 +3883,7 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
     }
     if (alreadySettled) { await resumeServerOrder(submissionScope); return; }
-    if (created.amountUsdt !== reviewedTotal) {
+    if (created.amountUsdt !== (existingOrder ? reviewedTotal : Number(createRequest.expectedAmountUsdt))) {
       toast.warn(t.value.store.coTotalQuoteChanged);
       step.value = 'confirm';
       return;
