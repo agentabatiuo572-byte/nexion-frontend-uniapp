@@ -317,6 +317,7 @@ const server=http.createServer(async(req,res)=>{
         }
         if(['single','paginated'].includes(update.securitySessionState))state.securitySessionState=update.securitySessionState;
         Object.assign(state,optionChanges);
+        if(optionChanges.weekEndState)delete state.weekEndingAt;
         selectDemoPaymentState(state,update.reset?demoDefaults.paymentState:wasPaymentMode,!update.reset&&wasMissing);
         if(state.dataState==='empty')state.withdrawLimitState='open';
         if(resetAuth)authDemo.reset();

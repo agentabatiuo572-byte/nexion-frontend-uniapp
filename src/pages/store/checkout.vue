@@ -174,19 +174,19 @@
                 <view v-for="label in [t.store.coRowSubtotal, purchaseCopy.coPromoShort, t.store.coRowTrialOffset, trialDetailCopy.earlyRow]" :key="label" class="checkout-fee checkout-trial-fee"><text class="checkout-trial-fee__label">{{ label }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton" aria-hidden="true" /><text v-else class="checkout-trial-fee__unknown">—</text></view>
               </template>
               <template v-else>
-              <CheckoutRow :label="t.store.coRowSubtotal" :value="reviewMoney(shownPurchaseSubtotal, false, true)" class="checkout-fee" />
+              <CheckoutRow :label="t.store.coRowSubtotal" :value="reviewMoney(shownPurchaseSubtotal, false, true, tradeinQuotePrecision)" class="checkout-fee" />
               <CheckoutRow v-if="shownTrialDiscounts.promo === null || shownTrialDiscounts.promo > 0" :label="shownTrialDiscounts.promo === null ? purchaseCopy.coPromoShort : trialCheckoutShown ? trialPromoRowLabel : promoRowLabel" :value="reviewMoney(shownTrialDiscounts.promo, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="shownTrialDiscounts.offset === null || shownTrialDiscounts.offset > 0" :label="t.store.coRowTrialOffset" :value="reviewMoney(shownTrialDiscounts.offset, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="shownTrialDiscounts.early === null || shownTrialDiscounts.early > 0" :label="trialCheckoutShown ? trialDetailCopy.earlyRow : trialCopy.earlyDiscountLabel" :value="reviewMoney(shownTrialDiscounts.early, true)" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="reviewMoney(voucherDiscount, true)" class="checkout-fee checkout-fee--discount" />
-              <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="reviewMoney(tradeinCredit, true)" class="checkout-fee checkout-fee--discount" />
+              <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="tradeinCreditText" class="checkout-fee checkout-fee--discount" />
               <CheckoutRow v-if="!trialCheckoutShown && isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="reviewMoney(cardFee)" class="checkout-fee" />
               <CheckoutRow v-else-if="!trialCheckoutShown && !remoteApiEnabled" :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" class="checkout-fee" />
               <CheckoutRow v-if="!trialCheckoutShown && !remoteApiEnabled" :label="t.store.coRowShipping" :value="t.store.coShippingValue" class="checkout-fee" />
               </template>
               <!-- While the original order's external payment is under way, this is the order's amount, not what that payment
                    charges (its total, fees included, lives on the payment itself). -->
-              <view class="checkout-fee checkout-fee--total checkout-summary-total" :class="{ 'checkout-fee--noted': trialCheckoutShown }"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /><CheckoutAmount v-else :value="shownConfirmationTotal" :currency="shownTrialDueBelowCent ? 'USDT' : 'USD'" :below-cent="shownTrialDueBelowCent" /></view>
+              <view class="checkout-fee checkout-fee--total checkout-summary-total" :class="{ 'checkout-fee--noted': trialCheckoutShown }"><text>{{ originalExternalPaying ? t.promotion.total : flowCopy.paymentTotal }}</text><view v-if="trialQuoteLoading" class="checkout-skeleton checkout-skeleton--total" aria-hidden="true" /><CheckoutAmount v-else :value="shownConfirmationTotal" :currency="shownTrialDueBelowCent ? 'USDT' : 'USD'" :precision="tradeinQuotePrecision" :below-cent="shownTrialDueBelowCent" /></view>
               <text v-if="trialCheckoutShown" class="checkout-fees-note">{{ trialCopy.voucherUnavailable }}</text>
             </view>
             <view v-if="trialCreditText" class="checkout-trial-credit" data-testid="checkout-trial-credit">
@@ -332,7 +332,7 @@
         <text v-else-if="trayNotice || trialConversionMode" class="nx-tray-note w-full" :role="trayNotice ? 'status' : undefined">{{ trayNotice || purchaseCopy.coTrialNotice }}</text>
         <!-- An unpaid full-price order for the device now on trial (R13): no total to pay here; the way on is the trial credit. -->
         <NxButton v-if="ownTrialOrderExit" variant="primary" :label="t.store.buyWithTrialCredit" @click="openOwnTrialPurchase"><text>{{ t.store.buyWithTrialCredit }}</text><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></NxButton>
-        <view v-if="!ownTrialOrderExit" class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" :currency="shownTrialDueBelowCent ? 'USDT' : 'USD'" :below-cent="shownTrialDueBelowCent" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
+        <view v-if="!ownTrialOrderExit" class="checkout-sticky-copy nx-tray-copy"><view v-if="trialQuoteLoading || (trialWaitLoading && trialQuoteScreenUnavailable)" class="checkout-skeleton checkout-skeleton--tray" aria-hidden="true" /><CheckoutAmount v-else class="checkout-total" :value="shownConfirmationTotal" :currency="shownTrialDueBelowCent ? 'USDT' : 'USD'" :precision="tradeinQuotePrecision" :below-cent="shownTrialDueBelowCent" /><text class="checkout-product-meta">{{ flowCopy.paymentTotal }}<text v-if="trialPreviousTotal" class="checkout-total-was">{{ trialPreviousTotal }}</text></text></view>
         <NxButton v-if="!ownTrialOrderExit" variant="primary" :disabled="trayDisabled || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :busy="trayBusy || trialWaitLoading || checkoutWalletRefreshing || quantitySwitching || reAddingTradein || paymentFlowBusy || checkoutLeaving" :label="trayLabel" @click="submitReview" />
         </template>
       </view>
@@ -1657,6 +1657,7 @@ const appliedTradeinView = computed(() => {
   return credit > 0 ? { device, credit, canonicalQuote: quote ?? null } : null;
 });
 const activeTradeinQuote = computed(() => remoteApiEnabled ? appliedTradeinView.value?.canonicalQuote ?? null : null);
+const tradeinQuotePrecision = computed(() => activeTradeinQuote.value ? 6 : 2);
 
 function sameTradeinTerms(previous: CanonicalTradeinQuote, current: CanonicalTradeinQuote): boolean {
   return previous.sourceDeviceId === current.sourceDeviceId
@@ -1691,12 +1692,11 @@ function resolveQuotedTradeIn(): { device: (typeof app.devices)[number]; credit:
 }
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
 const hasTradein = computed(() => tradeinCredit.value > 0);
-// 抵扣展示面统一使用两位小数和相同的十进制舍入。
-const tradeinCreditText = computed(() => formatAmount(tradeinCredit.value));
+const tradeinCreditText = computed(() => reviewMoney(tradeinCredit.value, true, false, tradeinQuotePrecision.value));
 const tradeinChipText = computed(() => {
   const ti = appliedTradeinView.value;
   if (!ti) return "";
-  return deviceName(t.value, ti.device) + ' · ' + reviewMoney(tradeinCredit.value, true);
+  return deviceName(t.value, ti.device) + ' · ' + tradeinCreditText.value;
 });
 const tradeinPlacementText = computed(() => !appliedTradeinView.value ? ""
   : (appliedTradeinView.value.canonicalQuote ? appliedTradeinView.value.canonicalQuote.targetDeviceStatus === "ACTIVE"
@@ -2458,8 +2458,8 @@ const paymentSheetOpen = ref(false);
 const paymentSheetAmount = ref(0);
 const paymentFlowBusy = ref(false);
 // The review page stays in dollars; the payment sheet shows the chosen method's currency.
-function reviewMoney(amount: Parameters<typeof formatCheckoutReviewAmount>[0], discount = false, unit = false) {
-  return amount === null ? "—" : formatCheckoutReviewAmount(amount, "USD", { discount, unit });
+function reviewMoney(amount: Parameters<typeof formatCheckoutReviewAmount>[0], discount = false, unit = false, precision: 2 | 6 = 2) {
+  return amount === null ? "—" : formatCheckoutReviewAmount(amount, "USD", { discount, unit, precision });
 }
 const checkoutLeaving = ref(false);
 let checkoutLeaveAttempt = 0;
@@ -3480,7 +3480,7 @@ async function completeRemoteTradein(recovery: CheckoutTradeinRecovery, submissi
           if (recoveredResult) return recoveredResult;
           let submitted: CanonicalTradeinResult | null = null;
           const summary = productDisplayName(reviewedQuote.targetProductNo, t.value.headerTitles.storeProduct, reviewedQuote.targetProductName);
-          const paid = await executeSelectedPurchase({amount:recovery.tradeinQuote.payableUsdt,currency:'USDT',summary},
+          const paid = await executeSelectedPurchase({amount:reviewedQuote.payableUsdt,currency:'USDT',summary,precision:6},
             async authorization=>{
               if (!authorizationIsCurrent()) return null;
               try {

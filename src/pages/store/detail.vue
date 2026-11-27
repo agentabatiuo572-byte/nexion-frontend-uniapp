@@ -414,8 +414,11 @@ const copy = computed(() =>
     : { tagline: "", badge: "", badgeKind: "custom" as const, taskLevels: "" },
 );
 
-const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
-  && !productOutOfStock(product.value));
+const purchaseUnavailable = computed(() => {
+  const current = product.value;
+  return current?.purchaseBlockedReason === "PRODUCT_SPECS_UNAVAILABLE"
+    || (current?.purchaseBlocked === true && !productOutOfStock(current));
+});
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
