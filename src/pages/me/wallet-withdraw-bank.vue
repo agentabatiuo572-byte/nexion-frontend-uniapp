@@ -345,7 +345,8 @@ const configBlockReason = computed(() => {
 });
 const submitReason = computed(() => {
   if (!quote.value || quoteExpired.value) return "";
-  return quoteLimitsChanged.value ? c.value.quoteLimitsChanged : configBlockReason.value;
+  // Channel, account, limits and daily count come first (PRD); a stale quote is said only when none applies. Both still block.
+  return configBlockReason.value || (quoteLimitsChanged.value ? c.value.quoteLimitsChanged : "");
 });
 // The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
 const cardTag = computed(() => {

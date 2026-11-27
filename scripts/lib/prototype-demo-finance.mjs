@@ -309,23 +309,13 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       const item=bank.items.find(row=>row.intentNo===intentNo);
       if(!item)refuse(404,'VIETQR_INTENT_NOT_FOUND');
       if (method === 'POST' && bankIntent[2]) {
+        // B28: a retired manual order is refused before anything else (410); a submitted hosted order is never cancellable.
+        if (item.paymentMode !== 'hosted') refuse(410, 'VIETQR_MANUAL_TOPUP_RETIRED');
         const key = (request.headers()['idempotency-key'] ?? '').trim();
         if (!/^[A-Za-z0-9:_-]{8,128}$/.test(key)) refuse(400, 'IDEMPOTENCY_KEY_INVALID');
         const expectedVersion = request.postDataJSON()?.expectedVersion;
         if (!Number.isInteger(expectedVersion) || expectedVersion < 0) refuse(422, 'VIETQR_EXPECTED_VERSION_REQUIRED');
-        if (item.paymentMode === 'hosted') refuse(409, 'HDPAY_PROVIDER_ORDER_NOT_CANCELLABLE');
-        if (item.status === 'cancelled') {
-          if (bank.cancelKeys?.[intentNo] === key && expectedVersion === item.version - 1) return item;
-          refuse(409, 'VIETQR_INTENT_ALREADY_CANCELLED');
-        }
-        if (item.status !== 'awaiting_payment' || Date.parse(item.expiresAt) <= now) {
-          refuse(409, 'VIETQR_INTENT_NOT_CANCELLABLE');
-        }
-        if (expectedVersion !== item.version) refuse(409, 'VIETQR_INTENT_VERSION_CONFLICT');
-        (bank.cancelKeys ??= {})[intentNo] = key;
-        item.status = 'cancelled';
-        item.version++;
-        return item;
+        refuse(409, 'HDPAY_PROVIDER_ORDER_NOT_CANCELLABLE');
       }
       if(method==='GET'&&!bankIntent[2])return item;
     }else if(method==='POST'){
