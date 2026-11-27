@@ -16,8 +16,8 @@ export interface PaymentPasswordContext {
   summary: string;
   details?: { name: string; quantity?: number; amount?: number | string }[];
   readDetailAmounts?: () => Promise<(number | string | undefined)[]>;
-  /** Display only: 'full' preserves every digit (the order top-up path); otherwise two places. */
-  precision?: 'full';
+  /** Display precision for the authorized quote. Defaults to two decimal places. */
+  precision?: 6 | 'full';
   belowCent?: boolean;
 }
 type Stage = "loading" | "read-error" | "setup" | "confirm" | "pay" | "recovery" | "reset" | "reset-confirm" | "pending";

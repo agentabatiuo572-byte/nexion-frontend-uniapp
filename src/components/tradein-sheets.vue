@@ -1081,7 +1081,7 @@ watch([remoteRetireLoadKey, state], () => {
 }, { immediate: true, flush: "sync" });
 
 // Display parts of an amount: the main-amount figure keeps its whole part in the main ink, the decimals muted (01 §1.2).
-// precision 6 keeps an original record's full amount (at least two decimals) instead of rounding it to cents (03 §3.6).
+// Six-place quotes and original records keep their full amount with at least two decimals (03 §3.6).
 function amountParts(value: number, precision: 2 | 6 = 2): { int: string; dec: string } {
   const [int, dec] = formatGroupedAmount(value, precision).split(".");
   return { int, dec: dec === undefined ? "" : `.${dec}` };
@@ -1181,6 +1181,7 @@ const tradeinView = computed(() => {
   const creditRatePct = remoteQuote ? remoteQuote.creditRatePct : band?.creditPct ?? null;
   const estNet = remoteQuote?.payableUsdt ?? Math.max(0, +(s.newPrice - credit).toFixed(2));
   const targetPrice = remoteQuote?.targetPriceUsdt ?? s.newPrice;
+  const precision = remoteQuote ? 6 : 2;
   const oldName = sourceDeviceLabel(oldDevice, remoteQuote?.sourceProductName);
   const targetProductNo = remoteQuote?.targetProductNo ?? s.newKind;
   const newName = targetProductLabel(targetProductNo, remoteQuote?.targetProductName);
@@ -1192,17 +1193,17 @@ const tradeinView = computed(() => {
     newKind: targetProductNo,
     newName,
     newImageUrl: getProduct(targetProductNo)?.imageUrl ?? null,
-    estNet: amountParts(estNet),
-    credit: formatGroupedAmount(credit),
-    targetPrice: formatGroupedAmount(targetPrice),
+    estNet: amountParts(estNet, precision),
+    credit: formatGroupedAmount(credit, precision),
+    targetPrice: formatGroupedAmount(targetPrice, precision),
     // How much of the target price the credit covers, drawn from the two server figures; no bar position when either is unknown.
     creditPct: targetPrice > 0 ? Math.round(Math.min(100, Math.max(0, credit / targetPrice * 100))) : null,
-    basis: fmtParts(t.value.tradein.sheetBasis, { price: `$${formatGroupedAmount(sourcePrice)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
+    basis: fmtParts(t.value.tradein.sheetBasis, { price: `$${formatGroupedAmount(sourcePrice, precision)}`, pct: creditRatePct == null ? "—" : String(creditRatePct) }),
     // An active old device loses its running job on payment (PRD §7.5.1, BUG-542); same condition as before, both branches.
     taskVoid: remoteQuote ? remoteQuote.targetDeviceStatus === "ACTIVE" : oldDevice.activatedAt != null,
     fundsGap: remoteQuote && !remoteQuote.sufficientFunds
-      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(remoteQuote.walletShortfallUsdt) }) : null,
-    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet) }),
+      ? fmtParts(t.value.tradein.purchaseFundsGap, { amount: formatGroupedAmount(remoteQuote.walletShortfallUsdt, precision) }) : null,
+    ctaText: fmt(t.value.tradein.sheetCta, { amount: formatGroupedAmount(estNet, precision) }),
   };
 });
 // Quota used up keeps the confirm label on the disabled button; the reason is the panel right above it (board B-4d).

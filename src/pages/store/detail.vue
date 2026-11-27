@@ -265,7 +265,7 @@ import { fmt } from "@/i18n/format";
 import { formatComputePoints } from "@/i18n/compute-points";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isProductAvailable, productOutOfStock } from "@/store/product-availability";
+import { isProductAvailable, productOutOfStock, productSpecsUnavailable } from "@/store/product-availability";
 import { isBundleHardwareAvailable } from "@/store/bundle-catalog-guard";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
@@ -433,8 +433,7 @@ const copy = computed(() =>
     : { tagline: "", badge: "", badgeKind: "custom" as const, taskLevels: "" },
 );
 
-const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true
-  && !productOutOfStock(product.value));
+const purchaseUnavailable = computed(() => productSpecsUnavailable(product.value));
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {

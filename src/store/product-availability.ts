@@ -19,6 +19,11 @@ export function productOutOfStock(product: Product | undefined): boolean {
     || product?.inventoryMode === "FINITE" && product.stock === 0;
 }
 
+export function productSpecsUnavailable(product: Product | undefined): boolean {
+  return product?.purchaseBlockedReason === "PRODUCT_SPECS_UNAVAILABLE"
+    || product?.purchaseBlocked === true && !productOutOfStock(product);
+}
+
 export function productHasStock(product: Product | undefined): boolean {
   return !!product && !productOutOfStock(product) && (product.inventoryMode === "UNLIMITED"
     || typeof product.stock === "number" && product.stock > 0);
