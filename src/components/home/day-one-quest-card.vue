@@ -160,7 +160,7 @@ interface QuestTask {
   /** 该填充色之上的前景色(勾/序号)。quest 两色恒浅 → on-quest 恒深墨;
    *  brand 随主题翻转 → 必须配同样翻转的 on-brand。用错会在某一主题糊掉。 */
   onColor: string;
-  ineligibilityReason: "unknown" | null;
+  ineligibilityReason: "expired" | null;
 }
 
 const visibility = useDataVisibility();
@@ -219,8 +219,8 @@ const remoteTasks = computed<QuestTask[]>(() => {
       nex: null,
       href: row.actionRoute,
       cat: categoryLabel(row.category),
-      // The Day-One state read exposes eligibility but has no reason field.
-      ineligibilityReason: row.eligible ? null : "unknown",
+      // The state read sets eligible=false only outside the frozen claim window (AppGrowthEngagementMapper), so the reason is expiry.
+      ineligibilityReason: row.eligible ? null : "expired",
       ...palette[index % palette.length],
     }));
 });
