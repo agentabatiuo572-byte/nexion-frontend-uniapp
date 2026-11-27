@@ -31,8 +31,9 @@
       <text v-if="verified && (intent === 'LINK' || challengeNo)" id="oauth-confirm-reason" class="oauth-reason"
         :class="{ 'oauth-reason--off': !completionReason || submitting }"
         :aria-hidden="completionReason && !submitting ? undefined : 'true'">{{ completionReason }}</text>
-      <NxButton class="oauth-action" variant="secondary" :label="t.ui.cancel" :disabled="submitting"
-        :aria-describedby="submitting ? 'oauth-panel-status' : undefined" @click="cancelFromUser" />
+      <!-- While confirm is submitting there is nothing to cancel yet (mask, Esc and back keep the same guard), so 取消 steps out
+           of the way instead of sitting greyed far from its reason; the status line above and confirm's spinner say what is under way. -->
+      <NxButton v-if="!submitting" class="oauth-action" variant="secondary" :label="t.ui.cancel" @click="cancelFromUser" />
     </component>
     <!-- The host page owns recovery of an unknown sign-in result. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
