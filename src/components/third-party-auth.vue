@@ -1,8 +1,8 @@
 <template>
-  <view v-if="providers.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
+  <view v-if="providers?.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
     <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
-    <text v-if="intent === 'LINK' && !providers.length" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
-    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || disabled" :preserve-appearance="disabled && !flow && !submitting && !unavailableReason" :unavailable-reason="unavailableReason" @select="start" />
+    <text v-if="intent === 'LINK' && providers?.length === 0" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
+    <AuthProviderGrid v-if="labels.length" :providers="labels" :linked="linkedLabels" :busy="!!flow || submitting || providersDisabled" :preserve-appearance="providersDisabled && !flow && !submitting && !unavailableReason" :unavailable-reason="unavailableReason" @select="start" />
     <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'" aria-live="polite" @close="cancelFromUser">
       <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
@@ -22,8 +22,7 @@
         <text>{{ t.ui.cancel }}</text>
       </view>
     </component>
-    <!-- 03 §3.5.1: operation results are toasts. This line keeps only states: a sign-in result still unknown (the host
-         page's recovery owns it) and providers that could not be listed for linking. -->
+    <!-- The host page owns recovery of an unknown sign-in result. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
     <ServerCaptchaSlider v-if="showCaptcha" scene="LOGIN" phone="" @success="captchaComplete" @close="showCaptcha = false" />
   </view>
@@ -43,6 +42,9 @@ import { navReset } from "@/lib/route";
 import { toast } from "@/store/ui";
 import { useLocaleStore } from "@/store/locale";
 import { ApiError } from "@/api/errors";
+import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { validOAuthBrowserReceipt, type OAuthBrowserReceipt } from "@/auth/oauth-browser-return";
 
 // beforeStart lets the host page veto a start (e.g. an invalid typed invite code) before the provider opens.
@@ -53,8 +55,28 @@ const props = withDefaults(defineProps<{ intent?: "LOGIN" | "LINK"; sheet?: bool
 const t = useT();
 const emit = defineEmits<{ (event: "busy", busy: boolean): void }>();
 const api = createOAuthProviderApi(apiClient, authApi);
-const providers = ref<ThirdPartyProvider[]>([]);
-const linked = ref<ThirdPartyProvider[]>([]);
+let disposed = false;
+
+function useProviderList(read: () => Promise<ThirdPartyProvider[]>, active?: () => boolean) {
+  const list = ref<ThirdPartyProvider[] | null>(null);
+  const recovery = useAutoRecovery({
+    active,
+    failed: () => list.value === null,
+    retry: async () => {
+      const scope = remoteAccountScope.snapshot();
+      const result = await read();
+      if (!disposed && remoteAccountScope.isCurrent(scope)) list.value = result;
+    },
+    repeatMs: 30_000,
+    repeatWhile: () => !hasVisiblePullRefresh(),
+  });
+  onMounted(() => { void recovery.retry(); });
+  return list;
+}
+
+const providers = useProviderList(api.available);
+const linked = useProviderList(api.linked, () => props.intent === "LINK");
+const providersDisabled = computed(() => props.disabled || (props.intent === "LINK" && linked.value === null));
 const flow = ref<OAuthFlow | null>(null);
 const selected = ref<ThirdPartyProvider>("GOOGLE");
 const verified = ref(false);
@@ -71,12 +93,11 @@ const completionDisabled = computed(() => submitting.value || (props.intent === 
 const showCaptcha = ref(false);
 const names = { GOOGLE: "Google", APPLE: "Apple", TELEGRAM: "Telegram" } as const;
 const label = (provider: ThirdPartyProvider) => names[provider];
-const linkedLabels = computed(() => props.intent === "LINK" ? linked.value.map(label) : []);
+const linkedLabels = computed(() => props.intent === "LINK" ? (linked.value ?? []).map(label) : []);
 const labels = computed(() => (props.intent === "LINK"
-  ? [...new Set([...providers.value, ...linked.value])] : providers.value).map(label));
+  ? [...new Set([...(providers.value ?? []), ...(linked.value ?? [])])] : (providers.value ?? [])).map(label));
 let generation = 0;
 let pollVersion = 0;
-let disposed = false;
 let revision = 0;
 let expiresAt = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -139,11 +160,11 @@ function sponsorRefused(cause: unknown): boolean {
   return true;
 }
 async function start(name: string) {
-  if (flow.value || submitting.value || props.disabled || disposed) return;
+  if (flow.value || submitting.value || providersDisabled.value || disposed) return;
   if (props.intent === "LOGIN" && authApi.pendingLogin()) { message.value = t.value.login.unknownAttempt; return; }
   const provider = (Object.keys(names) as ThirdPartyProvider[]).find(key => names[key] === name);
-  if (!provider || !providers.value.includes(provider)
-      || (props.intent === "LINK" && linked.value.includes(provider))) return;
+  if (!provider || !providers.value?.includes(provider)
+      || (props.intent === "LINK" && linked.value?.includes(provider))) return;
   const current = ++generation;
   revision = sessionVault.revision();
   selected.value = provider; message.value = ""; submitting.value = true; emit("busy", true);
@@ -208,7 +229,7 @@ async function complete(captchaTicket?: string) {
       await api.link(flow.value, password.value);
       if (disposed || current !== generation) return;
       // POST is the binding result. A failed optional list refresh must not turn it into a failed mutation.
-      if (!linked.value.includes(selected.value)) linked.value.push(selected.value);
+      if (linked.value && !linked.value.includes(selected.value)) linked.value.push(selected.value);
       cancel(); toast.success(t.value.thirdParty.linkSuccess);
     } else {
       const result = await api.complete(selected.value, flow.value, revision,
@@ -251,18 +272,10 @@ async function complete(captchaTicket?: string) {
     }
   } finally { submitting.value = false; password.value = ""; }
 }
-onMounted(async () => {
+onMounted(() => {
   // #ifdef H5
   window.addEventListener("message", browserMessage);
   // #endif
-  try {
-    const available = await api.available();
-    if (!disposed) providers.value = available;
-    if (props.intent === "LINK") {
-      const value = await api.linked();
-      if (!disposed) linked.value = value;
-    }
-  } catch { if (!disposed && props.intent === "LINK") message.value = t.value.thirdParty.unavailable; }
 });
 onUnmounted(() => {
   disposed = true; cancel();
