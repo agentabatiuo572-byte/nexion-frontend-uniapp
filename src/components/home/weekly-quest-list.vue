@@ -34,7 +34,7 @@
             <text class="block" :style="claimedLabelStyle">{{ titleOf(q) }}</text>
 
           </view>
-          <view style="text-align:right"><text :style="claimedRewardStyle">{{ claimedRewardText(q) }}</text><text class="block" :style="claimedStatusStyle">{{ t.questClaim.alreadyClaimed }}</text></view>
+          <view style="text-align:right"><text v-if="claimedRewardText(q)" :style="claimedRewardStyle">{{ claimedRewardText(q) }}</text><text class="block" :style="claimedStatusStyle">{{ t.questClaim.alreadyClaimed }}</text></view>
         </view>
 
         <!-- completed: claimable button -->
@@ -169,7 +169,8 @@ function isExpired(q: CanonicalQuest): boolean {
 }
 function claimedRewardText(q: CanonicalQuest): string {
   const confirmed = wq.confirmedRewardOf(q);
-  return confirmed === undefined ? "—" : `+${formatAmount(confirmed)}\u00A0UVT`;
+  // Without a confirmed credit the row only says it was claimed (the claim-time tier is not in the read).
+  return confirmed === undefined ? "" : `+${formatAmount(confirmed)}\u00A0UVT`;
 }
 function titleOf(q: CanonicalQuest): string {
   return weeklyQuestDisplayName(q, locale.code, t.value);
