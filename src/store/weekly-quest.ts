@@ -10,6 +10,7 @@ import {
 } from "@/lib/weekly-quest-command-key";
 import { isCurrentQuest } from "@/lib/actionable-quest";
 import { questClaimNoticeFor, type QuestClaimNotice } from "@/lib/quest-claim-notice";
+import { formatAmount } from "@/lib/amount-display";
 
 const UNKNOWN_IDEMPOTENCY_RESULTS = new Set([
   "IDEMPOTENCY_RESULT_UNKNOWN",
@@ -25,6 +26,15 @@ interface SharedQuestRead {
   readRemoteSnapshot(): Promise<QuestSnapshot | null>;
 }
 
+function decimalParts(amount: number): { digits: bigint; scale: number } {
+  const [whole, fraction = ""] = formatAmount(amount, "full").split(".");
+  return { digits: BigInt(whole + fraction), scale: fraction.length };
+}
+
+function rewardKey(quest: CanonicalQuest): string {
+  return JSON.stringify([quest.questCode, quest.instanceKey]);
+}
+
 /** Weekly quests are a read-through projection of the server mission and reward ledger. */
 export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   const questRead = shallowRef<SharedQuestRead | null>(null);
@@ -34,6 +44,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   const claimErrorQuestCode = ref<string | null>(null);
   const claimNotice = ref<QuestClaimNotice | null>(null);
   const claiming = ref<string | null>(null);
+  const confirmedRewards = ref(new Map<string, number>());
   let accountKeyValue = "default";
   let accountEpoch = 0;
   let refreshSequence = 0;
@@ -42,6 +53,19 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   const tier1Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T1" && isCurrentQuest(q)) ?? []);
   const tier2Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T2" && isCurrentQuest(q)) ?? []);
   const multiplier = computed(() => snapshot.value?.questBonusMultiplier ?? 1);
+
+  function pendingRewardOf(quest: CanonicalQuest): string {
+    const base = decimalParts(quest.rewardNex);
+    const factor = decimalParts(multiplier.value);
+    // Match the ledger's six-place truncation before applying display precision.
+    const micros = base.digits * factor.digits * 1_000_000n / 10n ** BigInt(base.scale + factor.scale);
+    const digits = micros.toString().padStart(7, "0");
+    return `${digits.slice(0, -6)}.${digits.slice(-6)}`;
+  }
+
+  function confirmedRewardOf(quest: CanonicalQuest): number | undefined {
+    return confirmedRewards.value.get(rewardKey(quest));
+  }
 
   function retireClaimedCommands(next: QuestSnapshot): void {
     for (const quest of next.quests) {
@@ -133,6 +157,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
       if (claimResult.questId !== quest.questCode || claimResult.instanceKey !== quest.instanceKey) {
         throw new Error("WEEKLY_QUEST_CLAIM_MISMATCH");
       }
+      confirmedRewards.value.set(rewardKey(quest), claimResult.rewardNex);
       const readBack = await questRead.value?.readRemoteSnapshot();
       if (!isCurrentRequest()) return false;
       const authoritative = readBack?.quests.find((row) =>
@@ -199,6 +224,7 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     claimErrorQuestCode.value = null;
     claimNotice.value = null;
     claiming.value = null;
+    confirmedRewards.value.clear();
     accountKeyValue = accountKey.trim().toLowerCase() || "default";
     questRead.value = source;
   }
@@ -212,5 +238,6 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     }
   });
 
-  return { snapshot, loading, error, claimErrorQuestCode, claimNotice, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
+  return { snapshot, loading, error, claimErrorQuestCode, claimNotice, claiming, tier1Quests, tier2Quests, multiplier,
+    pendingRewardOf, confirmedRewardOf, refresh, claim, bindAccount };
 });

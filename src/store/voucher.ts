@@ -3,7 +3,7 @@ import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { runPassiveTabRead, invalidateBeforePassiveTabRead, rememberPassiveTabRead } from "@/lib/passive-tab-read";
 import { defineStore } from "pinia";
 import { ref, computed, onScopeDispose } from "vue";
-import { remoteApiEnabled, voucherApi } from "@/api/runtime";
+import { apiClient, remoteApiEnabled, voucherApi } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import type { CanonicalVoucher, VoucherSnapshot } from "@/api/voucher-api";
 import {
@@ -92,6 +92,7 @@ export const useVoucher = defineStore("voucher", () => {
   const presentationClaimable = ref<VoucherDef[]>([]);
   const remoteAccountEpoch = createRemoteAccountEpoch("default");
   let remoteGeneration = 0;
+  let remoteAuthorityGeneration = 0;
   let retryAt = 0;
   let readInFlight: { generation: number; promise: Promise<boolean> } | null = null;
   /**
@@ -222,15 +223,27 @@ export const useVoucher = defineStore("voucher", () => {
     const request = remoteAccountEpoch.snapshot();
     const runScope = captureRuntimeRevision();
     const generation = ++remoteGeneration;
+    const authority = remoteAuthorityGeneration;
+    const assertSession = apiClient.captureSessionGuard?.();
+    const claimIsCurrent = () => {
+      if (authority !== remoteAuthorityGeneration || !remoteAccountEpoch.isCurrent(request)) return false;
+      try {
+        assertSession?.();
+        return true;
+      } catch {
+        return false;
+      }
+    };
     claimingVoucherId.value = id;
     try {
-      await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
-      if (!remoteAccountEpoch.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return false;
+      const receipt = await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
+      if (receipt.voucherId !== id) throw new ApiError({ kind: "protocol", message: "VOUCHER_CLAIM_RESPONSE_INVALID" });
+      if (!claimIsCurrent()) return false;
       // A claim receipt confirms the claim. Current usability comes from the catalogue.
       await refreshRemote();
-      return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
+      return claimIsCurrent();
     } catch {
-      await recoverCurrentRemoteRead(request, runScope, generation);
+      if (claimIsCurrent()) await recoverCurrentRemoteRead(request, runScope, generation);
       return false;
     } finally {
       if (remoteAccountEpoch.isCurrent(request)) claimingVoucherId.value = null;
@@ -261,7 +274,8 @@ export const useVoucher = defineStore("voucher", () => {
     }
     claimed.value = rows.bind(rawAccountKey)?.claimed ?? [];
   }
-  const unsubscribeCommerceRun = subscribeRuntimeRevision(() => {
+  const unsubscribeCommerceRun = subscribeRuntimeRevision((_scope, reason) => {
+    if (reason === "authority") remoteAuthorityGeneration += 1;
     if (!remoteApiEnabled || remoteAccountEpoch.snapshot().accountKey === "default") return;
     // A runtime revision invalidates both in-flight reads and existing voucher
     // facts. Clear selectable old vouchers before requesting the new catalog.

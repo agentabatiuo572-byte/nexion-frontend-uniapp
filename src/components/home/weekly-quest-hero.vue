@@ -121,8 +121,7 @@ const quest = computed<CanonicalQuest | null>(() => wq.tier1Quests.find((q) =>
   isLiteQuest(q) && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(q.actionRoute))
   && isCurrentQuest(q, nowTick.value * 1000)) ?? null);
 const mult = computed(() => wq.multiplier);
-const reward = computed(() => (quest.value ? Math.round(quest.value.rewardNex * mult.value) : 0));
-const rewardDisplay = computed(() => formatAmount(reward.value));
+const rewardDisplay = computed(() => formatAmount(quest.value ? wq.pendingRewardOf(quest.value) : 0));
 const completed = computed(() => !!quest.value && ["COMPLETED", "CLAIMABLE"].includes(quest.value.status));
 const visible = computed(() => !!quest.value && quest.value.status !== "CLAIMED");
 const periodExpired = computed(() => Date.parse(quest.value?.eligibleUntil ?? "") <= nowTick.value * 1000);

@@ -34,7 +34,7 @@
             <text class="block" :style="claimedLabelStyle">{{ titleOf(q) }}</text>
 
           </view>
-          <view style="text-align:right"><text :style="claimedRewardStyle">+{{ formatAmount(rewardOf(q)) }}{{ "\u00A0" }}UVT</text><text class="block" :style="claimedStatusStyle">{{ t.questClaim.alreadyClaimed }}</text></view>
+          <view style="text-align:right"><text :style="claimedRewardStyle">{{ claimedRewardText(q) }}</text><text class="block" :style="claimedStatusStyle">{{ t.questClaim.alreadyClaimed }}</text></view>
         </view>
 
         <!-- completed: claimable button -->
@@ -64,7 +64,7 @@
             <text v-else class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
           </view>
           <view v-if="!targetClosed(q)" class="flex items-baseline" style="gap: var(--v5-space-1)">
-            <text :style="pendingRewardStyle">+{{ formatAmount(rewardOf(q)) }}{{ "\u00A0" }}UVT</text>
+            <text :style="pendingRewardStyle">+{{ formatAmount(wq.pendingRewardOf(q)) }}{{ "\u00A0" }}UVT</text>
           </view>
           <svg v-if="!rowInactive(q)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: -2px; flex-shrink: 0"><path d="m9 6 6 6-6 6" /></svg>
         </view>
@@ -139,7 +139,6 @@ if (!pageReadSettled) {
 const tier2Quests = computed<CanonicalQuest[]>(() => mounted.value
   ? wq.tier2Quests.filter((q) => isLiteQuest(q) && (stakingDisplay.isEnabled("stakingVisible") || !isStakingVisibilityRoute(q.actionRoute))) : []);
 
-const mult = computed(() => wq.multiplier);
 const completedCount = computed(() => tier2Quests.value.filter((q) =>
   ["COMPLETED", "CLAIMABLE", "CLAIMED"].includes(q.status)).length);
 const progressText = computed(() => fmt(t.value.quest.progress, {
@@ -169,8 +168,9 @@ function isCompleted(q: CanonicalQuest): boolean {
 function isExpired(q: CanonicalQuest): boolean {
   return Date.parse(q.eligibleUntil) <= nowTick.value * 1000;
 }
-function rewardOf(q: CanonicalQuest): number {
-  return Math.round(q.rewardNex * mult.value);
+function claimedRewardText(q: CanonicalQuest): string {
+  const confirmed = wq.confirmedRewardOf(q);
+  return confirmed === undefined ? "—" : `+${formatAmount(confirmed)}\u00A0UVT`;
 }
 function titleOf(q: CanonicalQuest): string {
   return weeklyQuestDisplayName(q, locale.code, t.value);
@@ -185,7 +185,7 @@ function categoryOf(q: CanonicalQuest): string {
   })[q.category];
 }
 function claimTextFor(q: CanonicalQuest): string {
-  return fmt(w.value.claim, { n: formatAmount(rewardOf(q)) });
+  return fmt(w.value.claim, { n: formatAmount(wq.pendingRewardOf(q)) });
 }
 
 /**

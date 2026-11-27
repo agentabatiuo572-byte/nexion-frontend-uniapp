@@ -109,9 +109,9 @@ const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentation
 const claimedVouchers = computed(() => remoteApiEnabled
   ? voucher.presentationOffers.filter(row => !voucher.presentationClaimable.some(item => item.id === row.id))
   : voucher.claimedUnused);
-const voucherTargetStatus = useVoucherTargetAvailability(() =>
+const voucherTargetRestriction = useVoucherTargetAvailability(() =>
   voucherClaimable.value.some(isSingleSkuVoucher) || claimedVouchers.value.some(isSingleSkuVoucher));
-const voucherClaimed = computed(() => claimedVouchers.value.filter(row => voucherTargetStatus(row) !== "unavailable"));
+const voucherClaimed = computed(() => claimedVouchers.value.filter(row => !voucherTargetRestriction(row)));
 const voucherOffer = computed(() => voucherClaimable.value.length > 0);
 const voucherPending = computed(() => voucherClaimed.value.length > 0);
 function faceValue(rows: VoucherDef[]) {

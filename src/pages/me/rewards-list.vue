@@ -50,9 +50,9 @@
                   <text class="block voucher-ticket__wrap" :style="rowSubStyle">{{ scopeText(v) }}</text>
                   <text class="block" :style="rowSubTightStyle">{{ expiryText(v) }}</text>
                   <!-- The product is no longer in the catalog: the reason ends the text beside the greyed 「去使用」, which points to it (03 §3.1 禁用). -->
-                  <text v-if="voucherTargetStatus(v) === 'unavailable'" :id="`voucher-target-${v.id}`" class="block voucher-ticket__wrap" :style="rowSubTightStyle">{{ t.voucher.targetUnavailable }}</text>
+                  <text v-if="voucherTargetRestriction(v)" :id="`voucher-target-${v.id}`" class="block voucher-ticket__wrap" :style="rowSubTightStyle">{{ voucherTargetRestriction(v) === 'appOnly' ? t.home.dayOneAppOnlyTag : t.voucher.targetUnavailable }}</text>
                 </view>
-                <NxButton :disabled="voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `voucher-target-${v.id}` : undefined" class="shrink-0 voucher-ticket__action" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
+                <NxButton :disabled="!!voucherTargetRestriction(v)" :aria-describedby="voucherTargetRestriction(v) ? `voucher-target-${v.id}` : undefined" class="shrink-0 voucher-ticket__action" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
               </view>
             </view>
           </view>
@@ -207,7 +207,7 @@ const pageTitle = computed(() =>
 
 // ── vouchers ──
 const available = computed<VoucherDef[]>(() => voucher.claimedUnused);
-const voucherTargetStatus = useVoucherTargetAvailability(() =>
+const voucherTargetRestriction = useVoucherTargetAvailability(() =>
   cat.value === "voucher" && remoteSessionReady.value && available.value.some(isSingleSkuVoucher));
 const expired = computed<VoucherDef[]>(() => voucher.expiredVouchers);
 const voucherInitialLoading = computed(() => remoteApiEnabled
@@ -325,7 +325,7 @@ function openCourseReward(bill: Bill) {
   if (id) navTo(courseRewardHref(id));
 }
 function onUse(v: VoucherDef) {
-  if (voucherTargetStatus(v) === "unavailable") return;
+  if (voucherTargetRestriction(v)) return;
   if (isSingleSkuVoucher(v)) {
     navTo(`/store/detail?id=${v.applicableSkus[0]}`);
   } else {

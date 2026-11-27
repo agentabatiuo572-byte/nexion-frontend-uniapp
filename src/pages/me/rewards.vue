@@ -119,8 +119,8 @@ const lastClaimedVouchers = shallowRef<VoucherDef[] | null>(null);
 watch(() => voucherReady.value ? voucher.claimedUnused : null,
   (rows) => { if (rows !== null) lastClaimedVouchers.value = rows; }, { immediate: true });
 const claimedVouchers = computed(() => voucherReady.value ? voucher.claimedUnused : lastClaimedVouchers.value);
-const voucherTargetStatus = useVoucherTargetAvailability(() => claimedVouchers.value?.some(isSingleSkuVoucher) ?? false);
-const availableCount = computed(() => claimedVouchers.value?.filter(row => voucherTargetStatus(row) !== "unavailable").length ?? null);
+const voucherTargetRestriction = useVoucherTargetAvailability(() => claimedVouchers.value?.some(isSingleSkuVoucher) ?? false);
+const availableCount = computed(() => claimedVouchers.value?.filter(row => !voucherTargetRestriction(row)).length ?? null);
 const lastExpiredCount = ref<number | null>(null);
 watch(remoteExpiredCount, (value) => { if (value !== null) lastExpiredCount.value = value; }, { immediate: true });
 const expiredCount = computed(() => remoteExpiredCount.value ?? lastExpiredCount.value);

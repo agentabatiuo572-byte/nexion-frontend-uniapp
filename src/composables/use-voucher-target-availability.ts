@@ -1,6 +1,7 @@
 import { watch } from "vue";
 import { remoteApiEnabled } from "@/api/runtime";
 import { hasVisiblePullRefresh } from "@/lib/active-page-refresh";
+import { isLiteProduct } from "@/lib/lite-scope";
 import { isSingleSkuVoucher, type VoucherDef } from "@/mock/vouchers";
 import {
   productCatalogLanguageReadFailed,
@@ -12,15 +13,19 @@ import {
 import { useAutoRecovery } from "./use-auto-recovery";
 import { onShow } from "./use-tab-page-lifecycle";
 
-type VoucherTargetStatus = "available" | "unavailable" | "unknown";
+type VoucherTargetRestriction = "unavailable" | "appOnly" | null;
 
 const catalogReadFailed = () => productCatalogState.status === "error" || productCatalogLanguageReadFailed.value;
 
-export function voucherTargetStatus(voucher: VoucherDef): VoucherTargetStatus {
-  if (!isSingleSkuVoucher(voucher)) return "available";
+export function voucherTargetRestriction(voucher: VoucherDef): VoucherTargetRestriction {
+  if (!isSingleSkuVoucher(voucher)) return null;
+  const [id] = voucher.applicableSkus;
   const catalog = productCatalogPresentation.value;
-  if (!remoteApiEnabled || !catalog || productCatalogState.status !== "ready" || catalogReadFailed()) return "unknown";
-  return catalog.products.some(product => product.id === voucher.applicableSkus[0]) ? "available" : "unavailable";
+  if (catalog?.publishedProductIds.includes(id)) {
+    return catalog.products.some(product => product.id === id) ? null : "appOnly";
+  }
+  if (remoteApiEnabled && catalog && productCatalogState.status === "ready" && !catalogReadFailed()) return "unavailable";
+  return isLiteProduct({ id, productType: undefined }) ? null : "appOnly";
 }
 
 export function useVoucherTargetAvailability(needed: () => boolean) {
@@ -38,5 +43,5 @@ export function useVoucherTargetAvailability(needed: () => boolean) {
     repeatWhile: () => !hasVisiblePullRefresh(),
   });
 
-  return voucherTargetStatus;
+  return voucherTargetRestriction;
 }

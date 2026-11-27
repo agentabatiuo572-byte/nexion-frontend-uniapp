@@ -11,6 +11,7 @@ export interface ProductCatalogSnapshot {
   serverCanonical: true;
   revision: string | null;
   products: CatalogProduct[];
+  publishedProductIds: string[];
   sourceEnvironment: "PRODUCTION";
   runId: "";
 }
@@ -261,12 +262,14 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
   if (catalogSource !== "nx_product" || source.sourceEnvironment !== "PRODUCTION" || source.runId !== "") {
     return invalid();
   }
+  const publishedProducts = source.products.map(product);
   return {
     source: catalogSource,
     serverCanonical: true,
     sourceEnvironment: "PRODUCTION",
     runId: "",
     revision: source.revision as string | null,
-    products: source.products.map(product).filter(isLiteProduct),
+    products: publishedProducts.filter(isLiteProduct),
+    publishedProductIds: publishedProducts.map(({ id }) => id),
   };
 }

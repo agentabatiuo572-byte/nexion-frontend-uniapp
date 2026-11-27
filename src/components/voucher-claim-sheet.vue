@@ -40,14 +40,14 @@
             <text class="vcs-scope">{{ scopeText(v) }}</text>
             <text class="vcs-expiry">{{ expiryText(v) }}</text>
             <!-- The product is no longer in the catalog: the reason sits right above the greyed 「马上去使用」, which points to it (03 §3.1 禁用). -->
-            <text v-if="voucherTargetStatus(v) === 'unavailable'" :id="`vcs-target-${v.id}`" class="vcs-reason">{{ t.voucher.targetUnavailable }}</text>
+            <text v-if="voucherTargetRestriction(v)" :id="`vcs-target-${v.id}`" class="vcs-reason">{{ voucherTargetRestriction(v) === 'appOnly' ? t.home.dayOneAppOnlyTag : t.voucher.targetUnavailable }}</text>
             <!-- One control whose role follows the voucher (03 §3.1, 3.9; ticket-material voucher cards keep brand glass for 领取,
                  04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
                  text action with a trailing arrow into the next page. The same node stays, and the slot keeps the 44px row.
                  From the claim request to its read-back the tapped 领取 shows the shared busy spinner at a locked width (03 §3.1);
                  the other cards' 领取 keep their normal look, and onClaim's single in-flight guard stops a second request. -->
             <view class="vcs-cta">
-              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" :busy="voucher.claimingVoucherId === v.id" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :disabled="voucher.isClaimed(v.id) && !!voucherTargetRestriction(v)" :aria-describedby="voucherTargetRestriction(v) ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" :busy="voucher.claimingVoucherId === v.id" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
@@ -75,7 +75,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { voucherTargetStatus } from "@/composables/use-voucher-target-availability";
+import { voucherTargetRestriction } from "@/composables/use-voucher-target-availability";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 
@@ -142,7 +142,7 @@ async function onClaim(v: VoucherDef) {
   }
 }
 function onUse(v: VoucherDef) {
-  if (voucherTargetStatus(v) === "unavailable") return;
+  if (voucherTargetRestriction(v)) return;
   sheet.hide();
   if (isSingleSkuVoucher(v)) {
     // navTo() per project convention (maps /store/detail → /pages/store/detail).
