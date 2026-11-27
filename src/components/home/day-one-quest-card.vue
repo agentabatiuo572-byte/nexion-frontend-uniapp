@@ -72,9 +72,9 @@
             <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: missionLayout ? 'var(--v5-ink-3)' : task.color }">{{ task.order }}</text>
           </view>
           <view style="min-width: 0">
-            <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : undefined">
+            <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : isActionable(task) ? undefined : { flexWrap: 'wrap' }">
               <!-- An App-only row opens nothing, so its whole name stays readable and the tag drops below when both don't fit. -->
-              <text :class="task.appOnly ? 'newcomer-task__app-name' : targetClosed(task) ? 'newcomer-task__label--wrap' : 'truncate'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text :class="task.appOnly ? 'newcomer-task__app-name' : isActionable(task) ? 'truncate' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
               <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
               <text v-else :style="catStyle(task)">{{ task.cat }}</text>
             </view>
