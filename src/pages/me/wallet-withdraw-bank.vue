@@ -97,7 +97,7 @@
           <text v-if="displayConfig.capacity" class="hint pad">{{ format(c.dailyLabel, { remaining: displayConfig.capacity.dailyRemainingCount, total: displayConfig.capacity.dailyLimitCount }) }}</text>
           <view v-if="!quoteExpired" class="consent" role="checkbox" tabindex="0" data-testid="bank-consent" :aria-checked="accepted" :aria-disabled="busy" @click="toggleConsent" @keydown.enter.prevent="toggleConsent" @keydown.space.prevent="toggleConsent"><view class="checkbox" :class="{ checked: accepted }" aria-hidden="true"><svg v-if="accepted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view><text>{{ c.consent }}</text></view>
           <text class="hint pad">{{ c.confirmNotice }}</text>
-          <NxButton class="page-text-action" variant="text" size="small" :label="c.backToAmount" data-testid="bank-abandon" :disabled="busy" @click="abandon" />
+          <NxButton class="page-text-action nx-reverse-action" variant="text" size="small" :label="c.backToAmount" data-testid="bank-abandon" :disabled="busy" @click="abandon" />
         </template>
 
         <template v-else-if="formStep === 'account'">
@@ -129,7 +129,7 @@
           </view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
-          <NxButton class="page-text-action" variant="text" size="small" :label="c.backToAccount" :disabled="navigationLocked" @click="goBack" />
+          <NxButton class="page-text-action nx-reverse-action" variant="text" size="small" :label="c.backToAccount" :disabled="navigationLocked" @click="goBack" />
         </template>
         <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
@@ -147,7 +147,7 @@
           <view class="amount-input"><input data-testid="bank-amount" type="text" inputmode="decimal" disabled placeholder="—" :aria-label="c.amount" /><NxButton variant="text" size="small" :label="c.all" disabled aria-hidden="true" /></view>
           <view class="notice notice--info"><text>{{ c.feeIncluded }}</text></view>
           <NxButton class="page-action page-action--primary" variant="primary" :label="c.quote" disabled aria-hidden="true" data-testid="bank-quote" />
-          <NxButton class="page-text-action" variant="text" size="small" :label="c.backToAccount" :disabled="busy" @click="goBack" />
+          <NxButton class="page-text-action nx-reverse-action" variant="text" size="small" :label="c.backToAccount" :disabled="busy" @click="goBack" />
         </template>
         <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
       </template>
@@ -694,8 +694,9 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .danger { color: var(--v5-danger); }
 .warn { color: var(--v5-warning); }
 /* In-page buttons are the shared NxButton (03 §3.1); the page sets only layout. Full-width: the USDT entry, the intent
-   rows (neutral glass L) and the loading placeholders of the bar's primary. Text buttons (reload, 重新填写金额,
-   返回收款账户) sit centred on their label line with the shared 44px hit layer. */
+   rows (neutral glass L) and the loading placeholders of the bar's primary. Text buttons sit centred on their label
+   line with the shared 44px hit layer: 重新加载 in brand; 重新填写金额 and 返回收款账户 give up or step back, so they take
+   the shared quiet reverse-action style (.nx-reverse-action: ink-3, 13/18, 400) and do not compete with the bar. */
 .page-action { width: 100%; margin-top: 12px; }
 .page-action--primary { margin-top: 24px; }
 .bank-withdraw .page-action--intent { min-width: 0; }
