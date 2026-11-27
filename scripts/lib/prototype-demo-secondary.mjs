@@ -5,7 +5,7 @@ import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire, demoVisibleEarningReceipts } from './prototype-demo-notifications.mjs';
-import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoPayoutDateOrders, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 
@@ -167,13 +167,14 @@ export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUs
       return { withdrawalNo: demoHasLongContent(state) ? demoLongWithdrawalNo(sample) : sample,
         amount: 100, netReceive: 99, fee: 1, status, at: sampleAt - (i + 2) * day, holdUntil: sampleAt - day };
     }));
-  const chainRows = chainOrders.map(({ at, holdUntil = at, ...order }) => ({
+  const payoutDateOrders = history ? [] : demoPayoutDateOrders(state, sampleAt);
+  const chainRows = [...payoutDateOrders, ...chainOrders].map(({ at, holdUntil = at, riskRoute, ...order }) => ({
     ...order, targetAddress: `0x${'1'.repeat(40)}`, chain: 'USDT-BEP20',
     holdUntil: new Date(holdUntil).toISOString(), createdAt: new Date(at).toISOString(),
     networkConfirmUsd: order.fee, networkFee: order.fee, penaltyFee: 0, grossFee: order.fee,
     nexBurned: 0, nexRefunded: 0, nexRefundedAt: null, feeWaived: 0, actualFee: order.fee,
     policyVersion: 'money-policy', useNexFeeOffset: false,
-    riskRoute: order.amount <= 100 ? 'fast-pass' : 'manual', idSource: 'server',
+    riskRoute: riskRoute ?? (order.amount <= 100 ? 'fast-pass' : 'manual'), idSource: 'server',
   }));
   const bankRows = Object.values(state.bankDemo?.orders ?? {}).map(row => ({
     withdrawalNo: row.withdrawalNo, targetAddress: 'BANK-VND:' + row.beneficiaryNo, amount: row.bank.amountUsdt,

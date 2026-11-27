@@ -25,10 +25,13 @@ function canQuote({ beneficiary, policy, capacity }, amountUsdt) {
 }
 
 function saveQuote(demo, bank, amountUsdt, now, quoteNo = 'BQ-' + randomBytes(16).toString('hex')) {
-  const feeUsdt = Math.round(Math.max(1, Math.min(100, amountUsdt * .01)) * 1e6) / 1e6;
-  const netUsdt = Math.round((amountUsdt - feeUsdt) * 1e6) / 1e6;
-  const quote = { quoteNo, amountUsdt, feeUsdt, netUsdt,
-    rateVnd: 25000, amountVnd: Math.round(netUsdt * 25000), bankCode: bank.bankCode, bankName: bank.bankName,
+  // BankWithdrawalPricing rounds the 1% fee up to whole micro-USDT and the payout down to whole VND.
+  const amountMicros = Math.round(amountUsdt * 1e6);
+  const feeMicros = Math.max(1e6, Math.min(100e6, Math.ceil(amountMicros / 100)));
+  const netMicros = amountMicros - feeMicros;
+  const rateVnd = 25000;
+  const quote = { quoteNo, amountUsdt, feeUsdt: feeMicros / 1e6, netUsdt: netMicros / 1e6,
+    rateVnd, amountVnd: Math.floor(netMicros * rateVnd / 1e6), bankCode: bank.bankCode, bankName: bank.bankName,
     bankRoutingVerified: true, maskedAccount: bank.maskedAccount, expiresAt: new Date(now + 300000).toISOString() };
   return demo.quotes[quote.quoteNo] = { quote };
 }
