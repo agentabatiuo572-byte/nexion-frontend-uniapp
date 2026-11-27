@@ -154,7 +154,9 @@
            重试只可能从失败态发起,若失败态 v-if 在前,骨架永远抢不到 —— 那是死 UI。
            顺序:加载中 > 不可用 > 未输入金额 > 默认。 -->
       <!-- 明细井:网络确认费 → UVT 抵扣开关 → 实际到账(画板顺序);各态条件与原先一致。 -->
-      <view v-if="withdrawalPolicyCurrent || (feeConfigUsable && amountNum > 0 && !quoteBlocked)" class="wd-fee mx-4">
+      <!-- Why 提交 is grey is said once, above it in the bar (03 §3.1); the well shows the fee row with 「—」 instead of repeating it
+           (06 §6.1). With no withdrawal network open at all the well has nothing left to show. -->
+      <view v-if="(withdrawalPolicyCurrent && !(networkClosed && !pendingAttempt && NETWORKS.length === 0)) || (feeConfigUsable && amountNum > 0 && !quoteBlocked)" class="wd-fee mx-4">
       <template v-if="withdrawalPolicyCurrent">
       <view v-if="feeConfigLoading" class="wd-fee__sk">
         <view v-for="i in 3" :key="i" class="flex items-center justify-between">
@@ -163,7 +165,6 @@
         </view>
       </view>
       <view v-else-if="networkClosed && !pendingAttempt" class="wd-fee__msg">
-        <text class="wd-warn" role="status">{{ NETWORKS.length === 0 ? t.wallet.withdrawalChannelsClosed : t.bankWithdrawal.networkUnavailable }}</text>
         <view v-if="NETWORKS.length > 0" class="wd-link" role="button" tabindex="0" @click="chooseNetworkAgain" @keydown.enter.prevent="chooseNetworkAgain" @keydown.space.prevent="chooseNetworkAgain">
           <text>{{ t.bankWithdrawal.rechooseNetwork }}</text>
         </view>
@@ -181,9 +182,6 @@
       <!-- 空状态:金额未输入 —— 给占位说明,不留空白也不显示 $0.00 假明细 -->
       <view v-else-if="amountNum <= 0" class="wd-fee__msg">
         <text class="wd-line">{{ t.walletV3.feeDetailPlaceholder }}</text>
-      </view>
-      <view v-else-if="quoteBlocked || !quoteRowsVisible" class="wd-fee__msg">
-        <text v-if="withdrawalActionsFresh" class="wd-warn">{{ submitDisabledReason }}</text>
       </view>
       <!-- FEAT-WD02:单行网络确认费(每笔固定;$0 显示 $0.00 不藏行)。「?」打开费用说明半屏。 -->
       <view v-else class="wd-fee__r">
@@ -274,7 +272,7 @@
     <!-- 主操作在底部固定栏(DS-30);不可提交时原因写在按钮上方。 -->
     <template #pageFixed>
       <view class="wd-bar nx-glass-bar">
-        <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why nx-tray-note">{{ submitDisabledReason }}</text>
+        <text v-if="!canSubmitAction && !submitting && submitHintVisible" class="wd-bar__why nx-tray-note" role="status">{{ submitDisabledReason }}</text>
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
         <view class="nx-withdraw-submit-cta wd-submit" :class="{ 'wd-submit--on': canSubmitAction }" role="button" tabindex="0" :aria-disabled="canSubmitAction ? 'false' : 'true'" :aria-busy="submitting" @click="handleSubmit"  @keydown.enter.prevent="handleSubmit" @keydown.space.prevent="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
@@ -1242,10 +1240,8 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQ
   return "";
 }
 const submitDisabledReason = computed(() => disabledReasonFor(amountNum.value, eligibility.value));
-// Read/fee failures and invalid entered quotes already have an inline explanation.
-const submitHintVisible = computed(() => !pendingAttempt.value && Boolean(submitDisabledReason.value)
-  && withdrawalActionsFresh.value && feeConfigUsable.value
-  && (amountNum.value <= 0 || !quoteBlocked.value));
+// Every reason a grey 提交 has is said above it in the bar (03 §3.1 bottom bar); a pending attempt's button says its own state.
+const submitHintVisible = computed(() => !pendingAttempt.value && Boolean(submitDisabledReason.value));
 
 function fmtNex(n: number): string {
   return formatTruncatedAmount(n);

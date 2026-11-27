@@ -25,7 +25,8 @@
       </template>
       <text v-else :style="capStyle">{{ t.fx.updating }}</text>
 
-      <!-- The lock note and the info button wrap together onto a second line when the first is full. -->
+      <!-- The lock note and the info button wrap together onto a second line when the first is full; the note carries no
+           leading separator, so a wrapped line never opens with 「·」. -->
       <view class="flex items-center" :style="tailStyle">
       <text v-if="status === 'ready'" :style="lockStyle">{{ lockLine }}</text>
       <!-- 信息 icon:视觉 28px 圆,点击热区 44×44(负 margin 不撑行高) -->
@@ -74,9 +75,10 @@ const sheetOpen = ref(false);
 function closeSheet(): void { sheetOpen.value = false; }
 useDialogA11y(computed(() => sheetOpen.value), ".nx-fx-sheet-root", closeSheet);
 
-// 4 态判定:失败/异常数据 → unavailable;拉取中 → loading;从未返回 → empty。
+// 4 态判定:读取失败 → empty(原位「—」,页面自动重读,03 §3.4);异常数据 → unavailable;拉取中 → loading;从未返回 → empty。
 const status = computed<"loading" | "empty" | "unavailable" | "ready">(() => {
-  if (fx.syncFailed || (fx.syncedAt !== null && !fx.fxAvailable)) return "unavailable";
+  if (fx.syncFailed) return "empty";
+  if (fx.syncedAt !== null && !fx.fxAvailable) return "unavailable";
   if (fx.loading) return "loading";
   if (fx.syncedAt === null) return "empty";
   return "ready";
