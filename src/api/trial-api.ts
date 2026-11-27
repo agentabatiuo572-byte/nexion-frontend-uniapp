@@ -483,6 +483,7 @@ function trialConfig(value: unknown): Record<string, TrialConfigValue> {
   const result: Record<string, TrialConfigValue> = {};
   for (const [key, item] of Object.entries(source)) {
     if (key === "trialProductId" && (typeof item !== "string" || !/^[A-Za-z0-9._-]{2,64}$/.test(item.trim()))) return invalid();
+    if (key === "trialProductName" && (typeof item !== "string" || !item.trim() || item.trim().length > 128)) return invalid();
     if (key === "trialTermsVersion" && (typeof item !== "string" || !/^[a-f0-9]{64}$/.test(item))) return invalid();
     const nullable = key === "trialOffsetCapUSD" || key === "shadowDailyUSD" || key === "shadowDailyNEX";
     if ((typeof item !== "string" && typeof item !== "boolean"

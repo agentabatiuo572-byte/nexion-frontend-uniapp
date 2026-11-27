@@ -2503,30 +2503,30 @@ export const uz: Messages = {
     releaseComingToast: "Bu model tez orada sotuvga chiqadi — kuzatib boring",
     taskLevelLabels: {"1":"boshlangʻich","2":"oʻrta","3":"yuqori","4":"flagman"},
     taskLevelsLine: "AI vazifalari darajalari: {levels}",
+    productBadges: {
+      trending: "Ommabop",
+      upgradePick: "Yangilash uchun",
+      flagship: "Flagman",
+      lowBarrier: "Oson boshlash",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Toʻliq xizmat koʻrsatiladigan qurilma",
-        badge: "Xit",
       },
       "stellarbox-pro": {
         tagline: "GPU xususiyatlari va taxminiy daromadni solishtiring.",
-        badge: "Ommabop",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5× S1 unumdorligi",
-        badge: "Yangilash uchun",
       },
       "stellarrack-p1": {
         tagline: "Jiddiy operatorlar uchun maʼlumotlar markazi darajasidagi A100 stoyka.",
-        badge: "Flagman",
       },
       "stellarrack-p2": {
         tagline: "Maʼlumotlar markazi uchun H100 stoyka — eng yuqori quvvat.",
-        badge: "Flagman",
       },
       "cloud-share": {
         tagline: "Qurilma shart emas — tarmoq quvvatidan ulush oling.",
-        badge: "Oson boshlash",
       },
     },
     tradeinUpgrade: {

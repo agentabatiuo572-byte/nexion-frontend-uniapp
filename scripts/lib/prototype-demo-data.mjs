@@ -125,7 +125,7 @@ export const demoOptions = {
   checkoutState:[['ordinary','普通结算'],['replace','容量已满·需选择替换']],
   powerUpState:[['default','默认连签增益'],['staking','含质押活动入口（/wallet/staking）']],
   trialQuoteState:[['default','默认报价'],['historical-cap','旧领取单 · 上限 50（配合试用中/宽限期）'],['excess-offset','价款封顶抵扣·无需支付（配合到期·抵扣有效）'],['precision','六位小数报价'],['half-cent','半分报价 · 确认金额保留两位'],['sub-half-cent','试用设备 · 抵后应付 0.004000（配合试用中）'],['cloud-share-half-cent','Cloud Share · 抵后应付 0.575000'],['precision-repriced','六位报价变更 · 确认金额仍 342.12'],['capped','领取层依据行 · 抵扣上限 20']],
-  trialState:[['follow','跟随福利场景'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['grace-ending','抵扣期剩余 45 秒'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
+  trialState:[['follow','跟随福利场景'],['unconfigured','试用商品未配置'],['available','试用未领取'],['active','试用中'],['final-day','试用最后12小时'],['grace','试用到期·抵扣有效'],['grace-ending','抵扣期剩余 45 秒'],['ended','试用及抵扣已结束'],['eligible-again','冷却结束·可重新领取'],['converted','已转购'],['refunded','已转购·已退款'],['claim-error','首次激活失败·可重试'],['capacity-full','队列已满']],
   trialNameState:[['default','默认名称'],['long','超长设备名']],
   trialReadState:[['normal','正常读取'],['slow','试用状态 · 延迟返回原快照'],['error','试用读取失败'],['user-not-found','试用读取 · 用户不存在']],
   trialStartReceiptState:[...trialReceiptOptions,['rejected-unknown','通用拒绝（未知原因）＋资格重读']],
@@ -147,7 +147,7 @@ export const demoOptions = {
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
-  catalogState:[['phased','完整目录（含即将上线）'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro'],['trial-h2-yield-updated','S1 日收益已更新']],
+  catalogState:[['phased','完整目录（含即将上线）'],['sku-series','同系列两件商品'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro'],['trial-h2-yield-updated','S1 日收益已更新']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -213,6 +213,8 @@ const catalogTaglineTranslations = {
 const catalogTaglineFallbacks = {
   'Fully managed device': {zh:'全托管设备',ru:'Устройство с полным обслуживанием'},
 };
+const demoSeriesCodes=['S1','PRO','PRO_V2','RACK_P1','RACK_P2','CLOUD_SHARE'];
+const demoS1VariantNo='E-S1-002';
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},
   {badge:'Best seller',badgeKind:'bestSeller'},
@@ -243,7 +245,10 @@ function demoDailyUsdt(monthlyTarget, percent = 100) {
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const trialSku=state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku);
   const optionTarget=trialPurchaseOptionSku(state);
-  return skuDefinitions.map(([id,name,tier,listPrice,monthlyTarget,dailyEarnNEX,gpu,vram,watts],index)=>{
+  const definitions=state.catalogState==='sku-series'
+    ? [...skuDefinitions,[demoS1VariantNo,'UVELBox S1 96 GB','Entry',999,150,2,'4 × RTX 4090','96 GB',1200]]
+    : skuDefinitions;
+  const products=definitions.map(([id,name,tier,listPrice,monthlyTarget,dailyEarnNEX,gpu,vram,watts],index)=>{
     const monthlyEstimateUsdt=id===previewDefaultTrialSku&&state.catalogState==='trial-h2-yield-updated'?225:monthlyTarget;
     const discountSamplePrice=state.trialPurchaseListState==='device-discounts'&&['stellarbox-s1','cloud-share'].includes(id);
     const basePrice=discountSamplePrice?200:index!==0?listPrice:({ 'half-cent':402.135, 'sub-half-cent':11.769411, precision:402.123456,
@@ -261,9 +266,11 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
+    const variant=id===demoS1VariantNo;
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
+      seriesCode:variant?'S1':demoSeriesCodes[index],seriesRepresentative:false,
       vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
-      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+id+'.webp',origin).href,
+      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[variant?0:index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+(variant?previewDefaultTrialSku:id)+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:optionState==='unlisted'?'legacy':'active',
@@ -277,7 +284,15 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       dailyEstimateHighNex:Math.round(dailyEarnNEX*(100+demoBandPct)*10_000)/1e6,
       shareYieldMin:share?Number((monthlyEstimateUsdt*(1-b)*365/30/price*100).toFixed(4)):null,shareYieldMax:share?Number((monthlyEstimateUsdt*(1+b)*365/30/price*100).toFixed(4)):null,
     };
-  }).map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
+  });
+  const representatives=new Map();
+  for(const product of products){
+    if(!product.available||(product.inventoryMode==='FINITE'&&product.stock===0))continue;
+    const current=representatives.get(product.seriesCode);
+    if(!current||product.price<current.price)representatives.set(product.seriesCode,product);
+  }
+  for(const product of representatives.values())product.seriesRepresentative=true;
+  return products.map(product=>({...product,imageUrl:state.machineImageState==='missing'||(state.machineImageState==='missing-main'&&product.id==='stellarbox-s1')?null:state.machineImageState==='broken'?new URL('/static/demo-missing-'+product.id+'.webp',origin).href:product.imageUrl}));
 }
 
 function withItemImages(receipt,imageFor) {
@@ -1097,9 +1112,10 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
         {code:'EM',name:'BGE-M3',unit:null,price:.0008,deltaPct:2.1,sparkline:[.4,.45,.4,.5,.52,.55,.57],flagshipDeltaPct:null},
         {code:'SP',name:'Whisper v3',unit:null,price:.0003,deltaPct:-.6,sparkline:[.56,.55,.57,.53,.52,.53,.5],flagshipDeltaPct:null},
       ],deviceRankings:[
-        ...['stellarbox-pro','stellarbox-s1'].map((kind,index)=>{
-          const {name,dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,imageUrl}=productFor(kind);
-          return {rank:index+1,kind,name,dailyUsdt:dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,bestFor:null,imageUrl};
+        ...(state.catalogState==='sku-series'?[previewDefaultTrialSku,demoS1VariantNo]:['stellarbox-pro','stellarbox-s1']).map((productNo,index)=>{
+          const {name,dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,imageUrl}=productFor(productNo);
+          const kind=productNo===demoS1VariantNo?'stellarbox-s1':productNo;
+          return {rank:index+1,kind,productNo,name,dailyUsdt:dailyEarn,dailyEstimateLowUsdt,dailyEstimateHighUsdt,bestFor:null,imageUrl};
         }),
         {rank:3,kind:'phone',name:null,dailyUsdt:.06,dailyEstimateLowUsdt:null,dailyEstimateHighUsdt:null,bestFor:null,imageUrl:null},
       ]};
@@ -1733,6 +1749,18 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     data.quests.forEach((row,i)=>{row.actionRoute=routes[i];row.category=['identity','explore','explore','explore','identity','social'][i];});
     const weekNames=localized(contentLocale,['了解设备收益','完成一门课程','邀请一位好友','查看账户安全'],['Explore device earnings','Complete one course','Invite a friend','Review account security'],['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']);
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(now+(state.taskState==='expired'?-1000:5*day)).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
+    if(state.catalogState==='sku-series'&&state.taskState==='pending'){
+      Object.assign(data.quests[3],{
+        name:localized(contentLocale,'查看 S1 回本','View S1 ROI','Xem ROI của S1'),
+        actionRoute:'/pages/store/detail?id='+demoS1VariantNo,
+      });
+      Object.assign(data.quests[4],{
+        name:localized(contentLocale,'查看另一件设备','View another device','Xem thiết bị khác'),
+        actionRoute:'/pages/store/detail?id=E-S1-999',
+      });
+      data.quests.find(row=>row.questCode==='demo-week-0').actionRoute='/pages/store/detail?id='+demoS1VariantNo;
+      data.quests.find(row=>row.questCode==='demo-week-3').actionRoute='/pages/store/detail?id=E-S1-999';
+    }
     data.promoBanner={bannerCode:'demo-weekly',baseReward:300,multiplier:1,countdownDays:5,countdownHours:0,targetDevice:'UVELBox Pro',targetDaily:22.4,status:'active'};
     return data;
   }

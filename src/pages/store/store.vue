@@ -328,17 +328,10 @@ const bundleSelectedProducts = computed(() => cart.items
 
 const purchasableProducts = computed(() => unlockedProducts.value.filter(product => !productOutOfStock(product)));
 const upgrade = computed(() => storeUpgrade(purchasableProducts.value, ownedDevices.value));
-const upgradeBaseImageUrl = computed(() => {
-  const base = upgrade.value?.base;
-  return base ? displayProducts.value.find(p => p.id === base.kind)?.imageUrl : undefined;
-});
-const upgradeBaseDailyRange = computed(() => {
-  const base = upgrade.value?.base;
-  if (!base) return null;
-  const sku = base.productCode?.toLowerCase() ?? base.kind;
-  const product = displayProducts.value.find(p => p.id.toLowerCase() === sku);
-  return product ? productPublishedDailyUsdtRange(product) : null;
-});
+const upgradeBaseProduct = computed(() => displayProducts.value.find(p => p.id === upgrade.value?.base.productCode));
+const upgradeBaseImageUrl = computed(() => upgrade.value?.base.imageUrl ?? upgradeBaseProduct.value?.imageUrl);
+const upgradeBaseDailyRange = computed(() => upgradeBaseProduct.value
+  ? productPublishedDailyUsdtRange(upgradeBaseProduct.value) : null);
 const voucherClaimable = computed(() => (remoteApiEnabled ? voucher.presentationClaimable : voucher.claimableVouchers).filter(offer => voucherSupportsSurface(offer, 'store')));
 const voucherOffers = computed(() => remoteApiEnabled
   ? voucher.remoteStatus === "ready" || voucher.presentationOffers.length ? voucher.presentationOffers.filter(offer => !voucher.presentationClaimable.some(item => item.id === offer.id) || voucherSupportsSurface(offer, 'store'))

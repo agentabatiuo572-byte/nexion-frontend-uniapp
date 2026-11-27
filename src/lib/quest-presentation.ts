@@ -15,7 +15,6 @@ const APP_QUEST_ROUTES = new Set([
   "/pages/me/devices",
   "/pages/earn/earn",
   "/pages/store/store",
-  "/pages/store/detail?id=stellarbox-s1",
   "/pages/team/team",
   "/pages/team/commissions",
   "/pages/learn/courses",
@@ -24,10 +23,13 @@ const APP_QUEST_ROUTES = new Set([
   "/pages/genesis/marketplace",
 ]);
 
+export function questProductNo(route: string): string | null {
+  return /^\/pages\/store\/detail\?id=([A-Za-z0-9-]+)$/.exec(route)?.[1] ?? null;
+}
+
 export function normalizeQuestActionRoute(value: string): string {
   const route = value.trim();
-  if (!/^\/pages\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*(?:\?[A-Za-z0-9._~%=&-]+)?$/.test(route)
-      || !APP_QUEST_ROUTES.has(route)) {
+  if (!APP_QUEST_ROUTES.has(route) && !questProductNo(route)) {
     throw new Error("QUEST_ACTION_ROUTE_INVALID");
   }
   return route;

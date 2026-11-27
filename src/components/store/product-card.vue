@@ -163,7 +163,7 @@ const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.val
 const { imageSrc, imageError: fallbackProductImage } = useProductImage(() => props.product.imageUrl);
 const photo = computed(() => {
   const imageUrl = imageSrc.value;
-  return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.id, props.product.tier) } : null;
+  return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.seriesCode, props.product.tier) } : null;
 });
 
 

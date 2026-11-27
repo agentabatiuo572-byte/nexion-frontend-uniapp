@@ -64,7 +64,7 @@ import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
 import { isWeeklyQuestTargetClosed, unclaimableBusinessQuests, questBusinessContractViolation } from "@/lib/quest-business-availability";
-import { useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
+import { questActionRouteUnavailable, useQuestTargetAvailability } from "@/composables/use-quest-target-availability";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
@@ -164,7 +164,7 @@ const periodText = computed(() => {
 const questTargetClosed = computed(() => {
   const q = quest.value;
   if (!q) return false;
-  return isWeeklyQuestTargetClosed(q, {
+  return questActionRouteUnavailable(q.actionRoute) || isWeeklyQuestTargetClosed(q, {
     // 「还不知道」不等于「已经关了」:configUnavailable 属前者,不能停 CTA。
     genesisBlocked: genesisBlockIsKnownUnavailable(genesisBlock.value),
     stakingClosed: targetAvailability.value.stakingClosed,

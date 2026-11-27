@@ -531,7 +531,11 @@ const slab = computed(() => {
   return {
     // A refused member with devices gets no count: "N devices" would contradict the first-purchase prompt.
     count: owned && !(refused.value && owned.length > 0) ? owned.length : null, fleetRow, refused: refused.value,
-    thumbs: fleetRow ? owned.slice(0, 3).map(device => { const sku = device.kind; return { id: device.id, sku, imageUrl: device.imageUrl, label: getProductMedia(sku)?.tierCode ?? device.name }; }) : [],
+    thumbs: fleetRow ? owned.slice(0, 3).map(device => {
+      const sku = device.productCode;
+      const media = getProductMedia(sku);
+      return { id: device.id, sku, imageUrl: device.imageUrl ?? media?.src, label: media?.tierCode ?? device.name };
+    }) : [],
     more: fleetRow && owned.length > 3 ? owned.length - 3 : 0,
     target: r.productNo, targetName: productName(r.productNo), rewardText: partsText(parts), tagText: discount ? partsText(parts) : '+' + partsText(parts), uvt: parts.asset === 'UVT', line: [before, after],
   };

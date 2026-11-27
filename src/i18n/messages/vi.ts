@@ -2038,30 +2038,30 @@ chooseMethod: "Chọn cách kết nối mạng UVEL",
     // hiệu, KHÔNG bao giờ dịch. verify.sh kiểm tra mọi id trong PRODUCTS đều có ở đây.
     taskLevelLabels: {"1": "cơ bản", "2": "trung cấp", "3": "nâng cao", "4": "hàng đầu"},
     taskLevelsLine: "Hỗ trợ tác vụ điện toán AI ở mức {levels}",
+    productBadges: {
+      trending: "Đang hot",
+      upgradePick: "Nên nâng cấp",
+      flagship: "Hàng đầu",
+      lowBarrier: "Rào cản thấp",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Thiết bị được quản lý toàn diện",
-        badge: "Bán chạy",
       },
       "stellarbox-pro": {
         tagline: "So sánh cấu hình GPU và thu nhập ước tính.",
-        badge: "Đang hot",
       },
       "stellarbox-pro-v2": {
         tagline: "Thông lượng gấp 2.5× S1",
-        badge: "Nên nâng cấp",
       },
       "stellarrack-p1": {
         tagline: "Rack A100 chuẩn trung tâm dữ liệu cho người vận hành nghiêm túc.",
-        badge: "Hàng đầu",
       },
       "stellarrack-p2": {
         tagline: "Rack H100 trung tâm dữ liệu — bậc tính toán cao nhất.",
-        badge: "Hàng đầu",
       },
       "cloud-share": {
         tagline: "Không cần phần cứng — mua một phần của mạng lưới.",
-        badge: "Rào cản thấp",
       },
     },
     tradeinUpgrade: {

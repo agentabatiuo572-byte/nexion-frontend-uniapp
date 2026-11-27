@@ -70,7 +70,7 @@
         <view class="mx-4 nx-glass-card nx-tint overflow-hidden relative detail-hero" :class="{ 'detail-hero--credit': trialCreditEntry }" style="--nx-tint: var(--v5-brand)">
 
           <view class="relative border-b" style="border-color: var(--v5-border)">
-            <ProductRender class="detail-product-render" :product-id="product.id" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
+            <ProductRender class="detail-product-render" :product-id="product.id" :series-code="product.seriesCode" :tier="product.tier" :image-url="product.imageUrl" :video-url="product.videoUrl" />
             <ProductBadge v-if="copy.badge" :label="copy.badge" :kind="copy.badgeKind" detail />
             <!-- Live activity danmaku -->
             <LiveSocialProof v-if="product.liveActivityVisible !== false" :product="product" :placement="trialCreditEntry ? 'top-right' : 'bottom-left'" />
@@ -408,7 +408,7 @@ async function observeCanonicalProductDetail(): Promise<void> {
     isCurrent: isCurrentAccountScope,
     submit: () => h3ObservationApi.productDetail(canonicalProduct.id),
   });
-  if (canonicalProduct.id !== "stellarbox-s1" || canonicalProduct.productType === "SHARE"
+  if (canonicalProduct.seriesCode !== "S1" || canonicalProduct.productType === "SHARE"
     || !Number.isFinite(canonicalProduct.price) || canonicalProduct.price <= 0
     || !Number.isFinite(canonicalProduct.dailyEarn) || canonicalProduct.dailyEarn <= 0) return;
   void reportDayOnePageObservation("view_product_roi", {
@@ -416,7 +416,7 @@ async function observeCanonicalProductDetail(): Promise<void> {
     session: sessionVault.read(),
     visible: () => detailPageVisible && pageEpoch === detailObservationEpoch,
     isCurrent: isCurrentAccountScope,
-    submit: () => dayOnePageObservationApi.s1Roi(),
+    submit: () => dayOnePageObservationApi.s1Roi(canonicalProduct.id),
   });
 }
 

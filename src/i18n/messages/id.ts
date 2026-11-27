@@ -2503,30 +2503,30 @@ export const id: Messages = {
     releaseComingToast: "Model ini segera hadir — nantikan",
     taskLevelLabels: {"1":"dasar","2":"menengah","3":"lanjutan","4":"unggulan"},
     taskLevelsLine: "Tingkat tugas AI: {levels}",
+    productBadges: {
+      trending: "Naik daun",
+      upgradePick: "Pilihan upgrade",
+      flagship: "Unggulan",
+      lowBarrier: "Mudah mulai",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Perangkat yang dikelola penuh",
-        badge: "Terlaris",
       },
       "stellarbox-pro": {
         tagline: "Bandingkan spesifikasi GPU dan perkiraan pendapatan.",
-        badge: "Naik daun",
       },
       "stellarbox-pro-v2": {
         tagline: "Throughput 2.5× S1",
-        badge: "Pilihan upgrade",
       },
       "stellarrack-p1": {
         tagline: "Rak A100 kelas pusat data untuk operator serius.",
-        badge: "Unggulan",
       },
       "stellarrack-p2": {
         tagline: "Rak H100 pusat data — tingkat komputasi tertinggi.",
-        badge: "Unggulan",
       },
       "cloud-share": {
         tagline: "Tanpa perangkat keras — beli sebagian daya jaringan.",
-        badge: "Mudah mulai",
       },
     },
     tradeinUpgrade: {

@@ -669,7 +669,7 @@ function mintDialogOwner(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const productId = ref("stellarbox-s1");
+const productId = ref("");
 const checkoutRouteFence = new CheckoutRouteFence();
 let purchaseEligibilityRequestSequence = 0;
 let activeCheckoutLoad: CheckoutRouteScope | null = null;
@@ -958,10 +958,9 @@ onLoad(async (options) => {
     checkoutRouteLoaded.value = true;
     return;
   }
-  // accept ?product= (canonical) or ?id= via the one canonical product resolver.
-  if (o.product) productId.value = resolveTrialCheckoutProductId(o.product) ?? o.product;
-  else if (o.id) productId.value = resolveTrialCheckoutProductId(o.id) ?? o.id;
-  else if (trialCheckoutSource.value) productId.value = "";
+  // accept ?product= (canonical) or ?id=.
+  const routedProductNo = o.product || o.id || "";
+  productId.value = resolveTrialCheckoutProductId(routedProductNo) ?? routedProductNo;
   resumeSessionId = o.resume || null;
   const routeScope = beginCheckoutRoute();
   checkoutRouteInitialized = true;
@@ -975,6 +974,10 @@ async function initializeCheckout(routeScope: CheckoutRouteScope, mode: Checkout
   activeCheckoutLoad = routeScope;
   quantityReady.value = false;
   try {
+    if (!routeScope.productNo && !trialCheckoutSource.value) {
+      leaveUnavailableProduct(routeScope, undefined);
+      return;
+    }
     // A durable server order is a recovery route, never a fresh purchase. It has
     // priority over catalog/eligibility gates so a newly denied purchase cannot
     // hide an already committed original order.

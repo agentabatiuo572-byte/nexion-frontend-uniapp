@@ -2503,30 +2503,30 @@ export const fil: Messages = {
     releaseComingToast: "Malapit nang dumating ang model na ito — abangan",
     taskLevelLabels: {"1":"panimula","2":"katamtaman","3":"mataas","4":"pangunahing"},
     taskLevelsLine: "Antas ng gawaing AI: {levels}",
+    productBadges: {
+      trending: "Trending",
+      upgradePick: "Pang-upgrade",
+      flagship: "Flagship",
+      lowBarrier: "Mababang entry",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "Device na ganap na pinamamahalaan",
-        badge: "Pinakamabenta",
       },
       "stellarbox-pro": {
         tagline: "Ikumpara ang GPU specs at tinatayang kita.",
-        badge: "Trending",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5× throughput ng S1",
-        badge: "Pang-upgrade",
       },
       "stellarrack-p1": {
         tagline: "Datacenter-grade na A100 rack para sa seryosong operator.",
-        badge: "Flagship",
       },
       "stellarrack-p2": {
         tagline: "Datacenter H100 rack — ang pinakamataas na compute tier.",
-        badge: "Flagship",
       },
       "cloud-share": {
         tagline: "Walang hardware na kailangan — bumili ng bahagi ng network.",
-        badge: "Mababang entry",
       },
     },
     tradeinUpgrade: {

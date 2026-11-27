@@ -10,7 +10,7 @@ export function getProductMedia(id: string | null | undefined) {
   const product = productCatalogState.status === "ready" ? getProduct(id) ?? getProduct(id.toLowerCase()) : undefined;
   const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products : undefined;
   const current = product ?? display?.find(product => product.id.toLowerCase() === id.toLowerCase());
-  return current?.imageUrl ? { src: current.imageUrl, tierCode: productTierCode(current.id, current.tier) } : null;
+  return current?.imageUrl ? { src: current.imageUrl, tierCode: productTierCode(current.seriesCode, current.tier) } : null;
 }
 
 // Genesis is an independent entitlement, never a seventh device SKU.

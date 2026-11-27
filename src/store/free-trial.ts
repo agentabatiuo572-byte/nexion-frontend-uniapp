@@ -460,7 +460,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     }
     // Validate the whole policy before committing snapshot or promotion presentation.
     const trialConfig = useTrialConfig();
-    trialConfig.applyAuthoritative(next.config);
+    const productUnavailable = next.serverState === "ELIGIBLE" && !next.canStart
+      && next.eligibilityReason === "product-unavailable";
+    trialConfig.applyAuthoritative(next.config, productUnavailable);
     const confirmedExpiry = next.status === "ended" && next.endReason === "expired";
     if (pendingExpiryClaim !== next.claimNo || !confirmedExpiry) pendingExpiryClaim = null;
     if (confirmedExpiry && next.claimNo && confirmedLifecycle?.claimNo === next.claimNo

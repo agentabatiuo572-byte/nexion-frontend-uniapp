@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { exchangeApi, remoteApiEnabled, stakingApi } from "@/api/runtime";
 import type { StakingPool } from "@/api/staking-api";
 import { useStaking } from "@/store/staking";
@@ -8,6 +8,33 @@ import { genesisBlockIsKnownUnavailable } from "@/store/genesis-config";
 import { useGenesisSaleBlocks } from "./use-genesis-sale-gate";
 import type { CanonicalQuest } from "@/api/quest-api";
 import { STAKING_TERMS } from "@/store/staking";
+import { questProductNo } from "@/lib/quest-presentation";
+import { getProduct } from "@/mock/products";
+import { productCatalogPresentation, productCatalogState, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
+import { onShow } from "./use-tab-page-lifecycle";
+import { useAutoRecovery } from "./use-auto-recovery";
+
+export function questActionRouteUnavailable(route: string): boolean {
+  if (!route) return true;
+  const productNo = questProductNo(route);
+  if (!productNo) return false;
+  if (!remoteApiEnabled) return !getProduct(productNo);
+  return productCatalogState.status !== "ready"
+    || !productCatalogPresentation.value?.products.some(product => product.id === productNo);
+}
+
+export function useQuestCatalogRead(needed: () => boolean) {
+  const read = () => {
+    if (needed()) void revalidateProductCatalog();
+  };
+  watch(needed, read, { immediate: true });
+  onShow(read);
+  useAutoRecovery({
+    active: needed,
+    failed: () => productCatalogState.status === "error",
+    retry: () => refreshProductCatalog(),
+  });
+}
 
 /**
  * 任务目标业务可用性的**唯一读数入口**,喂给 quest-business-availability 的报警器。
@@ -88,7 +115,7 @@ export function useQuestTargetAvailability(readOnMount = true) {
 export function useWeeklyQuestTargetClosed(now: () => number) {
   const availability = useQuestTargetAvailability(false);
   const { block, secondaryBlock } = useGenesisSaleBlocks(now);
-  return (quest: Pick<CanonicalQuest, "layer" | "actionRoute">): boolean => isWeeklyQuestTargetClosed(
+  return (quest: Pick<CanonicalQuest, "layer" | "actionRoute">): boolean => questActionRouteUnavailable(quest.actionRoute) || isWeeklyQuestTargetClosed(
     quest,
     { ...availability.value, genesisBlocked: genesisBlockIsKnownUnavailable(block.value) },
     secondaryBlock.value !== null,

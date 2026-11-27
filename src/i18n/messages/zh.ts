@@ -2044,30 +2044,30 @@ chooseMethod: "选择方式，开始接入 UVEL 网络",
     // 商品 `name` 是品牌名,永不翻译。verify.sh 断言每个 PRODUCTS id 在此都有条目。
     taskLevelLabels: {"1": "初级", "2": "中级", "3": "高级", "4": "旗舰"},
     taskLevelsLine: "可运行{levels} AI 算力任务",
+    productBadges: {
+      trending: "正热",
+      upgradePick: "升级首选",
+      flagship: "旗舰",
+      lowBarrier: "低门槛",
+    },
     catalog: {
       "stellarbox-s1": {
         tagline: "全托管设备",
-        badge: "热销",
       },
       "stellarbox-pro": {
         tagline: "对比 GPU 配置与预估收益。",
-        badge: "正热",
       },
       "stellarbox-pro-v2": {
         tagline: "2.5 倍 S1 吞吐",
-        badge: "升级首选",
       },
       "stellarrack-p1": {
         tagline: "数据中心级 A100 机架,给认真的运营者。",
-        badge: "旗舰",
       },
       "stellarrack-p2": {
         tagline: "数据中心 H100 机架 —— 算力天花板。",
-        badge: "旗舰",
       },
       "cloud-share": {
         tagline: "不用买机器 —— 直接买一份网络算力。",
-        badge: "低门槛",
       },
     },
     tradeinUpgrade: {
