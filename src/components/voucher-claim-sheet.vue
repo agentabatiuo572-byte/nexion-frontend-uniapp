@@ -44,9 +44,10 @@
             <!-- One control whose role follows the voucher (03 §3.1, 3.9; ticket-material voucher cards keep brand glass for 领取,
                  04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
                  text action with a trailing arrow into the next page. The same node stays, and the slot keeps the 44px row.
-                 From the claim request to its read-back the tapped 领取 shows the shared busy spinner at a locked width (03 §3.1). -->
+                 From the claim request to its read-back the tapped 领取 shows the shared busy spinner at a locked width (03 §3.1);
+                 the other cards' 领取 keep their normal look, and onClaim's single in-flight guard stops a second request. -->
             <view class="vcs-cta">
-              <NxButton :disabled="voucher.isClaimed(v.id) ? voucherTargetStatus(v) === 'unavailable' : voucher.claimingVoucherId !== null" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" :busy="voucher.claimingVoucherId === v.id" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" :busy="voucher.claimingVoucherId === v.id" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
