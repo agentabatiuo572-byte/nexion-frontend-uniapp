@@ -42,10 +42,13 @@
       <view v-if="loginRecoveryPending" class="lg-body lg-col" data-testid="login-recovery">
         <text class="lg-sub" role="status" aria-live="polite">{{ loading ? t.login.signingIn : loginResultUnknown ? t.login.unknownAttempt : t.login.verificationPending }}</text>
         <text v-if="retryContext?.context.phone" class="lg-phone lg-recovery__account">{{ retryContext?.context.countryCode }} {{ retryContext?.context.phone }}</text>
-        <text v-if="retryNeedsPassword || retryNeedsCode" id="lg-retry-hint" class="lg-sub">{{ t.login.retryOriginalHint }}</text>
         <input id="lg-retry-password" class="lg-recovery__input" v-if="retryNeedsPassword" v-model="retryPassword" :cursor-spacing="keyboardSpacing.retryPassword" type="password" :maxlength="PASSWORD_MAX_LENGTH" confirm-type="done" @confirm="retryOriginalLogin()" :placeholder="t.login.passwordPlaceholder" :aria-label="t.login.passwordPlaceholder" />
         <input id="lg-retry-code" class="lg-recovery__input" v-if="retryNeedsCode" v-model="retryCode" :cursor-spacing="keyboardSpacing.retryCode" type="number" confirm-type="done" @confirm="retryOriginalLogin()" :maxlength="6" :placeholder="t.login.retryCode" :aria-label="t.login.retryCode" />
-        <NxButton class="lg-cta lg-recovery__action" data-system-chrome-primary variant="primary" :label="t.login.retryOriginal" :busy="loading" :busy-label="t.login.signingIn" :disabled="!canRetryOriginal" :aria-describedby="!canRetryOriginal && !loading ? 'lg-retry-hint' : undefined" @click="retryOriginalLogin()" />
+        <view class="lg-recovery__cta">
+          <NxButton class="lg-cta lg-recovery__action" data-system-chrome-primary variant="primary" :label="t.login.retryOriginal" :busy="loading" :busy-label="t.login.signingIn" :disabled="!canRetryOriginal" :aria-describedby="!canRetryOriginal && !loading ? 'lg-retry-reason' : undefined" @click="retryOriginalLogin()" />
+          <!-- 03 §3.1: the credential still missing, in the same reserved line under the button as the form's reason line. -->
+          <text v-if="retryNeedsPassword || retryNeedsCode" id="lg-retry-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': canRetryOriginal || loading }" :aria-hidden="canRetryOriginal || loading ? 'true' : undefined">{{ retryDisabledReason }}</text>
+        </view>
         <view v-if="!loginResultUnknown" class="lg-recovery__secondary" role="button" :tabindex="loading ? -1 : 0" :aria-disabled="loading" @click="cancelLoginVerification" @keydown.enter.prevent="cancelLoginVerification" @keydown.space.prevent="cancelLoginVerification"><text>{{ t.ui.cancel }}</text></view>
       </view>
       <view v-if="!loginRecoveryPending" class="lg-body">
@@ -112,8 +115,8 @@
            50% look and aria-disabled (03 §3.1). Busy shows NxButton's spinner and takes no taps. -->
       <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
-           directly above is showing, that line carries the reason and the button points to it instead. In the recovery
-           view the hint above the inputs is that condition panel (lg-retry-hint). The line keeps its height when it has
+           directly above is showing, that line carries the reason and the button points to it instead. The recovery view
+           has the same line under its own button (lg-retry-reason). The line keeps its height when it has
            nothing to say, hidden from view and from screen readers, so nothing below jumps. -->
       <text v-if="!loginRecoveryPending" id="lg-cta-reason" class="lg-cta-reason" :class="{ 'lg-cta-reason--off': canPrimary || loading || !!error }" :aria-hidden="canPrimary || loading || error ? 'true' : undefined">{{ primaryDisabledReason }}</text>
 
@@ -244,6 +247,12 @@ const retryNeedsCode = computed(() => ["OTP", "TWO_FACTOR", "REGISTRATION"].incl
 const canRetryOriginal = computed(() => !loading.value && (!retryContext.value || (replayAvailable.value
   && (!retryNeedsPassword.value || !!retryPassword.value)
   && (!retryNeedsCode.value || /^\d{6}$/.test(retryCode.value)))));
+// The first credential still missing, in field order.
+const retryDisabledReason = computed(() => {
+  if (retryNeedsPassword.value && !retryPassword.value) return t.value.login.errorInvalidPassword;
+  if (retryNeedsCode.value && !/^\d{6}$/.test(retryCode.value)) return t.value.login.errorInvalidCode;
+  return "";
+});
 function syncLoginRecovery() {
   retryContext.value = authApi.pendingLoginContext();
   loginResultUnknown.value = authApi.pendingLogin();
@@ -425,17 +434,17 @@ const primaryDisabledReason = computed(() => {
   }
   return "";
 });
-// Seeds include the reason line's 28px slot on the form. Recovery has no reason line below its button.
+// Seeds include the reason line's 28px slot below the button, on the form and in recovery (one of the two is rendered).
 const { spacing: keyboardSpacing, inset: keyboardInset } = useKeyboardPrimaryReach({
-  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta", primaryDescription: "#lg-cta-reason",
+  root: ".lg-root", form: ".lg-wrap", primary: ".lg-cta", primaryDescription: ".lg-cta-reason",
   inputs: {
     phone: { selector: ".lg-phone__in", seed: 263 },
     password: { selector: "#lg-password", seed: 169 },
     otp: { selector: ".lg-otp", seed: 144 },
     newPassword: { selector: "#lg-new-password", seed: 181 },
     confirmPassword: { selector: "#lg-confirm-password", seed: 113 },
-    retryPassword: { selector: "#lg-retry-password", seed: 164 },
-    retryCode: { selector: "#lg-retry-code", seed: 96 },
+    retryPassword: { selector: "#lg-retry-password", seed: 192 },
+    retryCode: { selector: "#lg-retry-code", seed: 124 },
   },
   layout: () => [step.value, mode.value, loginRecoveryPending.value, retryNeedsPassword.value, retryNeedsCode.value,
     error.value, primaryDisabledReason.value, phoneFormatMessage.value, developmentOtpEnabled.value],
@@ -1132,8 +1141,9 @@ onUnmounted(() => cleanup());
 .lg-recovery-notice { --nx-tint: var(--v5-brand); margin-top: 12px; padding: 8px 12px; border-radius: 12px; }
 .lg-recovery__account { box-sizing: border-box; padding: 0 16px; font-size: var(--ui-type-input); color: var(--v5-ink); }
 .lg-recovery__input { box-sizing: border-box; height: 56px; padding: 0 16px; border-radius: 16px; background: var(--v5-surface); color: var(--v5-ink); font-size: var(--ui-type-input); line-height: var(--ui-type-input-lh); }
+.lg-recovery__cta { display: flex; flex-direction: column; }
 .lg-recovery__action { margin-top: 12px; }
-.lg-recovery__secondary { min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: var(--ui-type-body); color: var(--v5-brand); }
+.lg-recovery__secondary { min-height: 44px; display: flex; align-items: center; justify-content: center; font: var(--ui-type-button-weight) var(--ui-type-button)/var(--ui-type-button-lh) var(--font-v5); color: var(--v5-brand); }
 .lg-recovery__secondary[aria-disabled="true"] { opacity: .5; }
 .lg-recovery-notice__t { display: block; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); }
 .lg-sub { display: block; margin-top: 8px; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
