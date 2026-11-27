@@ -138,9 +138,9 @@
       </template>
       <!-- First config or ?order= receipt read with nothing to show (03 §3.4, §3.5.2): when it fails, the page's one centred
            result and its one 重新加载; while it runs, the still placeholder below. An ?order= number that is not a withdrawal
-           number can never load, so its result offers the way back instead (neutral glass L, 03 §3.1). -->
+           number can never load, so its result says no record was found and offers the way back (neutral glass L, 03 §3.1). -->
       <template v-else-if="requestedOrder !== null || !pendingAttempt">
-        <EmptyState v-if="error && orderRouteInvalid" kind="empty-list" page :title="useTranslations.pageLoad.unknown" :cta-label="c.backToWallet" cta-size="large" @cta="backToWallet" />
+        <EmptyState v-if="error && orderRouteInvalid" kind="empty-list" page :title="useTranslations.wallet.withdrawalNotFound" :cta-label="c.backToWallet" cta-size="large" @cta="backToWallet" />
         <EmptyState v-else-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
       </template>
       <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />

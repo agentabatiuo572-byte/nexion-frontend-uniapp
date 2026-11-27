@@ -75,7 +75,7 @@
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
         <template v-if='intent.paymentMode === "hosted"'>
           <!-- Rejected before it was created: the shared result head (03 §3.6.1), not the countdown stage. -->
-          <view v-if="hostedRejected" class="nx-bank-state"><NxResultHead tone="danger" :title="t.bankPane.hostedRejectedNote" /></view>
+          <view v-if="hostedRejected" class="nx-bank-state"><NxResultHead tone="danger" :title="t.bankPane.hostedRejectedTitle" /></view>
           <view v-else class="nx-bank-stage">
             <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
             <view class="nx-bank-slab nx-bank-pay nx-tint">

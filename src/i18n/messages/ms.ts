@@ -6003,6 +6003,7 @@ export const ms: Messages = {
     fxReadRetrying: "Kadar belum dapat dimuatkan. Mencuba semula secara automatik.",
     hostedSecureNote: "Dapatkan akaun penerima atau kod QR daripada halaman bayaran. Semak jumlah sebelum memindahkan.",
     hostedPendingNote: "Pesanan anda sedang disahkan. Sila muat semula sebentar lagi.",
+    hostedRejectedTitle: "Pesanan bayaran tidak dicipta",
     hostedRejectedNote: "Pesanan bayaran tidak dicipta. Sila hubungi khidmat pelanggan.",
     hostedContinueCta: "Ke halaman bayaran bank",
     hostedOpenFailed: "Halaman bayaran tidak dapat dibuka. Sila cuba lagi.",
