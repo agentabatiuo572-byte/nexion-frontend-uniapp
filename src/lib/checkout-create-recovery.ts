@@ -1,4 +1,5 @@
 import type { CreateOrderRequest, OrderCreateCommand } from '@/api/order-api';
+import type { VoucherDef } from '@/mock/vouchers';
 import { readAccountRow, writeAccountRow } from '@/store/account-scoped-storage';
 
 const KEY = 'uvel-checkout-create-recovery-v1';
@@ -9,14 +10,33 @@ export interface PendingCheckoutCreate {
   subtotal: number;
   discount: number;
   amount: number;
+  expectedAmountUsdt?: string;
   productName?: string;
   voucherName?: string;
 }
 /** Stored merchandise subtotal and voucher discount also exist on pre-B127 pending records. */
+const MICRO_USDT = 1_000_000n;
+
+function decimalUnits(value: number, scale: number): bigint {
+  return BigInt(value.toFixed(scale).replace('.', ''));
+}
+
+/** The server uses cent-denominated merchandise and truncates the voucher to six decimals. */
+export function confirmedOrderAmountUsdt(subtotal: number, voucher?: VoucherDef): string {
+  const merchandise = decimalUnits(subtotal, 2) * 10_000n;
+  let discount = voucher?.type === 'percent'
+    ? merchandise * decimalUnits(voucher.percent ?? 0, 4) / MICRO_USDT
+    : decimalUnits(voucher?.amountUSD ?? 0, 6);
+  const cap = decimalUnits(voucher?.maxDiscountUSD ?? 0, 6);
+  if (cap > 0n && discount > cap) discount = cap;
+  const amount = merchandise > discount ? merchandise - discount : 0n;
+  return String(amount / MICRO_USDT) + '.' + String(amount % MICRO_USDT).padStart(6, '0');
+}
+
 export function checkoutCreateRequest(entry: PendingCheckoutCreate) {
   return {
     ...entry.request,
-    expectedAmountUsdt: Math.max(0, entry.subtotal - entry.discount).toFixed(6),
+    expectedAmountUsdt: entry.expectedAmountUsdt ?? Math.max(0, entry.subtotal - entry.discount).toFixed(6),
   };
 }
 
@@ -33,6 +53,8 @@ export function readCheckoutCreate(accountKey: string, productNo: string): Pendi
   if (entry.request?.productNo !== productNo || entry.request.quantity !== 1
       || typeof entry.request.idempotencyKey !== 'string' || !entry.request.idempotencyKey
       || (entry.request.voucherId != null && typeof entry.request.voucherId !== 'string')
+      || (entry.expectedAmountUsdt !== undefined && (typeof entry.expectedAmountUsdt !== 'string'
+        || !/^\d+\.\d{6}$/.test(entry.expectedAmountUsdt)))
       || typeof entry.intent !== 'string' || !entry.intent
       || ![entry.subtotal, entry.discount, entry.amount].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) {
     throw new Error('ACCOUNT_COMMAND_STORAGE_UNAVAILABLE');
