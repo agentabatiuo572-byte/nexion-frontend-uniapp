@@ -225,11 +225,10 @@ export const useVoucher = defineStore("voucher", () => {
     claimingVoucherId.value = id;
     try {
       await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
-      if (!remoteRequestIsCurrent(request, runScope, generation)) return false;
-      // A same-key receipt can predate redemption; only the current GET authorizes use.
-      const refreshed = await refreshRemote();
-      return refreshed && remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope)
-        && claimedUnused.value.some((item) => item.id === id);
+      if (!remoteAccountEpoch.isCurrent(request) || !isCurrentRuntimeRevision(runScope)) return false;
+      // The receipt confirms the claim. Current usability comes from the voucher catalogue.
+      await refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && isCurrentRuntimeRevision(runScope);
     } catch {
       await recoverCurrentRemoteRead(request, runScope, generation);
       return false;

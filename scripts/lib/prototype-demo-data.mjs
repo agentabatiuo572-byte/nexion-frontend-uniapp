@@ -1800,7 +1800,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const data=demoDayOneSnapshot(state,accountId,now,contentLocale,skuQuestTargets);
     if(empty) return data;
     const weekNames=localized(contentLocale,['了解设备收益','完成一门课程','邀请一位好友','查看账户安全'],['Explore device earnings','Complete one course','Invite a friend','Review account security'],['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']);
-    if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(state.taskState==='expired'?now-1000:state.weekEndState==='ending'&&i>0?(state.weekEndingAt??=now+60000):now+5*day).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
+    if(state.taskState!=='empty'){
+      const endingAt=state.taskState!=='expired'&&state.weekEndState==='ending'
+        ? (state.weekEndingAt??=now+60_000) : null;
+      const eligibleFrom=new Date((endingAt===null?now:endingAt-60_000)-day).toISOString();
+      const eligibleUntil=new Date(state.taskState==='expired'?now-1000:endingAt??now+5*day).toISOString();
+      data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom,eligibleUntil,eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
+    }
     if(state.catalogState==='sku-series'&&['account','pending'].includes(state.taskState)){
       data.quests.find(row=>row.questCode==='demo-week-0').actionRoute='/pages/store/detail?id='+demoS1VariantNo;
       data.quests.find(row=>row.questCode==='demo-week-3').actionRoute='/pages/store/detail?id=e-s1-999';

@@ -19,7 +19,7 @@
             <text class="newcomer-task__eyebrow">{{ t.home.dayOneFirstDayReward }}</text>
             <text class="newcomer-task__count">{{ taskCountText }}</text>
           </view>
-          <view v-if="!claimState.empty" class="newcomer-task__reward">
+          <view v-if="!claimState.empty && !claimState.claimed" class="newcomer-task__reward">
             <text class="newcomer-task__reward-value">{{ rewardText }}</text>
             <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">{{ "\u00A0" }}UVT</text>
           </view>
@@ -280,7 +280,7 @@ const toggleLabel = computed(() => questLoadError.value
   : expanded.value ? t.value.home.dayOneHideTasks : viewTasksText.value);
 const rewardText = computed(() => {
   if (!remoteApiEnabled) return `+${formatAmount(mockReward)}`;
-  if (quest.remoteStatus !== "ready") return "—";
+  if (questUnavailable.value || !claimState.value.verifiable) return "—";
   const amount = quest.dayOneRewardNex;
   return amount === 0 ? formatAmount(0) : `+${formatAmount(amount)}`;
 });
