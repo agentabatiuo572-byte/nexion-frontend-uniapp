@@ -18,9 +18,9 @@
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
-          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
-          <view class="row"><text>{{ c.fee }}</text><text>{{ exact(order.bank.feeUsdt) }}</text></view>
-          <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
+          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ usdt2(order.bank.amountUsdt) }} USDT</text></view>
+          <view class="row"><text>{{ c.fee }}</text><text>{{ usdt2(order.bank.feeUsdt) }}</text></view>
+          <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ usdt2(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
         <view class="bar-space bar-space--result" />
@@ -63,7 +63,7 @@
             <view class="aura" aria-hidden="true"><view /><view /></view>
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
-              <text class="slab__amt">{{ money(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
+              <text class="slab__amt">{{ usdt2(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
               <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
             </view>
           </view>
@@ -77,8 +77,8 @@
               </view>
             </view>
             <view class="ticket__rows">
-              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ exact(quote.feeUsdt) }}</text></view>
-              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ exact(quote.netUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ usdt2(quote.feeUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ usdt2(quote.netUsdt) }}</text></view>
               <view class="qrow"><text class="k">{{ c.rate }}</text><text class="qrow__v">{{ formatHowNumber(quote.rateVnd, dateLocale()) }}</text></view>
             </view>
             <view class="tear" aria-hidden="true" />
@@ -172,7 +172,7 @@
 <script setup lang="ts">
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { toast, type RuleItem } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -249,7 +249,7 @@ function readPendingQuoteNo(): string | null {
   return typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending) ? pending : null;
 }
 const money = (value: number) => formatAmount(value);
-const exact = (value: number) => formatGroupedAmount(value, 6);
+const usdt2 = (value: number) => formatTruncatedAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
@@ -312,6 +312,15 @@ function rulesPrimary() {
   rulesMode.value = null;
   if (submitting) void submit();
 }
+const rulesQuoteDetails = computed(() => {
+  const current = quote.value;
+  if (!current) return null;
+  return {
+    account: dots(current.maskedAccount),
+    debit: `${usdt2(current.amountUsdt)}\u00A0USDT`,
+    receive: formatAmount(current.amountVnd, "VND"),
+  };
+});
 function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.value = "amount"; }
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }

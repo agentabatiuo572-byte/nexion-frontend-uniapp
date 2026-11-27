@@ -79,7 +79,7 @@
       <!-- P-45: withdrawable balance card — amount anatomy ($ and cents in ink-3) plus what is held back. -->
       <view class="wd-bal mx-4">
         <text class="wd-k">{{ t.wallet.withdrawableLabel }}</text>
-        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt"><text class="wd-cur">$</text>{{ amountParts(maxWithdrawable)[0] }}<text class="wd-dec">{{ amountParts(maxWithdrawable)[1] }}</text></text>
+        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt"><text class="wd-cur">$</text>{{ amountParts(formatAmount(maxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatAmount(maxWithdrawable))[1] }}</text></text>
         <text v-else class="wd-bal__amt">—</text>
         <view v-if="withdrawalFactsDisplayable && heldBuckets" class="wd-locks">
           <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">${{ formatAmount(heldBuckets.review) }}</text></view>
@@ -251,7 +251,7 @@
         </view>
         <view class="wd-fee__r wd-fee__r--net">
           <text class="wd-k">{{ t.wallet.receiveLabel }}</text>
-          <text class="wd-fee__net"><text class="wd-cur">$</text>{{ amountParts(receive)[0] }}<text class="wd-dec">{{ amountParts(receive)[1] }}</text></text>
+          <text class="wd-fee__net"><text class="wd-cur">$</text>{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] }}</text></text>
         </view>
       </template>
       </view>
@@ -308,7 +308,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { USDT_WITHDRAWAL_DISPLAY_MAX } from "@/lib/withdrawal-display-limits";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { ref, computed, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { foregroundReadAllowed } from "@/lib/foreground-read";
@@ -1223,8 +1223,8 @@ const heldBuckets = computed(() => {
   return !b || (b.pending_review <= 0 && b.bonus_locked <= 0) ? null : { review: b.pending_review, locked: b.bonus_locked };
 });
 // Amount anatomy: whole part and cents rendered separately so the cents can sit in ink-3.
-function amountParts(value: number): [string, string] {
-  const text = formatAmount(value), at = text.lastIndexOf(".");
+function amountParts(text: string): [string, string] {
+  const at = text.lastIndexOf(".");
   return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at)];
 }
 // 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案;码表单源 lib/risk-reason-text)。
@@ -1464,12 +1464,12 @@ async function handleSubmit() {
   // 新提现用明细行(ConfirmOptions.rows);重放仍是纯文本说明。
   // The same frozen quote as rows: amount, network fee, UVT offset (only when used), network, address, received.
   const confirmRows = [
-    { label: t.value.walletV3.withdrawRowAmount, value: `$${formatAmount(snap.amount)} USDT` },
-    { label: t.value.walletV3.feeConfirmRow, value: `−$${formatAmount(snap.quote.networkConfirmUsd)}` },
-    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+$${formatAmount(snap.quote.feeWaived)} · ${fmtNex(snap.quote.nexBurned)} UVT` }] : []),
+    { label: t.value.walletV3.withdrawRowAmount, value: `$${formatTruncatedAmount(snap.amount)}\u00A0USDT` },
+    { label: t.value.walletV3.feeConfirmRow, value: `−$${formatTruncatedAmount(snap.quote.networkConfirmUsd)}` },
+    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+$${formatTruncatedAmount(snap.quote.feeWaived)} · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
     { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label },
-    { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address) },
-    { label: t.value.wallet.receiveLabel, value: `$${formatAmount(snap.quote.netReceive)}`, amount: true },
+    { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address },
+    { label: t.value.wallet.receiveLabel, value: `$${formatTruncatedAmount(snap.quote.netReceive)}`, amount: true },
   ];
   // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
   // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,

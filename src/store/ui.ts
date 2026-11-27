@@ -31,7 +31,7 @@ export interface ConfirmOptions {
   /** 谁开的框(如页面实例的 owner 标记)—— 页面卸载时只收自己开的,不碰别人排队中的框。 */
   owner?: string;
   /** Optional detail list (label/value rows) — switches the dialog to the centred detail layout. */
-  rows?: { label: string; value: string; amount?: boolean }[];
+  rows?: { label: string; value: string; amount?: boolean; fullCode?: string }[];
   /** Badge above the title in the detail layout. */
   glyph?: "withdraw";
   /** Rule data carried with a confirmation snapshot. */

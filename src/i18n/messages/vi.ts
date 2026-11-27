@@ -5524,7 +5524,7 @@ openSeaErrorPool: {
       issueBody: "Nếu tiền chưa về hoặc số tiền không khớp, vui lòng chuẩn bị chứng từ chuyển tiền (như mã hash giao dịch) và liên hệ hỗ trợ.",
       feeTitle: "Phí",
       feeFreeBody: "UVEL không thu phí nạp; ví chuyển có thể thu phí mạng.",
-      feeBody: "Mỗi lần nạp thu phí {fee}, trừ khi tiền về; ví chuyển có thể thu thêm phí mạng.",
+      feeBody: "Mỗi lần nạp có phí {fee}. Phí được khấu trừ khi ghi có. Ví chuyển có thể thu thêm phí mạng.",
     },
     change: "Đổi",
     paySuccess: "Thanh toán thành công",
