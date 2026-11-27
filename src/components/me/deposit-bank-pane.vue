@@ -161,8 +161,8 @@
 
         </template>
         <!-- HDPay 无关闭订单/退款接口，provider order 创建后禁止制造本地取消分叉。 -->
-        <!-- A reverse action: the shared quiet ink-3 text, no container, 44px target (03 §3.1 .nx-reverse-action). -->
-        <view v-if="intent.paymentMode !== 'hosted'" class="nx-bank-link-row"><NxButton class="nx-bank-cancel-cta nx-reverse-action" variant="text" size="small" :label="t.bankPane.cancelCta" @click="askCancel" /></view>
+        <!-- No 取消订单 on a manual order: B28 retired the manual rail and the server refuses its cancel (410); a hosted
+             provider order has no close interface either. -->
       </view>
     </template>
 
@@ -247,7 +247,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navBack, navTo } from "@/lib/route";
-import { toast, confirm } from "@/store/ui";
+import { toast } from "@/store/ui";
 import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
 import { useApp } from "@/store/app";
@@ -766,29 +766,6 @@ function openHostedOrder(it: DepositIntent) {
     return;
   }
   hostedOpenTimer = setTimeout(() => { openingHosted.value = false; }, 1000);
-}
-async function askCancel() {
-  const it = intent.value;
-  if (!it || it.status !== "awaiting_payment") return;
-  const ok = await confirm({
-    title: t.value.bankPane.cancelConfirmTitle,
-    message: t.value.bankPane.cancelConfirmBody,
-    confirmLabel: t.value.bankPane.cancelConfirmOk,
-    cancelLabel: t.value.bankPane.cancelConfirmNo,
-    danger: true,
-    icon: "warn",
-  });
-  if (!ok) return;
-  const r = remoteApiEnabled
-    ? await dep.cancelRemoteBankIntent(it.intentId)
-    : dep.cancelBankIntent(it.intentId);
-  if (r.ok) {
-    toast.success(t.value.bankPane.cancelledToast);
-    viewIntentId.value = null;
-  } else if (r.conflict) {
-    // 这张付款单在别处已经付掉 / 超时 / 撤掉了,store 已把最新状态刷回来。
-    toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
-  }
 }
 function goSupport() {
   // cat=deposit:从充值场景进工单,预选「充值」分类(同 usdt 段入口)
