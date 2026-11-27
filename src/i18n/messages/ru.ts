@@ -5967,7 +5967,7 @@ export const ru: Messages = {
     cancelConfirmNo: "Оставить",
     cancelledToast: "Заказ отменён",
     waitingTitle: "Ждём подтверждения",
-    waitingBody: "Ждём поступления банковского перевода — обычно 1–3 минуты.",
+    waitingBody: "Деньги обычно поступают за 1\u2060–\u20603 минуты. Страница обновится автоматически.",
     successTitle: "Баланс пополнен",
     successLine: "Зачислено на баланс · курс {rate} · без комиссии",
     doneCta: "В кошелёк",

@@ -5967,7 +5967,7 @@ export const fil: Messages = {
     cancelConfirmNo: "Panatilihin",
     cancelledToast: "Kinansela ang order",
     waitingTitle: "Hinihintay ang kumpirmasyon",
-    waitingBody: "Hinihintay pang pumasok ang bank transfer, karaniwang 1–3 minuto.",
+    waitingBody: "Karaniwang pumapasok ang pera sa loob ng 1\u2060–\u20603 minuto. Kusang mag-a-update ang page na ito.",
     successTitle: "Matagumpay ang top-up",
     successLine: "Naidagdag sa balanse · rate {rate} · walang fee",
     doneCta: "Bumalik sa wallet",

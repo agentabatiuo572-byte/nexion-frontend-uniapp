@@ -5967,7 +5967,7 @@ export const uz: Messages = {
     cancelConfirmNo: "Qoldirish",
     cancelledToast: "Bekor qilindi",
     waitingTitle: "Tasdiq kutilmoqda",
-    waitingBody: "Bank oʻtkazmasi tushishi kutilmoqda, odatda 1–3 daqiqa.",
+    waitingBody: "Pul odatda 1\u2060–\u20603 daqiqa ichida tushadi. Sahifa avtomatik yangilanadi.",
     successTitle: "Hisob toʻldirildi",
     successLine: "Balansga tushdi · kurs {rate} · komissiyasiz",
     doneCta: "Hamyonga qaytish",

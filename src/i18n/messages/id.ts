@@ -5967,7 +5967,7 @@ export const id: Messages = {
     cancelConfirmNo: "Simpan pesanan",
     cancelledToast: "Pesanan dibatalkan",
     waitingTitle: "Menunggu konfirmasi",
-    waitingBody: "Menunggu dana transfer bank masuk, biasanya 1–3 menit.",
+    waitingBody: "Dana biasanya masuk dalam 1\u2060–\u20603 menit. Halaman ini akan diperbarui otomatis.",
     successTitle: "Top up berhasil",
     successLine: "Masuk ke saldo · kurs {rate} · tanpa biaya",
     doneCta: "Kembali ke dompet",

@@ -5967,7 +5967,7 @@ export const ms: Messages = {
     cancelConfirmNo: "Simpan pesanan",
     cancelledToast: "Pesanan dibatalkan",
     waitingTitle: "Menunggu pengesahan",
-    waitingBody: "Menunggu wang pindahan bank masuk, biasanya 1–3 minit.",
+    waitingBody: "Dana biasanya masuk dalam 1\u2060–\u20603 minit. Halaman ini akan dikemas kini secara automatik.",
     successTitle: "Tambah nilai berjaya",
     successLine: "Dikreditkan ke baki · kadar {rate} · tanpa caj",
     doneCta: "Kembali ke dompet",

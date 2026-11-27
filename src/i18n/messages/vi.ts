@@ -5643,7 +5643,7 @@ openSeaErrorPool: {
     cancelConfirmNo: "Giữ lệnh",
     cancelledToast: "Đã hủy lệnh",
     waitingTitle: "Đang chờ xác nhận",
-    waitingBody: "Đang chờ tiền chuyển khoản đến, thường mất 1–3 phút.",
+    waitingBody: "Tiền thường đến trong 1\u2060–\u20603 phút. Trang này sẽ tự cập nhật khi nhận được tiền.",
     successTitle: "Nạp tiền thành công",
     successLine: "Đã vào số dư · tỷ giá {rate} · 0 phí",
     doneCta: "Quay lại ví",

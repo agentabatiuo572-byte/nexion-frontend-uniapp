@@ -5649,7 +5649,7 @@ openSeaErrorPool: {
     cancelConfirmNo: "保留订单",
     cancelledToast: "订单已取消",
     waitingTitle: "等待到账确认",
-    waitingBody: "正在等待银行到账，通常 1–3 分钟。",
+    waitingBody: "通常 1\u2060–\u20603 分钟内到账，到账后这里会自动更新。",
     successTitle: "充值成功",
     successLine: "已计入余额 · 牌价 {rate} · 手续费 0",
     doneCta: "返回钱包",

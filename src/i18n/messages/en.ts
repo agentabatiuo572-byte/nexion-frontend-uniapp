@@ -5740,7 +5740,7 @@ openSeaErrorPool: {
     cancelConfirmNo: "Keep the order",
     cancelledToast: "Order cancelled",
     waitingTitle: "Waiting for confirmation",
-    waitingBody: "Waiting for the bank transfer, usually 1–3 minutes.",
+    waitingBody: "Funds usually arrive in 1\u2060–\u20603 minutes. This page updates automatically.",
     successTitle: "Top-up successful",
     successLine: "Credited to balance · rate {rate} · zero fees",
     doneCta: "Back to wallet",
