@@ -286,10 +286,12 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   if (p === "/api/deposits/policy" || p === "/api/deposits/address") {
     // Policy and address share the same terms and existing payment availability switches.
     const paymentMode = demoPaymentScenario(state);
+    // The fee knob changes only what the policy and address report; ledger demos keep demoChainDepositFee.
+    const feeExact = { zero: '0', half: '0.5' }[state.depositFeeState] ?? demoChainDepositFee;
     const networks = ['BEP20', 'ERC20'].map(network => {
       const enabled = paymentMode !== 'usdt-off' && !(paymentMode === 'erc20-off' && network === 'ERC20');
       return { network, enabled, disabledReason: enabled ? null : 'NETWORK_SWITCH_OFF', confirmations: 15,
-        feeUsdt: Number(demoChainDepositFee), feeUsdtExact: demoChainDepositFee,
+        feeUsdt: Number(feeExact), feeUsdtExact: feeExact,
         minDepositUsdt: Number(demoChainDepositMinimum), minDepositUsdtExact: demoChainDepositMinimum };
     });
     if (p === "/api/deposits/policy") return { networks };
