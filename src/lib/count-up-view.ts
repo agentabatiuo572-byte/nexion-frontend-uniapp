@@ -1,5 +1,6 @@
 import { formatAmount, formatGroupedAmount } from "./amount-display";
 import { formatFinanceAmount } from "./finance-amount-display";
+import { formatEstimate } from "./estimate-display";
 import { formatUsdOverviewParts } from "./usd-display";
 
 /**
@@ -8,7 +9,7 @@ import { formatUsdOverviewParts } from "./usd-display";
  * frames straight into the text nodes of the `.nx-count--<part>` elements inside the host, so the
  * logic layer does not re-render every frame. Formatting matches the logic templates part by part.
  */
-export type CountUpKind = "grouped" | "finance" | "usd" | "plus";
+export type CountUpKind = "grouped" | "finance" | "usd" | "plus" | "estimate";
 export interface CountUpConfig { hostId: string; kind: CountUpKind; follow: boolean; value: number | null; count: boolean }
 
 // Templates bind `:change:count-up="countUp.update"` to the renderjs module of that name.
@@ -19,7 +20,12 @@ declare module "vue" {
 const DURATION = 900;
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
-function textParts(kind: CountUpKind, value: number): Record<string, string> {
+function textParts(kind: CountUpKind, value: number, target = value): Record<string, string> {
+  if (kind === "estimate") {
+    const places = formatEstimate(target).split(".")[1]?.length ?? 0;
+    const [int, frac] = value.toFixed(places).split(".");
+    return { int: int.replace(/\B(?=(\d{3})+(?!\d))/g, ","), frac: frac ? `.${frac}` : "" };
+  }
   if (kind === "plus") return { int: `+${formatAmount(value)}` };
   if (kind === "usd") {
     const parts = formatUsdOverviewParts(value)!;
@@ -80,7 +86,7 @@ function step(hostId: string) {
   const t = progress(run);
   const value = run.config.value!;
   if (t >= 1) { stop(run, textParts(run.config.kind, value)); return; }
-  write(run, textParts(run.config.kind, run.shown = shownAt(run, t)));
+  write(run, textParts(run.config.kind, run.shown = shownAt(run, t), value));
   run.frame = requestAnimationFrame(() => step(hostId));
 }
 
@@ -112,7 +118,7 @@ export const countUpView = {
         run.started = true;
         if (!config.count || reducedMotion()) { run.done = true; return; }
         run.start = performance.now();
-        write(run, textParts(config.kind, 0)); // the first painted frame already shows 0
+        write(run, textParts(config.kind, 0, config.value)); // the first painted frame already shows 0
         run.frame = requestAnimationFrame(() => step(config.hostId));
         return;
       }
@@ -125,7 +131,7 @@ export const countUpView = {
       }
       run.config = config;
       // Cover the final text this patch just wrote with the current frame.
-      write(run, textParts(config.kind, run.shown = shownAt(run, progress(run))));
+      write(run, textParts(config.kind, run.shown = shownAt(run, progress(run)), config.value));
     },
   },
 };
