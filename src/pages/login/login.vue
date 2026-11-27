@@ -120,7 +120,7 @@
         <text class="lg-switch__t">{{ mode === 'password' ? t.login.useCodeInstead : t.login.usePasswordInstead }}</text>
       </view>
 
-      <ThirdPartyAuth v-if="!loginRecoveryPending && remoteApiEnabled && step === 1 && mode !== 'reset'" :disabled="loading || loginRecoveryPending" :return-to="returnParam" :sponsor-code="refOnLogin" @busy="oauthBusy = $event; syncLoginRecovery()" />
+      <ThirdPartyAuth v-if="!loginRecoveryPending && remoteApiEnabled && step === 1 && mode !== 'reset'" :disabled="loading || loginRecoveryPending" :return-to="returnParam" :sponsor-code="refOnLogin" @busy="onOauthBusy" />
       <!-- OAuth (step 1, not reset) -->
       <view v-if="!loginRecoveryPending && step === 1 && mode !== 'reset' && !remoteApiEnabled" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
@@ -163,6 +163,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
+import { useOtpResend } from "@/composables/use-otp-resend";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -239,7 +240,7 @@ const error = ref<string | null>(null);
  */
 const phoneTouched = ref(false);
 const submitAttempted = ref(false);
-const resendLeft = ref(0);
+const { resendLeft, refreshResend, startResend, clearResend } = useOtpResend();
 const oauthBusy = ref(false);
 const localLoading = ref(false);
 const loading = computed({ get: () => localLoading.value || oauthBusy.value, set: (value: boolean) => { localLoading.value = value; } });
@@ -258,8 +259,14 @@ const canRetryOriginal = computed(() => !loading.value && (!retryContext.value |
 function syncLoginRecovery() {
   retryContext.value = authApi.pendingLoginContext();
   loginResultUnknown.value = authApi.pendingLogin();
-  loginRecoveryPending.value = loginResultUnknown.value || !!retryContext.value;
+  // While this page owns the password challenge, only an unknown result needs recovery.
+  loginRecoveryPending.value = loginResultUnknown.value || (!!retryContext.value && !remoteTwoFactorChallenge.value);
   replayAvailable.value = !!retryContext.value;
+}
+function onOauthBusy(busy: boolean) {
+  if (oauthBusy.value === busy) return;
+  oauthBusy.value = busy;
+  if (!busy) syncLoginRecovery();
 }
 // One read when an unresolved attempt first reaches this page. Further reads
 // belong to an explicit retry; a failed read must never start a polling loop.
@@ -335,6 +342,7 @@ const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
+let verifiedResetCode: string | null = null;
 const remoteTwoFactorChallenge = ref<string | null>(null);
 const serverSessionReloadNotice = ref(false);
 const sessionEndNotice = computed(() => sessionEndReason.value === "H5_REPLACED" ? t.value.login.sessionReplacedByWebNotice
@@ -347,7 +355,6 @@ const browserUnsupportedNotice = ref(false);
 const passwordFocused = ref(false);
 const confirmPasswordFocused = ref(false);
 
-let resendTimer: ReturnType<typeof setInterval> | undefined;
 let signInTimer: ReturnType<typeof setTimeout> | undefined;
 let otpFlowVersion = 0;
 let mounted = true;
@@ -505,9 +512,10 @@ function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onPhone(e: Event) {
-  invalidateOtpFlow();
+  const next = sanitizePhoneInput(inputVal(e));
+  if (phone.value !== next) invalidateOtpFlow();
   phoneTouched.value = true;
-  phone.value = sanitizePhoneInput(inputVal(e));
+  phone.value = next;
   error.value = null;
 }
 function focusPassword() {
@@ -540,7 +548,7 @@ function focusCode() {
 }
 function pickCountry(c: string) {
   if (!isSelectablePhoneDialCode(c)) return;
-  invalidateOtpFlow();
+  if (country.value !== c) invalidateOtpFlow();
   country.value = c;
   error.value = null;
   showCountries.value = false;
@@ -551,12 +559,20 @@ function clearSignIn() {
   loading.value = false;
 }
 
-/** 换号、返回或切换认证方式后，旧发码/验码/登录回包不得写回当前页面。 */
-function invalidateOtpFlow() {
-  otpFlowVersion += 1;
-  clearSignIn();
+function clearSmsChallenge() {
   otpRequestId.value = null;
   otpVerifyToken.value = null;
+  verifiedResetCode = null;
+}
+
+/** 换号、返回或切换认证方式后，旧发码/验码/登录回包不得写回当前页面。 */
+function invalidateOtpFlow(preserveSmsChallenge = false) {
+  otpFlowVersion += 1;
+  clearSignIn();
+  if (!preserveSmsChallenge) {
+    clearSmsChallenge();
+    clearResend();
+  }
   remoteTwoFactorChallenge.value = null;
 }
 
@@ -669,18 +685,16 @@ function finishVerifiedOtpSignIn(verifyToken: string, context: OtpFlowContext) {
   finishSignIn(exchange, context);
 }
 
-function startResend(sec: number) {
-  resendLeft.value = sec;
-  if (resendTimer) clearInterval(resendTimer);
-  resendTimer = setInterval(() => {
-    resendLeft.value = Math.max(0, resendLeft.value - 1);
-    if (resendLeft.value <= 0 && resendTimer) clearInterval(resendTimer);
-  }, 1000);
-}
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块)。倒计时以 server 返回的
 // resendAfterSec 为准,client 不再持有 60s 业务常量。
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
+  const remaining = refreshResend();
+  if (mode.value === "reset" && step.value === 1 && (otpRequestId.value || remaining > 0)) {
+    focusCode();
+    step.value = 2;
+    return;
+  }
   const phoneAtRequest = fullPhone.value;
   const sceneAtRequest = otpScene.value;
   const stepAtRequest = step.value;
@@ -695,6 +709,7 @@ async function requestCode(captchaTicket?: string) {
       loading.value = false;
       otpRequestId.value = res.challengeNo;
       otpVerifyToken.value = null;
+      verifiedResetCode = null;
       code.value = ["", "", "", "", "", ""];
       focusCode();
       step.value = 2;
@@ -750,7 +765,7 @@ function onCaptchaOk(ticket: string) {
   void requestCode(ticket);
 }
 function resend() {
-  if (resendLeft.value > 0) return;
+  if (refreshResend() > 0) return;
   error.value = null;
   void requestCode();
 }
@@ -904,13 +919,17 @@ async function verifyCode() {
         if (!isCurrentOtpFlow(context)) return;
         loading.value = false;
         if (code.value.join("") !== codeAtVerify) return;
+        verifiedResetCode = codeAtVerify;
         step.value = 3;
       } catch (cause) {
         if (!isCurrentOtpFlow(context)) return;
         loading.value = false;
         if (code.value.join("") !== codeAtVerify) return;
         const message = cause instanceof ApiError ? cause.message : "";
-        error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
+        const invalidOtp = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID";
+        // The API uses the same refusal for wrong digits and an inactive challenge.
+        if (invalidOtp && codeAtVerify === verifiedResetCode) clearSmsChallenge();
+        error.value = invalidOtp
           ? t.value.authOtp.errorOtpInvalidOrExpired
           : t.value.authOtp.errorServiceUnavailable;
       }
@@ -1005,7 +1024,9 @@ async function finishReset() {
     if (!isCurrentPasswordResetAttempt(resetAttempt)) return;
     loading.value = false;
     const message = cause instanceof ApiError ? cause.message : "";
-    error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
+    const invalidOtp = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID";
+    if (invalidOtp) clearSmsChallenge();
+    error.value = invalidOtp
       ? t.value.authOtp.errorOtpInvalidOrExpired
       : message === "USER_NEW_PASSWORD_MUST_DIFFER"
         ? t.value.login.errorPasswordUnchanged
@@ -1025,6 +1046,10 @@ async function finishReset() {
 function onPrimary() {
   if (authApi.pendingLogin()) { loginRecoveryPending.value = true; void recoverLoginResult(); return; }
   submitAttempted.value = true;
+  if (step.value === 1 && phone.value && !phoneOk.value) {
+    error.value = t.value.register.ctaDisabledPhone;
+    return;
+  }
   if (step.value === 1) { if (mode.value === "password") signInWithPassword(); else goSendCode(); }
   else if (step.value === 2) verifyCode();
   else finishReset();
@@ -1035,10 +1060,6 @@ function toggleMode() {
   password.value = ""; newPassword.value = ""; confirmPwd.value = "";
   showPwd.value = false; showCountries.value = false;
   code.value = ["", "", "", "", "", ""];
-  otpRequestId.value = null;
-  otpVerifyToken.value = null;
-  remoteTwoFactorChallenge.value = null;
-  resendLeft.value = 0;
   step.value = 1;
   mode.value = mode.value === "password" ? "otp" : "password";
 }
@@ -1048,25 +1069,24 @@ function goReset() {
   password.value = ""; newPassword.value = ""; confirmPwd.value = "";
   showPwd.value = false; showCountries.value = false;
   code.value = ["", "", "", "", "", ""];
-  otpRequestId.value = null;
-  otpVerifyToken.value = null;
-  resendLeft.value = 0;
   step.value = 1;
   mode.value = "reset";
 }
 function back() {
-  invalidateOtpFlow();
+  const preserveSmsChallenge = mode.value === "reset" && step.value > 1;
+  invalidateOtpFlow(preserveSmsChallenge);
   error.value = null;
+  code.value = ["", "", "", "", "", ""];
   if (mode.value === "reset" && step.value === 1) {
-    code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
     mode.value = "password"; return;
   }
   if (mode.value === "reset" && step.value === 3) {
     newPassword.value = ""; confirmPwd.value = ""; showPwd.value = false;
-    code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
+    if (!remoteApiEnabled) clearSmsChallenge();
+    refreshResend();
     step.value = 2; return;
   }
-  code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0; focusCode();
+  focusCode();
   step.value = 1;
 }
 function close() {
@@ -1084,7 +1104,6 @@ function goRegister() {
 function cleanup() {
   mounted = false;
   invalidateOtpFlow();
-  if (resendTimer) clearInterval(resendTimer);
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());

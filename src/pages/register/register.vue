@@ -181,6 +181,7 @@ import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import { useHeaderSystemBack } from "@/composables/use-dialog-a11y";
 import { useKeyboardPrimaryReach } from "@/composables/use-keyboard-primary-reach";
+import { useOtpResend } from "@/composables/use-otp-resend";
 import AuthProviderGrid from "@/components/auth-provider-grid.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
@@ -278,8 +279,8 @@ const verifying = ref(false);
 const completing = ref(false);
 const otpRequestId = ref<string | null>(null);
 const verifiedToken = ref<string | null>(null);
-const resendLeft = ref(0);
-let resendTimer: ReturnType<typeof setInterval> | undefined;
+let verifiedRegistrationCode: string | null = null;
+const { resendLeft, refreshResend, startResend, clearResend } = useOtpResend();
 let otpFlowVersion = 0;
 let mounted = true;
 let sponsorPreviewLoadVersion = 0;
@@ -456,19 +457,30 @@ function invalidateOtpFlow() {
   verifying.value = false;
 }
 
+function clearOtpChallenge() {
+  otpRequestId.value = null;
+  verifiedToken.value = null;
+  verifiedRegistrationCode = null;
+}
+
+function changeOtpNumber() {
+  invalidateOtpFlow();
+  clearOtpChallenge();
+  clearResend();
+}
+
 // uni <input> delivers the value on e.detail.value at runtime; vue-tsc types
 // the payload as a DOM Event, so we read detail through a narrow cast helper.
 function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onPhone(e: Event) {
-  invalidateOtpFlow();
+  const next = sanitizePhoneInput(inputVal(e));
+  if (phone.value !== next) changeOtpNumber();
   phoneTouched.value = true;
-  phone.value = sanitizePhoneInput(inputVal(e));
+  phone.value = next;
   error.value = null;
   registrationRisk.value = null;
-  otpRequestId.value = null;
-  verifiedToken.value = null;
 }
 function onInvite(e: Event) { invite.value = inputVal(e); inviteInvalid.value = false; error.value = null; registrationRisk.value = null; }
 function onCode(value: string) {
@@ -489,7 +501,7 @@ function focusPasswordConfirmation() {
 }
 
 function pickCountry(c: string) {
-  invalidateOtpFlow();
+  if (country.value !== c) changeOtpNumber();
   country.value = c;
   error.value = null;
   showCountries.value = false;
@@ -558,6 +570,12 @@ function rejectSponsorCode(sent: string | null) {
 async function requestCode(captchaTicket?: string) {
   if (verifying.value) return;
   devBackendDown.value = false;
+  const remaining = refreshResend();
+  if (step.value === 1 && (otpRequestId.value || remaining > 0)) {
+    focusCode();
+    step.value = 2;
+    return;
+  }
   const phoneAtRequest = fullPhone.value;
   const flowVersion = ++otpFlowVersion;
   verifying.value = true;
@@ -572,6 +590,7 @@ async function requestCode(captchaTicket?: string) {
       verifying.value = false;
       otpRequestId.value = res.challengeNo;
       verifiedToken.value = null;
+      verifiedRegistrationCode = null;
       code.value = ["", "", "", "", "", ""];
       focusCode();
       step.value = 2;
@@ -612,16 +631,8 @@ function onCaptchaOk(ticket: string) {
   showCaptcha.value = false;
   void requestCode(ticket);
 }
-function startResend(sec: number) {
-  resendLeft.value = sec;
-  if (resendTimer) clearInterval(resendTimer);
-  resendTimer = setInterval(() => {
-    resendLeft.value = Math.max(0, resendLeft.value - 1);
-    if (resendLeft.value <= 0 && resendTimer) clearInterval(resendTimer);
-  }, 1000);
-}
 function resend() {
-  if (resendLeft.value > 0) return;
+  if (refreshResend() > 0) return;
   error.value = null;
   void requestCode();
 }
@@ -664,13 +675,10 @@ function recoverRejectedRegistration(cause: unknown, sentSponsorCode: string | n
   // These refusals leave no new account; the challenge cannot be reused.
   // A user-requested resend must still pass the normal CAPTCHA and rate limits.
   invalidateOtpFlow();
-  otpRequestId.value = null;
-  verifiedToken.value = null;
+  clearOtpChallenge();
   code.value = ["", "", "", "", "", ""];
   focusCode();
-  if (resendTimer) clearInterval(resendTimer);
-  resendTimer = undefined;
-  resendLeft.value = 0;
+  refreshResend();
   step.value = invalidOtp ? 2 : 1;
   if (sponsorRejected) {
     rejectSponsorCode(sentSponsorCode);
@@ -708,16 +716,23 @@ async function verifyCode() {
         code: codeAtVerify,
       });
     } catch (cause) {
-      if (isCurrent() && codeStr.value === codeAtVerify) {
-        error.value = cause instanceof ApiError && cause.message === "USER_REGISTRATION_OTP_INVALID"
-          ? t.value.authOtp.errorOtpInvalidOrExpired
-          : registrationErrorText(cause);
-      }
+      if (!isCurrent()) return;
+      verifying.value = false;
+      if (codeStr.value !== codeAtVerify) return;
+      const invalidOtp = cause instanceof ApiError && cause.message === "USER_REGISTRATION_OTP_INVALID";
+      // The API uses the same refusal for wrong digits and an inactive challenge.
+      if (invalidOtp && codeAtVerify === verifiedRegistrationCode) clearOtpChallenge();
+      error.value = invalidOtp
+        ? t.value.authOtp.errorOtpInvalidOrExpired
+        : registrationErrorText(cause);
       return;
-    } finally {
-      if (isCurrent()) verifying.value = false;
     }
-    if (isCurrent() && codeStr.value === codeAtVerify) step.value = 3;
+    if (!isCurrent()) return;
+    verifying.value = false;
+    if (codeStr.value === codeAtVerify) {
+      verifiedRegistrationCode = codeAtVerify;
+      step.value = 3;
+    }
     return;
   }
   // ⚠️ MOCK-ONLY: PRD 已列的 OTP verify 的 TTL/attempts/一码一与验后账号分流
@@ -893,8 +908,8 @@ async function finish() {
     error.value = t.value.authOtp.errorOtpExpired;
     step.value = 2;
     code.value = ["", "", "", "", "", ""];
-    otpRequestId.value = null;
-    resendLeft.value = 0;
+    clearOtpChallenge();
+    refreshResend();
     return;
   }
   completing.value = true;
@@ -1038,12 +1053,10 @@ function back() {
   registrationRisk.value = null;
   verifying.value = false;
   completing.value = false;
-  otpRequestId.value = null;
-  verifiedToken.value = null;
+  if (!remoteApiEnabled) clearOtpChallenge();
   code.value = ["", "", "", "", "", ""];
   focusCode();
-  if (resendTimer) clearInterval(resendTimer);
-  resendLeft.value = 0;
+  refreshResend();
   step.value = (step.value === 3 ? 2 : 1) as Step;
 }
 function close() { navReset({ url: "/pages/onboarding/intro", fail: () => {} }); }
@@ -1063,7 +1076,8 @@ function cleanup() {
   mounted = false;
   sponsorPreviewLoadVersion += 1;
   invalidateOtpFlow();
-  if (resendTimer) clearInterval(resendTimer);
+  clearOtpChallenge();
+  clearResend();
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());
