@@ -362,7 +362,7 @@ Lite 手机号注册完成（含保存的手机号注册尝试恢复），或第
 | 下载链接 | 分别读取 `share.appDownload.iosUrl`、`androidUrl`、`officialUrl`；有效 HTTPS 地址可在当前页打开，缺失或无效时显示不可用占位并允许重读配置 |
 | 继续出口 | 「继续网页版」及返回动作进入首页，不返回注册或手机 onboarding |
 
-后端依据：`auth/application/AppUserAuthService.java` 只投影 `onboardingComplete`；`user/mapper/UserOpsMapper.java#isOnboardingComplete` 查询校准状态。后端 `4d9a0f08` 删除 `shared/security/UserBusinessWriteGateFilter.java` 并在 `SecurityConfig.java` 移除其安装；`onboarding/application/PhoneInstallationService.java#requireDefer` 的 `initialOnly` 约束只约束主动调用 deferral 的 H5 请求，并非账户业务前置条件。Lite 因此不调用 `confirmInitialWebPhoneDeferral`，不改写已有手机状态。
+后端依据：`auth/application/AppUserAuthService.java` 只投影 `onboardingComplete`；`user/mapper/UserOpsMapper.java#isOnboardingComplete` 查询校准状态。后端 `4d9a0f08` 删除 `shared/security/UserBusinessWriteGateFilter.java` 并在 `SecurityConfig.java` 移除其安装；`onboarding/application/PhoneInstallationService.java#requireDefer` 的 `initialOnly` 约束只约束主动调用 deferral 的 H5 请求，并非账户业务前置条件。Lite 因此不在注册成功页登记暂缓激活，不改写已有手机状态。
 
 ### 4.2 登录流程
 
