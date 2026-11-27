@@ -110,7 +110,7 @@ export const en = {
     availableLabel: "Available to withdraw: {amount}\u00A0USDT",
     dailyLabel: "{remaining} remaining today / {total} per day",
     dailyExhausted: "Daily withdrawal count reached. Available again at:",
-    capacityUnavailable: "Unable to load withdrawal limits. Please reload.",
+    capacityUnavailable: "Unable to load withdrawal limits. Retrying automatically.",
     bankRoutingUnverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
     feeIncluded: "The exchange fee is included in the total debit.",
     feeNote: "The exchange fee is charged by the bank payout partner and included in the withdrawal amount: {rate}%, minimum {min}, maximum {max}\u00A0USDT.",

@@ -448,7 +448,7 @@ export const ms: Messages = {
     availableLabel: "Boleh dikeluarkan: {amount}\u00A0USDT",
     dailyLabel: "{remaining} lagi hari ini / {total} sehari",
     dailyExhausted: "Had pengeluaran harian dicapai. Tersedia semula pada:",
-    capacityUnavailable: "Had pengeluaran tidak dapat dimuatkan. Sila muat semula.",
+    capacityUnavailable: "Had pengeluaran tidak dapat dimuatkan. Mencuba semula secara automatik.",
     bankRoutingUnverified: "Pengeluaran bank tidak tersedia buat masa ini. Anda masih boleh menyemak pengeluaran yang telah dihantar.",
     feeIncluded: "Caj pertukaran sudah termasuk dalam jumlah ditolak.",
     feeNote: "Caj pertukaran dikenakan oleh rakan pembayaran bank dan sudah termasuk dalam jumlah pengeluaran: {rate}%, minimum {min}, maksimum {max}\u00A0USDT.",

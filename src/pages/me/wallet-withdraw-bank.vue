@@ -117,23 +117,23 @@
                 <input data-testid="bank-amount" v-model="amount" type="text" inputmode="decimal" :disabled="busy || !canContinue" placeholder="0.00" :aria-label="c.amount" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" />
                 <text class="slab__unit">USDT</text>
               </view>
-              <view class="limits" v-if="displayConfig.policy && displayConfig.capacity">
-                <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
-                <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
+              <!-- Limits that came back missing keep their lines with 「—」 while the system re-reads them (03 §3.4, §3.5.2). -->
+              <view class="limits">
+                <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: displayConfig.capacity ? usdt2(displayConfig.capacity.maxWithdrawableUsdt) : "—" }) }}</text>
+                <text v-if="displayConfig.policy" data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
               </view>
             </view>
           </view>
           <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
-          <view v-if="displayConfig.policy && displayConfig.capacity" class="daily">
-            <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity.dailyRemainingCount, total: displayConfig.capacity.dailyLimitCount }) }}</text>
-            <view class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
+          <view class="daily" data-testid="bank-daily">
+            <text>{{ format(c.dailyLabel, { remaining: displayConfig.capacity?.dailyRemainingCount ?? "—", total: displayConfig.capacity?.dailyLimitCount ?? "—" }) }}</text>
           </view>
           <view v-if="displayConfig.capacity?.dailyRemainingCount === 0" class="notice" role="status"><text>{{ c.dailyExhausted }} {{ displayDate(displayConfig.capacity.dailyCountResetAt) }}</text></view>
           <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
           <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
           <view class="action text-link" role="button" tabindex="0" :aria-disabled="busy" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
         </template>
-        <view v-if="error || (!quote && displayConfig.enabled && (!displayConfig.policy || !displayConfig.capacity))" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
+        <view v-if="error" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
       </template>
@@ -315,6 +315,8 @@ const quoteReason = computed(() => {
   if (busy.value && !silentRead.value) return "";
   const problem = silentRead.value ? bankAmountError(amount.value, displayConfig.value) : amountProblem.value;
   if (!problem) return "";
+  // Missing limits are a read the system is retrying; a closed channel is not.
+  if (problem === "unavailable") return displayConfig.value?.policy && displayConfig.value.capacity ? c.value.unavailable : c.value.capacityUnavailable;
   return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
@@ -470,6 +472,14 @@ useAutoRecovery({
   failed: () => (canPollOrder() || canRecoverQuote()) && !busy.value && !readingOrder.value,
   retry: pollOrder,
   repeatMs: 15_000,
+});
+// Limits (single limit, balance, daily count) that came back missing are re-read by the system, no button (03 §3.5.2).
+// Orders, unknown results and quotes have the reader above, and load() would clear a quote's consent, so they are left out.
+const limitsMissing = computed(() => !!config.value?.enabled && !!config.value.beneficiary && (!config.value.policy || !config.value.capacity));
+useAutoRecovery({
+  failed: () => canReadVisibleBankPage() && limitsMissing.value && !busy.value && !order.value && !uncertain.value && !quote.value,
+  retry: load,
+  repeatMs: 30_000,
 });
 
 watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenticated], ([isVisible, allowed, sessionReady, authenticated], [wasVisible]) => {
@@ -638,7 +648,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .amount-input input { flex: 1; min-width: 0; font-size: 26px; height: 44px; color: var(--v5-ink); }
 .use-max { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--v5-brand); font-size: var(--ui-type-body); cursor: pointer; }
 .limits { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--v5-ink-3); margin-top: 12px; line-height: 1.5; }
-.refresh-limits { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); cursor: pointer; align-self: flex-start; }
 .fee-rule { display: block; margin-top: 6px; }
 /* 「提现说明 ›」 under the fee sentence, right-aligned (03 §3.9 文字链接). */
 .rules-link { display: flex; justify-content: flex-end; min-height: 44px; align-items: center; margin: 4px 0 0; }
@@ -705,7 +714,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .slab .use-max { min-width: 0; min-height: 32px; padding: 0 4px; font: 500 13px/18px var(--font-v5); }
 .slab .limits { gap: 0; margin-top: 4px; font: 400 12px/18px var(--font-v5); }
 .daily { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
-.daily .refresh-limits { flex-shrink: 0; white-space: nowrap; font: 500 12px/18px var(--font-v5); }
 .ticket { position: relative; margin-top: 12px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .ticket__top { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .ticket__title { font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }

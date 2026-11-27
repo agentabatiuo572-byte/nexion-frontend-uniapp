@@ -111,7 +111,7 @@ export const vi: Messages = {
     availableLabel: "Số dư có thể rút: {amount}\u00A0USDT",
     dailyLabel: "Còn {remaining} lượt hôm nay / {total} lượt mỗi ngày",
     dailyExhausted: "Đã hết lượt rút hôm nay. Có thể rút lại từ:",
-    capacityUnavailable: "Chưa tải được hạn mức rút tiền. Vui lòng tải lại.",
+    capacityUnavailable: "Chưa tải được hạn mức rút tiền. Đang tự động thử lại.",
     bankRoutingUnverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
     feeIncluded: "Phí quy đổi đã gồm trong tổng số tiền trừ.",
     feeNote: "Phí quy đổi do đơn vị chi trả ngân hàng thu, đã gồm trong số tiền rút: tỷ lệ {rate}%, tối thiểu {min}, tối đa {max}\u00A0USDT.",

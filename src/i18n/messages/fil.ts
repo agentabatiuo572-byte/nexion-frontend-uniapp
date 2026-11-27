@@ -448,7 +448,7 @@ export const fil: Messages = {
     availableLabel: "Mawi-withdraw: {amount}\u00A0USDT",
     dailyLabel: "{remaining} natitira ngayon / {total} kada araw",
     dailyExhausted: "Ubos na ang puwedeng withdrawal ngayon. Puwede ulit sa:",
-    capacityUnavailable: "Hindi ma-load ang limit ng withdrawal. I-reload.",
+    capacityUnavailable: "Hindi ma-load ang limit ng withdrawal. Awtomatikong sinusubukan ulit.",
     bankRoutingUnverified: "Hindi available ngayon ang bank withdrawal. Masusubaybayan mo pa rin ang mga naisumiteng withdrawal.",
     feeIncluded: "Kasama na ang exchange fee sa kabuuang bawas.",
     feeNote: "Ang exchange fee ay sinisingil ng bank payout partner at kasama na sa halaga ng withdrawal: {rate}%, minimum {min}, maximum {max}\u00A0USDT.",

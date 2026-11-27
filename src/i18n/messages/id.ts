@@ -448,7 +448,7 @@ export const id: Messages = {
     availableLabel: "Dapat ditarik: {amount}\u00A0USDT",
     dailyLabel: "Sisa {remaining} kali hari ini / {total} per hari",
     dailyExhausted: "Jatah penarikan harian habis. Tersedia lagi pada:",
-    capacityUnavailable: "Batas penarikan gagal dimuat. Muat ulang.",
+    capacityUnavailable: "Batas penarikan gagal dimuat. Mencoba lagi otomatis.",
     bankRoutingUnverified: "Penarikan bank sedang tidak tersedia. Penarikan yang sudah dikirim tetap bisa dicek.",
     feeIncluded: "Biaya penukaran sudah termasuk dalam total dipotong.",
     feeNote: "Biaya penukaran dipungut mitra pembayaran bank dan sudah termasuk dalam jumlah penarikan: {rate}%, minimum {min}, maksimum {max}\u00A0USDT.",

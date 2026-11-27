@@ -448,7 +448,7 @@ export const uz: Messages = {
     availableLabel: "Yechish mumkin: {amount}\u00A0USDT",
     dailyLabel: "Bugun {remaining} ta qoldi / kuniga {total} ta",
     dailyExhausted: "Kunlik pul yechish limiti tugadi. Keyingi imkoniyat:",
-    capacityUnavailable: "Pul yechish limitlarini yuklab boʻlmadi. Qayta yuklang.",
+    capacityUnavailable: "Pul yechish limitlarini yuklab boʻlmadi. Avtomatik qayta urinilmoqda.",
     bankRoutingUnverified: "Bankka pul yechish hozir mavjud emas. Yuborilgan soʻrovlarni koʻrishingiz mumkin.",
     feeIncluded: "Ayirboshlash haqi umumiy yechiladigan summaga kiritilgan.",
     feeNote: "Ayirboshlash haqini bank toʻlov hamkori oladi, u yechish summasiga kiritilgan: {rate}%, eng kam {min}, eng koʻp {max}\u00A0USDT.",

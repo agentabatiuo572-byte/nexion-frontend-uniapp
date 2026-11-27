@@ -111,7 +111,7 @@ export const zh: Messages = {
     availableLabel: "当前可提现余额 {amount}\u00A0USDT",
     dailyLabel: "今日剩余 {remaining} 次 / 每日 {total} 次",
     dailyExhausted: "今日提现次数已用完，下次可提现时间：",
-    capacityUnavailable: "暂时无法读取提现额度，请重新加载。",
+    capacityUnavailable: "暂时无法读取提现额度，正在自动重试。",
     bankRoutingUnverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
     feeIncluded: "换汇手续费已含在总扣金额中。",
     feeNote: "换汇手续费由银行兑付方收取，已含在提现金额中：费率 {rate}%，最低 {min}、最高 {max}\u00A0USDT。",
