@@ -1220,8 +1220,6 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQ
   if (amount < minWithdrawable.value) {
     return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatTruncatedAmount(minWithdrawable.value) });
   }
-  const netTooLow = decision.quote && Number(decision.quote.netReceive) <= 0;
-  if (netTooLow && !forQuoteDisplay) return t.value.walletV3.netTooLow;
   if (!forQuoteDisplay && remoteEligibilityFailed.value) {
     return decision.quote ? t.value.ui.refreshFailed : t.value.walletV3.submitReasonServiceUnavailable;
   }
@@ -1235,7 +1233,8 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQ
   if (amount > decision.maxWithdrawableUsdt) {
     return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatTruncatedAmount(decision.maxWithdrawableUsdt) });
   }
-  if (netTooLow) return "";
+  const netTooLow = decision.quote && Number(decision.quote.netReceive) <= 0;
+  if (netTooLow) return forQuoteDisplay ? "" : t.value.walletV3.netTooLow;
   if (!decision.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
   if (remoteApiEnabled && !decision.quote) return t.value.walletV3.submitReasonServiceUnavailable;
   return "";
