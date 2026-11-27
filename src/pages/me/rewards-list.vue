@@ -44,13 +44,13 @@
                 <view :style="notchStyle(true)" />
                 <view :style="notchStyle(false)" />
               </view>
-              <view class="flex-1 min-w-0 flex items-center" style="padding: 14px; gap: 10px">
-                <view class="flex-1 min-w-0">
-                  <text class="block truncate" :style="ticketNameStyle">{{ v.name }}</text>
-                  <text class="block truncate" :style="rowSubStyle">{{ scopeText(v) }}</text>
+              <view class="flex-1 min-w-0 flex items-center voucher-ticket__body" style="padding: 14px; gap: 10px">
+                <view class="voucher-ticket__text">
+                  <text class="block voucher-ticket__wrap" :style="ticketNameStyle">{{ v.name }}</text>
+                  <text class="block voucher-ticket__wrap" :style="rowSubStyle">{{ scopeText(v) }}</text>
                   <text class="block" :style="rowSubTightStyle">{{ expiryText(v) }}</text>
                 </view>
-                <NxButton class="shrink-0" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
+                <NxButton class="shrink-0 voucher-ticket__action" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
               </view>
             </view>
           </view>
@@ -68,12 +68,12 @@
                 <view :style="notchStyle(true)" />
                 <view :style="notchStyle(false)" />
               </view>
-              <view class="flex-1 min-w-0 flex items-center" style="padding: 14px; gap: 10px">
-                <view class="flex-1 min-w-0">
-                  <text class="block truncate" :style="ticketNameExpiredStyle">{{ v.name }}</text>
-                  <text class="block truncate" :style="rowSubStyle">{{ scopeText(v) }}</text>
+              <view class="flex-1 min-w-0 flex items-center voucher-ticket__body" style="padding: 14px; gap: 10px">
+                <view class="voucher-ticket__text">
+                  <text class="block voucher-ticket__wrap" :style="ticketNameExpiredStyle">{{ v.name }}</text>
+                  <text class="block voucher-ticket__wrap" :style="rowSubStyle">{{ scopeText(v) }}</text>
                 </view>
-                <view class="shrink-0 inline-flex" :style="expiredBadgeStyle"><text>{{ t.rewards.expiredBadge }}</text></view>
+                <view class="shrink-0 inline-flex voucher-ticket__action" :style="expiredBadgeStyle"><text>{{ t.rewards.expiredBadge }}</text></view>
               </view>
             </view>
           </view>
@@ -492,6 +492,13 @@ const manualLoadMoreStyle: CSSProperties = { minHeight: "44px", margin: "8px 16p
 </script>
 
 <style scoped>
+/* Voucher text wraps instead of truncating (03 §3.6.1: the full name and scope are not shown anywhere else). The text
+   block's flex basis is its unwrapped width, so when it no longer fits beside the action, the action drops to its own
+   line at the right and the text takes the full width (03 §3.6.1 卡片里文字＋按钮). */
+.voucher-ticket__body { flex-wrap: wrap; }
+.voucher-ticket__text { flex: 1 1 auto; min-width: 0; }
+.voucher-ticket__wrap { overflow-wrap: break-word; }
+.voucher-ticket__action { margin-left: auto; }
 .reward-month { display:block; margin:28px 20px 8px; font:400 12px/16px var(--font-metric); color:var(--v5-ink-3); }
 .reward-list-summary { margin:var(--v5-space-1) 20px 0; font:400 12px/16px var(--font-v5); color:var(--v5-ink-3); }.reward-list-summary__amount { display:flex; align-items:baseline; gap:6px; margin-top:var(--v5-space-1); font:500 32px/40px var(--font-amount); color:var(--v5-ink); }.reward-list-summary__unit { font:500 12px/16px var(--font-v5); color:var(--v5-ink-3); }.reward-list-summary__note { margin-top:0; line-height:18px; }
 
