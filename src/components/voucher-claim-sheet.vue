@@ -41,10 +41,9 @@
             <text class="vcs-expiry">{{ expiryText(v) }}</text>
             <!-- One control whose role follows the voucher (03 §3.1, 3.9; ticket-material voucher cards keep brand glass for 领取,
                  04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
-                 text action with a trailing arrow into the next page. The same node stays,
-                 so focus stays on it when the claim lands. The slot keeps the 44px row in both states. -->
+                 text action with a trailing arrow into the next page. The same node stays, and the slot keeps the 44px row. -->
             <view class="vcs-cta">
-              <NxButton :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
@@ -72,6 +71,7 @@ import { remoteApiEnabled } from "@/api/runtime";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { useVoucherTargetAvailability } from "@/composables/use-voucher-target-availability";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxIcon from "@/components/ui/nx-icon.vue";
 
@@ -89,6 +89,7 @@ const vouchers = computed<VoucherDef[]>(() => {
     sheet.surface,
   );
 });
+const voucherTargetStatus = useVoucherTargetAvailability(() => sheet.open && vouchers.value.some(isSingleSkuVoucher));
 
 const dismissLabel = computed(() => vouchers.value.length > 0 && vouchers.value.every(v => voucher.isClaimed(v.id))
   ? t.value.voucher.closeAria : t.value.voucher.dismissCta);
@@ -137,6 +138,7 @@ async function onClaim(v: VoucherDef) {
   }
 }
 function onUse(v: VoucherDef) {
+  if (voucherTargetStatus(v) === "unavailable") return;
   sheet.hide();
   if (isSingleSkuVoucher(v)) {
     // navTo() per project convention (maps /store/detail → /pages/store/detail).

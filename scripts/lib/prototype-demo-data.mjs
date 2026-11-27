@@ -36,6 +36,7 @@ const promotionEndsAt = new Date(demoStartedAt + 6 * day - 19 * 60000).toISOStri
 const endedPromotionEndsAt = new Date(demoStartedAt - day).toISOString();
 const localized = (locale,zh,en,vi) => locale === 'zh' ? zh : locale === 'vi' ? vi : en;
 const refuse=message=>{const error=new Error(message);error.status=409;throw error;};
+const retiredVoucherSku='stellarbox-retired';
 function demoVoucherGrant(state,voucherId,now){
   if(state.dataState==='empty')return null;
   if(voucherId==='V-DESIGN'){
@@ -55,6 +56,8 @@ function demoVoucherGrant(state,voucherId,now){
 function demoVoucherRedemption(state,voucherId,lines,subtotal,now){
   if(!voucherId)return null;
   if(lines.length!==1)refuse('BUNDLE_VOUCHER_UNSUPPORTED');
+  if(voucherId==='V-DESIGN'&&state.voucherScopeState==='single-unnamed'&&lines[0].productNo!==retiredVoucherSku)
+    refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
   const grant=demoVoucherGrant(state,voucherId,now);
   if(grant?.grantStatus!=='AVAILABLE'||subtotal<grant.minPurchaseUsd)refuse('VOUCHER_NOT_AVAILABLE_OR_NOT_APPLICABLE');
   return {voucherId,grantId:grant.grantId,status:'REDEEMED',discountUsdt:Math.min(subtotal,grant.amountUsd,grant.maxDiscountUsd)};
@@ -150,7 +153,7 @@ export const demoOptions = {
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
   catalogState:[['phased','完整目录（含即将上线）'],['sku-series','S1 系列多件商品（含一件规格不全）'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro'],['trial-h2-yield-updated','S1 日收益已更新']],
-  taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
+  taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['expired-long','首日任务长名称 · 已过期不可领'],['empty','暂无任务'],['legacy','任务信息待补全']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
   raffleState:[['normal','正常开奖'],['small-usdt','微额 USDT 奖励'],['upcoming','1 分钟后开始'],['ending','1 分钟后截止'],['ended','已截止待开奖']],
@@ -1784,10 +1787,23 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return {accepted:true,recorded};
   }
   if(pathname==='/api/quests/state') {
-    const data=reviewFixture(url,contentLocale,{...state,taskState:state.dayOneClaimed?'claimed':state.taskState},request);
+    const expiredLong=state.taskState==='expired-long';
+    const dayOneTaskState=expiredLong?'expired':state.dayOneClaimed?'claimed':state.taskState;
+    const data=reviewFixture(url,contentLocale,{...state,taskState:dayOneTaskState},request);
     if(empty) return {...data,quests:[],dayOneRequiredTaskCount:0,dayOneSnapshotStatus:'EMPTY'};
     const routes=['/pages/me/devices','/pages/store/store','/pages/earn/earn','/pages/learn/courses','/pages/me/profile','/pages/team/team'];
     data.quests.forEach((row,i)=>{row.actionRoute=routes[i];row.category=['identity','explore','explore','explore','identity','social'][i];});
+    if(expiredLong){
+      const {createdAt}=demoH4Account(state,now);
+      const eligibleFrom=new Date(createdAt).toISOString();
+      const eligibleUntil=new Date(createdAt+2*day).toISOString();
+      for(const row of data.quests)Object.assign(row,{eligibleFrom,eligibleUntil});
+      data.dayOneRewardNex=0;
+      data.quests[3].name=localized(contentLocale,
+        '阅读设备运行与收益入账课程，了解算力作业完成后如何查看预计收益及到账记录',
+        'Read the course on device operations and earnings to learn where to find estimates and posted earnings',
+        'Đọc bài học về vận hành thiết bị và thu nhập để biết cách xem thu nhập ước tính và đã ghi nhận');
+    }
     const weekNames=localized(contentLocale,['了解设备收益','完成一门课程','邀请一位好友','查看账户安全'],['Explore device earnings','Complete one course','Invite a friend','Review account security'],['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']);
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(state.taskState==='expired'?now-1000:state.weekEndState==='ending'&&i>0?(state.weekEndingAt??=now+60000):now+5*day).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
     if(state.catalogState==='sku-series'&&state.taskState==='pending'){
@@ -1811,6 +1827,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     return data;
   }
   const questClaim=pathname.match(/^\/api\/quests\/([^/]+)\/claim$/);
+  if(questClaim&&state.taskState==='expired-long'&&!questClaim[1].startsWith('demo-week-'))refuse('QUEST_EXPIRED');
   if(questClaim){const code=decodeURIComponent(questClaim[1]);if(code.startsWith('demo-week-')){state.weekClaims||=[];state.weekClaims.push(Number(code.split('-').pop()));}else state.dayOneClaimed=true;return {...authority,questId:code,rewardNex:code.startsWith('demo-week-')?100+Number(code.split('-').pop())*25:500,status:'CLAIMED',instanceKey:code.startsWith('demo-week-')?'WEEK:demo':previewDayOneInstanceKey};}
   if(pathname==='/api/events'||pathname.startsWith('/api/events/')){
     const spinTickets=demoStreakMilestones.reduce((count,[,type,amount],index)=>
@@ -1985,7 +2002,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const data=structuredClone(reviewFixture(url,locale,{...state,offers:!empty&&!state.voucherUsed&&state.benefitState!=='finished'},request));
     data.vouchers=data.vouchers.map(v=>({...v,voucherName:localized(locale,'设备代金券','Device voucher','Phiếu giảm giá thiết bị')}));
     // A single-product voucher whose product left the catalog: the App has no name for it and must not show the number.
-    if(state.voucherScopeState==='single-unnamed')data.vouchers=data.vouchers.map(v=>({...v,applicableSkus:'["stellarbox-retired"]'}));
+    if(state.voucherScopeState==='single-unnamed')data.vouchers=data.vouchers.map(v=>({...v,applicableSkus:[retiredVoucherSku]}));
     const designGrant=demoVoucherGrant(state,'V-DESIGN',now);
     if(designGrant)data.vouchers=data.vouchers.map(v=>({...v,...designGrant,claimable:false}));
     const wheelGrant=demoVoucherGrant(state,wheelVoucherId,now);

@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': targetClosed(task) }">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': hasUnavailableNavigation(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -77,7 +77,7 @@
               <text class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
             </view>
             <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
-            <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
+            <text v-if="hasUnavailableNavigation(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -160,7 +160,7 @@ interface QuestTask {
   /** 该填充色之上的前景色(勾/序号)。quest 两色恒浅 → on-quest 恒深墨;
    *  brand 随主题翻转 → 必须配同样翻转的 on-brand。用错会在某一主题糊掉。 */
   onColor: string;
-  eligible: boolean;
+  ineligibilityReason: "unknown" | null;
 }
 
 const visibility = useDataVisibility();
@@ -196,12 +196,12 @@ const categoryLabel = (category: QuestTaskCategory): string => ({
 })[category];
 
 const fallbackTasks = computed<QuestTask[]>(() => [
-  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)", eligible: true },
-  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", eligible: true },
-  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", eligible: true },
+  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)", ineligibilityReason: null },
+  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
+  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)", ineligibilityReason: null },
 ]);
 const remoteTasks = computed<QuestTask[]>(() => {
   const palette = [
@@ -219,7 +219,8 @@ const remoteTasks = computed<QuestTask[]>(() => {
       nex: null,
       href: row.actionRoute,
       cat: categoryLabel(row.category),
-      eligible: row.eligible,
+      // The Day-One state read exposes eligibility but has no reason field.
+      ineligibilityReason: row.eligible ? null : "unknown",
       ...palette[index % palette.length],
     }));
 });
@@ -308,12 +309,21 @@ function onClaim() {
   void quest.claimDayOne();
 }
 
-function isActionable(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
+function taskNavigationState(task: QuestTask): "missing-route" | "closed-target" | "available" {
+  if (!task.href) return "missing-route";
+  return questActionRouteUnavailable(task.href) ? "closed-target" : "available";
 }
 
-function targetClosed(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
+function canActOnTask(task: QuestTask) {
+  return task.ineligibilityReason === null && !dayOneExpired.value && !isDone(task);
+}
+
+function isActionable(task: QuestTask) {
+  return canActOnTask(task) && taskNavigationState(task) === "available";
+}
+
+function hasUnavailableNavigation(task: QuestTask) {
+  return canActOnTask(task) && taskNavigationState(task) !== "available";
 }
 
 function onRowTap(task: QuestTask) {
@@ -370,7 +380,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : targetClosed(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : hasUnavailableNavigation(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
