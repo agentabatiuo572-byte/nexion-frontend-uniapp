@@ -34,6 +34,16 @@ export interface ConfirmOptions {
   rows?: { label: string; value: string; amount?: boolean }[];
   /** Badge above the title in the detail layout. */
   glyph?: "withdraw";
+  /** Rule data carried with a confirmation snapshot. */
+  rules?: { title: string; items: RuleItem[] };
+}
+
+/** One numbered rule: {placeholders} in body take a figures value or a plain values value. */
+export interface RuleItem {
+  title: string;
+  body: string;
+  figures?: Record<string, string>;
+  values?: Record<string, string>;
 }
 
 interface ConfirmInternal extends ConfirmOptions {

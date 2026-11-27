@@ -19,7 +19,7 @@
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
           <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
-          <view class="row"><text>{{ c.fee }}</text><text>{{ money(order.bank.feeUsdt) }}</text></view>
+          <view class="row"><text>{{ c.fee }}</text><text>{{ exact(order.bank.feeUsdt) }}</text></view>
           <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
@@ -77,8 +77,8 @@
               </view>
             </view>
             <view class="ticket__rows">
-              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ money(quote.feeUsdt) }}</text></view>
-              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ money(quote.netUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ exact(quote.feeUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ exact(quote.netUsdt) }}</text></view>
               <view class="qrow"><text class="k">{{ c.rate }}</text><text class="qrow__v">{{ formatHowNumber(quote.rateVnd, dateLocale()) }}</text></view>
             </view>
             <view class="tear" aria-hidden="true" />
@@ -174,7 +174,7 @@ import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
-import { toast } from "@/store/ui";
+import { toast, type RuleItem } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
@@ -249,6 +249,7 @@ function readPendingQuoteNo(): string | null {
   return typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending) ? pending : null;
 }
 const money = (value: number) => formatAmount(value);
+const exact = (value: number) => formatGroupedAmount(value, 6);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
@@ -279,12 +280,38 @@ const quoteRatio = computed(() => {
 const secondsLeft = computed(() => Math.max(0, Math.ceil(((parseServerTimestamp(quote.value?.expiresAt) ?? 0) - now.value) / 1000)));
 const title = computed(() => quote.value ? c.value.confirmTitle : formStep.value === "amount" ? c.value.amountTitle : c.value.recipientTitle);
 const feeRule = computed(() => displayConfig.value?.policy ? format(c.value.feeRule, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
+const feeNote = computed(() => displayConfig.value?.policy ? format(c.value.feeNote, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
 const amountError = computed(() => {
   const problem = silentRead.value ? bankAmountError(amount.value, displayConfig.value) : amountProblem.value;
   if (!amount.value || !problem) return "";
   return c.value.amountErrors[problem];
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
+// ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
+const rulesMode = ref<"read" | "submit" | null>(null);
+const rulesReady = computed(() => !!displayConfig.value?.policy);
+const rulesItems = computed(() => {
+  const policy = displayConfig.value?.policy, r = c.value.rules;
+  if (!policy) return [];
+  const items: RuleItem[] = [
+    { title: r.amountTitle, body: r.amountBody, figures: { range: `${formatGroupedAmount(policy.minAmountUsd, "full")}–${formatGroupedAmount(policy.maxAmountUsd, "full")}\u00A0USDT` } },
+    { title: r.etaTitle, body: r.etaBody, figures: { window: r.window, weekend: r.weekend } },
+    { title: r.feeTitle, body: r.feeBody },
+    { title: r.accountTitle, body: r.accountBody },
+  ];
+  return items;
+});
+watch(() => !!quote.value && !quoteExpired.value, (live) => { if (!live && rulesMode.value === "submit") rulesMode.value = null; });
+function confirmSubmit() {
+  refreshPendingAttempt();
+  if (busy.value || !canSubmit.value || uncertain.value) return;
+  if (rulesReady.value) rulesMode.value = "submit";
+}
+function rulesPrimary() {
+  const submitting = rulesMode.value === "submit";
+  rulesMode.value = null;
+  if (submitting) void submit();
+}
 function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.value = "amount"; }
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }

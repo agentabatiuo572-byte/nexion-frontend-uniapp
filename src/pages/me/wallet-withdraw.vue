@@ -307,6 +307,7 @@
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
+import { USDT_WITHDRAWAL_DISPLAY_MAX } from "@/lib/withdrawal-display-limits";
 import { formatGroupedAmount } from "@/lib/amount-display";
 import { ref, computed, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
@@ -346,7 +347,7 @@ import { evaluateWithdrawal, requestWithdrawalEligibility, type WithdrawalEligib
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { confirm as uiConfirm, toast } from "@/store/ui";
+import { confirm as uiConfirm, toast, type RuleItem } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 type CryptoNetwork = Exclude<Withdrawal["network"], "BANK-VND">;
 
@@ -1242,6 +1243,26 @@ const feeDetailReady = computed(() => !feeConfigLoading.value && (pendingAttempt
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
+// ── 提现说明:只在拿到 policy 且当前网络开放时出现;金额全部读 policy(单笔最高是展示常量)。──
+const rulesOpen = ref(false);
+const rulesReady = computed(() => withdrawalPolicyCurrent.value && !!withdrawalPolicy.value && !networkClosed.value);
+function withdrawRulesItems(net: CryptoNetwork, networkFee: number): RuleItem[] {
+  const r = t.value.walletV3.withdrawRules;
+  const usdt = (value: number) => `${formatGroupedAmount(value, "full")}\u00A0USDT`;
+  const label = ALL_NETWORKS.find((nw) => nw.id === net)!.label;
+  return [
+    { title: r.amountTitle, body: r.amountBody, figures: { min: usdt(minWithdrawable.value), max: usdt(USDT_WITHDRAWAL_DISPLAY_MAX) } },
+    { title: r.etaTitle, body: r.etaBody },
+    formatGroupedAmount(networkFee, "full") === "0"
+      ? { title: r.feeTitle, body: r.feeFreeBody, values: { network: label } }
+      : { title: r.feeTitle, body: r.feeBody, values: { network: label }, figures: { fee: usdt(networkFee) } },
+    { title: r.addressTitle, body: r.addressBody },
+    { title: r.networkTitle, body: r.networkBody, values: { network: label } },
+  ];
+}
+const rulesItems = computed(() => rulesReady.value
+  ? withdrawRulesItems(network.value, withdrawalPolicy.value!.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]])
+  : []);
 /** reject = 永不建单,和「进入审核队列」是两回事,标题必须分开说。 */
 const riskNoticeTitle = computed(() =>
   eligibility.value.route === "reject" ? t.value.wallet.withdrawRouteRejectTitle : t.value.wallet.withdrawRouteReviewTitle,
@@ -1460,6 +1481,7 @@ async function handleSubmit() {
       // A new withdrawal shows the frozen quote as a detail list (P-45); the replay keeps its own wording.
       message: pending ? resendBody : undefined,
       rows: pending ? undefined : confirmRows,
+      rules: pending ? undefined : { title: t.value.walletV3.withdrawRules.title, items: withdrawRulesItems(snap.network, snap.quote.networkConfirmUsd) },
       glyph: pending ? undefined : "withdraw",
       confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
     });
