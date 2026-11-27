@@ -110,7 +110,7 @@
             <view class="slab nx-tint">
               <view class="slab__head">
                 <text class="k">{{ c.amount }}</text>
-                <view class="use-max" role="button" tabindex="0" data-testid="bank-max" :aria-disabled="busy || !canContinue || maxAmount <= 0" @click="useMax" @keydown.enter.prevent="useMax" @keydown.space.prevent="useMax"><text>{{ c.all }}</text></view>
+                <NxButton variant="text" size="small" :label="c.all" data-testid="bank-max" :disabled="busy || !canContinue || maxAmount <= 0" @click="useMax" />
               </view>
               <view class="amount-input">
                 <input data-testid="bank-amount" v-model="amount" type="text" inputmode="decimal" :disabled="busy || !canContinue" placeholder="0.00" :aria-label="c.amount" :aria-describedby="quoteReason ? 'bank-quote-reason' : undefined" :aria-invalid="!!amount.trim() && ['format', 'range', 'balance'].includes(amountProblem ?? '') ? 'true' : undefined" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" />
@@ -144,7 +144,7 @@
         </template>
         <template v-else>
           <text class="field-label">{{ c.totalDebit }} · USDT</text>
-          <view class="amount-input"><input data-testid="bank-amount" type="text" inputmode="decimal" disabled placeholder="—" :aria-label="c.amount" /><view class="use-max is-placeholder" aria-hidden="true"><text>{{ c.all }}</text></view></view>
+          <view class="amount-input"><input data-testid="bank-amount" type="text" inputmode="decimal" disabled placeholder="—" :aria-label="c.amount" /><NxButton variant="text" size="small" :label="c.all" disabled aria-hidden="true" /></view>
           <view class="notice notice--info"><text>{{ c.feeIncluded }}</text></view>
           <view class="action primary is-placeholder" aria-hidden="true" data-testid="bank-quote"><text>{{ c.quote }}</text></view>
           <view class="action secondary" role="button" tabindex="0" :aria-disabled="busy" @click="goBack"><text>{{ c.backToAccount }}</text></view>
@@ -696,12 +696,11 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .action { min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 20px; border-radius: 999px; font-size: var(--ui-type-button); font-weight: 600; cursor: pointer; box-sizing: border-box; }
 .primary { background: var(--v5-brand); color: var(--v5-on-brand); margin-top: 24px; }
 .secondary { background: var(--v5-surface-2); color: var(--v5-ink); margin-top: 12px; }
-[aria-disabled="true"], .is-placeholder { opacity: .4; cursor: default; }
-.action:focus-visible, .use-max:focus-visible, .consent:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
+[aria-disabled="true"]:not(.nx-button), .is-placeholder { opacity: .4; cursor: default; }
+.action:focus-visible, .consent:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
 .field-label { display: block; font-size: 12px; color: var(--v5-ink-2); margin: 18px 0 6px; }
 .amount-input { display: flex; align-items: center; gap: 8px; border: 1px solid var(--v5-border-strong); border-radius: 12px; padding: 8px 12px; }
 .amount-input input { flex: 1; min-width: 0; font-size: 26px; height: 44px; color: var(--v5-ink); }
-.use-max { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--v5-brand); font-size: var(--ui-type-body); cursor: pointer; }
 .limits { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--v5-ink-3); margin-top: 12px; line-height: 1.5; }
 .fee-rule { display: block; margin-top: 6px; }
 /* 「提现说明 ›」 under the fee sentence, right-aligned (03 §3.9 文字链接). */
@@ -770,7 +769,6 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .slab__unit { margin-left: 6px; color: var(--v5-ink-3); font: 500 12px/16px var(--font-v5); letter-spacing: 0; }
 .slab .amount-input { display: flex; align-items: baseline; gap: 0; margin-top: 4px; padding: 0; border: 0; border-radius: 0; }
 .slab .amount-input input { flex: 0 1 auto; max-width: calc(100% - 48px); height: 48px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.slab .use-max { min-width: 0; min-height: 32px; padding: 0 4px; font: 500 13px/18px var(--font-v5); }
 .slab .limits { gap: 0; margin-top: 4px; font: 400 12px/18px var(--font-v5); }
 .daily { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .ticket { position: relative; margin-top: 12px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
