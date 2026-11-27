@@ -90,10 +90,9 @@
             <text class="wd-amtrow__unit">USDT</text>
           </view>
           <view class="wd-k wd-min"><text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text><text v-else>—</text></view>
-          <text v-if="withdrawalFactsNeedsRetry || (!withdrawalQuoteRefreshing && !withdrawalActionsFresh)" class="wd-line" role="status">{{ withdrawalReadStatusText }}</text>
-          <view v-if="withdrawalFactsNeedsRetry" class="nx-card-recovery-action" role="button" tabindex="0" :aria-label="t.wallet.retryFunds" @click="retryWithdrawalFacts"  @keydown.enter.prevent="retryWithdrawalFacts" @keydown.space.prevent="retryWithdrawalFacts">
-            <text>{{ t.wallet.retryFunds }}</text>
-          </view>
+          <text v-if="(withdrawalFactsNeedsRetry || (!withdrawalQuoteRefreshing && !withdrawalActionsFresh))
+            && !(submitHintVisible && !submitting && submitDisabledReason === withdrawalReadStatusText)"
+            class="wd-line" role="status">{{ withdrawalReadStatusText }}</text>
           <text v-if="withdrawalFactsDisplayable && withdrawalRatioLine" class="wd-line">{{ withdrawalRatioLine }}</text>
           <text v-if="withdrawalFactsDisplayable && withdrawalPolicy && limitFacts.perWithdrawalMaximum < maxWithdrawable" class="wd-line">{{ perWithdrawalLimitText }}</text>
         </view>
@@ -147,18 +146,13 @@
       <text v-if="withdrawalChannelStatusText" class="wd-note mx-4">{{ withdrawalChannelStatusText }}</text>
 
       <!-- Summary: gross fee → NEX offset → net fee → receive (de-carded to floor) -->
-      <!-- FEAT-WD01c ⑤ 明细区四态。优先级:失败 > 加载 > 未输入金额 > 默认。
-           🔴 费率不可用时整块替换成失败态并给重试出口 —— 绝不在坏配置上渲染数字
-           (否则会渲染出 $NaN,或按写死的种子值展示一个用户会当真的费用)。 -->
-      <!-- 🔴 加载态必须排在失败态**前面**(2026-07-31 复验漏网点):
-           重试只可能从失败态发起,若失败态 v-if 在前,骨架永远抢不到 —— 那是死 UI。
-           顺序:加载中 > 不可用 > 未输入金额 > 默认。 -->
+      <!-- FEAT-WD01c ⑤ 明细区四态。费率不可用时不渲染数字，由策略读取自动恢复。 -->
       <!-- 明细井:网络确认费 → UVT 抵扣开关 → 实际到账(画板顺序);各态条件与原先一致。 -->
       <!-- Why 提交 is grey is said once, above it in the bar (03 §3.1); the well shows the fee row with 「—」 instead of repeating it
            (06 §6.1). With no withdrawal network open at all the well has nothing left to show. -->
       <view v-if="(withdrawalPolicyCurrent && !(networkClosed && !pendingAttempt && NETWORKS.length === 0)) || (feeConfigUsable && amountNum > 0 && !quoteBlocked)" class="wd-fee mx-4">
       <template v-if="withdrawalPolicyCurrent">
-      <view v-if="feeConfigLoading" class="wd-fee__sk">
+      <view v-if="withdrawalPolicyLoading" class="wd-fee__sk">
         <view v-for="i in 3" :key="i" class="flex items-center justify-between">
           <view :style="feeSkeletonLabelStyle" />
           <view :style="feeSkeletonValueStyle" />
@@ -169,13 +163,10 @@
           <text>{{ t.bankWithdrawal.rechooseNetwork }}</text>
         </view>
       </view>
-      <view v-else-if="!feeConfigUsable" class="wd-fee__msg">
+      <view v-else-if="!feeConfigUsable" class="wd-fee__msg"
+        v-show="!(submitHintVisible && !submitting && submitDisabledReason === t.walletV3.submitReasonFeeConfigUnavailable)">
         <view class="flex items-center justify-between">
           <text class="wd-warn">{{ t.walletV3.feeConfigUnavailableTitle }}</text>
-          <view class="wd-link" role="button" tabindex="0" :aria-label="t.walletV3.feeConfigRetry" @click="retryFeeConfig"
-             @keydown.enter.prevent="retryFeeConfig" @keydown.space.prevent="retryFeeConfig">
-            <text>{{ t.walletV3.feeConfigRetry }}</text>
-          </view>
         </view>
         <text class="wd-line">{{ t.walletV3.feeConfigUnavailableBody }}</text>
       </view>
@@ -618,7 +609,7 @@ const withdrawalReadStatusText = computed(() => {
 
 const withdrawalPageVisible = ref(false);
 let withdrawalEntryReadPending = true;
-async function retryWithdrawalFacts(): Promise<void> {
+async function loadWithdrawalFacts(): Promise<void> {
   // A cold H5 load drops the access token and restores it through the refresh
   // cookie; a protected read started before that restore returns AUTH_REQUIRED
   // and left this page permanently on "钱包暂时无法刷新". Wait for the same
@@ -636,7 +627,11 @@ async function retryWithdrawalFacts(): Promise<void> {
 useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteFleetStatus === "error", retry: () => app.refreshRemoteFleet() });
 useAutoRecovery({ failed: () => remoteApiEnabled && earningsReleaseStatus.value === "error", retry: () => refreshEarningsReleaseStatus(app.accountKey) });
 useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteWithdrawalListStatus === "error", retry: () => app.refreshRemoteWithdrawalList(app.accountKey) });
-useAutoRecovery({ failed: () => remoteApiEnabled && !!withdrawalPolicyError.value && !withdrawalPolicyLoading.value, retry: loadWithdrawalPolicy });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && !!withdrawalPolicyError.value && !withdrawalPolicyLoading.value,
+  retry: loadWithdrawalPolicy,
+  repeatMs: 30_000,
+});
 useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote() });
 
 function invalidateWithdrawalFacts(): void {
@@ -659,14 +654,14 @@ watch([() => app.accountBindingEpoch, remoteSessionReady], ([epoch, ready], [pre
   if (epoch !== previousEpoch) invalidateWithdrawalFacts();
   if (!withdrawalPageVisible.value || !ready || !foregroundReadAllowed()) return;
   if (remoteApiEnabled) void payout.refreshRemote();
-  void retryWithdrawalFacts();
+  void loadWithdrawalFacts();
 }, { flush: "post" });
 
 const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision((_scope, reason) => {
   if (reason === "authority" || withdrawalRecovery.value?.state === "NOT_SEEN") recoveryResult.value = null;
   withdrawalRecoveryRuntimeEpoch.value += 1;
   invalidateWithdrawalFacts();
-  if (foregroundReadAllowed()) void retryWithdrawalFacts();
+  if (foregroundReadAllowed()) void loadWithdrawalFacts();
 });
 
 // 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提基数 = 钱包可用余额(usdtBalance)。
@@ -867,7 +862,7 @@ watch([withdrawalPageVisible, foregroundReadAllowed], ([visible, allowed]) => {
   }
   withdrawalEntryReadPending = false;
   if (remoteApiEnabled && remoteSessionReady.value) void payout.refreshRemote();
-  void retryWithdrawalFacts();
+  void loadWithdrawalFacts();
 });
 onHide(() => {
   withdrawalPageVisible.value = false;
@@ -926,17 +921,6 @@ const feeConfigUsable = computed(() => {
     && (!!pendingAttempt.value || policy.enabledNetworks.includes(network.value))
     && policy.nexFeeOffsetRate > 0;
 });
-// 重试出口(规格 ⑤ 报错态必须给下一步)。PROD:重拉 GET /api/config/platform。
-const feeConfigLoading = ref(false);
-async function retryFeeConfig() {
-  if (feeConfigLoading.value) return;
-  feeConfigLoading.value = true;
-  try {
-    await loadWithdrawalPolicy();
-  } finally {
-    feeConfigLoading.value = false;
-  }
-}
 // 骨架条:形状对齐真实明细行(标签窄、数值宽),非通用转圈。
 const feeSkeletonLabelStyle = "width: 72px; height: 12px; border-radius: 4px; background: var(--v5-surface-2)";
 const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-2)";
@@ -1137,7 +1121,7 @@ const quoteDisplayBlocked = computed(() =>
   && disabledReasonFor(amountNum.value, eligibility.value, true) !== "",
 );
 const quoteRowsVisible = computed(() => !!activeQuote.value || remoteEligibilityFailed.value || !!pendingAttempt.value);
-const feeDetailReady = computed(() => !feeConfigLoading.value && (pendingAttempt.value || NETWORKS.value.length > 0)
+const feeDetailReady = computed(() => (pendingAttempt.value || NETWORKS.value.length > 0)
   && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && quoteRowsVisible.value);
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,

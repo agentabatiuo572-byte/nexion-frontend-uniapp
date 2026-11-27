@@ -293,6 +293,7 @@ const readFailure = computed(() => readError.value || fxReadFailure.value);
 useAutoRecovery({
   failed: () => pageActive.value && paymentSessionReady.value && !readRetryBusy.value && !!readFailure.value,
   retry: retryReadData,
+  repeatMs: 30_000,
 });
 async function retryReadData() {
   if (!pageActive.value || !paymentSessionReady.value || readRetryBusy.value) return;
