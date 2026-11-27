@@ -79,7 +79,7 @@
           </view>
           <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
           <view class="nx-dep-trio">
-            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">{{ formatAmount(minDeposit) + '\u00A0USDT' }}</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">{{ formatTruncatedAmount(minDeposit) + '\u00A0USDT' }}</text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ feeAmountText(feeUsdt) + '\u00A0USDT' }}</text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
