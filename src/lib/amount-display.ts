@@ -10,6 +10,14 @@ export function creditedAmounts(usdt: number | string | null | undefined, uvt: n
     .map(([value, unit]) => ({ sign: "+", value: formatGroupedAmount(value, "full"), unit }));
   return lines.length ? lines : [{ sign: "", value: "0", unit: "USDT" as const }];
 }
+/** Display only: two decimals, the rest cut off rather than rounded (111.115101 → 111.11, 109.9989 → 109.99), grouped.
+ *  API, quote and request values keep their original precision. */
+export function formatTruncatedAmount(value: number | string | null | undefined): string {
+  const full = formatAmount(value, "full");
+  if (full === "-") return full;
+  const [whole, fraction = ""] = full.split(".");
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + fraction.slice(0, 2).padEnd(2, "0");
+}
 export function formatAmount(value: number | string | null | undefined, precision: 2 | 4 | 6 | "full" = 2): string {
   if (typeof value === "number" && !Number.isFinite(value)) return "-";
   const match = String(value ?? "").trim().match(/^([+-]?)(\d+)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);

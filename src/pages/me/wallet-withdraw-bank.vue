@@ -18,9 +18,10 @@
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
-          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
-          <view class="row"><text>{{ c.fee }}</text><text>{{ exact(order.bank.feeUsdt) }}</text></view>
-          <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
+          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ usdt2(order.bank.amountUsdt) + '\u00A0USDT' }}</text></view>
+          <view class="row"><text>{{ c.fee }}</text><text>{{ usdt2(order.bank.feeUsdt) }}</text></view>
+          <view class="row"><text>{{ c.net }}</text><text>{{ usdt2(order.bank.netUsdt) }}</text></view>
+          <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ usdt2(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
         <view class="bar-space bar-space--result" />
@@ -63,7 +64,7 @@
             <view class="aura" aria-hidden="true"><view /><view /></view>
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
-              <text class="slab__amt">{{ money(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
+              <text class="slab__amt">{{ usdt2(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
               <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
             </view>
           </view>
@@ -77,8 +78,8 @@
               </view>
             </view>
             <view class="ticket__rows">
-              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ exact(quote.feeUsdt) }}</text></view>
-              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ exact(quote.netUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ usdt2(quote.feeUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ usdt2(quote.netUsdt) }}</text></view>
               <view class="qrow"><text class="k">{{ c.rate }}</text><text class="qrow__v">{{ formatHowNumber(quote.rateVnd, dateLocale()) }}</text></view>
             </view>
             <view class="tear" aria-hidden="true" />
@@ -168,10 +169,19 @@
         <view v-else class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="busy || !canContinue || !!amountProblem" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
       </view>
     </template>
-    <!-- 提现说明:只读时一个「确认」;确认提现时同一个弹窗,「确认提现」按原流程提交,「取消」回到报价(勾选保留)。 -->
-    <NxNoticeDialog :open="rulesMode !== null && rulesReady" :title="c.rules.title" :primary="rulesMode === 'submit' ? c.confirm : useTranslations.ui.confirm"
+    <!-- 提现说明:只读时一个「确认」;确认提现时同一个弹窗,「确认提现」按原流程提交,「取消」回到报价(勾选保留)。
+         确认时先列这笔的对象和后果(03 §3.5),取同一份报价:收款账号尾号、总扣、银行到账金额,再接提现说明。 -->
+    <NxNoticeDialog :open="rulesMode !== null && rulesReady" :title="rulesMode === 'submit' && quote ? c.confirmTitle : c.rules.title" :primary="rulesMode === 'submit' ? c.confirm : useTranslations.ui.confirm"
       :secondary="rulesMode === 'submit' ? useTranslations.ui.cancel : undefined" icon="none" scroll-body focus-title mask-secondary :dismissible="rulesMode === 'read'"
       @primary="rulesPrimary" @secondary="rulesMode = null" @dismiss="rulesMode = null">
+      <template v-if="rulesMode === 'submit' && quote">
+        <view class="cfm-rows" data-testid="bank-confirm-rows">
+          <view class="cfm-row"><text class="cfm-k">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="cfm-v">{{ dots(quote.maskedAccount) }}</text></view>
+          <view class="cfm-row"><text class="cfm-k">{{ c.totalDebit }}</text><text class="cfm-v">{{ usdt2(quote.amountUsdt) + '\u00A0USDT' }}</text></view>
+          <view class="cfm-row cfm-row--amount"><text class="cfm-k">{{ c.receive }}</text><text class="cfm-v">{{ formatAmount(quote.amountVnd, 'VND') }}</text></view>
+        </view>
+        <text class="cfm-rules-title" role="heading" aria-level="3">{{ c.rules.title }}</text>
+      </template>
       <NxRulesList :items="rulesItems" />
     </NxNoticeDialog>
   </AppChassis>
@@ -180,7 +190,7 @@
 <script setup lang="ts">
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -261,8 +271,8 @@ function readPendingQuoteNo(): string | null {
   return typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending) ? pending : null;
 }
 const money = (value: number) => formatAmount(value);
-// Quote and result fee / net at the precision the server gave (page format: at least two decimals, up to six).
-const exact = (value: number) => formatGroupedAmount(value, 6);
+// Quote, confirm and result amounts (principal, fee, net, refund): two decimals cut off, never rounded. Display only.
+const usdt2 = (value: number) => formatTruncatedAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
@@ -713,6 +723,15 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .acct__change::after { content: ""; position: absolute; inset: -6px -2px; }
 .consent { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .consent .checkbox { width: 22px; height: 22px; border-radius: 7px; font-size: 13px; }
+/* Confirm: this withdrawal's rows above the rules, the recessed detail list of the USDT submit confirm. */
+.cfm-rows { padding: 4px 14px; border-radius: 16px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .cfm-rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.cfm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
+.cfm-row + .cfm-row { border-top: 1px solid var(--v5-border); }
+.cfm-k { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.cfm-v { flex: none; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
+.cfm-row--amount .cfm-v { color: var(--v5-success-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
+.cfm-rules-title { display: block; margin: 20px 0 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }

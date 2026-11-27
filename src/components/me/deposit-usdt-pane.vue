@@ -71,7 +71,7 @@
         <view class="nx-dep-tear" aria-hidden="true" />
         <view class="nx-dep-ticket__bot">
           <view class="nx-dep-addr">
-            <text class="nx-dep-addr__a">{{ shortAddr }}</text>
+            <NxCodeValue class="nx-dep-addr__a" :value="address" :label="t.topupChrome.rules.addressTitle" full :copyable="false" />
             <view :class="['nx-dep-copy-address-cta nx-frosted-button', { 'nx-dep-copy--done': copied }]" role="button" tabindex="0" :aria-label="copied ? t.topupChrome.addrCopied : t.topupChrome.copyAddress" @click="copyAddr">
               <svg v-if="copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
               <text>{{ t.bankPane.copyCta }}</text>
@@ -496,13 +496,9 @@ function moveNet(delta: number) {
   });
 }
 
-// ── 专属地址(同账号同网络恒定;中段省略防溢出,复制取全量)──
+// ── 专属地址(同账号同网络恒定;付款前要逐字核对,完整显示、均匀折行,03 §3.6.1)──
 const address = computed(() => fundsServerEnabled ? serverAddress.value
   : activeNet.value ? dep.depositAddress(activeNet.value) : "");
-const shortAddr = computed(() => {
-  const a = address.value;
-  return a.length > 24 ? `${a.slice(0, 12)}…${a.slice(-8)}` : a;
-});
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 function copyAddr() {
   if (!address.value) return;
@@ -766,8 +762,8 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-ticket__bot { padding: 16px; }
 .nx-dep-addr { display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .nx-dep-addr { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
-.nx-dep-addr__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
-.nx-dep-copy-address-cta { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-ink); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.nx-dep-addr__a { flex: 1; min-width: 0; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); }
+.nx-dep-copy-address-cta { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .nx-dep-copy-address-cta::after { content: ""; position: absolute; inset: -6px -2px; }
 .nx-dep-copy-address-cta:active { transform: scale(.97); }
 .nx-dep-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; text-align: center; }

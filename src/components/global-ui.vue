@@ -42,9 +42,10 @@
            rows and rules share one scrolling region; without them the wrapper adds nothing. -->
       <view v-if="topConfirm.rows?.length || topConfirm.rules" :class="{ 'nx-modal__scroll': topConfirm.rules }">
       <view v-if="topConfirm.rows?.length" class="nx-modal__rows">
-        <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount }">
+        <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount, 'nx-modal__row--code': row.code }">
           <text class="nx-modal__k">{{ row.label }}</text>
-          <text v-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
+          <NxCodeValue v-if="row.code" class="nx-modal__code" :value="row.value" :label="row.label" full :copyable="false" />
+          <text v-else-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
           <text v-else class="nx-modal__v">{{ row.value }}</text>
         </view>
       </view>
@@ -232,6 +233,10 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
 .nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+/* A code row (payout address): the whole string on its own line under the label, mono, wrapping evenly (03 §3.6.1). */
+.nx-modal__row--code { flex-direction: column; align-items: stretch; gap: 4px; }
+.nx-modal__row--code .nx-modal__k { max-width: none; }
+.nx-modal__code { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); }
 .nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
 /* Rules under the rows: the dialog stops scrolling as a whole; the rows and rules scroll between a fixed head and actions. */
