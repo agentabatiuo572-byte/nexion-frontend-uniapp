@@ -152,8 +152,7 @@ const standingReason = computed<TrialStartFailure | undefined>(() => {
 const shownReason = computed<TrialStartFailure | undefined>(() => !claimErrorReason.value
   || claimErrorReason.value === "rejected" || claimErrorReason.value === "terms-changed"
   ? standingReason.value ?? claimErrorReason.value : claimErrorReason.value);
-const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used",
-  "onboarding-required"].includes(shownReason.value ?? ""));
+const claimOpensAnotherPage = computed(() => ["capacity-full", "converted", "in-progress", "used"].includes(shownReason.value ?? ""));
 // The service refused for now (quota, campaign, risk, product): the reason stays, with nothing to retry.
 const claimDenied = computed(() => isTrialStartDenied(shownReason.value));
 const termsChanged = computed(() => shownReason.value === "terms-changed");
@@ -204,7 +203,6 @@ const claimCtaLabel = computed(() => claiming.value ? copy.value.activating
   : shownReason.value === 'converted' ? copy.value.viewDevices
   : shownReason.value === 'in-progress' ? copy.value.viewTrial
   : shownReason.value === 'used' ? copy.value.buyDevice
-  : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingCta
   : copy.value.activateCta);
 // View state only: the one primary is the retry when the claim can be sent again (A06), busy while it is sent and while a
 // start the service took is still being confirmed (A07), so no greyed 「免费激活」 stands beside the status line.
@@ -219,7 +217,6 @@ const claimErrorText = computed(() => termsChanged.value && !confirmingStart.val
   : staleRead.value ? t.value.exchange.staleSnapshot
   : checkingEligibility.value ? t.value.trial.entryChecking
   : eligibilityUnknown.value ? t.value.trial.eligReasonUnknown
-  : shownReason.value === "onboarding-required" ? t.value.trial.claimOnboardingRequired
   // In place, beside 「重新领取」, the refusal drops its "try again" half; the toast after closing keeps the whole line.
   : shownReason.value === "rejected" ? copy.value.claimRejectedInline
   : sheet.failureText(shownReason.value));
@@ -236,7 +233,6 @@ async function onClaim() {
   if (shownReason.value === 'capacity-full' || shownReason.value === 'converted') { goDevices(); return; }
   if (shownReason.value === 'in-progress' || shownReason.value === 'used') { goTrial(); return; }
   // Lite has no setup step: a server setup refusal can only be resolved by support.
-  if (shownReason.value === "onboarding-required") { hide(); navTo("/pages/support/messages"); return; }
   const config = trialView.config.value;
   if (!config) return;
   const confirmedTerms = {

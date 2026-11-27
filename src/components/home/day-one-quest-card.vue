@@ -101,16 +101,11 @@
 
     <NxButton v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)" class="newcomer-task__claim" variant="brand" size="medium" :disabled="!props.active" :busy="quest.dayOneClaiming" :label="t.home.dayOneClaimReward" :busy-label="t.home.dayOneClaiming" @click="onClaim" />
     <view v-if="expanded && observationNotices.length" class="newcomer-task__observation">
-      <view v-for="notice in observationNotices" :key="notice.task.id" class="newcomer-task__observation-item">
-        <text role="status">{{ notice.task.label }} · {{ observationMessage(notice.reason) }}</text>
+      <view v-for="task in observationNotices" :key="task.id" class="newcomer-task__observation-item">
+        <text role="status">{{ task.label }} · {{ t.home.dayOneObservationUnconfirmed }}</text>
         <view class="newcomer-task__observation-actions">
-          <view v-if="notice.reason !== 'unconfirmed'" role="button" :tabindex="props.active ? 0 : -1"
-            :aria-disabled="!props.active" class="newcomer-task__observation-action"
-            @click="recoverObservation(notice.task)">
-            <text>{{ t.home.dayOneObservationSetupAction }}</text>
-          </view>
           <view role="button" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
-            class="newcomer-task__observation-action" @click="recoverObservation(notice.task, true)">
+            class="newcomer-task__observation-action" @click="recoverObservation(task)">
             <text>{{ t.home.dayOneObservationRetry }}</text>
           </view>
         </view>
@@ -160,7 +155,7 @@ import type { QuestTaskCategory } from "@/api/quest-api";
 import { selectHomeQuestRows } from "./home-quest-source";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
 import { dayOneQuestDisplayName } from "@/lib/quest-presentation";
-import { dayOneObservationRecovery, observationRecoveryRoute, type DayOneObservationReason } from "@/lib/day-one-observation-recovery";
+import { dayOneObservationRecovery } from "@/lib/day-one-observation-recovery";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
@@ -260,26 +255,17 @@ function observationIdentity(task: QuestTask) {
 }
 const observationNotices = computed(() => {
   app.accountKey; app.accountBindingEpoch;
-  return remoteApiEnabled ? tasks.value.flatMap(task => {
+  return remoteApiEnabled ? tasks.value.filter(task => {
     const identity = observationIdentity(task);
-    const reason = identity && isActionable(task) ? dayOneObservationRecovery.notice(identity) : undefined;
-    return reason ? [{ task, reason }] : [];
+    return identity && isActionable(task) && dayOneObservationRecovery.hasNotice(identity);
   }) : [];
 });
-function observationMessage(reason: DayOneObservationReason): string {
-  return reason === "onboarding" ? t.value.home.dayOneObservationSetup : t.value.home.dayOneObservationUnconfirmed;
-}
-function recoverObservation(task: QuestTask, retryOnly = false): void {
+function recoverObservation(task: QuestTask): void {
   if (!props.active || !isActionable(task)) return;
   const identity = observationIdentity(task);
-  const reason = identity && dayOneObservationRecovery.notice(identity);
-  if (!identity || !reason) return;
+  if (!identity || !dayOneObservationRecovery.hasNotice(identity)) return;
   dayOneObservationRecovery.retry(identity);
-  let web = false;
-  // #ifdef H5
-  web = true;
-  // #endif
-  navTo(retryOnly ? task.href : observationRecoveryRoute(reason, web, task.href));
+  navTo(task.href);
 }
 const claimState = computed(() => dayOneClaimState(
   quest.remoteQuests, quest.dayOneRequiredTaskCount, quest.dayOneSnapshotStatus, nowTick.value * 1000,

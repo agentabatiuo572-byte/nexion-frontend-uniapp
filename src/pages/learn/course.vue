@@ -43,7 +43,7 @@
         <text v-if="startState === 'pending' && !warmCourseRead" class="block" style="margin-top: var(--v5-space-2); color: var(--v5-ink-3); text-wrap: pretty" role="status" aria-live="polite">{{ t.learning.courseStartConfirming }}</text>
         <view v-else-if="startState === 'unconfirmed'" style="margin-top: var(--v5-space-2)">
           <text class="block" style="color: var(--v5-ink-3); text-wrap: pretty" role="alert" aria-live="assertive">{{ startFailureText }}</text>
-          <NxButton data-testid="learning-start-recovery" style="margin-top: var(--v5-space-2)" variant="secondary" :label="startRecoveryLabel" @click="recoverStart" />
+          <NxButton data-testid="learning-start-recovery" style="margin-top: var(--v5-space-2)" variant="secondary" :label="t.ui.retry" @click="recoverStart" />
         </view>
 
         <view v-for="(question, index) in displayCourse.questions" :key="question.questionId" style="margin-top: var(--v5-space-4)">
@@ -112,7 +112,6 @@ import { useApp } from "@/store/app";
 import { bindPageVisibilityRefresh, createPageVisibilityRefresh } from "@/lib/page-visibility-refresh";
 import { createLearningPageFenceReader, type LearningPageFence } from "./learning-page-fence";
 import { createLearningCourseStartLoadCoalescer, loadPublishedCourseWithStart, type LearningCourseStartFailure } from "./learning-course-start";
-import { observationRecoveryRoute } from "@/lib/day-one-observation-recovery";
 import { initialQuizAnswers, quizOptionTabIndex, learningAttemptRecoveryAction, learningResultDetails, matchingCourseResult, matchingReceiptResult, validAnswersForCourse } from "./learning-result-details";
 import { uiLocale, serverLanguage } from "@/i18n";
 
@@ -144,9 +143,8 @@ const loading = ref(true);
 const error = ref<CourseError>("");
 
 const errorText = computed(() => error.value ? t.value.learning[error.value] : "");
-const startFailureText = computed(() => startFailure.value?.reason === "onboarding" ? t.value.learning.courseStartSetup
-  : startFailure.value?.reason === "network" ? t.value.learning.courseStartNetwork : t.value.learning.courseStartUnconfirmed);
-const startRecoveryLabel = computed(() => startFailure.value?.reason === "onboarding" ? t.value.home.dayOneObservationSetupAction : t.value.ui.retry);
+const startFailureText = computed(() => startFailure.value?.reason === "network"
+  ? t.value.learning.courseStartNetwork : t.value.learning.courseStartUnconfirmed);
 const allAnswered = computed(() => !!course.value
   && validAnswersForCourse(course.value, answers.value));
 const resultDetails = computed(() => answeringAgain.value && !result.value ? null : learningResultDetails(course.value, result.value));
@@ -386,14 +384,7 @@ function retryCourse() { invalidateLearningContent(); return load(); }
 
 function recoverStart() {
   if (!mounted || loading.value || startState.value !== "unconfirmed" || !displayCourse.value) return;
-  const reason = startFailure.value?.reason;
-  if (reason !== "onboarding") return retryCourse();
-  let web = false;
-  // #ifdef H5
-  web = true;
-  // #endif
-  const returnTo = `/pages/learn/course?id=${encodeURIComponent(courseId.value)}${courseSource.value ? `&source=${encodeURIComponent(courseSource.value)}` : ""}`;
-  navTo(observationRecoveryRoute(reason, web, returnTo));
+  return retryCourse();
 }
 
 // 回读服务端课程快照。completed、lastScore、attempts、rewardGranted 都是当前

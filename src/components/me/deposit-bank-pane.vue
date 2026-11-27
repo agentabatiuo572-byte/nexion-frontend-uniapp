@@ -467,13 +467,8 @@ watch(
 );
 
 // ── 金额输入(USDT 主位 + 实时 ≈VND 副显)──
-function recoveryAmount(): string {
-  const draft = dep.bankRecoveryDraft;
-  return paymentSessionReady.value && dep.currentAccountKey() === app.accountKey
-    && draft?.accountKey === app.accountKey ? draft.amount : "";
-}
-const amount = ref(recoveryAmount());
-watch(() => [app.accountKey, paymentSessionReady.value], () => { amount.value = recoveryAmount(); });
+const amount = ref("");
+watch(() => [app.accountKey, paymentSessionReady.value], () => { amount.value = ""; });
 function onAmount(e: Event) {
   if (creating.value) return;
   // 保留原输入；非法符号或超精度必须提示，不能静默变成另一笔金额。
@@ -612,9 +607,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       // text or use this presentation choice to classify/retire a command key.
       if (cause instanceof ApiError && cause.kind === "http" && cause.status === 503 && cause.code === 503) {
         switch (cause.message) {
-          case "USER_ONBOARDING_STATE_UNAVAILABLE":
-            approvedBusinessFailureCopy = t.value.bankPane.createOnboardingUnavailable;
-            break;
           case "LEGAL_TERMS_UNAVAILABLE":
             approvedBusinessFailureCopy = t.value.bankPane.createTermsUnavailable;
             break;
@@ -652,7 +644,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       success: (it) => {
         if (!stillCurrent()) return;
         createError.value = "";
-        dep.bankRecoveryDraft = null;
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
