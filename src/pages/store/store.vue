@@ -123,6 +123,7 @@ import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import { resolveStoreGoalFocus } from "@/lib/store-goal-focus";
 import { productPublishedDailyUsdtRange } from "@/lib/product-estimates";
 import { highestOwnedHardware, storeUpgrade } from "@/lib/store-upgrade";
+import { findDeviceCatalogProduct } from "@/lib/product-media";
 import { useApp } from "@/store/app";
 import { dayOnePageObservationApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -294,7 +295,7 @@ const liveYield = computed(() => buildStoreYieldAuthority(
 ));
 const yieldAuthority = computed(() => {
   if (!remoteApiEnabled) return liveYield.value;
-  const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("catalogYield");
+  const catalog = productCatalogDisplayProof.value ? liveYield.value : readTabSnapshot("representativeCatalogYield");
   const phone = earnConfig.phoneTiers.value ? liveYield.value.phone : readTabSnapshot("phoneYield");
   const entry = catalog?.entry ?? null, pro = catalog?.pro ?? null, rack = catalog?.rack ?? null;
   const rows = liveYield.value.ladder.map(row => ({ ...row, amount: row.id === "phone" ? phone : catalog?.ladder.find(item => item.id === row.id)?.amount ?? null }));
@@ -328,7 +329,7 @@ const bundleSelectedProducts = computed(() => cart.items
 
 const purchasableProducts = computed(() => unlockedProducts.value.filter(product => !productOutOfStock(product)));
 const upgrade = computed(() => storeUpgrade(purchasableProducts.value, ownedDevices.value));
-const upgradeBaseProduct = computed(() => displayProducts.value.find(p => p.id === upgrade.value?.base.productCode));
+const upgradeBaseProduct = computed(() => findDeviceCatalogProduct(displayProducts.value, upgrade.value?.base.productCode));
 const upgradeBaseImageUrl = computed(() => upgrade.value?.base.imageUrl ?? upgradeBaseProduct.value?.imageUrl);
 const upgradeBaseDailyRange = computed(() => upgradeBaseProduct.value
   ? productPublishedDailyUsdtRange(upgradeBaseProduct.value) : null);

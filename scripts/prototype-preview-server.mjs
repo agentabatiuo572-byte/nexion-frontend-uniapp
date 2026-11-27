@@ -331,7 +331,7 @@ const server=http.createServer(async(req,res)=>{
         if(update.trialStartReceiptState==='normal')trialLifecycle.release('start');
         if(update.trialStartReceiptState&&update.trialStartReceiptState!=='rejected')delete state.trialStartPhaseClosed;
         if(update.trialCancelReceiptState==='normal')trialLifecycle.release('cancel');
-        if(update.taskState)for(const key of ['weekClaims','dayOneClaimed'])delete state[key];
+        if(update.taskState)for(const key of ['weekClaims','dayOneClaimed','dayOneObservedRoi'])delete state[key];
         if(update.riskState)delete state.riskDemo;
         // Install a different opening streak before the user records a streak or milestone command.
         const replaceStreak=wasStreak!==state.streakState&&!state.walletLegacySeed
@@ -509,10 +509,11 @@ const server=http.createServer(async(req,res)=>{
       const securityRevoke=req.method==='POST'&&/^\/api\/app\/security\/sessions\/(?:[^/]+\/revoke|revoke-others)$/.test(url.pathname);
       const realtimeTicket=req.method==='POST'&&url.pathname==='/api/app/support/realtime-ticket';
       const trialWrite=req.method==='POST'&&/^\/api\/trial\/(start|cancel|convert)$/.test(url.pathname);
+      const dayOneRoiObservation=req.method==='POST'&&url.pathname==='/api/growth/day-one/page-observations/s1-roi';
       // AppStakingService.open refuses an unacknowledged risk disclosure before recording the command.
       if(req.method==='POST'&&url.pathname==='/api/stakes'&&state.stakingOpenState==='disclosure')return sendJson(res,{code:409,message:'RISK_DISCLOSURE_ACK_REQUIRED',data:null});
       const conversationDelete=req.method==='DELETE'&&/^\/api\/app\/support\/conversations\/DEMO-SUPPORT-\d+$/.test(url.pathname);
-      if(req.method!=='GET'&&!securityRevoke&&!realtimeTicket&&!trialWrite&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
+      if(req.method!=='GET'&&!securityRevoke&&!realtimeTicket&&!trialWrite&&!dayOneRoiObservation&&!conversationDelete&&!modeledWrite.test(url.pathname)&&!withdrawalRequest&&!modeledBankWrite&&!modeledBankTopup&&url.pathname!=='/api/legal/risk-disclosure/acknowledgment')return sendJson(res,{code:409,message:'该演示操作尚未配置，请使用外侧面板切换状态',data:null},409);
       if(req.method==='GET'&&url.pathname==='/api/trial/state'&&state.trialReadState==='error')
         return sendJson(res,{code:503,message:'TRIAL_STATE_UNAVAILABLE',data:null},503);
       if(req.method==='GET'&&url.pathname==='/api/notifications'&&url.searchParams.has('cursor')&&state.notificationPageState==='error')

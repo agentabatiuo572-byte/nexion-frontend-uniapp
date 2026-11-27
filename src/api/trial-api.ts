@@ -260,7 +260,7 @@ function purchaseProductType(value: unknown): TrialPurchaseDevice["productType"]
 function purchaseDevice(row: Record<string, unknown>, productNo: string): TrialPurchaseDevice {
   return {
     productNo,
-    productName: text(row.name) ?? productNo,
+    productName: text(row.name) ?? "",
     imageUrl: text(row.imageUrl),
     productType: purchaseProductType(row.productType) ?? "DEVICE",
   };

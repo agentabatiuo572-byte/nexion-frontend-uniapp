@@ -246,7 +246,7 @@ const stopQuotaRuntime = subscribeRuntimeRevision(scope => {
   if (!isProductCatalogDisplayCurrent(scope)) resetQuotaPageState();
 });
 const focusedProductHref = computed(() => `/pages/store/detail?id=${encodeURIComponent(focusedProductId.value)}`);
-const focusedProductName = computed(() => catalogProduct(focusedProductId.value)?.name ?? focusedProductId.value);
+const focusedProductName = computed(() => catalogProduct(focusedProductId.value)?.name ?? t.value.headerTitles.storeProduct);
 
 function buildTier(productId: string, tint: string): QuotaTier | null {
   const p = getMockProduct(productId);

@@ -13,14 +13,20 @@ import { getProduct } from "@/mock/products";
 import { productCatalogPresentation, productCatalogState, refreshProductCatalog, revalidateProductCatalog } from "@/store/product-catalog";
 import { onShow } from "./use-tab-page-lifecycle";
 import { useAutoRecovery } from "./use-auto-recovery";
+import { isProductAvailable } from "@/store/product-availability";
+import { resolveActivePhase } from "@/store/product-phase";
+import { useApp } from "@/store/app";
 
 export function questActionRouteUnavailable(route: string): boolean {
   if (!route) return true;
   const productNo = questProductNo(route);
   if (!productNo) return false;
-  if (!remoteApiEnabled) return !getProduct(productNo);
+  if (!remoteApiEnabled) {
+    const product = getProduct(productNo);
+    return !product || !isProductAvailable(product, resolveActivePhase(useApp().user.joinedAt));
+  }
   return productCatalogState.status !== "ready"
-    || !productCatalogPresentation.value?.products.some(product => product.id === productNo);
+    || !productCatalogPresentation.value?.products.some(product => product.id === productNo && product.available === true);
 }
 
 export function useQuestCatalogRead(needed: () => boolean) {

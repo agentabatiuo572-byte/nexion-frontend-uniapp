@@ -129,7 +129,7 @@
         <!-- Estimated returns: every product uses the Cloud Share card (user 2026-11-23), except a detail opened from an
              activity, which is an activity page (04 §4.6). Each figure shows the catalog's range when it sends one and its
              single estimate otherwise; all follow the selected quantity. -->
-        <view v-if="!activityId" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
+        <view v-if="showEstimatedReturns" class="mx-4 mt-3 nx-glass-card detail-returns" data-testid="detail-returns">
           <text class="detail-returns__title">{{ t.bundle.estimatedDaily }}</text>
           <text v-if="isShare" class="detail-returns__description">{{ t.store.shareFlexibleDescription }}</text>
           <view class="detail-returns__rows">
@@ -408,21 +408,18 @@ async function observeCanonicalProductDetail(): Promise<void> {
     isCurrent: isCurrentAccountScope,
     submit: () => h3ObservationApi.productDetail(canonicalProduct.id),
   });
-  if (canonicalProduct.seriesCode !== "S1" || canonicalProduct.productType === "SHARE"
+  if (!showEstimatedReturns.value || canonicalProduct.seriesCode !== "S1" || canonicalProduct.productType === "SHARE"
     || !Number.isFinite(canonicalProduct.price) || canonicalProduct.price <= 0
     || !Number.isFinite(canonicalProduct.dailyEarn) || canonicalProduct.dailyEarn <= 0) return;
   void reportDayOnePageObservation("view_product_roi", {
     scope,
     session: sessionVault.read(),
-    visible: () => detailPageVisible && pageEpoch === detailObservationEpoch,
+    visible: () => detailPageVisible && pageEpoch === detailObservationEpoch
+      && product.value === canonicalProduct && showEstimatedReturns.value,
     isCurrent: isCurrentAccountScope,
     submit: () => dayOnePageObservationApi.s1Roi(canonicalProduct.id),
   });
 }
-
-watch([catalogStatus, () => product.value?.id], () => {
-  void observeCanonicalProductDetail();
-});
 
 const isShare = computed(() => product.value?.productType === "SHARE");
 const earnConfig = useEarnConfig();
@@ -444,6 +441,11 @@ const isLocked = computed(() => {
   const p = product.value;
   if (!p || purchaseUnavailable.value) return false;
   return !isProductAvailable(p, phase.value);
+});
+const showEstimatedReturns = computed(() => !publicOnly.value && !activityId.value && !!product.value
+  && catalogStatus.value !== "loading" && catalogStatus.value !== "error" && !isLocked.value && !purchaseUnavailable.value);
+watch([catalogStatus, () => product.value?.id, showEstimatedReturns], () => {
+  void observeCanonicalProductDetail();
 });
 
 // Per-user purchase gate — local V-rank/team snapshots are mock-only. Remote

@@ -300,6 +300,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const confirmedHomeOffer = shallowRef<{
     status: "none" | "ended";
     capacityFull: boolean;
+    reason?: TrialIneligibleReason;
     deviceName: string;
     productId: string | null;
     imageUrl?: string;
@@ -460,8 +461,8 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     }
     // Validate the whole policy before committing snapshot or promotion presentation.
     const trialConfig = useTrialConfig();
-    const productUnavailable = next.serverState === "ELIGIBLE" && !next.canStart
-      && next.eligibilityReason === "product-unavailable";
+    const productUnavailable = !next.canStart && next.eligibilityReason === "product-unavailable"
+      && ["ELIGIBLE", "FAILED", "CANCELLED"].includes(next.serverState);
     trialConfig.applyAuthoritative(next.config, productUnavailable);
     const confirmedExpiry = next.status === "ended" && next.endReason === "expired";
     if (pendingExpiryClaim !== next.claimNo || !confirmedExpiry) pendingExpiryClaim = null;
@@ -504,6 +505,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       || (next.status === "ended" && next.canStart) ? {
         status: next.status,
         capacityFull,
+        reason: next.eligibilityReason,
         deviceName: config.trialProductName,
         productId: resolveTrialCheckoutProductId(config.trialProductId),
         imageUrl: config.imageUrl,

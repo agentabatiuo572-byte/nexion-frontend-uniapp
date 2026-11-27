@@ -1754,6 +1754,16 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   }
   if(/^\/api\/promotions\/demo-promo-\d+\/referral-progress$/.test(pathname))return {activityId:pathname.split('/')[3],qualifyingOrders:2,ownRewards:[],serverTime:iso};
   const contentLocale=url.searchParams.get('locale')?.trim().toLowerCase().split('-')[0] || 'en';
+  if(pathname==='/api/growth/day-one/page-observations/s1-roi'&&request?.method()==='POST'){
+    const accountId=previewAccountId(state,request.headers());
+    const {productNo}=request.postDataJSON();
+    const product=productFor(productNo);
+    const recorded=!!accountId&&!empty&&state.catalogState==='sku-series'&&state.taskState==='pending'
+      &&productNo===demoS1VariantNo&&product?.seriesCode==='S1'&&product.available===true
+      &&product.price>0&&product.dailyEarn>0;
+    if(recorded)(state.dayOneObservedRoi??={})[accountId]=productNo;
+    return {accepted:true,recorded};
+  }
   if(pathname==='/api/quests/state') {
     const data=reviewFixture(url,contentLocale,{...state,taskState:state.dayOneClaimed?'claimed':state.taskState},request);
     if(empty) return {...data,quests:[],dayOneRequiredTaskCount:0,dayOneSnapshotStatus:'EMPTY'};
@@ -1762,9 +1772,13 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const weekNames=localized(contentLocale,['了解设备收益','完成一门课程','邀请一位好友','查看账户安全'],['Explore device earnings','Complete one course','Invite a friend','Review account security'],['Tìm hiểu thu nhập','Hoàn thành một bài học','Mời một người bạn','Kiểm tra bảo mật']);
     if(state.taskState!=='empty') data.quests.push(...weekNames.map((name,i)=>({questCode:'demo-week-'+i,name,layer:i===0?'WEEKLY_T1':'WEEKLY_T2',rewardNex:100+i*25,status:state.weekClaims?.includes(i)?'CLAIMED':state.taskState==='complete'?'CLAIMABLE':state.taskState==='claimed'?'CLAIMED':state.taskState==='expired'?'EXPIRED':i===1?'CLAIMABLE':'PENDING',category:i===2?'social':'explore',actionRoute:['/pages/earn/earn','/pages/learn/courses','/pages/team/team','/pages/me/profile'][i],instanceKey:'WEEK:demo',eligibleFrom:new Date(now-day).toISOString(),eligibleUntil:new Date(now+(state.taskState==='expired'?-1000:5*day)).toISOString(),eligible:!['claimed','expired'].includes(state.taskState)&&!state.weekClaims?.includes(i)})));
     if(state.catalogState==='sku-series'&&state.taskState==='pending'){
+      const accountId=previewAccountId(state,request?.headers?.()??{});
       Object.assign(data.quests[3],{
+        questCode:'view_product_roi',
         name:localized(contentLocale,'查看 S1 回本','View S1 ROI','Xem ROI của S1'),
         actionRoute:'/pages/store/detail?id='+demoS1VariantNo,
+        ...(data.quests[3].status==='PENDING'&&accountId&&state.dayOneObservedRoi?.[accountId]===demoS1VariantNo
+          ?{status:'COMPLETED'}:{}),
       });
       Object.assign(data.quests[4],{
         name:localized(contentLocale,'查看另一件设备','View another device','Xem thiết bị khác'),

@@ -1,4 +1,14 @@
-import type { VoucherDef, VoucherSurface } from "@/mock/vouchers";
+import { isSingleSkuVoucher, type VoucherDef, type VoucherSurface } from "@/mock/vouchers";
+import { fmt } from "@/i18n/format";
+import type { Messages } from "@/i18n/messages/en";
+import { landingCopy } from "@/i18n/promotion-landing";
+import { productDisplayName } from "./product-display-name";
+
+export function voucherScopeText(voucher: VoucherDef, copy: Messages["voucher"], language: string): string {
+  if (!isSingleSkuVoucher(voucher)) return copy.scopeAll;
+  const name = productDisplayName(voucher.applicableSkus[0], landingCopy(language).deviceFallback);
+  return fmt(copy.scopeSingle, { name });
+}
 
 /** H7's empty surface list allows every supported claim entry. */
 export function voucherSupportsSurface(voucher: Pick<VoucherDef, "claimSurfaces">, surface: VoucherSurface): boolean {

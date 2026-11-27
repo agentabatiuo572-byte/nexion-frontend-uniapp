@@ -79,7 +79,7 @@ subscribeRuntimeRevision((scope: RuntimeRevisionScope) => {
   publishedCatalogSignature = null;
   publishedCatalogLocale = null;
   languageReadFailed.value = false;
-  invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"]);
+  invalidateTabSnapshots(["representativeCatalogYield", "commission", "network", "rank", "referral"]);
   displayProof.value = null;
 
   productCatalogState.serverCanonical = false;
@@ -241,7 +241,7 @@ function readProductCatalog(force: boolean, languageOnly: boolean): Promise<bool
       if (published) {
         publishedCatalogSignature = signature;
         const { entry, pro, rack, ladder } = buildStoreYieldAuthority(snapshot.products, [], snapshot);
-        saveTabSnapshot(snapshotWrite, "catalogYield", { entry, pro, rack, ladder }, null);
+        saveTabSnapshot(snapshotWrite, "representativeCatalogYield", { entry, pro, rack, ladder }, null);
       }
       return published && requestEpoch === catalogEpoch && requestBinding === catalogBindingEpoch;
     })
@@ -254,7 +254,7 @@ function readProductCatalog(force: boolean, languageOnly: boolean): Promise<bool
         return false;
       }
       languageReadFailed.value = false;
-      if (!transient) { displayProof.value = null; invalidateTabSnapshots(["catalogYield", "commission", "network", "rank", "referral"], snapshotWrite); }
+      if (!transient) { displayProof.value = null; invalidateTabSnapshots(["representativeCatalogYield", "commission", "network", "rank", "referral"], snapshotWrite); }
       if (!current()) return false;
       if (error instanceof ApiError && (error.kind === "auth" || error.status === 401 || error.status === 403 || error.code === 401 || error.code === 403)) presentation.value = null;
       if (!current()) return false;
