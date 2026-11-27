@@ -182,8 +182,7 @@
       <view v-else-if="amountNum <= 0" class="wd-fee__msg">
         <text class="wd-line">{{ t.walletV3.feeDetailPlaceholder }}</text>
       </view>
-      <!-- 🔴 金额超出可提范围:**给原因,不给报价**(2026-08-01 走查 P0-3)。报价必须只对真能提交的金额出。 -->
-      <view v-else-if="quoteBlocked || !activeQuote" class="wd-fee__msg">
+      <view v-else-if="quoteBlocked || !quoteRowsVisible" class="wd-fee__msg">
         <text v-if="withdrawalActionsFresh" class="wd-warn">{{ submitDisabledReason }}</text>
       </view>
       <!-- FEAT-WD02:单行网络确认费(每笔固定;$0 显示 $0.00 不藏行)。「?」打开费用说明半屏。 -->
@@ -194,7 +193,7 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
         </view>
-        <text class="wd-fee__v">−{{ formatTruncatedAmount(networkConfirmUsd) + '\u00A0USDT' }}</text>
+        <text class="wd-fee__v">{{ activeQuote ? '−' + formatTruncatedAmount(activeQuote.networkFee) + '\u00A0USDT' : '—' }}</text>
       </view>
       </template>
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关)。🔴 费率不可用时整块隐藏:凡是吃费用数据的区块都挂 feeConfigUsable 门。 -->
@@ -225,17 +224,18 @@
         </view>
       </view>
       <template v-if="withdrawalPolicyCurrent && feeDetailReady">
-        <view v-if="nexBurned > 0" class="wd-fee__r">
+        <view v-if="nexBurned > 0 || (offsetWithNex && !activeQuote)" class="wd-fee__r">
           <text class="wd-k wd-k--brand">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="wd-fee__v wd-fee__v--brand">+{{ formatTruncatedAmount(feeWaived) + '\u00A0USDT' }} · {{ fmtNex(nexBurned) + '\u00A0UVT' }}</text>
+          <text class="wd-fee__v wd-fee__v--brand">{{ activeQuote ? '+' + formatTruncatedAmount(feeWaived) + '\u00A0USDT · ' + fmtNex(nexBurned) + '\u00A0UVT' : '—' }}</text>
         </view>
         <view v-if="offsetWithNex" class="wd-fee__r">
           <text class="wd-k">{{ t.walletV3.feeCharged }}</text>
-          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">{{ formatTruncatedAmount(fee) + '\u00A0USDT' }}</text>
+          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': activeQuote && fee === 0 }">{{ activeQuote ? chargedFeeText : '—' }}</text>
         </view>
         <view class="wd-fee__r wd-fee__r--net">
           <text class="wd-k">{{ t.wallet.receiveLabel }}</text>
-          <text class="wd-fee__net">{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] }}</text><text class="wd-unit">{{ '\u00A0USDT' }}</text></text>
+          <text v-if="activeQuote" class="wd-fee__net">{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] }}</text><text class="wd-unit">{{ '\u00A0USDT' }}</text></text>
+          <text v-else class="wd-fee__net">—</text>
         </view>
       </template>
       </view>
@@ -253,7 +253,7 @@
       </template>
 
       <!-- Reverse-talk staking alternative -->
-      <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
+      <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked && !remoteEligibilityFailed" :amount-num="amountNum" />
 
       <!-- 费用说明:用户点「?」主动查看的说明,底部 sheet(03 §3.5.1 选择级),共享 NxSheet 的标题、圆形关闭和退出。 -->
       <NxSheet :open="feeWhyOpen" :title="t.walletV3.feeWhyTitle" @close="feeWhyOpen = false">
@@ -964,6 +964,8 @@ const nexBurned = computed(() => Number(activeQuote.value?.nexBurned ?? 0));
 const receive = computed(() => activeQuote.value?.netReceive);
 const fee = computed(() => Number((amountNum.value - Number(receive.value ?? 0)).toFixed(6)));
 const feeWaived = computed(() => Number((networkConfirmUsd.value - fee.value).toFixed(6)));
+const chargedFeeText = computed(() => fee.value > 0 && fee.value < 0.01
+  ? t.value.topupChrome.feeUnderCent : formatTruncatedAmount(fee.value) + "\u00A0USDT");
 /** 开关置灰判据:没有 NEX 可抵(NEX=0 → 置灰 + 去赚 NEX 入口,规格 ② 异常1)。 */
 const offsetToggleDisabled = computed(() => nexBalance.value <= 0);
 function toggleOffset() {
@@ -981,11 +983,11 @@ const offsetHintText = computed(() => {
   }
   if (networkConfirmUsd.value <= 0) return t.value.walletV3.feeOffsetFreeNetwork;
   if (!offsetWithNex.value) return fmt(t.value.walletV3.feeOffsetOffHint, { n: fmtNex(nexBalance.value) });
-  if (fee.value <= 0.0001) return fmt(t.value.walletV3.feeOffsetOnFull, { nex: fmtNex(nexBurned.value) });
+  if (fee.value === 0) return fmt(t.value.walletV3.feeOffsetOnFull, { nex: fmtNex(nexBurned.value) });
   return fmt(t.value.walletV3.feeOffsetOnPartial, {
     nex: fmtNex(nexBurned.value),
     waived: formatTruncatedAmount(feeWaived.value),
-    rest: formatTruncatedAmount(fee.value),
+    rest: chargedFeeText.value,
   });
 });
 /** 费用说明半屏开合。 */
@@ -1147,12 +1149,11 @@ function amountParts(text: string): [string, string] {
 const quoteDisplayBlocked = computed(() =>
   !pendingAttempt.value && amountNum.value > 0
   && !withdrawalQuoteRefreshing.value
-  && submitDisabledReason.value !== ""
-  && submitDisabledReason.value !== t.value.help.loadingMore
-  && submitDisabledReason.value !== t.value.walletV3.withdrawRecoveryReasonAmount,
+  && disabledReasonFor(amountNum.value, eligibility.value, true) !== "",
 );
+const quoteRowsVisible = computed(() => !!activeQuote.value || remoteEligibilityFailed.value || !!pendingAttempt.value);
 const feeDetailReady = computed(() => !feeConfigLoading.value && (pendingAttempt.value || NETWORKS.value.length > 0)
-  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && !!activeQuote.value);
+  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && quoteRowsVisible.value);
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
@@ -1200,7 +1201,7 @@ const riskNoticeBody = computed(() => {
  * 点完什么都不会发生,还把当天唯一一次机会的金额改小了(2026-08-01 审计 P0)。
  * 两个判据只要不是同一个源,迟早漂移。这里收成一个。
  */
-function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string {
+function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQuoteDisplay = false): string {
   if (!withdrawalActionsFresh.value) return withdrawalActionStatusText.value;
   if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
   if (NETWORKS.value.length === 0) return t.value.wallet.withdrawalChannelsClosed;
@@ -1216,20 +1217,23 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   // No eligibility request is made until these inputs exist. Missing input is
   // not an in-flight request and must never be presented as perpetual loading.
   if (amount <= 0) return t.value.walletV3.submitReasonAmountRequired;
+  if (amount < minWithdrawable.value) {
+    return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatTruncatedAmount(minWithdrawable.value) });
+  }
+  if (!forQuoteDisplay && remoteEligibilityFailed.value) {
+    return decision.quote ? t.value.ui.refreshFailed : t.value.walletV3.submitReasonServiceUnavailable;
+  }
   if (remoteApiEnabled && decision.configVersion === "remote-pending") {
-    return remoteEligibilityFailed.value ? t.value.walletV3.submitReasonServiceUnavailable : t.value.help.loadingMore;
+    return forQuoteDisplay ? "" : t.value.help.loadingMore;
   }
   // 换址冻结:24h 内提交按钮置灰(横幅带真倒计时)。
   if (frozenNow.value) return t.value.addrRebind.submitFrozenReason;
   // FEAT-WD01b:今日笔数用完 → 置灰 + 告知何时重置(不建单不扣款)
   if (decision.dailyLimitReached) return dailyLimitReachedText.value;
-  if (amount < minWithdrawable.value) {
-    return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatTruncatedAmount(minWithdrawable.value) });
-  }
   if (amount > decision.maxWithdrawableUsdt) {
     return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatTruncatedAmount(decision.maxWithdrawableUsdt) });
   }
-  if (decision.quote && Number(decision.quote.netReceive) <= 0) return t.value.walletV3.withdrawRecoveryReasonAmount;
+  if (decision.quote && Number(decision.quote.netReceive) <= 0) return forQuoteDisplay ? "" : t.value.exchange.belowFee;
   if (!decision.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
   if (remoteApiEnabled && !decision.quote) return t.value.walletV3.submitReasonServiceUnavailable;
   return "";
@@ -1327,13 +1331,14 @@ async function readRemoteEligibility(): Promise<void> {
     remoteEligibilityFailed.value = false;
   } catch (cause) {
     if (!isCurrent()) return;
-    remoteEligibility.value = null;
     remoteEligibilityFailed.value = true;
-    // A changed version starts a new read. Do not keep reloading an unchanged policy.
-    if (cause instanceof ApiError && cause.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT"
-      && refreshedConflictVersion !== policyVersion) {
-      refreshedConflictVersion = policyVersion;
-      await loadWithdrawalPolicy();
+    if (cause instanceof ApiError && cause.message === "WITHDRAWAL_POLICY_VERSION_CONFLICT") {
+      remoteEligibility.value = null;
+      // A changed version starts a new read. Do not keep reloading an unchanged policy.
+      if (refreshedConflictVersion !== policyVersion) {
+        refreshedConflictVersion = policyVersion;
+        await loadWithdrawalPolicy();
+      }
     }
   }
 }
@@ -1344,7 +1349,7 @@ watch([quoteInputs, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdra
   ([inputs], [previousInputs], onCleanup) => {
     remoteEligibilityEpoch += 1;
     // Only a refresh of the same inputs can retain the last quote on screen.
-    if (inputs !== previousInputs) {
+    if (!previousInputs || inputs.some((input, index) => input !== previousInputs[index])) {
       remoteEligibility.value = null;
       remoteEligibilityFailed.value = false;
     }

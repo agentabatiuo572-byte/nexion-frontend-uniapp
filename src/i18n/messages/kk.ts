@@ -4533,7 +4533,7 @@ export const kk: Messages = {
     feeOffsetToggle: "Комиссияны UVT-мен төлеу",
     feeOffsetOffHint: "Бұл комиссияны UVT-мен жабу үшін қосыңыз. Сізде {n}\u00A0UVT бар.",
     feeOffsetOnFull: "{nex}\u00A0UVT жұмсалады · комиссия толық жабылады (0.00\u00A0USDT).",
-    feeOffsetOnPartial: "{nex}\u00A0UVT жұмсалады · {waived}\u00A0USDT жабылады, {rest}\u00A0USDT төлеу қажет.",
+    feeOffsetOnPartial: "{nex}\u00A0UVT жұмсалады · {waived}\u00A0USDT жабылады, {rest} төлеу қажет.",
     feeOffsetNoNex: "Комиссияны жабатын UVT жоқ. UVT-ні белгі қою және құрылғы тапсырмалары арқылы табыңыз.",
     feeOffsetFreeNetwork: "Бұл желі қазір комиссия алмайды — жабудың қажеті жоқ.",
     feeWhyTitle: "Комиссия туралы",
