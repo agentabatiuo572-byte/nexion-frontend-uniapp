@@ -700,7 +700,7 @@ const withdrawalRatioLine = computed(() => {
   if (ratio <= 0 || ratio >= 0.999999 || held <= 0.000001) return "";
   return fmt(t.value.wallet.withdrawalRatioLine, {
     pct: formatWithdrawalRatioPercent(ratio),
-    held: formatAmount(held),
+    held: formatTruncatedAmount(held),
   });
 });
 /**
@@ -726,7 +726,7 @@ const limitFacts = computed(() => withdrawalLimitFacts({
   now: nowTick.value,
 }));
 const perWithdrawalLimitText = computed(() => fmt(t.value.wallet.perWithdrawalLimit, {
-  amount: formatAmount(limitFacts.value.perWithdrawalMaximum),
+  amount: formatTruncatedAmount(limitFacts.value.perWithdrawalMaximum),
 }));
 const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
   used: String(limitFacts.value.dailyUsedCount),
@@ -788,7 +788,7 @@ const dailyLimitReachedText = computed(() => {
 // 重放是「今天不能提了,**而且先前那笔可能已经占掉了额度**」——
 // 只说前半句会让用户以为先前那笔没成功,转头去开新的一笔,那正是要防的事。
 const dailyLimitReachedWithPendingText = computed(() => t.value.walletV3.withdrawDailyLimitWithPending);
-const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: formatAmount(minWithdrawable.value) }));
+const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: formatTruncatedAmount(minWithdrawable.value) }));
 const devMode = ref(false);
 onLoad((options) => {
   devMode.value = import.meta.env.DEV && options?.dev === "1";
@@ -1304,10 +1304,10 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   // FEAT-WD01b:今日笔数用完 → 置灰 + 告知何时重置(不建单不扣款)
   if (decision.dailyLimitReached) return dailyLimitReachedText.value;
   if (amount < minWithdrawable.value) {
-    return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatAmount(minWithdrawable.value) });
+    return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatTruncatedAmount(minWithdrawable.value) });
   }
   if (amount > decision.maxWithdrawableUsdt) {
-    return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatAmount(decision.maxWithdrawableUsdt) });
+    return fmt(t.value.walletV3.submitReasonMaxAmount, { n: formatTruncatedAmount(decision.maxWithdrawableUsdt) });
   }
   if (!decision.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
   return "";
@@ -1319,7 +1319,7 @@ const submitHintVisible = computed(() => !pendingAttempt.value && Boolean(submit
   && (amountNum.value <= 0 || !quoteBlocked.value));
 
 function fmtNex(n: number): string {
-  return formatAmount(n);
+  return formatTruncatedAmount(n);
 }
 
 const canSubmit = computed(() => submitDisabledReason.value === "");
@@ -1357,8 +1357,8 @@ function useMax() {
   const decision = resolveWithdrawalUseMax(maxWithdrawable.value, minWithdrawable.value);
   if (decision.reason === "below-minimum") {
     toast.info(fmt(t.value.wallet.useMaxBelowMinimum, {
-      max: formatAmount(maxWithdrawable.value),
-      min: formatAmount(minWithdrawable.value),
+      max: formatTruncatedAmount(maxWithdrawable.value),
+      min: formatTruncatedAmount(minWithdrawable.value),
     }));
     return;
   }
@@ -1465,7 +1465,7 @@ async function handleSubmit() {
   // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。
   const resendBody = pending
     ? fmt(t.value.walletV3.withdrawResendBody, {
-        amount: formatAmount(snap.amount),
+        amount: formatTruncatedAmount(snap.amount),
         network: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label,
         address: maskAddressMid(snap.address),
       })

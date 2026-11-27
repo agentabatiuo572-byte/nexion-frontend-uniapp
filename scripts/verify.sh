@@ -423,7 +423,6 @@ const SAFE_AREA_EXEMPT=[
   ["src/pages/me/payment-password.vue",".payment-pin-page"],
   ["src/pages/me/trial.vue",".trial-bar-space"],
   ["src/pages/register/success.vue",".rs-wrap"],
-  ["src/pages/register/success.vue",".rs-wrap--web-setup"],
   ["src/pages/register/success.vue",".rs-wrap--gift"],
   ["src/pages/team/agent-applications.vue",".records-content"],
   ["src/components/purchase-payment-dialog.vue",".purchase-payment-resume"],
