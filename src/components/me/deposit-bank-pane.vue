@@ -18,11 +18,6 @@
     </view>
     <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
       <text class="block" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger); overflow-wrap: break-word">{{ createError }}</text>
-      <view v-if="createRecovery" class="nx-bank-setup-recovery active-press" role="button" tabindex="0"
-        @click="goCreateRecovery" @keydown.enter.prevent="goCreateRecovery" @keydown.space.prevent="goCreateRecovery"
-        style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)">
-        <text>{{ t.bankPane.onboardingRecoveryCta }}</text>
-      </view>
     </view>
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
@@ -472,13 +467,8 @@ watch(
 );
 
 // ── 金额输入(USDT 主位 + 实时 ≈VND 副显)──
-function recoveryAmount(): string {
-  const draft = dep.bankRecoveryDraft;
-  return paymentSessionReady.value && dep.currentAccountKey() === app.accountKey
-    && draft?.accountKey === app.accountKey ? draft.amount : "";
-}
-const amount = ref(recoveryAmount());
-watch(() => [app.accountKey, paymentSessionReady.value], () => { amount.value = recoveryAmount(); });
+const amount = ref("");
+watch(() => [app.accountKey, paymentSessionReady.value], () => { amount.value = ""; });
 function onAmount(e: Event) {
   if (creating.value) return;
   // 保留原输入；非法符号或超精度必须提示，不能静默变成另一笔金额。
@@ -551,24 +541,7 @@ const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.v
 // ── 生成付款单(mock ~600ms 延迟演加载态:按钮内联 spinner「生成中…」)──
 const creating = ref(false);
 const createError = ref("");
-const createRecovery = ref<"onboarding" | null>(null);
 const formCtaVisible = computed(() => paneView.value === "form" && paymentSessionReady.value && fx.configReady && !fx.syncFailed && bankRailAvailable.value);
-function goCreateRecovery() {
-  if (!paymentSessionReady.value || creating.value || dep.currentAccountKey() !== app.accountKey) return;
-  if (createRecovery.value !== "onboarding") return;
-  dep.bankRecoveryDraft = { accountKey: app.accountKey, amount: amount.value };
-  // Restore only the input if navigation rebuilds the page; never replay CREATE.
-  // #ifdef H5
-  navTo("/pages/register/success?setup=1");
-  // #endif
-  // #ifndef H5
-  navTo("/pages/onboarding/estimator");
-  // #endif
-}
-watch(() => app.accountBindingEpoch, () => {
-  if (createRecovery.value) createError.value = "";
-  createRecovery.value = null;
-});
 let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
@@ -576,7 +549,6 @@ function createOrder(presetUsdt?: number) {
     || creating.value || readError.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
-  createRecovery.value = null;
   if (presetUsdt === undefined) createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
@@ -635,9 +607,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       // text or use this presentation choice to classify/retire a command key.
       if (cause instanceof ApiError && cause.kind === "http" && cause.status === 503 && cause.code === 503) {
         switch (cause.message) {
-          case "USER_ONBOARDING_STATE_UNAVAILABLE":
-            approvedBusinessFailureCopy = t.value.bankPane.createOnboardingUnavailable;
-            break;
           case "LEGAL_TERMS_UNAVAILABLE":
             approvedBusinessFailureCopy = t.value.bankPane.createTermsUnavailable;
             break;
@@ -652,12 +621,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
           case "PAYMENT_CONFIG_UNAVAILABLE":
             approvedBusinessFailureCopy = t.value.bankPane.createServiceUnavailable;
             break;
-        }
-      }
-      if (cause instanceof ApiError && cause.kind === "http" && cause.status === 428 && cause.code === 428) {
-        if (cause.message === "USER_ONBOARDING_REQUIRED") {
-          approvedBusinessFailureCopy = t.value.bankPane.onboardingRequired;
-          if (stillCurrent()) createRecovery.value = "onboarding";
         }
       }
       if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
@@ -681,8 +644,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       success: (it) => {
         if (!stillCurrent()) return;
         createError.value = "";
-        createRecovery.value = null;
-        dep.bankRecoveryDraft = null;
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;

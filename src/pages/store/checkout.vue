@@ -194,10 +194,9 @@
               <text class="checkout-trial-credit-value">{{ trialCreditText }}</text>
             </view>
             <view v-if="tradeinPlacementText" class="checkout-note"><text>{{ tradeinPlacementText }}</text></view>
-            <view v-if="checkoutCapacityBlocked && (checkoutOnboardingRequired || checkoutCapacityRefusal === 'purchase-conditions')" class="checkout-capacity-notice" data-testid="checkout-capacity-notice">
+            <view v-if="checkoutCapacityBlocked && checkoutCapacityRefusal === 'purchase-conditions'" class="checkout-capacity-notice" data-testid="checkout-capacity-notice">
               <view class="checkout-capacity-actions">
-                <NxButton v-if="checkoutOnboardingRequired" variant="text" size="small" :label="t.trial.claimOnboardingCta" @click="openCheckoutSetup" />
-                <NxButton v-else variant="link" size="small" :label="t.store.coBrowseOtherDevices" @click="goStore"><text class="nx-after-chevron">{{ t.store.coBrowseOtherDevices }}</text></NxButton>
+                <NxButton variant="link" size="small" :label="t.store.coBrowseOtherDevices" @click="goStore"><text class="nx-after-chevron">{{ t.store.coBrowseOtherDevices }}</text></NxButton>
               </view>
             </view>
             <view v-if="checkoutFullSlots && !checkoutCapacityBlocked" class="checkout-note checkout-note--warning" role="status" data-testid="checkout-inventory-notice"><text>{{ t.tradein.fullSlotsInventoryNotice }}</text></view>
@@ -1773,9 +1772,7 @@ watch(() => tradein.state, selection => {
     checkoutCapacityTradeinRejection.value = undefined;
   }
 });
-const checkoutOnboardingRequired = ref(false);
 const checkoutCapacityReadFailed = ref(false);
-let checkoutSetupReturn = false;
 watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   interceptFired = false;
   tradeinAvailable.value = false;
@@ -1785,8 +1782,6 @@ watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
   quotedAssignableSlots.value = null;
   checkoutCapacityRefusal.value = null;
   checkoutCapacityTradeinRejection.value = undefined;
-  checkoutOnboardingRequired.value = false;
-  checkoutSetupReturn = false;
   checkoutCapacityRead = null;
   checkoutWalletRefreshSequence += 1;
   checkoutWalletRefreshing.value = false;
@@ -1859,7 +1854,6 @@ async function fireTradeinIntercept(mode: 'entry' | 'review' | 'interactive' | '
   const kind = p.id as DeviceKind;
   if (tradein.appliedTradein?.targetKind === kind) return;
   if (remoteApiEnabled) {
-    if (checkoutOnboardingRequired.value && mode !== "foreground") return;
     if (remoteCapacityGate.pending) return checkoutCapacityRead ?? undefined;
     const requestScope = captureCheckoutRoute();
     if (mode === "interactive") {
@@ -1890,7 +1884,6 @@ async function fireTradeinIntercept(mode: 'entry' | 'review' | 'interactive' | '
       if (!isCurrentCheckoutRoute(requestScope)) return;
       quotedAssignableSlots.value = assignableSlots ?? null;
       checkoutCapacityReadFailed.value = false;
-      checkoutOnboardingRequired.value = false;
       checkoutCapacityTradeinRejection.value = undefined;
       tradeinAvailable.value = paidTradeinSourceIds(eligibility, p.id).length > 0;
       if (mode !== "entry" || !eligibility?.eligible || hasVoucher.value) return tradeinAvailable.value;
@@ -1909,8 +1902,6 @@ async function fireTradeinIntercept(mode: 'entry' | 'review' | 'interactive' | '
       if (!isCurrentCheckoutRoute(requestScope)) return;
       quotedAssignableSlots.value = null;
       const failure = asApiError(error);
-      checkoutOnboardingRequired.value = failure.kind === "http" && failure.status === 428
-        && failure.code === 428 && failure.message === "USER_ONBOARDING_REQUIRED";
       if (checkoutQuoteBlock(failure) === 'outOfStock') {
         checkoutStockRefused.value = true;
       } else if (isApiRefusal(failure, 409, "TRADEIN_TARGET_NOT_ACTIVE", "TRADEIN_TARGET_NOT_RELEASED")) {
@@ -1919,8 +1910,7 @@ async function fireTradeinIntercept(mode: 'entry' | 'review' | 'interactive' | '
         checkoutCapacityRefusal.value = "purchase-conditions";
       }
       const tradeinRejection = tradeinPaymentRejection(failure);
-      checkoutCapacityReadFailed.value = !checkoutOutOfStock.value && !checkoutOnboardingRequired.value
-        && !checkoutCapacityRefusal.value && !tradeinRejection;
+      checkoutCapacityReadFailed.value = !checkoutOutOfStock.value && !checkoutCapacityRefusal.value && !tradeinRejection;
       if (!checkoutCapacityReadFailed.value) checkoutCapacityTradeinRejection.value = tradeinRejection;
       tradeinAvailable.value = false;
     });
@@ -1939,20 +1929,10 @@ async function fireTradeinIntercept(mode: 'entry' | 'review' | 'interactive' | '
   return false;
 }
 async function retryCheckoutCapacity() {
-  if (checkoutOnboardingRequired.value || !foregroundReadAllowed()) return;
+  if (!foregroundReadAllowed()) return;
   if (remoteCapacityGate.pending) { await checkoutCapacityRead; return; }
   interceptFired = false;
   await fireTradeinIntercept();
-}
-function openCheckoutSetup() {
-  if (!checkoutOnboardingRequired.value || hasLegacyTrialBalance() || !isCurrentCheckoutRoute(captureCheckoutRoute())) return;
-  checkoutSetupReturn = true;
-  // #ifdef H5
-  navTo("/pages/register/success?setup=1");
-  // #endif
-  // #ifndef H5
-  navTo("/pages/onboarding/estimator");
-  // #endif
 }
 const checkoutBackHref = computed(() => promotionRoute.value
   ? promotionRoute.value.orderNo
@@ -2108,11 +2088,9 @@ const checkoutFullSlots = computed(() => canPreviewPurchasePlacement.value
   && (remoteCapacityGate.decision === "INVENTORY_ONLY"
     || (quotedAssignableSlots.value ?? (app.remoteSlotsUsed === null ? null : Math.max(0, app.slotCap - app.remoteSlotsUsed))) === 0));
 const checkoutCapacityBlocked = computed(() => !hasOriginalCheckout.value
-  && ((checkoutOnboardingRequired.value && !hasLegacyTrialBalance())
-    || (checkoutCapacityRequired.value && (checkoutCapacityRefusal.value === "purchase-conditions"
-      || (checkoutCapacityTradeinRejection.value && !!appliedTradeinView.value?.canonicalQuote)))));
-const checkoutCapacityMessage = computed(() => checkoutOnboardingRequired.value ? t.value.store.coSetupRequired
-  : checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
+  && checkoutCapacityRequired.value && (checkoutCapacityRefusal.value === "purchase-conditions"
+    || (checkoutCapacityTradeinRejection.value && !!appliedTradeinView.value?.canonicalQuote)));
+const checkoutCapacityMessage = computed(() => checkoutCapacityRefusal.value === "purchase-conditions" ? t.value.store.coCapacityPurchaseConditions
   : checkoutCapacityTradeinRejection.value ? flowCopy.value[checkoutCapacityTradeinRejection.value] : "");
 const pendingTrialPurchase = computed(() => trialExternalConfirming.value || freeTrial.legacyConversionPending);
 const checkoutTrayBlock = computed(() => (legacyTrialResultOwner.value || trialRoute.value && pendingTrialPurchase.value) ? purchaseCopy.value.coConfirming
@@ -2369,10 +2347,6 @@ async function submitReview() {
   }
   if (trialQuoteUnavailable.value || quantitySwitching.value || (remoteApiEnabled && !checkoutWalletReadable.value)) return;
   if (trialNeedsTopup.value) { goToTrialTopup(scope); return; }
-  if (checkoutOnboardingRequired.value && !hasLegacyTrialBalance() && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) {
-    toast.warn(t.value.store.coSetupRequired);
-    return;
-  }
   if (dialogsOpen > 0 || checkoutPurchaseChecking.value) return;
   if (step.value === 'select-payment') { goConfirm(); await nextTick(); if (!isCurrentCheckoutRoute(scope)) return; }
   if (step.value === 'confirm' && !checkoutPurchaseChecking.value) await requestConfirmPay();
@@ -2388,11 +2362,6 @@ function goConfirm() {
   if (purchaseUnavailable.value) {
     toast.warn(t.value.store.specUnavailable);
     navTo("/store");
-    return;
-  }
-  if (checkoutOnboardingRequired.value && !hasLegacyTrialBalance() && !createdCheckoutOrder.value && !pendingCheckoutCreate.value) {
-    toast.warn(t.value.store.coSetupRequired);
-    step.value = "select-payment";
     return;
   }
   if (step.value === "pay-instructions" || step.value === "confirm") {
@@ -2786,12 +2755,6 @@ async function onConfirmPay() {
   if (remoteApiEnabled) {
     const recovering = createdCheckoutOrder.value ? false : await resumeServerOrder(recoveryScope);
     if (recovering || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
-    if (checkoutOnboardingRequired.value && !hasLegacyTrialBalance()) {
-      confirming = false;
-      step.value = "select-payment";
-      toast.warn(t.value.store.coSetupRequired);
-      return;
-    }
     // Only a checkout that may use trial credit needs fresh trial authority before payment.
     if (!isConfirmedOrdinaryProduct()) {
       const trialReady = await freeTrial.refreshRemote();
@@ -4202,11 +4165,6 @@ function refreshVisibleCheckout(retryCatalog = false, mode: CheckoutLoadMode = "
     void openTrialOrder(legacyResult.orderNo, captureCheckoutRoute());
     return;
   }
-  if (checkoutSetupReturn) {
-    checkoutSetupReturn = false;
-    if (checkoutRouteInitialized) void initializeCheckout(beginCheckoutRoute(), mode);
-    return;
-  }
   if (activeCheckoutLoad) {
     // An explicit catalog retry may replace the read the initialization owns.
     if (retryCatalog) void refreshProductCatalog(true);
@@ -4456,7 +4414,6 @@ onHide(() => {
   quotedAssignableSlots.value = null;
   checkoutCapacityRefusal.value = null;
   checkoutCapacityTradeinRejection.value = undefined;
-  checkoutOnboardingRequired.value = false;
   checkoutCapacityRead = null;
   if (dialogsOpen > 0) useUI().clearConfirmsBy(dialogOwner);
   // 页面被别的页压住(前向导航)时,让浮动条在上面那页露出这张发票;回来 onShow 再收起。

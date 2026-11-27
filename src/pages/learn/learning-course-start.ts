@@ -1,9 +1,8 @@
 import type { LearningApi, LearningCourse } from "@/api/learning-api";
 import { ApiError, isApiRefusal, type ApiErrorKind } from "@/api/errors";
-import { observationRejectionReason } from "@/lib/day-one-observation-recovery";
 
 export interface LearningCourseStartFailure {
-  reason: "onboarding" | "network" | "unconfirmed";
+  reason: "network" | "unconfirmed";
   kind: ApiErrorKind | "unknown";
   status?: number;
   code?: number;
@@ -48,7 +47,7 @@ export async function loadPublishedCourseWithStart(
     if (!dependencies.isCurrent()) return { kind: "stale" };
     if (isApiRefusal(cause, 404, "LEARNING_COURSE_UNAVAILABLE")) throw cause;
     const failure: LearningCourseStartFailure = {
-      reason: cause instanceof ApiError && cause.kind === "network" ? "network" : observationRejectionReason(cause),
+      reason: cause instanceof ApiError && cause.kind === "network" ? "network" : "unconfirmed",
       kind: cause instanceof ApiError ? cause.kind : "unknown",
       status: cause instanceof ApiError && Number.isFinite(cause.status) ? cause.status : undefined,
       code: cause instanceof ApiError && Number.isFinite(cause.code) ? cause.code : undefined,

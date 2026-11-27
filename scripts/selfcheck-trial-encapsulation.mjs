@@ -274,9 +274,6 @@ const confirmedTrialQuoteVersion = trialView.value.quoteVersion;
 if (remoteApiEnabled) {
   const recovering = createdCheckoutOrder.value ? false : await resumeServerOrder(recoveryScope);
   if (recovering || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
-  if (checkoutOnboardingRequired.value && !freeTrial.hasPendingConversion()) {
-    confirming = false; step.value = "select-payment"; toast.warn(t.value.store.coSetupRequired); return;
-  }
   const trialReady = await freeTrial.refreshRemote();
   if (!trialReady || !isCurrentCheckoutRoute(recoveryScope)) { confirming = false; return; }
 }
