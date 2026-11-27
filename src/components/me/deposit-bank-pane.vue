@@ -191,7 +191,7 @@
       <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning"
         :title="paneView === 'late_review' ? t.bankPane.lateReviewTitle : t.bankPane.receiptReviewTitle"
         :description="paneView === 'late_review' ? t.bankPane.lateReviewBody : t.bankPane.receiptReviewBody" /></view>
-      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.help.contactSupport" @click="goSupport" /></view>
     </template>
 
     <!-- ── 成功(credited)── -->
@@ -468,14 +468,14 @@ const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 // Facts well under the amount: unknown values stay "—", never a fabricated 0.
 const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}\u2060–\u2060${shortUsdt(maxDeposit.value)}\u00A0USDT` : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
-const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemainingLabel.value : "—");
+const todayRemainingFact = computed(() => dailyCapacityKnown.value ? `${shortUsdt(todayRemainingDeposit.value)}\u00A0USDT` : "—");
 const feeFact = computed(() => {
   if (!fx.configReady) return "—";
   if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
   return `${formatAmount(Math.max(fx.feeUsdt, 0))}\u00A0USDT`;
 });
-// Whole numbers for presets and the limit range ("1,000"), keeping cents only when present; the USDT unit is said
-// once, by the amount field and after the range (03 §3.6.1).
+// Whole numbers for presets, the limit range and today's remaining fact ("1,000"), keeping cents only when present; the
+// USDT unit is said once, by the amount field and after the range (03 §3.6.1).
 function shortUsdt(value: number): string { return formatAmount(value).replace(/\.00$/, ""); }
 const quickAmounts = computed(() => [100, 500, 1000, 5000].map(value => ({ value, label: shortUsdt(value),
   enabled: fxUsable.value && !creating.value && !dailyCapacityExhausted.value && value >= minDeposit.value && value <= maxDeposit.value
