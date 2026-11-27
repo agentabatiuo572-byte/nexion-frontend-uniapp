@@ -9,8 +9,10 @@
       :unavailable-reason="unavailableReason || (linkedUnknown ? t.thirdParty.linkedLoading : undefined)" @select="start" />
     <text v-if="linkedUnknown && !unavailableReason" class="oauth-copy">{{ t.thirdParty.linkedLoading }}</text>
     <component :is="sheet && intent === 'LINK' ? NxSheet : 'view'" v-if="flow" :open="!!flow" :title="t.thirdParty.linkTitle" :class="sheet ? 'oauth-panel-sheet' : 'oauth-panel'"
-      :close-locked-by="submitting ? 'oauth-exit-reason' : undefined" aria-live="polite" @close="cancelFromUser">
-      <text class="oauth-copy">{{ verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
+      :close-locked-by="submitting ? 'oauth-panel-status' : undefined" aria-live="polite" @close="cancelFromUser">
+      <!-- The panel's status line. While submitting it says why 取消 and the sheet's close wait (03 §3.1: the reason may sit in
+           the panel above the button); swapping its text keeps every control in place and in view. -->
+      <text id="oauth-panel-status" class="oauth-copy">{{ submitting ? t.thirdParty.submitLocked : verified ? t.thirdParty.confirmIdentity : t.thirdParty.browserPrompt }}</text>
       <text v-if="verified" class="oauth-identity">{{ label(selected) }} · {{ displayName }}</text>
       <!-- The security sheet is not a short sign-in flow, so the field keeps a visible label (03 §3.3). -->
       <text v-if="verified && intent === 'LINK'" class="oauth-label">{{ t.security.currentPassword }}</text>
@@ -30,10 +32,7 @@
         :class="{ 'oauth-reason--off': !completionReason || submitting }"
         :aria-hidden="completionReason && !submitting ? undefined : 'true'">{{ completionReason }}</text>
       <NxButton class="oauth-action" variant="secondary" :label="t.ui.cancel" :disabled="submitting"
-        :aria-describedby="submitting ? 'oauth-exit-reason' : undefined" @click="cancelFromUser" />
-      <!-- While submitting, 取消 and the sheet's close wait; the line under 取消 says why (mask, Esc and back keep the same guard
-           in cancelFromUser). It is added below the last button, so nothing above it moves. -->
-      <text v-if="submitting" id="oauth-exit-reason" class="oauth-reason">{{ t.thirdParty.submitLocked }}</text>
+        :aria-describedby="submitting ? 'oauth-panel-status' : undefined" @click="cancelFromUser" />
     </component>
     <!-- The host page owns recovery of an unknown sign-in result. -->
     <text v-if="message" class="oauth-copy" role="status">{{ message }}</text>
