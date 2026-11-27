@@ -147,7 +147,7 @@ export const demoOptions = {
   supportReadbackState:[['missing','查无原命令（404）'],['sent','原命令已发出'],['cleared','原命令已发出 · 历史已清空'],['rejected','明确没发出（REJECTED）']],
   machineImageState:[['normal','原活动机型'],['banner','后台自定义活动海报'],['missing-main','主购缺图（赠品保持原位）'],['missing','目录未发布图片'],['broken','图片加载失败']],
   quotaState:[['unconfigured','无启用档'],['pending','待审'],['approved','已批准'],['catalog-error','档位商品不可用']],
-  catalogState:[['phased','完整目录（含即将上线）'],['sku-series','同系列两件商品'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro'],['trial-h2-yield-updated','S1 日收益已更新']],
+  catalogState:[['phased','完整目录（含即将上线）'],['sku-series','S1 系列多件商品（含一件规格不全）'],['available','全部 SKU 可购'],['soldout','S1 E1 名额售罄'],['outofstock','S1 实物缺货'],['restricted','购买条件未满足'],['trial-h2-switched','试用机型已从 S1 切换到 Pro'],['trial-h2-yield-updated','S1 日收益已更新']],
   taskState:[['pending','任务进行中'],['complete','全部完成·待领取'],['claimed','奖励已领取'],['expired','任务已过期'],['empty','暂无任务'],['legacy','任务信息待补全']],
   wheelState:[['closed','未开放'],['open','开放八档奖池']],
   eventState:[['mixed','全部活动状态'],['available','可参与'],['joined','已参与'],['claimable','奖励待领取'],['claimed','奖励已领取'],['upcoming','即将开始'],['ended','已结束'],['empty','暂无活动']],
@@ -358,13 +358,18 @@ function demoHardwareQuota(product,state,points,now){
     perks:[],available:product.available&&remaining>0};
 }
 
+function demoPurchaseBlock(product) {
+  if(product.purchaseBlockedReason==='PRODUCT_SPECS_UNAVAILABLE')return product.purchaseBlockedReason;
+  return product.releaseState!=='AVAILABLE'?'PRODUCT_NOT_RELEASED':null;
+}
+
 function demoE1PurchaseRule(state,product,now,checkLiveQuota=true,skipPurchaseGate=false) {
   const required=!skipPurchaseGate&&product.purchaseGate?.enforce?product.purchaseGate.rankMin:0;
   const current=required?demoH4Account(state,now).rank:0;
   const gap=Math.max(0,required-current);
   const soldOut=!skipPurchaseGate&&checkLiveQuota&&state.catalogState==='soldout'&&product.id==='stellarbox-s1';
-  const decisionCode=!product.available?'PRODUCT_NOT_RELEASED':soldOut?'PURCHASE_GATE_SOLD_OUT':
-    gap>0?'PURCHASE_GATE_NOT_MET':'ELIGIBLE';
+  const decisionCode=demoPurchaseBlock(product)??(soldOut?'PURCHASE_GATE_SOLD_OUT':
+    gap>0?'PURCHASE_GATE_NOT_MET':'ELIGIBLE');
   const conditions=required?[{kind:'rank',required,current,gap,met:gap===0}]:[];
   if(soldOut)conditions.push({kind:'lifetimeQuota',required:product.sold,current:product.sold,gap:0,met:false});
   return {policy:'E1',eligible:decisionCode==='ELIGIBLE',decisionCode,mode:'ALL',conditions};
@@ -1532,7 +1537,8 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
       if(input.policyVersion!==1)refuse('BUNDLE_DISCOUNT_POLICY_STALE');
       if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('BUNDLE_PRODUCT_NOT_AVAILABLE');
     }else{
-      if(lineProducts.some(p=>!p.available))refuse('PRODUCT_NOT_RELEASED');
+      const purchaseBlock=lineProducts.map(demoPurchaseBlock).find(Boolean);
+      if(purchaseBlock)refuse(purchaseBlock);
       if(lineProducts.some((p,i)=>p.inventoryMode==='FINITE'&&p.stock<lines[i].quantity))refuse('PRODUCT_OUT_OF_STOCK');
       if(quote){
         if(lineProducts.some(p=>!demoE1PurchaseRule(state,p,now).eligible))refuse('PURCHASE_GATE_BLOCKED');
