@@ -1,10 +1,10 @@
 <template>
-  <view v-if="providers?.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
+  <view v-if="providersLoading || providers?.length || intent === 'LINK'" class="third-party-auth" data-testid="third-party-auth">
     <text class="oauth-title">{{ intent === "LINK" ? t.thirdParty.linkTitle : t.thirdParty.signInTitle }}</text>
     <text v-if="intent === 'LINK' && providers?.length === 0" class="oauth-copy">{{ t.thirdParty.unavailable }}</text>
-    <!-- LINK reads two lists and recovers them silently (03 §3.4, §3.5.2). First read with both unknown: placeholder tiles of
-         the final size. Bound list still unknown: the tiles stay greyed and the line below says when binding opens. -->
-    <AuthProviderGrid v-if="labels.length || listsLoading" :providers="labels" :linked="linkedLabels" :placeholders="listsLoading ? providerCount : 0"
+    <!-- Keep the placeholder grid until available providers are known (03 §3.4, §3.5.2).
+         If LINK is still waiting on its linked list, keep the provider tiles disabled with the reason below. -->
+    <AuthProviderGrid v-if="labels.length || providersLoading" :providers="labels" :linked="linkedLabels" :placeholders="providersLoading ? providerCount : 0"
       :busy="!!flow || submitting || providersDisabled" :preserve-appearance="providersDisabled && !flow && !submitting && !unavailableReason && !linkedUnknown"
       :unavailable-reason="unavailableReason || (linkedUnknown ? t.thirdParty.linkedLoading : undefined)" @select="start" />
     <text v-if="linkedUnknown && !unavailableReason" class="oauth-copy">{{ t.thirdParty.linkedLoading }}</text>
@@ -112,11 +112,14 @@ const showCaptcha = ref(false);
 const names = { GOOGLE: "Google", APPLE: "Apple", TELEGRAM: "Telegram" } as const;
 const label = (provider: ThirdPartyProvider) => names[provider];
 const providerCount = Object.keys(names).length;
-const listsLoading = computed(() => props.intent === "LINK" && providers.value === null && linked.value === null);
+const providersLoading = computed(() => providers.value === null);
 const linkedUnknown = computed(() => props.intent === "LINK" && linked.value === null && !!providers.value?.length);
 const linkedLabels = computed(() => props.intent === "LINK" ? (linked.value ?? []).map(label) : []);
-const labels = computed(() => (props.intent === "LINK"
-  ? [...new Set([...(providers.value ?? []), ...(linked.value ?? [])])] : (providers.value ?? [])).map(label));
+const labels = computed(() => {
+  const available = providers.value;
+  if (available === null) return [];
+  return (props.intent === "LINK" ? [...new Set([...available, ...(linked.value ?? [])])] : available).map(label);
+});
 let generation = 0;
 let pollVersion = 0;
 let revision = 0;
