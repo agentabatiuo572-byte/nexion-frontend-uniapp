@@ -37,8 +37,8 @@
         <text id="rg-status-reason" class="rg-status__t">{{ t.register.registrationSignInRequired }}</text>
         <NxButton variant="text" size="small" :label="t.register.signIn" @click="goLogin" />
       </view>
-      <view v-else-if="authApi.pendingLogin()" class="rg-status nx-tint" role="status">
-        <text id="rg-status-reason" class="rg-status__t">{{ t.login.unknownAttempt }}</text>
+      <view v-else-if="registrationResultPending" class="rg-status nx-tint" role="status">
+        <text id="rg-status-reason" class="rg-status__t">{{ blockingStatusReason }}</text>
         <NxButton variant="text" size="small" :label="t.login.recoverAttempt" @click="recoverOriginalLogin" />
       </view>
       <NxTag v-if="modeLabel" class="rg-mode-badge" tone="warning" data-testid="auth-runtime-label">{{ modeLabel }}</NxTag>
@@ -131,6 +131,7 @@
         variant="primary"
         :label="ctaLabel"
         :busy="busy"
+        :disabled="registrationResultPending"
         :aria-disabled="!ctaEnabled || busy"
         :aria-describedby="ctaDescriptionId"
         @click="onCta"
@@ -172,8 +173,8 @@ import { formatAmount } from "@/lib/amount-display";
 import { privacyPolicyHref } from "@/lib/privacy-return";
 import ServerCaptchaSlider from "@/components/server-captcha-slider.vue";
 import { navReset, navTo, takeNavigationQuery } from "@/lib/route";
-import { ref, computed, nextTick, onUnmounted } from "vue";
-import { onLoad, onUnload } from "@dcloudio/uni-app";
+import { ref, computed, nextTick, onUnmounted, watch } from "vue";
+import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import BrandLockup from "@/components/brand-lockup.vue";
 import GlobalUi from "@/components/global-ui.vue";
@@ -342,9 +343,16 @@ const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.va
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
 const oauthBusy = ref(false);
 const busy = computed(() => verifying.value || completing.value || oauthBusy.value || checkingInvite.value);
-const originalRegistrationRecoveryRequired = computed(() => !busy.value && requiresOriginalRegistrationRecovery(authApi,
-  { countryCode: country.value, phone: phoneClean.value }));
-const ctaEnabled = computed(() => !registrationNeedsLogin.value && !originalRegistrationRecoveryRequired.value
+// The durable attempt is pending even while its original POST is in flight.
+const registrationResultPending = ref(false);
+function syncRegistrationResult() {
+  registrationResultPending.value = !busy.value && authApi.pendingLogin();
+}
+onShow(syncRegistrationResult);
+watch(busy, syncRegistrationResult, { immediate: true, flush: "sync" });
+const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
+const waitingToResend = computed(() => step.value === 1 && !otpRequestId.value && resendLeft.value > 0);
+const ctaEnabled = computed(() => !registrationNeedsLogin.value && !registrationResultPending.value && !waitingToResend.value
   && (step.value === 1 ? phoneOk.value : step.value === 2 ? codeOk.value : pwdMatch.value));
 const ctaLabel = computed(() =>
   step.value === 2 && verifiedToken.value
@@ -361,11 +369,13 @@ const ctaLabel = computed(() =>
 );
 const blockingStatusReason = computed(() => {
   if (registrationNeedsLogin.value) return t.value.register.registrationSignInRequired;
-  if (originalRegistrationRecoveryRequired.value) return t.value.login.unknownAttempt;
+  if (registrationResultPending.value) return pendingRegistrationRecovery
+    ? t.value.register.registrationOutcomeUnknown : t.value.login.unknownAttempt;
   return "";
 });
 const ctaDisabledReason = computed(() => {
   if (blockingStatusReason.value) return blockingStatusReason.value;
+  if (waitingToResend.value) return resendInText.value;
   if (step.value === 1) return t.value.register.ctaDisabledPhone;
   if (step.value === 2) return t.value.register.ctaDisabledCode;
   return t.value.register.ctaDisabledPassword;
@@ -377,7 +387,6 @@ const ctaDescriptionId = computed(() => {
   return inlineError.value ? "rg-error" : "rg-cta-reason";
 });
 const showCtaReason = computed(() => ctaDescriptionId.value === "rg-cta-reason");
-const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 function showOauthUnavailable(provider: string) {
   toast.info(fmt(t.value.register.oauthUnavailableTitle, { provider }), t.value.register.oauthUnavailableBody);
 }
@@ -520,7 +529,8 @@ function onCta() {
     return;
   }
   if (!ctaEnabled.value) {
-    error.value = ctaDisabledReason.value;
+    // The existing reason line counts down until a fresh send is possible.
+    error.value = waitingToResend.value ? null : ctaDisabledReason.value;
     return;
   }
   if (step.value === 1) void goSendCode();
@@ -576,6 +586,7 @@ async function requestCode(captchaTicket?: string) {
   if (verifying.value) return;
   devBackendDown.value = false;
   if (step.value === 1 && refreshResend() > 0) {
+    if (!otpRequestId.value) return;
     focusCode();
     step.value = 2;
     return;

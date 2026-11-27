@@ -1,7 +1,8 @@
 // Loopback-only fixtures for sign-in, recovery and the current session.
 import { randomBytes } from 'node:crypto';
-import { clearPreviewAccessToken, demoReferralBuyer, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
-import { demoSecurityAccount } from './prototype-demo-account.mjs';
+import { isResetPasswordOk } from '../../src/auth/password-rules.ts';
+import { clearPreviewAccessToken, demoReferralBuyer, demoPhoneAccessToken, issuePreviewAccessToken, previewAccountId, previewSelectedAccountId } from './prototype-demo-identity.mjs';
+import { changeDemoPassword, demoAccountPasswordMatches, demoSecurityAccount } from './prototype-demo-account.mjs';
 import { createSignInDemo, demoExistingUser as existing, findDemoSignInUser } from './prototype-demo-sign-in.mjs';
 
 export const savedAttemptOptions = ['none', 'registration', 'registration-retry', 'oauth-existing'].map(value => [value, value]);
@@ -14,9 +15,56 @@ const success = data => ({ status: 200, body: { code: 0, message: 'OK', data } }
 const failure = (status, message) => ({ status, body: { code: status, message, data: null } });
 const session = user => ({ refreshToken: null, tokenType: 'Bearer', user });
 
+const resetRoot = '/auth/users/password-reset/otp';
+const providerRoot = '/auth/users/oauth/provider';
+const resetPaths = [resetRoot + '/send', resetRoot + '/verify', resetRoot + '/complete'];
+export const demoAuthorizePrefix = 'https://127.0.0.1/auth/users/oauth/provider/authorize/';
+
 export function createAuthDemo(state) {
   let saved = null;
   const otps = new Map();
+
+  const resetChallenges = new Map();
+  let providerFlow = null;
+
+  function passwordReset(path, body) {
+    const user = findDemoSignInUser(body.countryCode, body.phone);
+    if (path === resetRoot + '/send') {
+      const challengeNo = 'RESET-' + randomBytes(16).toString('hex');
+      if (user) resetChallenges.set(user.userId, challengeNo);
+      return success({ challengeNo, resendAfterSec: 1, deliveryHint: '***' + body.phone.slice(-4) });
+    }
+    if (!user || !body.challengeNo || resetChallenges.get(user.userId) !== body.challengeNo || body.code !== '123456') {
+      return failure(422, 'USER_PASSWORD_RESET_CHALLENGE_INVALID');
+    }
+    if (path === resetRoot + '/verify') return success({ status: 'PASSWORD_RESET_OTP_VERIFIED' });
+    if (typeof body.newPassword !== 'string' || !isResetPasswordOk(body.newPassword, { phone: user.phone })) {
+      return failure(422, 'USER_PASSWORD_RESET_CHALLENGE_INVALID');
+    }
+    if (demoAccountPasswordMatches(state, body.newPassword, user.userId)) return failure(422, 'USER_NEW_PASSWORD_MUST_DIFFER');
+    resetChallenges.delete(user.userId);
+    const accountId = String(user.userId);
+    let { revokedSessionCount } = changeDemoPassword(state, accountId, body.newPassword);
+    if (previewSelectedAccountId(state) === accountId) {
+      state.sessionState = 'signed-out';
+      delete state.authUser;
+      clearPreviewAccessToken(state);
+      revokedSessionCount++;
+    }
+    return success({ status: 'PASSWORD_RESET', revokedSessionCount });
+  }
+
+  function startProvider(body) {
+    // Existing provider buttons select the two local outcomes without switching presets.
+    if (body.intent !== 'LOGIN' || !['GOOGLE', 'TELEGRAM'].includes(body.provider)) {
+      return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
+    }
+    const expiresInSec = 120;
+    const flowId = 'OIDC-' + randomBytes(16).toString('hex');
+    const flowKey = randomBytes(32).toString('base64url');
+    providerFlow = { flowId, flowKey, provider: body.provider, expiresAt: Date.now() + expiresInSec * 1000 };
+    return success({ flowId, flowKey, expiresInSec, authorizationUrl: demoAuthorizePrefix + randomBytes(32).toString('base64url') });
+  }
 
   function issue(data) {
     state.sessionState = 'signed-in';
@@ -39,6 +87,8 @@ export function createAuthDemo(state) {
     reset() {
       saved = null;
       otps.clear();
+      resetChallenges.clear();
+      providerFlow = null;
       signIn.reset();
       delete state.authUser;
       clearPreviewAccessToken(state);
@@ -65,11 +115,19 @@ export function createAuthDemo(state) {
       return attempt;
     },
     handles(path) {
-      return signIn.handles(path) || recoverPath.test(path) || ['/auth/users/refresh', '/auth/users/logout',
+      return signIn.handles(path) || recoverPath.test(path) || resetPaths.includes(path) || [providerRoot + '/start', providerRoot + '/status',
+        '/auth/users/refresh', '/auth/users/logout',
         '/auth/users/register/otp/send', '/auth/users/register/otp/verify', '/auth/users/register'].includes(path);
     },
     handle(path, headers, body) {
       if (signIn.handles(path)) return signIn.handle(path, body);
+      if (resetPaths.includes(path)) return passwordReset(path, body);
+      if (path === providerRoot + '/start') return startProvider(body);
+      if (path === providerRoot + '/status') {
+        if (!providerFlow || body.flowId !== providerFlow.flowId || body.flowKey !== providerFlow.flowKey
+            || Date.now() >= providerFlow.expiresAt) return failure(410, 'OAUTH_FLOW_EXPIRED');
+        return success({ provider: providerFlow.provider, status: 'PENDING', displayName: null });
+      }
       if (path === '/auth/users/logout') {
         state.sessionState = 'signed-out';
         delete state.authUser;

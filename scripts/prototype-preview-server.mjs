@@ -21,7 +21,7 @@ import { createCheckoutFlowFixture } from './lib/checkout-flow-fixture.mjs';
 import { previewPurchaseCashier } from './lib/purchase-payment-preview-fixture.mjs';
 import { recordDemoTaskCancellation } from './lib/prototype-demo-auxiliary.mjs';
 import { createMeEntryDotsFixture } from './lib/me-entry-dots-fixture.mjs';
-import { createAuthDemo } from './lib/prototype-demo-auth.mjs';
+import { createAuthDemo, demoAuthorizePrefix } from './lib/prototype-demo-auth.mjs';
 import { demoTradeinRecovery, tradeinRecoveryStates } from './lib/prototype-demo-tradein-recovery.mjs';
 import { applyDemoOrderTopupScene, demoOrderTopupResponse } from './lib/prototype-demo-order-topup.mjs';
 import { demoRankSalaryCommand, isRankSalaryCommand } from './lib/prototype-demo-rank-salary.mjs';
@@ -102,7 +102,20 @@ let tradeinRecoverySeed;
 // Runs in every App page before the App starts (design rule at demoSeedFleet). It drops the records of another
 // scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
-function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene,recoveryEntries){
+function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene,recoveryEntries,authorizePrefix){
+  // A PENDING preview has no external provider. Keep its reserved popup local until the App closes it.
+  const openPopup=window.open;
+  window.open=function(...args){
+    const popup=openPopup.apply(this,args);
+    if(popup&&args[0]==='about:blank'&&args[1]==='_blank'&&/^#\/pages\/(login\/login|register\/register)(?:\?|$)/.test(location.hash)){
+      // The login component only navigates or closes this reservation in the pending demo.
+      return {
+        close:()=>popup.close(),
+        location:{set href(url){if(!url.startsWith(authorizePrefix))popup.location.href=url;}},
+      };
+    }
+    return popup;
+  };
   // Keep the bank top-up placeholder on its current page.
   window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
   // The app validates the hosted address first. Rewrite it before assigning the iframe's source.
@@ -181,7 +194,7 @@ function selectedSupportAccount(url) {
 function scenarioSeed(url) {
   const sample=state.messageState==='transferred'?selectedSupportAccount(url)?.supportTransferSample:null;
   const recoveryEntries=tradeinRecoverySeed?.accountId===previewSelectedAccountId(state)?tradeinRecoverySeed.entries:[];
-  const scenarioArgs=[scenarioId(),scenarioStorageKeys,previewPurchaseCashier.href,scenarioId()+':'+(state.eventSceneEpoch??0),recoveryEntries];
+  const scenarioArgs=[scenarioId(),scenarioStorageKeys,previewPurchaseCashier.href,scenarioId()+':'+(state.eventSceneEpoch??0),recoveryEntries,demoAuthorizePrefix];
   return '<script>('+previewScenarioPage+')('+scenarioArgs.map(value=>JSON.stringify(value)).join(',')+');'
     +'('+previewTransferOutbox+')('+JSON.stringify(serverRun)+','+JSON.stringify(sample??null)+','+JSON.stringify(demoAccountId)+');</script>';
 }

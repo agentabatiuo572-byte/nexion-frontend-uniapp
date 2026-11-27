@@ -47,6 +47,20 @@ function activeOtherSecuritySessions(state, accountId, security) {
   }).filter(({ session }) => !security.revokedSessionIds?.includes(session.id));
 }
 
+// Both password commands update the credential that the preview sign-in flow reads.
+export function changeDemoPassword(state, accountId, newPassword, commandKey) {
+  const security = demoSecurityAccount(state, accountId);
+  const revokedSessionCount = activeOtherSecuritySessions(state, accountId, security).length;
+  security.passwordChangedAt = new Date().toISOString();
+  security.otherSessionsRevoked = true;
+  const credentials = securityCredentials.get(security) ?? { receipts: new Map() };
+  credentials.digest = passwordDigest(newPassword);
+  securityCredentials.set(security, credentials);
+  const receipt = { passwordChangedAt: security.passwordChangedAt, revokedSessionCount };
+  if (commandKey) credentials.receipts.set(commandKey, receipt);
+  return receipt;
+}
+
 // Java StringUtils.hasText and String.trim use different whitespace sets.
 const javaHasText = value => typeof value === 'string'
   && /[^\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]/.test(value);
@@ -134,8 +148,7 @@ export function accountDemo(url, locale, state, request) {
     const accountId = previewAccountId(state, request.headers());
     if (!accountId) reject('AUTH_REQUIRED', 401);
     const security = demoSecurityAccount(state, accountId);
-    let credentials = securityCredentials.get(security);
-    const previous = credentials?.receipts.get(key);
+    const previous = securityCredentials.get(security)?.receipts.get(key);
     if (passwordReceipt) return previous ?? null;
     const { currentPassword, newPassword } = body();
     if (previous) {
@@ -145,17 +158,7 @@ export function accountDemo(url, locale, state, request) {
     if (typeof newPassword !== 'string' || !isPasswordOk(newPassword)) reject('USER_NEW_PASSWORD_POLICY_REJECTED', 422);
     if (!demoAccountPasswordMatches(state, currentPassword, accountId)) reject('CURRENT_PASSWORD_INVALID', 401);
     if (demoAccountPasswordMatches(state, newPassword, accountId)) reject('USER_NEW_PASSWORD_MUST_DIFFER', 422);
-    const revokedSessionCount = activeOtherSecuritySessions(state, accountId, security).length;
-    security.passwordChangedAt = new Date().toISOString();
-    security.otherSessionsRevoked = true;
-    if (!credentials) {
-      credentials = { digest: initialPasswordDigest, receipts: new Map() };
-      securityCredentials.set(security, credentials);
-    }
-    credentials.digest = passwordDigest(newPassword);
-    const receipt = { passwordChangedAt: security.passwordChangedAt, revokedSessionCount };
-    credentials.receipts.set(key, receipt);
-    return receipt;
+    return changeDemoPassword(state, accountId, newPassword, key);
   }
   if (path === '/api/app/security/account-deletion' || path === '/api/app/security/account-deletion/cancel') {
     if (method === 'GET' && state.securityReadFailure === 'deletion') reject('DEMO_SECURITY_READ_UNAVAILABLE', 503);
