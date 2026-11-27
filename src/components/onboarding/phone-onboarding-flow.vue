@@ -322,7 +322,7 @@ async function acceptCalibration(result: OnboardingCalibration, options: ReturnT
     await waitForDial();
     if (!options.isCurrent()) return;
   }
-  if (!isEstimate.value && phase.value === "calibrating" && readOnlyWait.value) startEntrance("read");
+  // A calibration already made shows its result at rest: the dial animates only while it really measures.
   phase.value = "result";
 }
 
