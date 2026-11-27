@@ -30,6 +30,7 @@ export interface Product {
   tier: "Entry" | "Pro" | "Flagship" | "Share";
   tagline: string;
   catalogRequestLocale?: ServerLanguage;
+  storeSortRank?: number;
   badge?: string;
   badgeKind?: ProductBadgeKind | null;
   // 🔴 全部服务端显示规格一律可选:后端字段可空(运营在后台表单留空即不下发)。

@@ -391,9 +391,12 @@ const restProducts = computed(() =>
   unlockedProducts.value.filter((p) => p.id !== featured.value?.id),
 );
 
-const catalogProducts = computed(() => focusFeatured.value
-  ? [focusFeatured.value, ...unlockedProducts.value.filter(p => p.id !== focusFeatured.value?.id)]
-  : unlockedProducts.value);
+const catalogProducts = computed(() => {
+  const products = [...unlockedProducts.value].sort((a, b) =>
+    (a.storeSortRank ?? Number.MAX_SAFE_INTEGER) - (b.storeSortRank ?? Number.MAX_SAFE_INTEGER));
+  const focused = focusFeatured.value;
+  return focused ? [focused, ...products.filter(product => product.id !== focused.id)] : products;
+});
 
 function retryCatalog() {
   void refreshProductCatalog(true);

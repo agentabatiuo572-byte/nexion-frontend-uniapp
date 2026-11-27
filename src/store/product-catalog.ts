@@ -234,7 +234,7 @@ function readProductCatalog(force: boolean, languageOnly: boolean): Promise<bool
       retryAt = 0;
       const signature = JSON.stringify({
         ...snapshot,
-        products: snapshot.products.map(({ tagline, catalogRequestLocale, ...product }) => product),
+        products: snapshot.products.map(({ tagline, catalogRequestLocale, storeSortRank, ...product }) => product),
       });
       // A subtitle-only change does not invalidate purchase or quote context.
       const published = signature === publishedCatalogSignature || publishCatalogRuntime();
