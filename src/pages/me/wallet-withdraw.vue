@@ -198,7 +198,7 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
         </view>
-        <text class="wd-fee__v">−${{ formatAmount(networkConfirmUsd) }}</text>
+        <text class="wd-fee__v">−${{ formatTruncatedAmount(networkConfirmUsd) }}</text>
       </view>
       </template>
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关)。🔴 费率不可用时整块隐藏:凡是吃费用数据的区块都挂 feeConfigUsable 门。 -->
@@ -233,11 +233,11 @@
       <template v-if="withdrawalPolicyCurrent && feeDetailReady">
         <view v-if="nexBurned > 0" class="wd-fee__r">
           <text class="wd-k wd-k--brand">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="wd-fee__v wd-fee__v--brand">+${{ formatAmount(feeWaived) }} · {{ fmtNex(nexBurned) }} UVT</text>
+          <text class="wd-fee__v wd-fee__v--brand">+${{ formatTruncatedAmount(feeWaived) }} · {{ fmtNex(nexBurned) + '\u00A0UVT' }}</text>
         </view>
         <view v-if="offsetWithNex" class="wd-fee__r">
           <text class="wd-k">{{ t.walletV3.feeCharged }}</text>
-          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">${{ formatAmount(fee) }}</text>
+          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">${{ formatTruncatedAmount(fee) }}</text>
         </view>
         <view class="wd-fee__r wd-fee__r--net">
           <text class="wd-k">{{ t.wallet.receiveLabel }}</text>
@@ -1050,8 +1050,8 @@ const offsetHintText = computed(() => {
   if (fee.value <= 0.0001) return fmt(t.value.walletV3.feeOffsetOnFull, { nex: fmtNex(nexBurned.value) });
   return fmt(t.value.walletV3.feeOffsetOnPartial, {
     nex: fmtNex(nexBurned.value),
-    waived: formatAmount(feeWaived.value),
-    rest: formatAmount(fee.value),
+    waived: formatTruncatedAmount(feeWaived.value),
+    rest: formatTruncatedAmount(fee.value),
   });
 });
 /** 费用说明半屏开合。 */
