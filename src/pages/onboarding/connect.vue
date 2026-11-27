@@ -291,6 +291,16 @@ async function acceptCalibration(result: OnboardingCalibration, options: ReturnT
     phase.value = "error";
     return;
   }
+  // The entrance starts from the read-wait dial, which stays hidden until its first measure: the result waits for it (bounded,
+  // and without an entrance if the measure is late) so the bar never turns live over an empty centre.
+  if (!dialReady.value) {
+    await new Promise<void>((resolve) => {
+      const done = () => { clearTimeout(timer); stop(); resolve(); };
+      const timer = setTimeout(done, 1500);
+      const stop = watch(dialReady, (ready) => { if (ready) done(); });
+    });
+    if (!options.isCurrent()) return;
+  }
   phase.value = "result";
 }
 
@@ -654,7 +664,7 @@ const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia
 watch(phase, (next, previous) => {
   if (enterTimer) clearTimeout(enterTimer);
   enterTimer = null;
-  if (next === "result" && previous === "calibrating" && !reducedMotion()) {
+  if (next === "result" && previous === "calibrating" && dialReady.value && !reducedMotion()) {
     enterFrom.value = readOnlyWait.value ? "read" : "scan";
     if (enterFrom.value === "scan") sweepAt.value = Math.round((Date.now() - scanStartedAt) % SWEEP_MS / SWEEP_MS * 360);
     entering.value = true;
