@@ -56,8 +56,8 @@ async function update(changes,reload=true) {
     const href='/?nx_device=off&previewOrder='+encodeURIComponent(topup.orderNo)+'#/pages/me/wallet-topup?'+query;
     if(frame.contentWindow.location.href===new URL(href,location.href).href)frame.contentWindow.location.reload();
     else frame.src=href;
-  }else if(changes.topupState==='credited'){
-    const href='/?nx_device=off&previewBankTopup=credited#/pages/me/wallet-topup?channel=bank';
+  }else if(['credited','expired','mismatch'].includes(changes.topupState)){
+    const href='/?nx_device=off&previewBankTopup='+changes.topupState+'#/pages/me/wallet-topup?channel=bank';
     if(frame.contentWindow.location.href===new URL(href,location.href).href)frame.contentWindow.location.reload();
     else frame.src=href;
   }else if(reload)frame.contentWindow.location.reload();

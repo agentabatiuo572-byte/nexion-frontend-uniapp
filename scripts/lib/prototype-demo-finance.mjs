@@ -266,12 +266,15 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     const bank=state.bankTopupDemo??={items:[],commands:{}};
     if(!bank.seeded){
       bank.seeded=true;
-      if(!empty&&['paying','credited'].includes(state.topupState)){
-        const settling=state.topupState==='credited',created=now-28000;
-        bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:500*bankFx.quoteRateVndPerUsdt,
-          status:'awaiting_payment',expiresAt:new Date(created+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:new Date(created).toISOString(),
+      if(!empty&&['paying','credited','expired','mismatch'].includes(state.topupState)){
+        const settling=state.topupState==='credited',expiring=state.topupState==='expired',mismatch=state.topupState==='mismatch';
+        const lockMs=bankFx.lockWindowMinutes*60000;
+        // The pane adopts a live order and shows expiry when its normal read sees that order expire.
+        const created=expiring?now+1000-lockMs:now-28000,vndAmount=500*bankFx.quoteRateVndPerUsdt;
+        bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount,
+          status:mismatch?'mismatch_review':'awaiting_payment',expiresAt:new Date(created+lockMs).toISOString(),createdAt:new Date(created).toISOString(),
           creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:0,paymentMode:'hosted',providerStatus:settling?'pending':'created',
-          ...(settling?{}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})});
+          ...(mismatch?{receivedVnd:vndAmount-bankConfig.toleranceVnd-1000}:settling?{}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})});
         if(settling)bank.settlingPreset=bank.items[0].intentNo;
       }
     }else if(method==='GET'&&bank.settlingPreset){
