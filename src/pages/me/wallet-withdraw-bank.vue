@@ -121,7 +121,6 @@
                 <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
                 <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
               </view>
-              <text v-if="amountError" class="error-text" role="alert">{{ amountError }}</text>
             </view>
           </view>
           <view v-if="displayConfig.capacity && app.user.usdtBalance < 0" class="note note--debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ format(useTranslations.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
@@ -136,7 +135,7 @@
         </template>
         <view v-if="error || (!quote && displayConfig.enabled && (!displayConfig.policy || !displayConfig.capacity))" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
-        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary }" />
+        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
       </template>
       <template v-else-if="requestedOrder === null && !pendingAttempt">
         <text class="screen-title" role="heading" aria-level="1">{{ title }}</text>
@@ -170,7 +169,11 @@
           <view class="action secondary nx-tray-text" role="button" tabindex="0" :aria-disabled="busy" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ displayConfig.beneficiary ? c.changeAccount : c.addAccount }}</text></view>
           <view v-if="displayConfig.beneficiary" class="action primary" role="button" tabindex="0" data-testid="bank-continue" :aria-disabled="busy || !canContinue" @click="continueWithdrawal" @keydown.enter.prevent="continueWithdrawal" @keydown.space.prevent="continueWithdrawal"><text>{{ c.continueWithdrawal }}</text></view>
         </template>
-        <view v-else class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="busy || !canContinue || !!amountProblem" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
+        <template v-else>
+          <!-- Grey 「获取报价」: its reason above it (03 §3.1 bottom bar); the amount field no longer repeats it. -->
+          <text v-if="quoteReason" class="nx-tray-note" role="status" data-testid="bank-quote-reason">{{ quoteReason }}</text>
+          <view class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="busy || !canContinue || !!amountProblem" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
+        </template>
       </view>
     </template>
     <!-- 提现说明:只读时一个「确认」;确认提现时同一个弹窗,「确认提现」按原流程提交,「取消」回到报价(勾选保留)。
@@ -307,10 +310,12 @@ const quoteRatio = computed(() => {
 const secondsLeft = computed(() => Math.max(0, Math.ceil(((parseServerTimestamp(quote.value?.expiresAt) ?? 0) - now.value) / 1000)));
 const title = computed(() => quote.value ? c.value.confirmTitle : formStep.value === "amount" ? c.value.amountTitle : c.value.recipientTitle);
 const feeNote = computed(() => displayConfig.value?.policy ? format(c.value.feeNote, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
-const amountError = computed(() => {
+// Why 「获取报价」 is grey. A silent re-read keeps the values on screen; any other read shows no reason until it ends.
+const quoteReason = computed(() => {
+  if (busy.value && !silentRead.value) return "";
   const problem = silentRead.value ? bankAmountError(amount.value, displayConfig.value) : amountProblem.value;
-  if (!amount.value || !problem) return "";
-  return c.value.amountErrors[problem];
+  if (!problem) return "";
+  return problem === "format" && !amount.value.trim() ? useTranslations.value.walletV3.submitReasonAmountRequired : c.value.amountErrors[problem];
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
 // ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
@@ -621,8 +626,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .bank-name { font-size: var(--ui-type-body); }
 .chip { display: inline-block; border-radius: 999px; background: var(--v5-surface-2); color: var(--v5-brand); padding: 4px 10px; font-size: 12px; }
 .notice { border-left: 2px solid var(--v5-warning); padding-left: 12px; color: var(--v5-ink-2); font-size: 12px; line-height: 1.7; margin: 20px 0; }
-.danger, .error-text { color: var(--v5-danger); }
-.error-text { display: block; font-size: 12px; margin-top: 10px; }
+.danger { color: var(--v5-danger); }
 .warn { color: var(--v5-warning); }
 .action { min-height: 50px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 20px; border-radius: 999px; font-size: var(--ui-type-button); font-weight: 600; cursor: pointer; box-sizing: border-box; }
 .primary { background: var(--v5-brand); color: var(--v5-on-brand); margin-top: 24px; }
@@ -739,6 +743,9 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }
+/* A reason above the button makes the tray taller: up to two note lines over the 48 button (04 §4.0 clearance). */
+.bar-space--note { height: 150px; }
+.bar > .nx-tray-note { flex: 1 1 100%; }
 /* Buttons size to their words so no label wraps; when two labels cannot share one row (long languages at 360), the bar stacks them. */
 .bar { position: absolute; z-index: 36; display: flex; flex-wrap: wrap; }
 .bar .action { flex: 1 1 0; min-width: max-content; min-height: 48px; margin: 0; padding: 0 16px; font: 500 15px/20px var(--font-v5); }
