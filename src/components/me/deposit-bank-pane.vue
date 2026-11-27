@@ -1088,10 +1088,12 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-done::before { content: ""; position: absolute; left: 50%; top: 70px; width: 300px; height: 180px; margin-left: -150px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--v5-success) 20%, transparent), transparent); pointer-events: none; }
 .nx-bank-done__medal { position: relative; width: 88px; height: 88px; display: grid; place-items: center; border-radius: 50%; background: var(--v5-success-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v5-success) 35%, transparent); animation: nx-viz-pop 520ms cubic-bezier(.2,1.4,.4,1) 120ms both; }
 .nx-bank-done__medal::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 2px solid var(--v5-success); opacity: 0; animation: nx-bank-ring-out 900ms 620ms ease-out both; }
-.nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: 600 20px/28px var(--font-v5); }
-.nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-success-ink); font: 500 36px/44px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 14px/16px var(--font-v5); letter-spacing: 0; }
-.nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
+.nx-bank-done__title { position: relative; display: block; margin-top: 20px; color: var(--v5-ink); font: var(--ui-type-hero-title-weight) var(--ui-type-hero-title)/var(--ui-type-hero-title-lh) var(--font-v5); }
+/* The credited amount is the result's main amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38) at 500 (01.2), in
+   main ink; success colour is for status only (01 §1.1.1 rule 4). Unit max(12px, .4em), 500, secondary ink (01.2). */
+.nx-bank-done__amt { position: relative; display: block; margin-top: 10px; color: var(--v5-ink); font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-bank-done__unit { margin-left: 2px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); letter-spacing: 0; }
+.nx-bank-done__line { position: relative; display: block; margin-top: 8px; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); }
 .nx-bank-sum--done { margin-top: 24px; }
 .nx-bank-sum--done .nx-bank-sum__v { font: 500 14px/20px var(--font-v5); }
 @keyframes nx-bank-ring-out { 0% { opacity: .55; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.14); } }
