@@ -2811,6 +2811,7 @@ export const ru: Messages = {
     trackFailedBody: "Вывод не завершён. Обратитесь в поддержку.",
     trackEtaPending: "Ожидается в течение {n} ч",
     trackExpectedAt: "Ожидаемое время обработки: {time}",
+    trackExpectedArrivalDate: "Ожидается зачисление {date}",
     trackEtaTitlePending: "В обработке",
     trackArrivedAt: "Зачислено {time}",
     trackContactSupport: "Поддержка",

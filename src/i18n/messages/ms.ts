@@ -2811,6 +2811,7 @@ export const ms: Messages = {
     trackFailedBody: "Pengeluaran tidak selesai. Sila hubungi khidmat pelanggan.",
     trackEtaPending: "Dijangka dalam {n} jam",
     trackExpectedAt: "Anggaran masa pemprosesan: {time}",
+    trackExpectedArrivalDate: "Dana dijangka dikreditkan pada {date}",
     trackEtaTitlePending: "Diproses",
     trackArrivedAt: "Diterima {time}",
     trackContactSupport: "Hubungi bantuan",

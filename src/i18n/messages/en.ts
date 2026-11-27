@@ -2393,6 +2393,7 @@ rankBenefits: "View rank benefits",
     trackFailedBody: "Withdrawal not completed. Please contact support.",
     trackEtaPending: "Expected within {n} hours",
     trackExpectedAt: "Estimated processing time: {time}",
+    trackExpectedArrivalDate: "Expected to arrive on {date}",
 
     trackEtaTitlePending: "Processing",
 

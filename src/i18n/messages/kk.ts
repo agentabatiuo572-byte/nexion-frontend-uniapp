@@ -2811,6 +2811,7 @@ export const kk: Messages = {
     trackFailedBody: "Шығару аяқталмады. Қолдау қызметіне жазыңыз.",
     trackEtaPending: "{n} сағат ішінде күтіледі",
     trackExpectedAt: "Болжамды өңдеу уақыты: {time}",
+    trackExpectedArrivalDate: "Қаражат {date} күні түседі деп күтіледі",
     trackEtaTitlePending: "Өңделуде",
     trackArrivedAt: "Түсті: {time}",
     trackContactSupport: "Қолдауға жазу",
