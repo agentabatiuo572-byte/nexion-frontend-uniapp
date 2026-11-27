@@ -65,14 +65,14 @@
         </view>
       </view>
 
-      <!-- P-45: withdrawable balance card — amount anatomy ($ and cents in ink-3) plus what is held back. -->
+      <!-- P-45: withdrawable balance card — amount anatomy (cents and the USDT unit in secondary ink) plus what is held back. -->
       <view class="wd-bal mx-4">
         <text class="wd-k">{{ t.wallet.withdrawableLabel }}</text>
-        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt"><text class="wd-cur">$</text>{{ amountParts(formatTruncatedAmount(maxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[1] }}</text></text>
+        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[1] + '\u00A0USDT' }}</text></text>
         <text v-else class="wd-bal__amt">—</text>
         <view v-if="withdrawalFactsDisplayable && heldBuckets" class="wd-locks">
-          <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">${{ formatTruncatedAmount(heldBuckets.review) }}</text></view>
-          <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">${{ formatTruncatedAmount(heldBuckets.locked) }}</text></view>
+          <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">{{ formatTruncatedAmount(heldBuckets.review) + '\u00A0USDT' }}</text></view>
+          <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">{{ formatTruncatedAmount(heldBuckets.locked) + '\u00A0USDT' }}</text></view>
           <text>{{ t.wallet.heldNotYet }}</text>
         </view>
         <view v-if="withdrawalFactsDisplayable && app.user.usdtBalance < 0" class="wd-debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ fmt(t.me.walletDebtNote, { amount: formatGroupedAmount(-app.user.usdtBalance, 6) }) }}</text></view>
@@ -89,7 +89,6 @@
             </view>
           </view>
           <view class="wd-amtrow">
-            <text class="wd-amtrow__cur">$</text>
             <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="remoteSessionReady ? amount : ''" :placeholder="remoteSessionReady ? '0.00' : ''" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
             <text class="wd-amtrow__unit">USDT</text>
           </view>
@@ -198,7 +197,7 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
         </view>
-        <text class="wd-fee__v">−${{ formatTruncatedAmount(networkConfirmUsd) }}</text>
+        <text class="wd-fee__v">−{{ formatTruncatedAmount(networkConfirmUsd) + '\u00A0USDT' }}</text>
       </view>
       </template>
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关)。🔴 费率不可用时整块隐藏:凡是吃费用数据的区块都挂 feeConfigUsable 门。 -->
@@ -233,15 +232,15 @@
       <template v-if="withdrawalPolicyCurrent && feeDetailReady">
         <view v-if="nexBurned > 0" class="wd-fee__r">
           <text class="wd-k wd-k--brand">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="wd-fee__v wd-fee__v--brand">+${{ formatTruncatedAmount(feeWaived) }} · {{ fmtNex(nexBurned) + '\u00A0UVT' }}</text>
+          <text class="wd-fee__v wd-fee__v--brand">+{{ formatTruncatedAmount(feeWaived) + '\u00A0USDT' }} · {{ fmtNex(nexBurned) + '\u00A0UVT' }}</text>
         </view>
         <view v-if="offsetWithNex" class="wd-fee__r">
           <text class="wd-k">{{ t.walletV3.feeCharged }}</text>
-          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">${{ formatTruncatedAmount(fee) }}</text>
+          <text class="wd-fee__v" :class="{ 'wd-fee__v--brand': fee <= 0 }">{{ formatTruncatedAmount(fee) + '\u00A0USDT' }}</text>
         </view>
         <view class="wd-fee__r wd-fee__r--net">
           <text class="wd-k">{{ t.wallet.receiveLabel }}</text>
-          <text class="wd-fee__net"><text class="wd-cur">$</text>{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] }}</text></text>
+          <text class="wd-fee__net">{{ amountParts(formatTruncatedAmount(receive))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(receive))[1] + '\u00A0USDT' }}</text></text>
         </view>
       </template>
       </view>
@@ -1452,12 +1451,12 @@ async function handleSubmit() {
   // 新提现用明细行(ConfirmOptions.rows);重放仍是纯文本说明。
   // The same frozen quote as rows: amount, network fee, UVT offset (only when used), network, address, received.
   const confirmRows = [
-    { label: t.value.walletV3.withdrawRowAmount, value: `$${formatTruncatedAmount(snap.amount)}\u00A0USDT` },
-    { label: t.value.walletV3.feeConfirmRow, value: `−$${formatTruncatedAmount(snap.quote.networkConfirmUsd)}` },
-    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+$${formatTruncatedAmount(snap.quote.feeWaived)} · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
+    { label: t.value.walletV3.withdrawRowAmount, value: `${formatTruncatedAmount(snap.amount)}\u00A0USDT` },
+    { label: t.value.walletV3.feeConfirmRow, value: `−${formatTruncatedAmount(snap.quote.networkConfirmUsd)}\u00A0USDT` },
+    ...(snap.quote.nexBurned > 0 ? [{ label: t.value.walletV3.feeOffsetRow, value: `+${formatTruncatedAmount(snap.quote.feeWaived)}\u00A0USDT · ${fmtNex(snap.quote.nexBurned)}\u00A0UVT` }] : []),
     { label: t.value.wallet.networkLabel, value: ALL_NETWORKS.find((nw) => nw.id === snap.network)!.label },
     { label: t.value.wallet.withdrawAddressLabel, value: maskAddressMid(snap.address), fullCode: snap.address },
-    { label: t.value.wallet.receiveLabel, value: `$${formatTruncatedAmount(snap.quote.netReceive)}`, amount: true },
+    { label: t.value.wallet.receiveLabel, value: `${formatTruncatedAmount(snap.quote.netReceive)}\u00A0USDT`, amount: true },
   ];
   // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
   // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,

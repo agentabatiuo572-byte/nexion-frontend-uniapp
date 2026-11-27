@@ -36,7 +36,7 @@
           <view class="tr-ticket">
             <view class="tr-tk">
               <view class="tr-row1"><text class="tr-k">{{ t.wallet.trackAmountLabel }}</text><text class="tr-tag" :class="`tr-tag--${statusTone}`">{{ statusTag }}</text></view>
-              <text class="tr-amt"><text class="tr-cur">$</text>{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] }}</text></text>
+              <text class="tr-amt">{{ amountParts[0] }}<text class="tr-dec">{{ amountParts[1] + '\u00A0USDT' }}</text></text>
               <text class="tr-note">{{ viaLine }}</text>
               <NxCodeValue class="tr-addr" :value="wd.address" :label="t.wallet.withdrawAddressLabel" />
               <view class="tr-id"><text class="tr-k">{{ t.bankWithdrawal.orderNumber }}</text><NxCodeValue class="tr-id__v" :value="wd.id" :label="t.bankWithdrawal.orderNumber" fill /></view>

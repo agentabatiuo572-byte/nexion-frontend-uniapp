@@ -494,13 +494,13 @@ const inRange = computed(() =>
 );
 
 function usdtLabel(value: number): string {
-  return `$${formatAmount(value)}`;
+  return `${formatAmount(value)}\u00A0USDT`;
 }
 function fmtVnd(value: number): string { return `${formatAmount(value, "VND")} ₫`; }
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 // Facts well under the amount: unknown values stay "—", never a fabricated 0.
-const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}–${shortUsdt(maxDeposit.value)}` : "—");
+const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}–${shortUsdt(maxDeposit.value)}\u00A0USDT` : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
 const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemainingLabel.value : "—");
 const feeFact = computed(() => {
@@ -508,8 +508,9 @@ const feeFact = computed(() => {
   if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return fmtVnd(fx.feeVnd);
   return `${formatAmount(Math.max(fx.feeUsdt, 0))} USDT`;
 });
-// Whole-dollar labels for presets and limits ("$1,000"), keeping cents only when present.
-function shortUsdt(value: number): string { return usdtLabel(value).replace(/\.00$/, ""); }
+// Whole numbers for presets and the limit range ("1,000"), keeping cents only when present; the USDT unit is said
+// once, by the amount field and after the range (03 §3.6.1).
+function shortUsdt(value: number): string { return formatAmount(value).replace(/\.00$/, ""); }
 const quickAmounts = computed(() => [100, 500, 1000, 5000].map(value => ({ value, label: shortUsdt(value),
   enabled: fxUsable.value && !creating.value && !dailyCapacityExhausted.value && value >= minDeposit.value && value <= maxDeposit.value
     && (!dailyCapacityKnown.value || value <= todayRemainingDeposit.value) })));

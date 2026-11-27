@@ -104,10 +104,10 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 const ui = useUI();
 const t = useT();
 // Last enqueued confirm renders on top (LIFO), matching the original.
-// "$999.00" → ["$", "999", ".00"] so the currency sign and cents can sit in ink-3 (amount anatomy).
+// Preserve the existing amount parts and keep any trailing unit with the cents.
 function amountAnatomy(value: string): [string, string, string] {
-  const match = /^(\$?)(.*?)(\.\d+)?$/.exec(value);
-  return match ? [match[1], match[2], match[3] ?? ""] : ["", value, ""];
+  const match = /^(\$?)(.*?)(\.\d+)?(\s[A-Z]+)?$/.exec(value);
+  return match ? [match[1], match[2], (match[3] ?? "") + (match[4] ?? "")] : ["", value, ""];
 }
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
 const PAYMENT_RESUME_ENTRY_ROUTES: Record<string, true> = {
