@@ -66,10 +66,11 @@
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
               <text class="slab__amt">{{ usdt2(quote.amountUsdt).replace(/\.\d*$/, "") }}<text class="slab__dec">{{ usdt2(quote.amountUsdt).replace(/^[^.]*/, "") }}</text><text class="slab__unit">{{ '\u00A0' }}USDT</text></text>
-              <!-- Balance and single limit on two lines, as on the amount step, so the range never breaks at its dash. -->
-              <view v-if="displayConfig.policy && displayConfig.capacity" class="limits">
-                <text>{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
-                <text>{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
+              <!-- Balance and single limit on two lines, as on the amount step, so the range never breaks at its dash. Limits that
+                   came back missing keep their lines with 「—」 while the system re-reads them (03 §3.4, §3.5.2). -->
+              <view class="limits">
+                <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: displayConfig.capacity ? usdt2(displayConfig.capacity.maxWithdrawableUsdt) : "—" }) }}</text>
+                <text v-if="displayConfig.policy" data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
               </view>
             </view>
           </view>
@@ -94,7 +95,7 @@
               <text class="hint">{{ c.feeIncluded }}</text>
             </view>
           </view>
-          <text v-if="displayConfig.capacity" class="hint pad">{{ format(c.dailyLabel, { remaining: displayConfig.capacity.dailyRemainingCount, total: displayConfig.capacity.dailyLimitCount }) }}</text>
+          <text class="hint pad" data-testid="bank-daily">{{ format(c.dailyLabel, { remaining: displayConfig.capacity?.dailyRemainingCount ?? "—", total: displayConfig.capacity?.dailyLimitCount ?? "—" }) }}</text>
           <view v-if="!quoteExpired" class="consent" role="checkbox" tabindex="0" data-testid="bank-consent" :aria-checked="accepted" :aria-disabled="busy" @click="toggleConsent" @keydown.enter.prevent="toggleConsent" @keydown.space.prevent="toggleConsent"><view class="checkbox" :class="{ checked: accepted }" aria-hidden="true"><svg v-if="accepted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></view><text>{{ c.consent }}</text></view>
           <text class="hint pad">{{ c.confirmNotice }}</text>
           <NxButton class="page-text-action nx-reverse-action" variant="text" size="small" :label="c.backToAmount" data-testid="bank-abandon" :disabled="busy" @click="abandon" />
@@ -789,7 +790,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 /* P-45 bank withdrawal: physical bank card, compact account row, amount on glass, quote ticket, fixed actions. */
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
-.hint { display: block; margin-top: 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
+.hint { display: block; margin-top: 4px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .hint.pad { margin: 12px 4px 0; }
 .bcard { position: relative; display: flex; flex-direction: column; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; overflow: hidden; border-radius: var(--ui-radius-surface); color: color-mix(in srgb, white 96%, transparent);
   --bcard-ok: #9EDC1D; --bcard-warn: #FFCB4D;
@@ -840,7 +841,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .slab__amt .slab__unit { margin-left: 2px; font-size: max(12px, .4em); }
 .slab .amount-input { display: flex; align-items: baseline; gap: 0; margin-top: 4px; padding: 0; border: 0; border-radius: 0; }
 .slab .amount-input input { flex: 0 1 auto; max-width: calc(100% - 48px); height: 48px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.slab .limits { gap: 0; margin-top: 4px; font: 400 12px/18px var(--font-v5); }
+.slab .limits { gap: 0; margin-top: 4px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .daily { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .ticket { position: relative; margin-top: 12px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .ticket__top { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
