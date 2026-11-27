@@ -12,20 +12,29 @@ const registrationReceipt = {
   giftStatus: 'PENDING_REVIEW', giftUsdt: 5, giftNex: 20,
 };
 const success = data => ({ status: 200, body: { code: 0, message: 'OK', data } });
-const failure = (status, message) => ({ status, body: { code: status, message, data: null } });
+const failure = (status, message, data = null) => ({ status, body: { code: status, message, data } });
 const session = user => ({ refreshToken: null, tokenType: 'Bearer', user });
 
 const resetRoot = '/auth/users/password-reset/otp';
 const providerRoot = '/auth/users/oauth/provider';
 const resetPaths = [resetRoot + '/send', resetRoot + '/verify', resetRoot + '/complete'];
 export const demoAuthorizePrefix = 'https://127.0.0.1/auth/users/oauth/provider/authorize/';
+const loginIdentities = { GOOGLE: existing, TELEGRAM: demoReferralBuyer.user };
+const linkableProviders = ['GOOGLE', 'APPLE', 'TELEGRAM'];
 
 export function createAuthDemo(state) {
   let saved = null;
   const otps = new Map();
 
   const resetChallenges = new Map();
-  let providerFlow = null;
+  const providerFlows = new Map();
+
+  function linksFor(accountId) {
+    const accounts = state.oauthDemoLinksByAccount ??= {};
+    return accounts[accountId] ??= Object.entries(loginIdentities)
+      .filter(([, user]) => String(user.userId) === accountId)
+      .map(([provider]) => provider);
+  }
 
   function passwordReset(path, body) {
     const user = findDemoSignInUser(body.countryCode, body.phone);
@@ -54,16 +63,65 @@ export function createAuthDemo(state) {
     return success({ status: 'PASSWORD_RESET', revokedSessionCount });
   }
 
-  function startProvider(body) {
-    // Existing provider buttons select the two local outcomes without switching presets.
-    if (body.intent !== 'LOGIN' || !['GOOGLE', 'TELEGRAM'].includes(body.provider)) {
-      return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
-    }
+  function startProvider(body, headers) {
+    const { intent, provider } = body;
+    const accountId = intent === 'LINK' ? previewAccountId(state, headers) : null;
+    const user = Object.hasOwn(loginIdentities, provider) ? loginIdentities[provider] : null;
+    if (intent === 'LINK') {
+      if (!accountId) return failure(401, 'AUTH_REQUIRED');
+      if (!linkableProviders.includes(provider)) return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
+      if (linksFor(accountId).includes(provider)) return failure(409, 'OAUTH_PROVIDER_ALREADY_LINKED');
+    } else if (intent !== 'LOGIN' || !user) return failure(503, 'OAUTH_PROVIDER_UNAVAILABLE');
+
+    const now = Date.now();
+    for (const [id, flow] of providerFlows) if (flow.expiresAt <= now) providerFlows.delete(id);
     const expiresInSec = 120;
     const flowId = 'OIDC-' + randomBytes(16).toString('hex');
     const flowKey = randomBytes(32).toString('base64url');
-    providerFlow = { flowId, flowKey, provider: body.provider, expiresAt: Date.now() + expiresInSec * 1000 };
-    return success({ flowId, flowKey, expiresInSec, authorizationUrl: demoAuthorizePrefix + randomBytes(32).toString('base64url') });
+    const authorizeKey = randomBytes(32).toString('base64url');
+    const displayName = intent === 'LINK' ? state.authUser?.nickname ?? 'Alex' : user.nickname;
+    providerFlows.set(flowId, { flowId, flowKey, authorizeKey, intent, provider, accountId, user, displayName,
+      expiresAt: now + expiresInSec * 1000 });
+    return success({ flowId, flowKey, expiresInSec, authorizationUrl: demoAuthorizePrefix + authorizeKey });
+  }
+
+  function handleProvider(path, body, headers) {
+    if (path === providerRoot + '/start') return startProvider(body, headers);
+    const flow = providerFlows.get(body.flowId);
+    if (!flow || body.flowKey !== flow.flowKey || Date.now() >= flow.expiresAt)
+      return failure(410, 'OAUTH_FLOW_EXPIRED');
+    if (path === providerRoot + '/status') {
+      return success({ provider: flow.provider, status: flow.consumed ? 'CONSUMED' : flow.receipt ? 'VERIFIED' : 'PENDING',
+        displayName: flow.receipt ? flow.displayName : null });
+    }
+    if (flow.consumed || !flow.receipt || body.receipt !== flow.receipt) return failure(410, 'OAUTH_FLOW_EXPIRED');
+
+    if (path === providerRoot + '/link') {
+      const accountId = previewAccountId(state, headers);
+      if (flow.intent !== 'LINK' || !accountId || accountId !== flow.accountId) return failure(403, 'AUTH_REQUIRED');
+      if (!demoAccountPasswordMatches(state, body.password, accountId)) return failure(403, 'OAUTH_LINK_PASSWORD_INVALID');
+      const linked = linksFor(accountId);
+      if (linked.includes(flow.provider)) return failure(409, 'OAUTH_PROVIDER_ALREADY_LINKED');
+      linked.push(flow.provider);
+      flow.consumed = true;
+      return success(null);
+    }
+
+    if (flow.intent !== 'LOGIN' || body.provider !== flow.provider) return failure(403, 'OAUTH_ACCOUNT_LINK_REQUIRED');
+    const { user } = flow;
+    if (!linksFor(String(user.userId)).includes(flow.provider)) return failure(403, 'OAUTH_ACCOUNT_LINK_REQUIRED');
+    if (!body.challengeNo && !body.code) {
+      const deliveryHint = '****' + user.phone.slice(-4);
+      flow.challengeNo ??= 'OTP-' + randomBytes(16).toString('hex');
+      return failure(428, 'USER_TWO_FACTOR_VERIFICATION_REQUIRED', {
+        accessToken: null, refreshToken: null, tokenType: 'Challenge',
+        user: { ...user, phone: deliveryHint }, challengeNo: flow.challengeNo, deliveryHint,
+      });
+    }
+    if (!flow.challengeNo || body.challengeNo !== flow.challengeNo || body.code !== '123456')
+      return failure(422, 'USER_TWO_FACTOR_CHALLENGE_INVALID');
+    flow.consumed = true;
+    return issueLogin(session(user), body.deviceName);
   }
 
   function issue(data) {
@@ -88,7 +146,7 @@ export function createAuthDemo(state) {
       saved = null;
       otps.clear();
       resetChallenges.clear();
-      providerFlow = null;
+      providerFlows.clear();
       signIn.reset();
       delete state.authUser;
       clearPreviewAccessToken(state);
@@ -114,26 +172,33 @@ export function createAuthDemo(state) {
       saved = { attempt, response, recoverUnavailable: state.savedAttemptState === 'registration-retry' };
       return attempt;
     },
+    linkedProviders(headers) {
+      const accountId = previewAccountId(state, headers);
+      return accountId ? success(linksFor(accountId)) : failure(401, 'AUTH_REQUIRED');
+    },
+    authorizeProvider(key) {
+      const flow = [...providerFlows.values()].find(row => row.authorizeKey === key);
+      if (!flow || flow.consumed || Date.now() >= flow.expiresAt) return null;
+      flow.receipt ??= randomBytes(32).toString('base64url');
+      return { type: 'uvel-oauth', flowId: flow.flowId, receipt: flow.receipt };
+    },
     handles(path) {
-      return signIn.handles(path) || recoverPath.test(path) || resetPaths.includes(path) || [providerRoot + '/start', providerRoot + '/status',
+      return signIn.handles(path) || recoverPath.test(path) || resetPaths.includes(path)
+        || ['/start', '/status', '/link', '/complete'].some(suffix => path === providerRoot + suffix) || [
         '/auth/users/refresh', '/auth/users/logout',
         '/auth/users/register/otp/send', '/auth/users/register/otp/verify', '/auth/users/register'].includes(path);
     },
     handle(path, headers, body) {
       if (signIn.handles(path)) return signIn.handle(path, body);
       if (resetPaths.includes(path)) return passwordReset(path, body);
-      if (path === providerRoot + '/start') return startProvider(body);
-      if (path === providerRoot + '/status') {
-        if (!providerFlow || body.flowId !== providerFlow.flowId || body.flowKey !== providerFlow.flowKey
-            || Date.now() >= providerFlow.expiresAt) return failure(410, 'OAUTH_FLOW_EXPIRED');
-        return success({ provider: providerFlow.provider, status: 'PENDING', displayName: null });
-      }
+      if (path.startsWith(providerRoot + '/')) return handleProvider(path, body, headers);
       if (path === '/auth/users/logout') {
         state.sessionState = 'signed-out';
         delete state.authUser;
         clearPreviewAccessToken(state);
         state.savedAttemptState = 'none';
         saved = null;
+        providerFlows.clear();
         return success(null);
       }
       if (path === '/auth/users/refresh') {

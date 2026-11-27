@@ -103,18 +103,29 @@ let tradeinRecoverySeed;
 // scenario, makes every same-origin request carry this page's scenario, and reloads the page when a reply comes from
 // another scenario or another page has entered one, so a page of an old scenario never acts in the new one.
 function previewScenarioPage(scenario,keys,purchaseCashierPrefix,eventScene,recoveryEntries,authorizePrefix){
-  // A PENDING preview has no external provider. Keep its reserved popup local until the App closes it.
+  // Only the preview translates its validated HTTPS provider address to a loopback page.
   const openPopup=window.open;
   window.open=function(...args){
     const popup=openPopup.apply(this,args);
-    if(popup&&args[0]==='about:blank'&&args[1]==='_blank'&&/^#\/pages\/(login\/login|register\/register)(?:\?|$)/.test(location.hash)){
-      // The login component only navigates or closes this reservation in the pending demo.
-      return {
-        close:()=>popup.close(),
-        location:{set href(url){if(!url.startsWith(authorizePrefix))popup.location.href=url;}},
-      };
+    if(!popup||args[0]!=='about:blank'||args[1]!=='_blank'||!/^#\/pages\/(login\/login|register\/register|me\/security)(?:\?|$)/.test(location.hash))return popup;
+    let providerOrigin;
+    function relay(event){
+      if(!providerOrigin||event.source!==popup||event.origin!==location.origin||event.data?.type!=='uvel-oauth')return;
+      const receipt=new MessageEvent('message',{origin:providerOrigin,data:event.data});
+      Object.defineProperty(receipt,'source',{value:previewPopup});
+      window.dispatchEvent(receipt);
     }
-    return popup;
+    const previewPopup={
+      close(){window.removeEventListener('message',relay);popup.close();},
+      location:{set href(url){
+        if(!url.startsWith(authorizePrefix)){popup.location.href=url;return;}
+        const address=new URL(url);
+        providerOrigin=address.origin;
+        popup.location.href=new URL(address.pathname,location.origin).href;
+      }},
+    };
+    window.addEventListener('message',relay);
+    return previewPopup;
   };
   // Keep the bank top-up placeholder on its current page.
   window.navigation?.addEventListener('navigate',event=>{if(event.destination.url==='https://api.hdpayadmin.com/pay/demo-preview-only')event.preventDefault();});
@@ -211,6 +222,19 @@ const server=http.createServer(async(req,res)=>{
   try {
     const url=new URL(req.url,'http://127.0.0.1:'+server.address().port);
     res.setHeader('Cache-Control','no-store');
+    const oauthAuthorize=/^\/auth\/users\/oauth\/provider\/authorize\/([A-Za-z0-9_-]{43})$/.exec(url.pathname);
+    if(oauthAuthorize&&req.method==='GET'){
+      res.setHeader('Content-Type',mime['.html']);
+      return res.end('<!doctype html><html lang="zh"><meta charset="utf-8"><title>模拟第三方授权</title><form method="post"><button>模拟授权</button></form></html>');
+    }
+    if(oauthAuthorize&&req.method==='POST'){
+      for await(const chunk of req) { /* Drain the local authorization form. */ }
+      if(staleWrite())return refuseStale();
+      const receipt=authDemo.authorizeProvider(oauthAuthorize[1]);
+      if(!receipt)return sendJson(res,{code:410,message:'OAUTH_FLOW_EXPIRED',data:null},410);
+      res.setHeader('Content-Type',mime['.html']);
+      return res.end('<!doctype html><html lang="zh"><meta charset="utf-8"><title>授权完成</title><script>window.opener?.postMessage('+JSON.stringify(receipt)+',location.origin);</script></html>');
+    }
     if(req.method==='GET'&&url.pathname.startsWith(previewPurchaseCashier.pathname)){
       const intentNo=url.pathname.slice(previewPurchaseCashier.pathname.length);
       if(!/^PPI-PREVIEW-\d+$/.test(intentNo)){res.writeHead(404);return res.end();}
@@ -465,6 +489,10 @@ const server=http.createServer(async(req,res)=>{
     if(/^\/(api|auth)\//.test(url.pathname)) {
       const page=req.headers['x-preview-scenario'];
       if(page&&page!==scenarioId())return refuseStale();
+      if(req.method==='GET'&&url.pathname==='/auth/users/oauth/provider/linked'){
+        const response=authDemo.linkedProviders(req.headers);
+        return sendJson(res,response.body,response.status);
+      }
       if(state.trialReadState==='user-not-found'&&/^\/api\/trial\/(?:state|eligibility|start|cancel|convert|purchase-options|commands\/[^/]+)$/.test(url.pathname)
           &&previewAccountId(state,req.headers))
         return sendJson(res,{code:404,message:'USER_NOT_FOUND',data:null},404);

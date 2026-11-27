@@ -1059,6 +1059,7 @@ async function finishReset() {
 }
 
 function onPrimary() {
+  if (loading.value) return;
   if (authApi.pendingLogin()) { loginRecoveryPending.value = true; void recoverLoginResult(); return; }
   if (step.value === 1 && !phoneOk.value) {
     error.value = primaryDisabledReason.value;
