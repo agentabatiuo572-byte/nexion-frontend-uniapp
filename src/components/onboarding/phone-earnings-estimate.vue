@@ -139,7 +139,7 @@ export default countUpView;
 .est-basis { display: block; height: var(--ui-type-description-lh); margin-top: 4px; white-space: nowrap; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* 10.1 行内数值: a non-amount metric inline, JetBrains Mono 500 (01 §1.2); the row keeps its line height so all states stay level. */
 .est-basis__v { font-family: var(--font-metric); font-size: var(--ui-type-inline-figure); font-weight: var(--ui-type-inline-figure-weight); font-variant-numeric: tabular-nums; color: var(--v5-ink); }
-.est-basis__v--unknown { color: var(--v5-ink-3); }
+.est-basis__v--unknown { font-family: var(--font-v5); color: var(--v5-ink-3); }
 /* Comparison: section title, one solid card, column head written once. */
 .est-sec { display: block; margin-top: var(--ui-space-section-gap); font: var(--ui-type-section-weight) var(--ui-type-section)/var(--ui-type-section-lh) var(--font-v5); color: var(--v5-ink); }
 .est-list { flex: none; margin-top: 12px; padding: 0 16px; border-radius: var(--ui-radius-surface, 22px); background: var(--v5-surface); }

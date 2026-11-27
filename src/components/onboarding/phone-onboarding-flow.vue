@@ -77,7 +77,7 @@
           <!-- Task rules (03 §3.5.1): one row, text and icon are one trigger. -->
           <!-- A tray with a note above its button is taller than the bar this slot reserves, so the rules row steps aside for it
                (the dial keeps its box). -->
-          <view v-if="calibrationWritePending && dialMode === 'idle' && !calibrationResendAvailable" class="cn-rules" role="status"><text>{{ t.onboarding.calibrationWritePending }}</text></view>
+          <view v-if="calibrationWritePending && dialMode === 'idle' && !calibrationResendAvailable" class="cn-rules cn-status" role="status"><view class="ob-spin cn-status__spin" aria-hidden="true" /><text>{{ t.onboarding.calibrationWritePending }}</text></view>
           <view v-else-if="standalone && dialMode === 'result' && !(bar.kind === 'tray' && bar.note)" class="cn-rules"><NxHintBubble :label="t.onboarding.policyTitle" :text="policyLines" /></view>
           <view v-if="(dialMode === 'scan' || enterFrom === 'scan') && iosPhone" class="cn-iostrack" role="list">
             <view class="cn-iostrack__nd" role="listitem"><view class="cn-iostrack__dot cn-iostrack__dot--cur" /><text class="cn-iostrack__lb">{{ t.onboarding.iosStepIdentify }}</text></view>
@@ -120,9 +120,11 @@
         <view v-if="bar.primary.busy" class="ob-spin" aria-hidden="true" /><text>{{ bar.primary.label }}</text><template v-if="bar.primary.arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></template>
       </view>
     </view>
-    <!-- Bar reservation for the dial phases: the tallest bar any of them can show here, the iOS result tray (it wraps on long languages). -->
+    <!-- Bar reservation for the dial phases: the tallest bar any of them can show here. Guided step 2 shows at most one floating
+         button (board: 48 + 22 + 16); the standalone result can show the iOS tray (it wraps on long languages). -->
     <view class="ob-bar nx-glass-bar cn-probe" aria-hidden="true">
-      <view class="ob-tray-row"><view class="ob-tray-text nx-tray-text"><text>{{ t.onboarding.iosActivateLater }}</text></view><view class="ob-btn ob-btn--primary"><text>{{ t.onboarding.activatePhone }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view></view>
+      <view v-if="!standalone" class="ob-btn ob-btn--primary" role="button"><text>{{ t.onboarding.viewEstimate }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view>
+      <view v-else class="ob-tray-row"><view class="ob-tray-text nx-tray-text"><text>{{ t.onboarding.iosActivateLater }}</text></view><view class="ob-btn ob-btn--primary"><text>{{ t.onboarding.activatePhone }}</text><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg></view></view>
     </view>
     <GlobalUi />
   </StandalonePageShell>
@@ -1314,6 +1316,9 @@ export default calibrationDialView;
 .cn-slot--enter > * { animation: cn-slot-rise 300ms cubic-bezier(.16, 1, .3, 1) 950ms both; }
 .cn-rules { display: flex; justify-content: center; margin-top: 8px; }
 .cn-rules--estimate { margin-top: auto; }
+/* Pending-write status row (board E13; 10.2 status line): 16px brand spinner, the description role in body ink. */
+.cn-status { align-items: center; gap: 8px; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); text-align: center; }
+.cn-status__spin { width: 16px; height: 16px; color: var(--v5-brand); }
 .cn-dial-tag { position: absolute; left: 50%; transform: translateX(-50%); }
 .cn-dial-tag__icon { flex: none; margin-right: 4px; }
 .cn-dial-tag--anim { animation: cn-fade 300ms ease-out 900ms both; }
