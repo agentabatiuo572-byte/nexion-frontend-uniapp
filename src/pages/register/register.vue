@@ -32,13 +32,14 @@
 
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
-      <view v-if="registrationNeedsLogin" role="status">
-        <text>{{ t.register.registrationSignInRequired }}</text>
-        <view role="button" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin"><text>{{ t.register.signIn }}</text></view>
+      <!-- Status notice: the sign-in notice's shared tint, the sentence left and its text action right (03 §3.6.1). -->
+      <view v-if="registrationNeedsLogin" class="rg-status nx-tint" role="status">
+        <text class="rg-status__t">{{ t.register.registrationSignInRequired }}</text>
+        <NxButton variant="text" size="small" :label="t.register.signIn" @click="goLogin" />
       </view>
-      <view v-else-if="authApi.pendingLogin()" role="status">
-        <text>{{ t.login.unknownAttempt }}</text>
-        <view role="button" tabindex="0" @click="recoverOriginalLogin" @keydown.enter.prevent="recoverOriginalLogin" @keydown.space.prevent="recoverOriginalLogin"><text>{{ t.login.recoverAttempt }}</text></view>
+      <view v-else-if="authApi.pendingLogin()" class="rg-status nx-tint" role="status">
+        <text class="rg-status__t">{{ t.login.unknownAttempt }}</text>
+        <NxButton variant="text" size="small" :label="t.login.recoverAttempt" @click="recoverOriginalLogin" />
       </view>
       <NxTag v-if="modeLabel" class="rg-mode-badge" tone="warning" data-testid="auth-runtime-label">{{ modeLabel }}</NxTag>
       <text class="rg-subtitle">
@@ -135,8 +136,9 @@
         @click="onCta"
       />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
-           directly above is showing, that line carries the reason and the button points to it instead. -->
-      <text v-if="!ctaEnabled && !busy && !error" id="rg-cta-reason" class="rg-cta-reason">{{ ctaDisabledReason }}</text>
+           directly above is showing, that line carries the reason and the button points to it instead. The line keeps its height
+           when it has nothing to say, hidden from view and from screen readers, so nothing below jumps. -->
+      <text id="rg-cta-reason" class="rg-cta-reason" :class="{ 'rg-cta-reason--off': ctaEnabled || busy || !!error }" :aria-hidden="ctaEnabled || busy || error ? 'true' : undefined">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
       <ThirdPartyAuth v-if="remoteApiEnabled && step === 1" :disabled="busy || authApi.pendingLogin()" :sponsor-code="lockedRef || invite" :before-start="manualInviteAccepted" :sponsor-rejected="rejectSponsorCode" @busy="oauthBusy = $event" />
@@ -1098,7 +1100,7 @@ onUnmounted(() => cleanup());
 .rg-sponsor__gift { display: block; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-brand); margin-top: 4px; }
 .rg-dots { margin-top: 28px; display: flex; align-items: center; gap: 6px; }
 /* Upcoming step: foreground 8%, the step-track tone of 04 (onboarding track), so it reads on both page floors. */
-.rg-dot { height: 4px; width: 16px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); transition: all 0.3s; }
+.rg-dot { height: 4px; width: 16px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .rg-dot--active { width: 32px; background: var(--v5-brand); }
 .rg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .rg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
@@ -1144,12 +1146,16 @@ onUnmounted(() => cleanup());
 .rg-cta { margin-top: 20px; }
 .rg-cta--off { opacity: .5; }
 /* 03 §3.1 禁用: the greyed CTA names its reason in one neutral line right under it (description role, ink-3). */
-.rg-cta-reason { display: block; margin-top: 8px; text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.rg-cta-reason { display: block; min-height: var(--ui-type-description-lh); margin-top: 8px; text-align: center; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-3); }
+.rg-cta-reason--off { visibility: hidden; }
 .rg-oauth { }
 .rg-divider { display: flex; align-items: center; margin: 24px 0; }
 .rg-divider__line { flex: 1; height: 1px; background: color-mix(in srgb, var(--v5-ink) 8%, transparent); }
 .rg-divider__t { padding: 0 12px; font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); color: var(--v5-ink-3); }
 .rg-mode-badge { align-self: flex-start; margin-top: 8px; }
+/* 01 §1.1.2 整体底色 (as the sign-in notice) + 03 §3.6.1 卡片里文字＋按钮: the action wraps under the sentence, right-aligned. */
+.rg-status { --nx-tint: var(--v5-brand); margin-top: 12px; padding: 8px 12px; border-radius: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 12px; }
+.rg-status__t { flex: 1 1 10em; min-width: 0; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink-2); overflow-wrap: break-word; }
 .rg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .rg-footer__acc { display: block; font-size: var(--ui-type-list-subtitle); color: var(--v5-ink-3); }
 /* 同 login:inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 扩热区不撑行高 */
