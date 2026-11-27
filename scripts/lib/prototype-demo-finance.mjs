@@ -267,12 +267,20 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     if(!bank.seeded){
       bank.seeded=true;
       if(!empty&&['paying','credited'].includes(state.topupState)){
-        const credited=state.topupState==='credited',created=now-28000;
+        const settling=state.topupState==='credited',created=now-28000;
         bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:500*bankFx.quoteRateVndPerUsdt,
-          status:credited?'credited':'awaiting_payment',expiresAt:new Date(created+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:new Date(created).toISOString(),
-          creditedUsdt:credited?500:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:credited?1:0,paymentMode:'hosted',providerStatus:'created',
-          ...(credited?{receivedVnd:500*bankFx.quoteRateVndPerUsdt,matchedAt:new Date(created+14000).toISOString()}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})});
+          status:'awaiting_payment',expiresAt:new Date(created+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:new Date(created).toISOString(),
+          creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:0,paymentMode:'hosted',providerStatus:settling?'pending':'created',
+          ...(settling?{}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})});
+        if(settling)bank.settlingPreset=bank.items[0].intentNo;
       }
+    }else if(method==='GET'&&bank.settlingPreset){
+      // The first list read lets the pane adopt the live payment. Its next read sees settlement of the same intent.
+      const item=bank.items.find(row=>row.intentNo===bank.settlingPreset);
+      const credit=state.walletMovements?.find(row=>row.bizNo===item.intentNo&&row.bizType==='VIETQR_DEPOSIT');
+      if(!credit)postDemoWalletEntries(state,{bizNo:item.intentNo,bizType:'VIETQR_DEPOSIT',asset:'USDT',direction:'IN',category:'topup',at:now,amount:item.usdtAmount});
+      Object.assign(item,{status:'credited',providerStatus:'created',version:1,creditedUsdt:item.usdtAmount,receivedVnd:item.vndAmount,matchedAt:new Date(credit?.at??now).toISOString()});
+      delete bank.settlingPreset;
     }
     // Like get/list: expire awaiting rows once, and remove a hosted URL from terminal reads.
     if(method==='GET')for(const item of bank.items)if(item.status==='awaiting_payment'&&Date.parse(item.expiresAt)<=now){item.status='expired';item.version++;delete item.paymentUrl;}
