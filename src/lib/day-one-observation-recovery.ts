@@ -1,10 +1,9 @@
 import { reactive } from "vue";
 import { ApiError } from "@/api/errors";
-import { buildLegalTermsRoute } from "./legal-terms-gate";
 import { createAuthenticatedPageObservationReporter, type AuthenticatedPageObservation } from "./authenticated-page-observation";
 import type { RemoteAccountRequest } from "./remote-account-epoch";
 
-export type DayOneObservationReason = "onboarding" | "terms" | "unconfirmed";
+export type DayOneObservationReason = "onboarding" | "unconfirmed";
 export interface DayOneObservationIdentity {
   scope: RemoteAccountRequest;
   questCode: string;
@@ -17,13 +16,11 @@ export interface DayOneObservationRequest extends DayOneObservationIdentity,
 export function observationRejectionReason(error: unknown): DayOneObservationReason {
   if (error instanceof ApiError && error.kind === "http" && error.status === 428 && error.code === 428) {
     if (error.message === "USER_ONBOARDING_REQUIRED") return "onboarding";
-    if (error.message === "LEGAL_TERMS_ACK_REQUIRED") return "terms";
   }
   return "unconfirmed";
 }
 export function observationRecoveryRoute(reason: DayOneObservationReason, web: boolean, taskRoute: string): string {
   if (reason === "onboarding") return web ? "/pages/register/success?setup=1" : "/pages/onboarding/estimator";
-  if (reason === "terms") return buildLegalTermsRoute(taskRoute);
   return taskRoute;
 }
 export function createDayOneObservationRecovery(reporter = createAuthenticatedPageObservationReporter()) {

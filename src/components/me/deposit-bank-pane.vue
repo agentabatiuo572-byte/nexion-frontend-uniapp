@@ -21,7 +21,7 @@
       <view v-if="createRecovery" class="nx-bank-setup-recovery active-press" role="button" tabindex="0"
         @click="goCreateRecovery" @keydown.enter.prevent="goCreateRecovery" @keydown.space.prevent="goCreateRecovery"
         style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)">
-        <text>{{ createRecovery === 'terms' ? t.bankPane.termsRecoveryCta : t.bankPane.onboardingRecoveryCta }}</text>
+        <text>{{ t.bankPane.onboardingRecoveryCta }}</text>
       </view>
     </view>
 
@@ -551,13 +551,12 @@ const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.v
 // ── 生成付款单(mock ~600ms 延迟演加载态:按钮内联 spinner「生成中…」)──
 const creating = ref(false);
 const createError = ref("");
-const createRecovery = ref<"onboarding" | "terms" | null>(null);
+const createRecovery = ref<"onboarding" | null>(null);
 const formCtaVisible = computed(() => paneView.value === "form" && paymentSessionReady.value && fx.configReady && !fx.syncFailed && bankRailAvailable.value);
 function goCreateRecovery() {
   if (!paymentSessionReady.value || creating.value || dep.currentAccountKey() !== app.accountKey) return;
-  if (createRecovery.value !== "terms" && createRecovery.value !== "onboarding") return;
+  if (createRecovery.value !== "onboarding") return;
   dep.bankRecoveryDraft = { accountKey: app.accountKey, amount: amount.value };
-  if (createRecovery.value === "terms") { navTo("/pages/onboarding/terms"); return; }
   // Restore only the input if navigation rebuilds the page; never replay CREATE.
   // #ifdef H5
   navTo("/pages/register/success?setup=1");
@@ -659,9 +658,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         if (cause.message === "USER_ONBOARDING_REQUIRED") {
           approvedBusinessFailureCopy = t.value.bankPane.onboardingRequired;
           if (stillCurrent()) createRecovery.value = "onboarding";
-        } else if (cause.message === "LEGAL_TERMS_ACK_REQUIRED") {
-          approvedBusinessFailureCopy = t.value.bankPane.termsRequired;
-          if (stillCurrent()) createRecovery.value = "terms";
         }
       }
       if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
