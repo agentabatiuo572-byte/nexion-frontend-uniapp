@@ -430,12 +430,13 @@ export const ru: Messages = {
     firstNoSms: "Для первой привязки SMS не нужен.",
   },
   bankWithdrawal: {
-    refreshLimits: "Обновить лимиты",
     recipientTitle: "Счёт получателя",
-    recipientSubtitle: "Счёт во Вьетнаме · в VND",
+    recipientSubtitle: "Банковский счёт · VND",
     continueWithdrawal: "Продолжить вывод",
     available: "Готов к зачислению",
     unbound: "Нет счёта получателя",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Недоступен", tagUnverified: "На проверке",
     unboundNotice: "Чтобы продолжить вывод, добавьте банковский счёт на своё имя.",
     amountTitle: "Сумма вывода",
     amountHint: "Введите общую сумму USDT к списанию, включая комиссию за обмен.",
@@ -445,7 +446,7 @@ export const ru: Messages = {
     availableLabel: "Доступно для вывода: {amount}\u00A0USDT",
     dailyLabel: "Осталось сегодня: {remaining} из {total}",
     dailyExhausted: "Дневной лимит выводов исчерпан. Снова доступно:",
-    capacityUnavailable: "Не удалось загрузить лимиты вывода. Обновите страницу.",
+    capacityUnavailable: "Не удалось загрузить лимиты вывода. Повторяем автоматически.",
     bankRoutingUnverified: "Вывод на банковский счёт сейчас недоступен. Отправленные заявки можно проверить.",
     feeIncluded: "Комиссия за обмен уже входит в общую сумму списания.",
     rules: {
@@ -477,7 +478,7 @@ export const ru: Messages = {
       range: "Укажите сумму в пределах показанного лимита на одну операцию.",
       balance: "Сумма превышает доступный для вывода баланс.",
       daily: "Дневной лимит выводов исчерпан. Повторите завтра.",
-      unavailable: "Лимиты вывода недоступны. Обновите страницу.",
+      unavailable: "Лимиты вывода недоступны.",
     },
     resultNotes: {
       review: "Заявка отправлена и ожидает обработки.",
@@ -514,7 +515,7 @@ export const ru: Messages = {
     refunded: "Возвращено в кошелёк",
     accountStatus: {
       ready: "Счёт получателя сохранён.",
-      unavailable: "Этот счёт получателя недоступен. Обновите страницу.",
+      unavailable: "Этот счёт получателя недоступен.",
       unverified: "Вывод на банковский счёт сейчас недоступен. Отправленные заявки можно проверить.",
     },
     requote: "Отменить расчёт и начать заново",

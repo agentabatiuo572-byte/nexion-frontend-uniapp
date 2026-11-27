@@ -93,12 +93,13 @@ export const vi: Messages = {
     firstNoSms: "Liên kết lần đầu không cần mã SMS.",
   },
   bankWithdrawal: {
-    refreshLimits: "Cập nhật hạn mức",
     recipientTitle: "Tài khoản nhận",
-    recipientSubtitle: "Tài khoản ngân hàng Việt Nam · Nhận VND",
+    recipientSubtitle: "Tài khoản ngân hàng · VND",
     continueWithdrawal: "Tiếp tục rút tiền",
     available: "Có thể nhận tiền",
     unbound: "Chưa có tài khoản nhận",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Tạm ngưng", tagUnverified: "Chờ xác minh",
     unboundNotice: "Vui lòng thêm tài khoản ngân hàng chính chủ trước khi tiếp tục rút tiền.",
     amountTitle: "Số tiền rút",
     amountHint: "Nhập tổng số USDT trừ khỏi số dư, đã gồm phí quy đổi.",
@@ -108,7 +109,7 @@ export const vi: Messages = {
     availableLabel: "Số dư có thể rút: {amount}\u00A0USDT",
     dailyLabel: "Còn {remaining} lượt hôm nay / {total} lượt mỗi ngày",
     dailyExhausted: "Đã hết lượt rút hôm nay. Có thể rút lại từ:",
-    capacityUnavailable: "Chưa tải được hạn mức rút tiền. Vui lòng tải lại.",
+    capacityUnavailable: "Chưa tải được hạn mức rút tiền. Đang tự động thử lại.",
     bankRoutingUnverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
     feeIncluded: "Phí quy đổi đã gồm trong tổng số tiền trừ.",
     rules: {
@@ -135,7 +136,7 @@ export const vi: Messages = {
     backToAmount: "Sửa số tiền",
     backToWallet: "Về ví",
     orderNumber: "Mã lệnh rút",
-    amountErrors: {"format": "Nhập số tiền lớn hơn 0, tối đa 6 chữ số thập phân.", "range": "Nhập số tiền trong hạn mức mỗi giao dịch được hiển thị.", "balance": "Số tiền vượt quá số dư có thể rút.", "daily": "Đã hết lượt rút hôm nay. Vui lòng thử lại ngày mai.", "unavailable": "Hạn mức rút chưa khả dụng. Vui lòng tải lại."},
+    amountErrors: {"format": "Nhập số tiền lớn hơn 0, tối đa 6 chữ số thập phân.", "range": "Nhập số tiền trong hạn mức mỗi giao dịch được hiển thị.", "balance": "Số tiền vượt quá số dư có thể rút.", "daily": "Đã hết lượt rút hôm nay. Vui lòng thử lại ngày mai.", "unavailable": "Hạn mức rút chưa khả dụng."},
     resultNotes: {"review": "Yêu cầu đã được gửi và đang chờ xử lý.", "processing": "Đang chờ ngân hàng xử lý. Trang này sẽ cập nhật khi tiền về tài khoản, bạn không cần rút lại.", "held": "Trang này sẽ cập nhật khi xác nhận xong. Vui lòng không gửi yêu cầu rút tiền khác.", "paid": "Đã xác nhận tiền đến ngân hàng.", "refunded": "Số tiền rút đã được hoàn về ví."},
     chooseMethod: "Chọn cách rút tiền", chooseMethodHint: "Chọn nơi nhận tiền rút.",
     usdtMethodHint: "Chuyển USDT đến địa chỉ ví", bankMethod: "Tài khoản ngân hàng", bankMethodHint: "Nhận VND vào tài khoản ngân hàng Việt Nam",
@@ -158,7 +159,7 @@ export const vi: Messages = {
     quoteExpired: "Báo giá đã hết hạn. Tải lại hoặc hủy để lấy báo giá mới.",
     refundAmount: "Số tiền đã hoàn (USDT)", confirmedAt: "Thời gian xác nhận", refunded: "Đã hoàn tiền về ví",
     accountStatus: {
-      ready: "Đã liên kết tài khoản nhận tiền.", unavailable: "Chưa thể sử dụng tài khoản nhận tiền này. Vui lòng tải lại.", unverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
+      ready: "Đã liên kết tài khoản nhận tiền.", unavailable: "Chưa thể sử dụng tài khoản nhận tiền này.", unverified: "Rút về ngân hàng hiện chưa khả dụng. Bạn vẫn có thể xem các lệnh rút đã gửi.",
     },
     requote: "Hủy báo giá chưa dùng / nhập lại",
     title: "Rút tiền về ngân hàng", unavailable: "Hiện chưa thể rút tiền về ngân hàng. Vui lòng thử lại sau.",

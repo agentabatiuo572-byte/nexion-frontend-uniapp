@@ -430,12 +430,13 @@ export const fil: Messages = {
     firstNoSms: "Walang SMS sa unang pag-link.",
   },
   bankWithdrawal: {
-    refreshLimits: "I-refresh ang limit",
     recipientTitle: "Account na tatanggap",
-    recipientSubtitle: "Bangko sa Vietnam · VND",
+    recipientSubtitle: "Bank account · VND",
     continueWithdrawal: "Ituloy ang withdrawal",
     available: "Handang tumanggap",
     unbound: "Walang account na tatanggap",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Hindi available", tagUnverified: "Bineberipika",
     unboundNotice: "Magdagdag ng account sa bangko na nakapangalan sa iyo bago ituloy ang withdrawal.",
     amountTitle: "Halaga ng withdrawal",
     amountHint: "Ilagay ang kabuuang USDT na ibabawas, kasama ang exchange fee.",
@@ -445,7 +446,7 @@ export const fil: Messages = {
     availableLabel: "Mawi-withdraw: {amount}\u00A0USDT",
     dailyLabel: "{remaining} natitira ngayon / {total} kada araw",
     dailyExhausted: "Ubos na ang puwedeng withdrawal ngayon. Puwede ulit sa:",
-    capacityUnavailable: "Hindi ma-load ang limit ng withdrawal. I-reload.",
+    capacityUnavailable: "Hindi ma-load ang limit ng withdrawal. Awtomatikong sinusubukan ulit.",
     bankRoutingUnverified: "Hindi available ngayon ang bank withdrawal. Masusubaybayan mo pa rin ang mga naisumiteng withdrawal.",
     feeIncluded: "Kasama na ang exchange fee sa kabuuang bawas.",
     rules: {
@@ -477,7 +478,7 @@ export const fil: Messages = {
       range: "Maglagay ng halagang pasok sa ipinapakitang limit bawat transaksyon.",
       balance: "Lampas ang halaga sa balanseng mawi-withdraw mo.",
       daily: "Ubos na ang puwedeng withdrawal ngayon. Subukan ulit bukas.",
-      unavailable: "Hindi available ang limit ng withdrawal. I-reload.",
+      unavailable: "Hindi available ang limit ng withdrawal.",
     },
     resultNotes: {
       review: "Naisumite ang request mo at hinihintay itong maproseso.",
@@ -514,7 +515,7 @@ export const fil: Messages = {
     refunded: "Naibalik sa wallet mo",
     accountStatus: {
       ready: "Na-save ang account na tatanggap.",
-      unavailable: "Hindi available ang account na ito. I-reload.",
+      unavailable: "Hindi available ang account na ito.",
       unverified: "Hindi available ngayon ang bank withdrawal. Masusubaybayan mo pa rin ang mga naisumiteng withdrawal.",
     },
     requote: "I-cancel ang quote / magsimula ulit",

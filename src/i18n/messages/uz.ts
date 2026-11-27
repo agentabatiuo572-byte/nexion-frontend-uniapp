@@ -430,12 +430,13 @@ export const uz: Messages = {
     firstNoSms: "Birinchi ulashda SMS kerak emas.",
   },
   bankWithdrawal: {
-    refreshLimits: "Limitlarni yangilash",
     recipientTitle: "Qabul qiluvchi hisob",
-    recipientSubtitle: "Vyetnam bank hisobi · VNDda qabul qilish",
+    recipientSubtitle: "Bank hisobi · VND",
     continueWithdrawal: "Yechishni davom ettirish",
     available: "Qabul qilishga tayyor",
     unbound: "Qabul qiluvchi hisob yoʻq",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Mavjud emas", tagUnverified: "Tekshirilmoqda",
     unboundNotice: "Pul yechishni davom ettirishdan oldin oʻz nomingizdagi bank hisobini qoʻshing.",
     amountTitle: "Yechish summasi",
     amountHint: "Ayirboshlash haqi bilan birga yechiladigan umumiy USDT summasini kiriting.",
@@ -445,7 +446,7 @@ export const uz: Messages = {
     availableLabel: "Yechish mumkin: {amount}\u00A0USDT",
     dailyLabel: "Bugun {remaining} ta qoldi / kuniga {total} ta",
     dailyExhausted: "Kunlik pul yechish limiti tugadi. Keyingi imkoniyat:",
-    capacityUnavailable: "Pul yechish limitlarini yuklab boʻlmadi. Qayta yuklang.",
+    capacityUnavailable: "Pul yechish limitlarini yuklab boʻlmadi. Avtomatik qayta urinilmoqda.",
     bankRoutingUnverified: "Bankka pul yechish hozir mavjud emas. Yuborilgan soʻrovlarni koʻrishingiz mumkin.",
     feeIncluded: "Ayirboshlash haqi umumiy yechiladigan summaga kiritilgan.",
     rules: {
@@ -477,7 +478,7 @@ export const uz: Messages = {
       range: "Koʻrsatilgan bir martalik limitlar doirasidagi summani kiriting.",
       balance: "Summa yechish mumkin boʻlgan balansdan oshib ketdi.",
       daily: "Kunlik pul yechish limiti tugadi. Ertaga urinib koʻring.",
-      unavailable: "Pul yechish limitlarini yuklab boʻlmadi. Qayta yuklang.",
+      unavailable: "Pul yechish limitlarini yuklab boʻlmadi.",
     },
     resultNotes: {
       review: "Soʻrovingiz yuborildi va koʻrib chiqilishini kutmoqda.",
@@ -514,7 +515,7 @@ export const uz: Messages = {
     refunded: "Hamyoningizga qaytarildi",
     accountStatus: {
       ready: "Qabul qiluvchi hisob saqlandi.",
-      unavailable: "Bu hisobdan hozircha foydalanib boʻlmaydi. Qayta yuklang.",
+      unavailable: "Bu hisobdan hozircha foydalanib boʻlmaydi.",
       unverified: "Bankka pul yechish hozir mavjud emas. Yuborilgan soʻrovlarni koʻrishingiz mumkin.",
     },
     requote: "Narxni bekor qilib, qaytadan boshlash",

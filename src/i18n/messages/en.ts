@@ -92,12 +92,13 @@ export const en = {
     firstNoSms: "No SMS needed for the first link.",
   },
   bankWithdrawal: {
-    refreshLimits: "Refresh limits",
     recipientTitle: "Receiving account",
-    recipientSubtitle: "Vietnamese bank account · Receive VND",
+    recipientSubtitle: "Bank account · VND",
     continueWithdrawal: "Continue withdrawal",
     available: "Ready to receive",
     unbound: "No receiving account",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Unavailable", tagUnverified: "Verifying",
     unboundNotice: "Add a bank account in your own name before continuing the withdrawal.",
     amountTitle: "Withdrawal amount",
     amountHint: "Enter the total USDT to deduct, including the exchange fee.",
@@ -107,7 +108,7 @@ export const en = {
     availableLabel: "Available to withdraw: {amount}\u00A0USDT",
     dailyLabel: "{remaining} remaining today / {total} per day",
     dailyExhausted: "Daily withdrawal count reached. Available again at:",
-    capacityUnavailable: "Unable to load withdrawal limits. Please reload.",
+    capacityUnavailable: "Unable to load withdrawal limits. Retrying automatically.",
     bankRoutingUnverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
     feeIncluded: "The exchange fee is included in the total debit.",
     rules: {
@@ -134,7 +135,7 @@ export const en = {
     backToAmount: "Edit amount",
     backToWallet: "Back to wallet",
     orderNumber: "Withdrawal number",
-    amountErrors: {"format": "Enter an amount greater than zero with up to 6 decimal places.", "range": "Enter an amount within the displayed per-transaction limits.", "balance": "The amount exceeds your available withdrawal balance.", "daily": "Daily withdrawal count reached. Please try tomorrow.", "unavailable": "Withdrawal limits are unavailable. Please reload."},
+    amountErrors: {"format": "Enter an amount greater than zero with up to 6 decimal places.", "range": "Enter an amount within the displayed per-transaction limits.", "balance": "The amount exceeds your available withdrawal balance.", "daily": "Daily withdrawal count reached. Please try tomorrow.", "unavailable": "Withdrawal limits are unavailable."},
     resultNotes: {"review": "Your request was submitted and is awaiting processing.", "processing": "Waiting for the bank's result. This page updates once the money arrives — no need to withdraw again.", "held": "This page updates once the check is done. Please don't submit another withdrawal.", "paid": "Receipt by the bank has been confirmed.", "refunded": "The withdrawal amount has been returned to your wallet."},
     chooseMethod: "Choose withdrawal method", chooseMethodHint: "Select where to receive your withdrawal.",
     usdtMethodHint: "Send USDT to your wallet address", bankMethod: "Bank account", bankMethodHint: "Receive VND in your Vietnamese bank account",
@@ -157,7 +158,7 @@ export const en = {
     quoteExpired: "This quote has expired. Refresh or cancel it to get a new quote.",
     refundAmount: "Returned amount (USDT)", confirmedAt: "Confirmed at", refunded: "Returned to your wallet",
     accountStatus: {
-      ready: "Receiving account saved.", unavailable: "This receiving account is unavailable. Please reload.", unverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
+      ready: "Receiving account saved.", unavailable: "This receiving account is unavailable.", unverified: "Bank withdrawals are unavailable right now. You can still check submitted withdrawals.",
     },
     requote: "Cancel unused quote / start again",
     title: "Bank withdrawal", unavailable: "Bank withdrawals are currently unavailable. Please try again later.",

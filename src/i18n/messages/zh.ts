@@ -93,12 +93,13 @@ export const zh: Messages = {
     firstNoSms: "首次绑定无需短信验证。",
   },
   bankWithdrawal: {
-    refreshLimits: "刷新额度",
     recipientTitle: "收款账户",
-    recipientSubtitle: "越南银行收款账户 · VND 到账",
+    recipientSubtitle: "银行账户 · VND",
     continueWithdrawal: "继续提现",
     available: "可用于提现",
     unbound: "未绑定收款账户",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "暂不可用", tagUnverified: "待核实",
     unboundNotice: "请先添加本人银行收款账户，再继续提现。",
     amountTitle: "提现金额",
     amountHint: "输入本次从余额中扣除的总额（含换汇手续费）。",
@@ -108,7 +109,7 @@ export const zh: Messages = {
     availableLabel: "当前可提现余额 {amount}\u00A0USDT",
     dailyLabel: "今日剩余 {remaining} 次 / 每日 {total} 次",
     dailyExhausted: "今日提现次数已用完，下次可提现时间：",
-    capacityUnavailable: "暂时无法读取提现额度，请重新加载。",
+    capacityUnavailable: "暂时无法读取提现额度，正在自动重试。",
     bankRoutingUnverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
     feeIncluded: "换汇手续费已含在总扣金额中。",
     rules: {
@@ -135,7 +136,7 @@ export const zh: Messages = {
     backToAmount: "重新填写金额",
     backToWallet: "返回钱包",
     orderNumber: "提现单号",
-    amountErrors: {"format": "请输入大于 0 的金额，最多 6 位小数。", "range": "金额超出当前单笔限额，请按显示范围填写。", "balance": "金额超过当前可提现余额。", "daily": "今日提现次数已用完，请在次日再试。", "unavailable": "提现额度暂不可用，请重新加载。"},
+    amountErrors: {"format": "请输入大于 0 的金额，最多 6 位小数。", "range": "金额超出当前单笔限额，请按显示范围填写。", "balance": "金额超过当前可提现余额。", "daily": "今日提现次数已用完，请在次日再试。", "unavailable": "提现额度暂不可用。"},
     resultNotes: {"review": "提现申请已提交，正在等待处理。", "processing": "等待银行处理结果，到账后这里会更新，无需重复提现。", "held": "核对完成后这里会更新，请勿重复提现。", "paid": "银行到账结果已确认。", "refunded": "本次提现金额已退回钱包。"},
     chooseMethod: "选择提现方式", chooseMethodHint: "请选择收款方式。",
     usdtMethodHint: "USDT 转入钱包地址", bankMethod: "银行卡", bankMethodHint: "VND 转入越南银行账户",
@@ -158,7 +159,7 @@ export const zh: Messages = {
     quoteExpired: "报价已过期，请刷新或取消后重新获取报价。",
     refundAmount: "已退回金额（USDT）", confirmedAt: "确认时间", refunded: "已退回钱包",
     accountStatus: {
-      ready: "收款账户已绑定。", unavailable: "暂时无法使用此收款账户，请重新加载。", unverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
+      ready: "收款账户已绑定。", unavailable: "暂时无法使用此收款账户。", unverified: "银行卡提现暂不可用，已提交的提现可正常查询。",
     },
     requote: "取消未提交报价／重新填写",
     title: "银行卡提现", unavailable: "银行卡提现暂不可用，请稍后再试。",

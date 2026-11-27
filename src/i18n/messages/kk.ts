@@ -430,12 +430,13 @@ export const kk: Messages = {
     firstNoSms: "Алғаш байланыстыруға SMS қажет емес.",
   },
   bankWithdrawal: {
-    refreshLimits: "Лимиттерді жаңарту",
     recipientTitle: "Ақша түсетін шот",
-    recipientSubtitle: "Вьетнам банкіндегі шот · VND түрінде алу",
+    recipientSubtitle: "Банк шоты · VND",
     continueWithdrawal: "Шығаруды жалғастыру",
     available: "Шығаруға дайын",
     unbound: "Ақша түсетін шот жоқ",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Қолжетімсіз", tagUnverified: "Тексерілуде",
     unboundNotice: "Ақша шығаруды жалғастыру үшін өз атыңыздағы банк шотын қосыңыз.",
     amountTitle: "Шығару сомасы",
     amountHint: "Айырбастау комиссиясын қоса шегерілетін жалпы USDT сомасын енгізіңіз.",
@@ -445,7 +446,7 @@ export const kk: Messages = {
     availableLabel: "Шығаруға қолжетімді: {amount}\u00A0USDT",
     dailyLabel: "Бүгін қалды: {remaining} / күніне {total}",
     dailyExhausted: "Күндік шығару саны бітті. Қайта қолжетімді уақыт:",
-    capacityUnavailable: "Шығару лимиттері жүктелмеді. Қайта жүктеңіз.",
+    capacityUnavailable: "Шығару лимиттері жүктелмеді. Автоматты түрде қайталанып жатыр.",
     bankRoutingUnverified: "Банк шотына шығару қазір қолжетімсіз. Жіберілген сұрауларды қарай аласыз.",
     feeIncluded: "Айырбастау комиссиясы жалпы шегерімге кірген.",
     rules: {
@@ -477,7 +478,7 @@ export const kk: Messages = {
       range: "Көрсетілген бір операциялық лимит шегінде сома енгізіңіз.",
       balance: "Сома шығаруға қолжетімді баланстан асып кетті.",
       daily: "Күндік шығару саны бітті. Ертең қайталап көріңіз.",
-      unavailable: "Шығару лимиттері қолжетімсіз. Қайта жүктеңіз.",
+      unavailable: "Шығару лимиттері қолжетімсіз.",
     },
     resultNotes: {
       review: "Сұрауыңыз жіберілді, өңделуін күтуде.",
@@ -514,7 +515,7 @@ export const kk: Messages = {
     refunded: "Әмиянға қайтарылды",
     accountStatus: {
       ready: "Ақша түсетін шот сақталды.",
-      unavailable: "Ақша түсетін бұл шот қолжетімсіз. Қайта жүктеңіз.",
+      unavailable: "Ақша түсетін бұл шот қолжетімсіз.",
       unverified: "Банк шотына шығару қазір қолжетімсіз. Жіберілген сұрауларды қарай аласыз.",
     },
     requote: "Баға ұсынысынан бас тарту / қайта бастау",

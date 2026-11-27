@@ -430,12 +430,13 @@ export const ms: Messages = {
     firstNoSms: "Pemautan pertama tidak memerlukan SMS.",
   },
   bankWithdrawal: {
-    refreshLimits: "Muat semula had",
     recipientTitle: "Akaun penerima",
-    recipientSubtitle: "Akaun bank Vietnam · Terima VND",
+    recipientSubtitle: "Akaun bank · VND",
     continueWithdrawal: "Teruskan pengeluaran",
     available: "Sedia untuk pengeluaran",
     unbound: "Tiada akaun penerima",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu pengesahan",
     unboundNotice: "Tambah akaun bank atas nama anda sendiri sebelum meneruskan pengeluaran.",
     amountTitle: "Jumlah pengeluaran",
     amountHint: "Masukkan jumlah USDT untuk ditolak, termasuk caj pertukaran.",
@@ -445,7 +446,7 @@ export const ms: Messages = {
     availableLabel: "Boleh dikeluarkan: {amount}\u00A0USDT",
     dailyLabel: "{remaining} lagi hari ini / {total} sehari",
     dailyExhausted: "Had pengeluaran harian dicapai. Tersedia semula pada:",
-    capacityUnavailable: "Had pengeluaran tidak dapat dimuatkan. Sila muat semula.",
+    capacityUnavailable: "Had pengeluaran tidak dapat dimuatkan. Mencuba semula secara automatik.",
     bankRoutingUnverified: "Pengeluaran bank tidak tersedia buat masa ini. Anda masih boleh menyemak pengeluaran yang telah dihantar.",
     feeIncluded: "Caj pertukaran sudah termasuk dalam jumlah ditolak.",
     rules: {
@@ -477,7 +478,7 @@ export const ms: Messages = {
       range: "Masukkan jumlah dalam had setiap transaksi yang dipaparkan.",
       balance: "Jumlah melebihi baki yang boleh dikeluarkan.",
       daily: "Had pengeluaran harian dicapai. Sila cuba esok.",
-      unavailable: "Had pengeluaran tidak tersedia. Sila muat semula.",
+      unavailable: "Had pengeluaran tidak tersedia.",
     },
     resultNotes: {
       review: "Permintaan anda telah dihantar dan menunggu pemprosesan.",
@@ -514,7 +515,7 @@ export const ms: Messages = {
     refunded: "Dikembalikan ke dompet anda",
     accountStatus: {
       ready: "Akaun penerima disimpan.",
-      unavailable: "Akaun penerima ini tidak tersedia. Sila muat semula.",
+      unavailable: "Akaun penerima ini tidak tersedia.",
       unverified: "Pengeluaran bank tidak tersedia buat masa ini. Anda masih boleh menyemak pengeluaran yang telah dihantar.",
     },
     requote: "Batal sebut harga / mula semula",

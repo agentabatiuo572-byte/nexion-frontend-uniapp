@@ -430,12 +430,13 @@ export const id: Messages = {
     firstNoSms: "Penautan pertama tidak perlu SMS.",
   },
   bankWithdrawal: {
-    refreshLimits: "Muat ulang batas",
     recipientTitle: "Rekening penerima",
-    recipientSubtitle: "Rekening bank Vietnam · Terima VND",
+    recipientSubtitle: "Rekening bank · VND",
     continueWithdrawal: "Lanjutkan penarikan",
     available: "Siap untuk penarikan",
     unbound: "Belum ada rekening penerima",
+    // Short one-line card tags (03 §3.8); the full reason sits in the tray above 继续提现.
+    tagUnavailable: "Tidak tersedia", tagUnverified: "Menunggu verifikasi",
     unboundNotice: "Tambahkan rekening bank atas nama Anda sendiri sebelum melanjutkan penarikan.",
     amountTitle: "Jumlah penarikan",
     amountHint: "Masukkan total USDT yang dipotong, termasuk biaya penukaran.",
@@ -445,7 +446,7 @@ export const id: Messages = {
     availableLabel: "Dapat ditarik: {amount}\u00A0USDT",
     dailyLabel: "Sisa {remaining} kali hari ini / {total} per hari",
     dailyExhausted: "Jatah penarikan harian habis. Tersedia lagi pada:",
-    capacityUnavailable: "Batas penarikan gagal dimuat. Muat ulang.",
+    capacityUnavailable: "Batas penarikan gagal dimuat. Mencoba lagi otomatis.",
     bankRoutingUnverified: "Penarikan bank sedang tidak tersedia. Penarikan yang sudah dikirim tetap bisa dicek.",
     feeIncluded: "Biaya penukaran sudah termasuk dalam total dipotong.",
     rules: {
@@ -477,7 +478,7 @@ export const id: Messages = {
       range: "Masukkan jumlah dalam batas per transaksi yang ditampilkan.",
       balance: "Jumlah melebihi saldo yang dapat ditarik.",
       daily: "Jatah penarikan harian habis. Coba lagi besok.",
-      unavailable: "Batas penarikan tidak tersedia. Muat ulang.",
+      unavailable: "Batas penarikan tidak tersedia.",
     },
     resultNotes: {
       review: "Permintaan Anda sudah terkirim dan menunggu diproses.",
@@ -514,7 +515,7 @@ export const id: Messages = {
     refunded: "Dikembalikan ke dompet Anda",
     accountStatus: {
       ready: "Rekening penerima tersimpan.",
-      unavailable: "Rekening penerima ini tidak tersedia. Muat ulang.",
+      unavailable: "Rekening penerima ini tidak tersedia.",
       unverified: "Penarikan bank sedang tidak tersedia. Penarikan yang sudah dikirim tetap bisa dicek.",
     },
     requote: "Batalkan penawaran / mulai lagi",
