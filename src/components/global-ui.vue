@@ -48,7 +48,7 @@
         <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount, 'nx-modal__row--code': row.code }">
           <text class="nx-modal__k">{{ row.label }}</text>
           <NxCodeValue v-if="row.code" class="nx-modal__code" :value="row.value" :label="row.label" full :copyable="false" />
-          <text v-else-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
+          <text v-else-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text><text class="nx-modal__unit">{{ amountAnatomy(row.value)[3] }}</text></text>
           <text v-else class="nx-modal__v">{{ row.value }}</text>
         </view>
       </view>
@@ -119,10 +119,10 @@ import { useDialogA11y } from "@/composables/use-dialog-a11y";
 const ui = useUI();
 const t = useT();
 // Last enqueued confirm renders on top (LIFO), matching the original.
-// "$999.00" → ["$", "999", ".00"] so the currency sign and cents can sit in ink-3 (amount anatomy).
-function amountAnatomy(value: string): [string, string, string] {
-  const match = /^(\$?)(.*?)(\.\d+)?$/.exec(value);
-  return match ? [match[1], match[2], match[3] ?? ""] : ["", value, ""];
+// "$999.00" → ["$", "999", ".00", ""], "49.00 USDT" → ["", "49", ".00", " USDT"]: the sign, cents and unit sit in ink-3 (amount anatomy).
+function amountAnatomy(value: string): [string, string, string, string] {
+  const match = /^(\$?)(.*?)(\.\d+)?(\s[A-Z]+)?$/.exec(value);
+  return match ? [match[1], match[2], match[3] ?? "", match[4] ?? ""] : ["", value, "", ""];
 }
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
 const PAYMENT_RESUME_ENTRY_ROUTES: Record<string, true> = {
@@ -228,6 +228,8 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-modal--detail { padding: 24px 20px 12px; }
 .nx-modal__cur { margin-right: 2px; color: var(--v5-ink-3); font-size: .55em; letter-spacing: 0; }
 .nx-modal__dec { color: var(--v5-ink-3); }
+/* Under 30px an amount's unit is the 辅助数值 role (01 §1.2). */
+.nx-modal__unit { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); letter-spacing: 0; }
 .nx-modal__glyph { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; background: var(--v5-brand-soft); color: var(--v5-brand); }
 .nx-modal__glyph--warn { background: color-mix(in srgb, var(--v5-warning) 14%, transparent); color: var(--v5-warning); }
 .nx-modal__glyph--danger { background: color-mix(in srgb, var(--v5-danger) 14%, transparent); color: var(--v5-danger); }
