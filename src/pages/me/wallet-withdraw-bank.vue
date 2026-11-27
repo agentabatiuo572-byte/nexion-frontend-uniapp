@@ -295,8 +295,9 @@ const cardTag = computed(() => {
   const shown = displayConfig.value, c0 = c.value;
   if (!shown?.enabled) return { tone: "warning", label: c0.tagUnavailable } as const;
   if (!shown.beneficiary) return { tone: "warning", label: c0.unbound } as const;
-  if (!shown.beneficiary.canWithdraw) return { tone: "warning", label: bankAccountNotice(shown.beneficiary) === "unverified" ? c0.tagUnverified : c0.tagUnavailable } as const;
-  if (shown.capacity && !shown.capacity.withdrawalEnabled) return { tone: "warning", label: c0.tagUnavailable } as const;
+  if (!bankBeneficiaryReady(shown.beneficiary)) return { tone: "warning", label: bankAccountNotice(shown.beneficiary) === "unverified" ? c0.tagUnverified : c0.tagUnavailable } as const;
+  // Green only when a withdrawal can start: limits still being read count as not yet available, like the grey 继续提现.
+  if (!shown.policy || !shown.capacity || !shown.capacity.withdrawalEnabled) return { tone: "warning", label: c0.tagUnavailable } as const;
   return { tone: "success", label: c0.available } as const;
 });
 const accountStatus = computed(() => displayConfig.value?.beneficiary ? c.value.accountStatus[bankAccountNotice(displayConfig.value.beneficiary)] : "");
