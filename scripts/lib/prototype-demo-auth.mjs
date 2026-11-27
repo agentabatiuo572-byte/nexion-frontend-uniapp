@@ -2,14 +2,15 @@
 // c44d6526 scripts/oauth-provider.h5.e2e.mjs; no real provider or SMS is contacted.
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
-import { demoSecurityAccount } from './prototype-demo-account.mjs';
+import { isResetPasswordOk } from '../../src/auth/password-rules.ts';
+import { changeDemoPassword, demoAccountPasswordMatches, demoSecurityAccount } from './prototype-demo-account.mjs';
 import { createSignInDemo, demoExistingUser as existing, findDemoSignInUser } from './prototype-demo-sign-in.mjs';
 import { clearPreviewAccessToken, demoReferralBuyer, issuePreviewAccessToken, previewAccountId } from './prototype-demo-identity.mjs';
 
 export const authDemoDefaults = {authState:'signed-in',oauthState:'signup',registrationState:'normal',phoneBindingState:'normal',savedAttemptState:'none'};
 export const authDemoOptions = {
   authState:[['signed-in','已登录'],['signed-out','未登录（验证登录/注册）']],
-  oauthState:[['signup','第三方新账号'],['existing','第三方已有账号'],['lost-unissued','complete 丢失且过期：未签发'],['lost-issued','complete 回包丢失且过期：已签发，恢复暂时不可用'],['invite-refused','授权后邀请码被拒'],['device-limit','第三方注册设备上限'],['ip-limit','第三方注册 IP 上限']],
+  oauthState:[['signup','第三方新账号'],['existing','第三方已有账号'],['lost-unissued','complete 丢失且过期：未签发'],['lost-issued','complete 回包丢失且过期：已签发，恢复暂时不可用'],['invite-refused','授权后邀请码被拒'],['device-limit','第三方注册设备上限'],['ip-limit','第三方注册 IP 上限'],['start-failed','发起授权失败']],
   savedAttemptState:[['none','无旧尝试'],['legacy-empty','旧空安装 ID：恢复已签发会话'],['storage-cleared','旧浏览器 ID：恢复已签发会话'],['registration','手机号注册恢复']],
   phoneBindingState:[['normal','正常绑定（验证码 123456）'],['captcha','绑定发码需滑块'],['used','手机号已被使用']],
   registrationState:[['normal','正常注册'],['captcha','发码需滑块'],['captcha-invalid','发码 ticket 无效后重新验证'],['device-limit','注册设备上限'],['ip-limit','注册 IP 上限']],
@@ -120,6 +121,7 @@ export function createAuthDemo(state) {
       }
       if(path.endsWith('/oauth/provider/available'))return ok(['GOOGLE','APPLE','TELEGRAM']);
       if(path.endsWith('/oauth/provider/start')) {
+        if(state.oauthState==='start-failed')return fail(503,'OAUTH_PROVIDER_UNAVAILABLE');
         const flowId='OIDC-'+randomBytes(16).toString('hex'),flowKey=randomBytes(32).toString('base64url'),receipt=randomBytes(32).toString('base64url'),browserState=randomBytes(32).toString('base64url');
         flows.set(flowId,{flowId,flowKey,receipt,browserState,provider:body.provider,intent:body.intent==='LINK'?'LINK':'LOGIN',sponsorCode:body.sponsorCode,approved:false});
         return ok({flowId,flowKey,expiresInSec:600,authorizationUrl:url.origin+'/auth/users/oauth/provider/authorize/'+browserState});
@@ -198,7 +200,11 @@ export function createAuthDemo(state) {
         }
         const prefix=otpSend[1]==='register'?'REG':'RESET';
         const challengeNo=prefix+'-'+randomBytes(16).toString('hex');
-        otps.set(challengeNo,{countryCode:body.countryCode,phone:body.phone,installationId:headers['x-nexgrid-installation-id']??''});
+        // As AppUserPasswordResetService: an unknown number still gets a challenge number but no usable challenge,
+        // and a new reset code replaces the account's open one.
+        const resetUser=prefix==='RESET'?findDemoSignInUser(body.countryCode,body.phone):null;
+        if(resetUser)for(const [open,otp] of otps)if(otp.resetUserId===resetUser.userId)otps.delete(open);
+        if(prefix==='REG'||resetUser)otps.set(challengeNo,{countryCode:body.countryCode,phone:body.phone,installationId:headers['x-nexgrid-installation-id']??'',resetUserId:resetUser?.userId});
         return ok({challengeNo,resendAfterSec:1,deliveryHint:'***'+body.phone.slice(-4)});
       }
       if(path==='/auth/users/register') {
@@ -210,11 +216,22 @@ export function createAuthDemo(state) {
           return issueLogin(attempt.response.user,attempt.response.registrationReceipt,attempt.deviceName);
         }
       }
-      if(['/auth/users/register','/auth/users/register/otp/verify','/auth/users/password-reset/otp/verify','/auth/users/password-reset/otp/complete'].includes(path)) {
+      if(path==='/auth/users/password-reset/otp/verify'||path==='/auth/users/password-reset/otp/complete') {
+        // As AppUserPasswordResetService: a wrong code, a replaced or used challenge and a weak new password are all
+        // USER_PASSWORD_RESET_CHALLENGE_INVALID; the challenge is spent only when the password actually changes.
+        const user=findDemoSignInUser(body.countryCode,body.phone),otp=otps.get(body.challengeNo);
+        if(!user||!otp||otp.resetUserId!==user.userId||body.code!=='123456')return fail(422,'USER_PASSWORD_RESET_CHALLENGE_INVALID');
+        if(path.endsWith('/verify'))return ok({status:'PASSWORD_RESET_OTP_VERIFIED'});
+        if(typeof body.newPassword!=='string'||!isResetPasswordOk(body.newPassword,{phone:user.phone}))return fail(422,'USER_PASSWORD_RESET_CHALLENGE_INVALID');
+        if(demoAccountPasswordMatches(state,body.newPassword,user.userId))return fail(422,'USER_NEW_PASSWORD_MUST_DIFFER');
+        otps.delete(body.challengeNo);
+        changeDemoPassword(state,user.userId,body.newPassword);
+        return ok({status:'PASSWORD_RESET',revokedSessionCount:0});
+      }
+      if(['/auth/users/register','/auth/users/register/otp/verify'].includes(path)) {
         const otp=otps.get(body.challengeNo);
-        const prefix=path.startsWith('/auth/users/register')?'REG-':'RESET-';
-        if(!otp||!body.challengeNo.startsWith(prefix)||otp.countryCode!==body.countryCode||otp.phone!==body.phone||body.code!=='123456')return fail(422,'USER_REGISTRATION_OTP_INVALID');
-        if(prefix==='REG-'&&findDemoSignInUser(body.countryCode,body.phone))return fail(409,'USER_REGISTRATION_ACCOUNT_EXISTS');
+        if(!otp||!body.challengeNo.startsWith('REG-')||otp.countryCode!==body.countryCode||otp.phone!==body.phone||body.code!=='123456')return fail(422,'USER_REGISTRATION_OTP_INVALID');
+        if(findDemoSignInUser(body.countryCode,body.phone))return fail(409,'USER_REGISTRATION_ACCOUNT_EXISTS');
         if(path==='/auth/users/register') {
           otps.delete(body.challengeNo);
           if(otp.installationId!==(headers['x-nexgrid-installation-id']??''))return fail(428,'USER_CAPTCHA_REQUIRED');
@@ -222,8 +239,7 @@ export function createAuthDemo(state) {
           if(state.registrationState==='ip-limit')return fail(409,'USER_REGISTRATION_K1_IP_LIMIT');
           return issueLogin({...existing,userId:583920417,countryCode:body.countryCode,phone:body.phone,onboardingComplete:false},receipt(body.sponsorCode),body.deviceName);
         }
-        if(path.endsWith('/complete'))return ok({status:'PASSWORD_RESET',revokedSessionCount:0});
-        return ok({status:path.includes('/register/')?'REGISTRATION_OTP_VERIFIED':'PASSWORD_RESET_OTP_VERIFIED'});
+        return ok({status:'REGISTRATION_OTP_VERIFIED'});
       }
       return fail(404,'AUTH_PREVIEW_NOT_MODELLED');
     },
