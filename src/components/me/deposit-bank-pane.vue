@@ -9,9 +9,11 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
-    <FxRateLine v-if="paymentSessionReady" :style="readFailure || paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
-    <view v-if="readFailure" class="nx-bank-read-error" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-2)" role="status">
-      <text>{{ readFailure }}</text>
+    <FxRateLine v-if="paymentSessionReady" :style="fxReadFailure || paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
+    <!-- Only the rate read failing leaves this line: it hides the form. An order-list read failure only blocks 生成付款单, says so
+         above it in the bar and recovers by itself (03 §3.4, §3.5.2). -->
+    <view v-if="fxReadFailure" class="nx-bank-read-error" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-2)" role="status">
+      <text>{{ fxReadFailure }}</text>
       <view class="nx-bank-read-retry" role="button" :tabindex="readRetryBusy ? -1 : 0" :aria-disabled="readRetryBusy" style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)" @click="retryReadData" @keydown.enter.prevent="retryReadData" @keydown.space.prevent="retryReadData">
         <text>{{ readRetryBusy ? t.help.loadingMore : t.ui.retry }}</text>
       </view>
@@ -179,8 +181,16 @@
 
     <!-- ── 等待回调(仅 UI 等待提示,单仍 awaiting;到点过期由 store 引擎翻面)── -->
     <template v-else-if="paneView === 'waiting'">
-      <!-- Waiting, expired and mismatch open with the shared result head (03 §3.6.1), as credited does. -->
+      <!-- Waiting, both checks, expired and mismatch open with the shared result head (03 §3.6.1), as credited does. -->
       <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning" :title="t.bankPane.waitingTitle" :description="t.bankPane.waitingBody" /></view>
+      <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
+    </template>
+
+    <!-- ── 回单核对中(receipt_review)/ 过期后到账核对中(late_review):同等待态,底栏不放主操作;「重新发起充值」只给真正的金额不符 ── -->
+    <template v-else-if="paneView === 'receipt_review' || paneView === 'late_review'">
+      <view class="nx-bank-state nx-step-in"><NxResultHead tone="warning"
+        :title="paneView === 'late_review' ? t.bankPane.lateReviewTitle : t.bankPane.receiptReviewTitle"
+        :description="paneView === 'late_review' ? t.bankPane.lateReviewBody : t.bankPane.receiptReviewBody" /></view>
       <view class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.topupChrome.depositNotArrived" @click="goSupport" /></view>
     </template>
 
@@ -291,7 +301,8 @@ const pageActive = ref(false);
 const readError = ref("");
 const readRetryPending = ref(false);
 const readRetryBusy = computed(() => readRetryPending.value || fx.loading || dep.serverStatus === "loading");
-const readFailure = computed(() => readError.value || (paymentSessionReady.value && fx.syncFailed ? t.value.bankPane.createFxUnavailable : ""));
+const fxReadFailure = computed(() => paymentSessionReady.value && fx.syncFailed ? t.value.bankPane.createFxUnavailable : "");
+const readFailure = computed(() => readError.value || fxReadFailure.value);
 useAutoRecovery({
   failed: () => pageActive.value && paymentSessionReady.value && !readRetryBusy.value && !!readFailure.value,
   retry: retryReadData,
@@ -455,7 +466,7 @@ function fmtVnd(value: number): string { return `${formatAmount(value, "VND")}\u
 const minLabel = computed(() => usdtLabel(minDeposit.value));
 const maxLabel = computed(() => usdtLabel(maxDeposit.value));
 // Facts well under the amount: unknown values stay "—", never a fabricated 0.
-const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}\u2060–\u2060${shortUsdt(maxDeposit.value)} USDT` : "—");
+const limitFact = computed(() => fx.configReady ? `${shortUsdt(minDeposit.value)}\u2060–\u2060${shortUsdt(maxDeposit.value)}\u00A0USDT` : "—");
 const todayRemainingLabel = computed(() => usdtLabel(todayRemainingDeposit.value));
 const todayRemainingFact = computed(() => dailyCapacityKnown.value ? todayRemainingLabel.value : "—");
 const feeFact = computed(() => {
@@ -985,15 +996,16 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-chip[aria-disabled="true"] { opacity: .45; cursor: default; }
 .nx-bank-chip:not([aria-disabled="true"]):active { transform: scale(.97); }
 .nx-bank-chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
+.nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(min-content, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
   background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .nx-bank-facts { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .nx-bank-fact { min-width: 0; }
 .nx-bank-fact > .nx-bank-k { padding-top: 3px; }
 .nx-bank-fact + .nx-bank-fact { padding-left: 12px; border-left: 1px solid var(--v5-border); }
-/* Values wrap instead of being cut (03 §3.6.1): the limit range breaks only before its unit. */
-.nx-bank-fact__v { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: break-word; }
-.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: 400 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
+/* Values in the 10.1 行内数值 role, never cut and never split from their unit (03 §3.6.1): a value and its USDT are one
+   unbreakable run, so a column whose value is wider than its third grows to it and the others give way. */
+.nx-bank-fact__v { display: block; margin-top: 4px; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: break-word; }
+.nx-bank-fact__sub { display: block; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-metric); white-space: nowrap; }
 .nx-bank-hint { display: flex; align-items: flex-start; gap: 8px; margin: 14px 2px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-bank-hint > svg, .nx-bank-hint > .nx-native-svg { flex: none; margin-top: 2px; color: var(--v5-success-ink, var(--v5-success)); }
 /* Hosted payment: countdown ring on the glass slab, order summary card. */
