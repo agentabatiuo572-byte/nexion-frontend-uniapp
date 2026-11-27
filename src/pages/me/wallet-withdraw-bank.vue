@@ -5,7 +5,8 @@
       <text class="muted loading" role="status">{{ c.loading }}</text>
     </view>
     <view v-else class="bank-withdraw" :aria-busy="busy">
-      <view v-if="error" class="notice danger" role="alert"><text>{{ error }}</text></view>
+      <!-- Not on the first-read failure below: its centred result already says it once. -->
+      <view v-if="error && (order || uncertain || displayIntents.length || displayConfig || requestedOrder !== null || pendingAttempt)" class="notice danger" role="alert"><text>{{ error }}</text></view>
       <text v-if="busy && !silentRead" class="muted loading" role="status">{{ c.loading }}</text>
       <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
         <text>{{ c.resumeUsdt }}</text>
@@ -135,21 +136,11 @@
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
         <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': !quote && formStep === 'amount' && !!quoteReason }" />
       </template>
+      <!-- First config read with no snapshot (03 §3.4, §3.5.2): while it runs, only the page's loading line above; when it
+           fails, the page's one centred result and its one 重新加载. No form skeleton and no grey main-action placeholders;
+           the bar renders nothing here (04 §4.0). -->
       <template v-else-if="requestedOrder === null && !pendingAttempt">
-        <text class="screen-title" role="heading" aria-level="1">{{ title }}</text>
-        <text class="intro">{{ formStep === 'amount' ? c.amountHint : c.recipientSubtitle }}</text>
-        <template v-if="formStep === 'account'">
-          <view class="account-card"><text class="muted">{{ c.recipientTitle }}</text><text class="account-number">—</text><text class="bank-name">—</text></view>
-          <NxButton class="page-action page-action--primary" variant="primary" :label="c.continueWithdrawal" disabled aria-hidden="true" data-testid="bank-continue" />
-        </template>
-        <template v-else>
-          <text class="field-label">{{ c.totalDebit }} · USDT</text>
-          <view class="amount-input"><input data-testid="bank-amount" type="text" inputmode="decimal" disabled placeholder="—" :aria-label="c.amount" /><NxButton variant="text" size="small" :label="c.all" disabled aria-hidden="true" /></view>
-          <view class="notice notice--info"><text>{{ c.feeIncluded }}</text></view>
-          <NxButton class="page-action page-action--primary" variant="primary" :label="c.quote" disabled aria-hidden="true" data-testid="bank-quote" />
-          <NxButton class="page-text-action nx-reverse-action" variant="text" size="small" :label="c.backToAccount" :disabled="busy" @click="goBack" />
-        </template>
-        <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
+        <EmptyState v-if="error" kind="recoverable-error" page :title="useTranslations.pageLoad.unknown" :cta-label="c.reload" :cta-busy="busy" @cta="load" />
       </template>
       <NxButton v-else-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
     </view>
@@ -208,6 +199,7 @@ import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import EmptyState from "@/components/empty-state.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxRulesList from "@/components/ui/nx-rules-list.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -685,12 +677,10 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 <style scoped>
 .bank-withdraw { padding: 0 16px 40px; color: var(--v5-ink); font-family: var(--font-v5); }
 .screen-title { display: block; font-size: 26px; line-height: 1.3; font-weight: 600; letter-spacing: -.5px; overflow-wrap: break-word; }
-.intro { display: block; margin: 10px 0 24px; color: var(--v5-ink-3); font-size: var(--ui-type-list-subtitle); line-height: 1.6; }
 .muted { display: block; color: var(--v5-ink-3); font-size: 12px; line-height: 1.6; overflow-wrap: break-word; }
 .loading { margin-bottom: 12px; }
 .account-card, .amount-card { border-radius: 16px; background: var(--v5-surface-2); padding: 18px; margin: 20px 0; }
 .account-number { display: block; font-family: var(--font-metric); font-size: 20px; letter-spacing: 1px; font-variant-numeric: tabular-nums; margin: 6px 0; overflow-wrap: break-word; }
-.bank-name { font-size: var(--ui-type-body); }
 .chip { display: inline-block; border-radius: 999px; background: var(--v5-surface-2); color: var(--v5-brand); padding: 4px 10px; font-size: 12px; }
 /* Page notices (pending, unknown result, routing, limits, daily count): a 16px status icon before the text instead of a
    side stripe (design-rules: warnings in the warning colour with an icon); errors in the error colour, plain facts neutral. */
@@ -699,24 +689,20 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .notice > text { flex: 1 1 0; min-width: 0; overflow-wrap: break-word; }
 .notice > .page-action { flex: 1 1 100%; }
 .notice.danger::before { background: var(--v5-danger); }
-.notice--info { --notice-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5m0-9h.01'/%3E%3C/svg%3E"); }
-.notice--info::before { background: var(--v5-ink-3); }
 @media (forced-colors: active) { .notice::before { forced-color-adjust: none; background: CanvasText; } }
 .danger { color: var(--v5-danger); }
 .warn { color: var(--v5-warning); }
-/* In-page buttons are the shared NxButton (03 §3.1); the page sets only layout. Full-width: the USDT entry, the intent
-   rows (neutral glass L) and the loading placeholders of the bar's primary. Text buttons sit centred on their label
+/* In-page buttons are the shared NxButton (03 §3.1); the page sets only layout. Full-width: the USDT entry and the intent
+   rows (neutral glass L). Text buttons sit centred on their label
    line with the shared 44px hit layer: 重新加载 in brand; 重新填写金额 and 返回收款账户 give up or step back, so they take
    the shared quiet reverse-action style (.nx-reverse-action: ink-3, 13/18, 400) and do not compete with the bar. */
 .page-action { width: 100%; margin-top: 12px; }
-.page-action--primary { margin-top: 24px; }
 .bank-withdraw .page-action--intent { min-width: 0; }
 .bank-withdraw .page-text-action { display: flex; width: max-content; margin: 21px auto 13px; }
 /* Margins collapse, so a second text button right below takes 34: the two 44px hit layers keep 8 between them. */
 .bank-withdraw .page-text-action + .page-text-action { margin-top: 34px; }
 [aria-disabled="true"]:not(.nx-button) { opacity: .4; cursor: default; }
 .consent:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 3px; }
-.field-label { display: block; font-size: 12px; color: var(--v5-ink-2); margin: 18px 0 6px; }
 .amount-input { display: flex; align-items: center; gap: 8px; border: 1px solid var(--v5-border-strong); border-radius: 12px; padding: 8px 12px; }
 .amount-input input { flex: 1; min-width: 0; font-size: 26px; height: 44px; color: var(--v5-ink); }
 .limits { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--v5-ink-3); margin-top: 12px; line-height: 1.5; }
