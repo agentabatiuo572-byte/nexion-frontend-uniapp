@@ -4480,7 +4480,7 @@ export const ru: Messages = {
     withdrawEarlierOutcome: "Предыдущий запрос: {outcome}",
     withdrawOtherPending: "Сейчас на странице показан другой вывод в процессе обработки. Проверьте его.",
     withdrawResendTitle: "Отправить этот вывод повторно без изменений?",
-    withdrawResendBody: "Вывод ${amount} на адрес {network} {address} будет отправлен повторно без изменений. Отправится только он, новый вывод не создаётся.",
+    withdrawResendBody: "Отправится только он, новый вывод не создаётся.",
     withdrawResendCta: "Отправить повторно",
     withdrawOutcomeUnknownTitle: "Результат вывода не подтверждён",
     withdrawAbandonAttemptCta: "Отказаться",

@@ -4480,7 +4480,7 @@ export const kk: Messages = {
     withdrawEarlierOutcome: "Алдыңғы сұрау: {outcome}",
     withdrawOtherPending: "Қазір бетте басқа өңделіп жатқан ақша шығару көрсетілген. Оны тексеріңіз.",
     withdrawResendTitle: "Бұл шығаруды өзгеріссіз қайта жібересіз бе?",
-    withdrawResendBody: "${amount} сомасын {network} {address} мекенжайына шығару өзгеріссіз қайта жіберіледі. Тек осы сұрау жіберіледі, жаңасы жасалмайды.",
+    withdrawResendBody: "Тек осы сұрау жіберіледі, жаңасы жасалмайды.",
     withdrawResendCta: "Қайта жіберу",
     withdrawOutcomeUnknownTitle: "Шығару нәтижесі расталмады",
     withdrawAbandonAttemptCta: "Сұрауды жабу",

@@ -4480,7 +4480,7 @@ export const ms: Messages = {
     withdrawEarlierOutcome: "Permintaan terdahulu: {outcome}",
     withdrawOtherPending: "Halaman ini kini memaparkan pengeluaran lain yang sedang diproses. Sila semak.",
     withdrawResendTitle: "Hantar semula pengeluaran ini tanpa perubahan?",
-    withdrawResendBody: "Pengeluaran ${amount} ke alamat {network} {address} akan dihantar semula tanpa perubahan. Hanya pengeluaran ini dihantar, tiada pengeluaran baharu.",
+    withdrawResendBody: "Hanya pengeluaran ini dihantar, tiada pengeluaran baharu.",
     withdrawResendCta: "Hantar semula",
     withdrawOutcomeUnknownTitle: "Keputusan pengeluaran belum disahkan",
     withdrawAbandonAttemptCta: "Tinggalkan",

@@ -4480,7 +4480,7 @@ export const uz: Messages = {
     withdrawEarlierOutcome: "Avvalgi soʻrov: {outcome}",
     withdrawOtherPending: "Bu sahifada hozir boshqa davom etayotgan pul yechish koʻrsatilgan. Uni tekshiring.",
     withdrawResendTitle: "Bu yechish oʻzgarishsiz qayta yuborilsinmi?",
-    withdrawResendBody: "${amount} miqdorini {network} {address} manziliga yechish oʻzgarishsiz qayta yuboriladi. Faqat shu soʻrov yuboriladi, yangisi yaratilmaydi.",
+    withdrawResendBody: "Faqat shu soʻrov yuboriladi, yangisi yaratilmaydi.",
     withdrawResendCta: "Qayta yuborish",
     withdrawOutcomeUnknownTitle: "Yechish natijasi tasdiqlanmagan",
     withdrawAbandonAttemptCta: "Voz kechish",
