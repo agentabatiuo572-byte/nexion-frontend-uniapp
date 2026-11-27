@@ -79,8 +79,8 @@
           </view>
           <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
           <view class="nx-dep-trio">
-            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">{{ formatTruncatedAmount(minDeposit) + '\u00A0USDT' }}</text></view>
-            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ isSubCentFee(feeUsdt) ? t.topupChrome.feeUnderCent : feeAmountText(feeUsdt) + '\u00A0USDT' }}</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">{{ formatTruncatedAmount(minDeposit) }}<text class="nx-dep-trio__u">{{ '\u00A0USDT' }}</text></text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text v-if="isSubCentFee(feeUsdt)" class="nx-dep-trio__v nx-dep-trio__v--words">{{ t.topupChrome.feeUnderCent }}</text><text v-else class="nx-dep-trio__v">{{ feeAmountText(feeUsdt) }}<text class="nx-dep-trio__u">{{ '\u00A0USDT' }}</text></text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
@@ -782,7 +782,12 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-trio > view + view { border-left: 1px solid var(--v5-border); }
 .nx-dep-k { display: block; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-dep-trio .nx-dep-k { padding-top: 3px; }
-.nx-dep-trio__v { display: block; margin-top: 2px; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); font-variant-numeric: tabular-nums; }
+/* Three-column data block (10.1 统计数值): the figure in the metric face, its USDT unit after it in the 辅助数值 role and
+   secondary ink. A worded value (「不足 0.01 USDT」) is a phrase, not a figure: it takes the 行内数值 size in the interface face
+   and wraps inside its column in long languages instead of overflowing. */
+.nx-dep-trio__v { display: block; margin-top: 2px; color: var(--v5-ink); font: var(--ui-type-metric-value-weight) var(--ui-type-metric-value)/var(--ui-type-metric-value-lh) var(--font-metric); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nx-dep-trio__u { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.nx-dep-trio__v--words { padding: 3px 4px 0; font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-v5); white-space: normal; overflow-wrap: break-word; }
 .nx-dep-warnbox { display: flex; align-items: flex-start; gap: 10px; margin: 12px -2px 0; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-warning) 16%, transparent); color: var(--v5-warning-ink); font: 400 13px/20px var(--font-v5); }
 .nx-dep-warnbox > svg, .nx-dep-warnbox > .nx-native-svg { flex: none; margin-top: 3px; }
 .nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
