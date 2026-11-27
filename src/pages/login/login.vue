@@ -113,8 +113,9 @@
 
       <!-- Primary CTA -->
       <!-- Incomplete fields still allow a tap to show their reason. A missing challenge disables the CTA.
-           Busy shows NxButton's spinner and takes no taps. -->
-      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !loading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="loading" :disabled="otpChallengeMissing" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
+           Busy shows NxButton's spinner and takes no taps. While the third-party panel is open the CTA is disabled, not
+           busy: the panel's confirm is the only primary in view (03 §3.1), and the panel's copy describes the button. -->
+      <NxButton v-if="!loginRecoveryPending" class="lg-cta" :class="{ 'lg-cta--off': !canPrimary && !localLoading }" data-system-chrome-primary variant="primary" :label="primaryText" :busy="localLoading" :disabled="otpChallengeMissing || oauthBusy" :aria-disabled="!canPrimary || loading" :aria-describedby="oauthBusy ? 'oauth-panel-copy' : !canPrimary && !loading ? (error ? 'lg-error' : 'lg-cta-reason') : undefined" @click="onPrimary" />
       <!-- 03 §3.1: a greyed CTA shows its reason in a neutral line below it from the first frame. While the error line
            directly above is showing, that line carries the reason and the button points to it instead. The recovery view
            has the same line under its own button (lg-retry-reason). The line keeps its height when it has
