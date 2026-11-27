@@ -191,7 +191,7 @@ export const demoOptions = {
   jobsBaseState:[['unpublished','全球作业基数 · 未发布'],['published','全球作业基数 · 已发布 560']],
   homeDisplayState:[['paused','暂停'],['growth','增长']],
   globeShareState:[['nodes','旧格式 · 按节点数分配'],['share','新格式 · 只下发 sharePct'],['invalid','新格式 · 占比合计 90（无效）'],['missing','未下发全球网络展示配置']],
-  fleetState:[['normal','默认设备'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位'],['earning-credit','收益到账通知 · 三台设备']],
+  fleetState:[['normal','默认设备'],['tradein-variant','升级置换 · 持有 S1 Plus'],['none','暂无设备'],['inventory','含仓库未激活设备'],['decayed','S1 产能递减 · 含未激活 S1 / Share'],['full','槽位已满 6/6'],['reserved','含机位分配中槽位'],['earning-credit','收益到账通知 · 三台设备']],
   paymentState:[['delivered','正常到账（15 秒到账，25 秒开通）'],['funds-confirmed','已收到付款 · 等待开通'],['waiting','一直等待到账'],['read-error','原付款读取失败（503，保留原单）'],['intent-missing','确证没有原付款单（404，结束查询）'],['remote-in-progress','别处发起的进行中付款（本机无记录）'],['urgent','剩余不足 5 分钟'],['expired','超时未到账·订单取消'],['late','宽限结束后到账·订单已取消（示例 001 剩 1 分钟）'],['bank-failed','银行卡付款失败'],['mismatch','金额不符·人工核对'],['delivery-failed','已到账·开通失败'],['bank-off','银行卡未配置'],['erc20-off','后台关闭 ERC20'],['usdt-off','后台关闭 USDT 两个网络'],['low-balance','钱包余额不足（820.64 USDT）'],['reward-clawback-debt','奖励扣回·USDT 欠款（−12.123456）']],
   deviceTaskSampleState:[['default','默认作业样例'],['long','长作业名 · 最近完成 10 条（模拟作业）']],
   // Implies fleetState=full: device 41 (running sample job) waits to be replaced by inventory UVELBox Pro 47.
@@ -215,6 +215,8 @@ const catalogTaglineFallbacks = {
 };
 const demoSeriesCodes=['S1','PRO','PRO_V2','RACK_P1','RACK_P2','CLOUD_SHARE'];
 const demoS1VariantNo='E-S1-002';
+const demoTradeinSourceNo='E-S1-003';
+const demoTradeinTargetNo='P-PRO-002';
 const demoCatalogBadges = [
   {badge:'Recommended',badgeKind:'recommended'},
   {badge:'Best seller',badgeKind:'bestSeller'},
@@ -245,9 +247,14 @@ function demoDailyUsdt(monthlyTarget, percent = 100) {
 export function demoProducts(state,origin='http://127.0.0.1:5190') {
   const trialSku=state.trialRow?.claimConfig?.trialProductId??(state.catalogState==='trial-h2-switched'?'stellarbox-pro':previewDefaultTrialSku);
   const optionTarget=trialPurchaseOptionSku(state);
-  const definitions=state.catalogState==='sku-series'
-    ? [...skuDefinitions,[demoS1VariantNo,'UVELBox S1 96 GB','Entry',999,150,2,'4 × RTX 4090','96 GB',1200]]
-    : skuDefinitions;
+  const definitions=[...skuDefinitions];
+  if(state.catalogState==='sku-series')
+    definitions.push([demoS1VariantNo,'UVELBox S1 96 GB','Entry',999,150,2,'4 × RTX 4090','96 GB',1200]);
+  if(state.fleetState==='tradein-variant')
+    definitions.push(
+      [demoTradeinSourceNo,'UVELBox S1 Plus','Entry',1599,210,4,'4 × RTX 4090','96 GB',1200],
+      [demoTradeinTargetNo,'UVELBox Pro Plus','Pro',5499,720,14,'8 × RTX 4090','192 GB',2400],
+    );
   const products=definitions.map(([id,name,tier,listPrice,monthlyTarget,dailyEarnNEX,gpu,vram,watts],index)=>{
     const monthlyEstimateUsdt=id===previewDefaultTrialSku&&state.catalogState==='trial-h2-yield-updated'?225:monthlyTarget;
     const discountSamplePrice=state.trialPurchaseListState==='device-discounts'&&['stellarbox-s1','cloud-share'].includes(id);
@@ -266,11 +273,12 @@ export function demoProducts(state,origin='http://127.0.0.1:5190') {
       Math.max(0,60-index*7-demoH4GiftQuantity(state,id)-bought);
     // AppProductCatalogService projects release and stock gates independently.
     // The phased preset models a valid E1 phase id that has not been reached.
-    const variant=id===demoS1VariantNo;
+    const variantBase=id===demoTradeinTargetNo?1:id===demoS1VariantNo||id===demoTradeinSourceNo?0:index;
+    const imageSku=skuDefinitions[variantBase][0];
     return {id,name:state.catalogState==='trial-h2-switched'&&id===previewDefaultTrialSku?'UVELBox S1 Classic':name,tier,price,dailyEarn,dailyEarnNEX,monthlyEstimateUsdt,computePoints:Math.round(price*10),gpu,
-      seriesCode:variant?'S1':demoSeriesCodes[index],seriesRepresentative:false,
+      seriesCode:demoSeriesCodes[variantBase],seriesRepresentative:false,
       vram:share?'not_applicable':vram.replace(/[ ,]/g,''),power:watts?watts+' W':'not_applicable',hashRate:null,
-      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[variant?0:index],imageUrl:new URL('/static/img/products/uvel-pedestal/'+(variant?previewDefaultTrialSku:id)+'.webp',origin).href,
+      tagline:share?'Cloud-hosted share':tier==='Flagship'?'Fully managed rack':'Fully managed device',...demoCatalogBadges[variantBase],imageUrl:new URL('/static/img/products/uvel-pedestal/'+imageSku+'.webp',origin).href,
       videoUrl:null,specDocumentTitle:null,specDocumentUrl:null,phoneDailyEarn:'unavailable',phoneDailyEarnNEX:'unavailable',
       productType:share?'SHARE':'DEVICE',inventoryMode:share?'UNLIMITED':'FINITE',stock,sold:42+index*13+bought,
       features:[],taskLevels:[],ai:null,datacenter:'',uptime:'99.9%',warranty:share?'unavailable':'36 months',status:optionState==='unlisted'?'legacy':'active',
@@ -624,6 +632,10 @@ function demoSeedFleet(state,baseDevice,products,capacitySchedule,cap,occupied,r
   const live=device=>!retired.includes(device.id);
   if(state.dataState==='empty'||state.promotionBuyer==='sponsored-new')return [];
   let devices=state.fleetState==='none'?[]:[template,{...template,id:42,instanceNo:'DEMO-PRO',name:'UVELBox Pro',productCode:'STELLARBOX-PRO',dailyUsdt:22.4,dailyNex:12,todayEarningsUsdt:13.9,todayEarningsNex:2,actualPaidUsdt:4999}];
+  if(state.fleetState==='tradein-variant'){
+    const source=products.find(product=>product.id===demoTradeinSourceNo);
+    devices.push(clone(43,source.id,source.name,source.dailyEarn,source.price,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
+  }
   if(state.fleetState==='inventory')devices.push(clone(43,'STELLARRACK-P1','UVELRack P1',45,12999,{status:'INACTIVE',activatedAt:null,runtimeStatus:'OFFLINE'}));
   if(state.fleetState==='earning-credit'){
     devices.push(clone(43,'STELLARRACK-P1','UVELRack Pacific Research Compute Cluster International West 0043',45,12999,{}));
@@ -1257,17 +1269,17 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
   if(pathname==='/api/app/trade-in/config')return {enabled:!empty,eligibility:'ALL',outputRatioCutsPct:tradeinCuts,creditRatesPct:tradeinRates,requireHigherPrice:true,maxDevicesPerOrder:1,earlyAccessEnabled:false,earlyAccessLeadDays:30,source:'server'};
   // All rows in the preview account's fleet are its own unless ownership says otherwise.
   const isTradeinSource=device=>{
-    const sku=products.find(product=>product.id===device.productCode.toLowerCase());
+    const sku=products.find(product=>product.id.toUpperCase()===device.productCode);
     if(sku?.productType!=='DEVICE'||['SHARE','CLOUD'].includes(device.deviceType)
       ||(device.ownershipStatus??'OWNED')!=='OWNED'||device.pendingDeactivate||device.sourceChannel==='PROMOTION_GIFT')return false;
     if(device.activatedAt!=null)
       return device.deactivatedAt==null&&['ACTIVE','ONLINE','BUSY','RUNNING','OFFLINE'].includes(device.status);
     return ['INACTIVE','INVENTORY','DEACTIVATED','PENDING_ACTIVATION'].includes(device.status);
   };
-  const tradeinSourcePrice=device=>products.find(product=>product.id===device.productCode.toLowerCase())?.price??0;
+  const tradeinSourcePrice=device=>products.find(product=>product.id.toUpperCase()===device.productCode)?.price??0;
   const tradeinSourceReason=(device,product)=>{
     if(!(device.actualPaidUsdt>0))return 'SOURCE_PAID_PRICE_UNAVAILABLE';
-    if(device.productCode.toLowerCase()===product.id)return 'TARGET_MUST_DIFFER';
+    if(device.productCode===product.id.toUpperCase())return 'TARGET_MUST_DIFFER';
     const sourcePrice=tradeinSourcePrice(device);
     if(sourcePrice<=0)return 'SOURCE_CURRENT_PRICE_UNAVAILABLE';
     return product.price>sourcePrice?'OK':'HIGHER_PRICE_REQUIRED';
@@ -1353,7 +1365,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const replacement=keepingCapacity?null:checkReplacementSource(quote.sourceDeviceId,Boolean(paid));
     const currentTask=replacement?.assignment?.currentTask;
     const product=products.find(p=>p.id===quote.targetProductNo);
-    const sourceSku=products.find(p=>p.id===replacement?.source?.productCode.toLowerCase());
+    const sourceSku=products.find(p=>p.id.toUpperCase()===replacement?.source?.productCode);
     const computePoints=Math.max(0,product.computePoints-(sourceSku?.computePoints??0));
     if(paid&&Number(quote.payableUsdt).toFixed(6)!==paid.businessAmountUsdt)refuse('PURCHASE_PAYMENT_PRICING_CHANGED');
     const hardwareQuotaUsedAt=requireDemoPurchase(state,products,[{productNo:product.id,quantity:1}],now,true,paid?.quotaHold);
@@ -1926,7 +1938,7 @@ export function demoFixture(url,locale,state,request,now=Date.now()) {
     const assignments=active.length?read(demoReplacementAssignmentsPath(state)).devices:[];
     const busyIds=new Set(assignments.filter(demoActiveSlotReplacementTask).map(row=>row.deviceId));
     data.devices=facts.devices.map(device=>({
-      ...device,imageUrl:device.imageUrl??imageFor(device.productCode.toLowerCase()),
+      ...device,imageUrl:device.imageUrl??products.find(product=>product.id.toUpperCase()===device.productCode)?.imageUrl??null,
       ...(device.activatedAt!==null&&{slotReplacementTiming:busyIds.has(device.id)?'PENDING':'IMMEDIATE'}),
     }));
     return data;

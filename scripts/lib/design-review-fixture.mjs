@@ -31,7 +31,8 @@ const voucher = { voucherId: 'V-DESIGN', voucherName: 'Device voucher', voucherT
 
 const capacitySchedule = { stageEarlyEnd: '3', stageMidEnd: '8', capacityFloorPct: '22', capacitySubsidyDays: '30', capacityBand1DeltaPct: '-4', capacityBand2DeltaPct: '-6', capacityBand3DeltaPct: '-23.7', capacityApplyToPhone: 'false', capacityApplyToCloudShare: 'false', capacityApplyToPcGpu: 'false', capacityApplyToS1: 'true', capacityApplyToPro: 'true', capacityApplyToProV2: 'true', capacityApplyToRackP1: 'true', capacityApplyToRackP2: 'true' };
 
-const capacityKeys = { 'STELLARBOX-S1': 'capacityApplyToS1', 'STELLARBOX-PRO': 'capacityApplyToPro',
+const capacityKeys = { 'STELLARBOX-S1': 'capacityApplyToS1', 'E-S1-003': 'capacityApplyToS1',
+    'STELLARBOX-PRO': 'capacityApplyToPro', 'P-PRO-002': 'capacityApplyToPro',
     'STELLARBOX-PRO-V2': 'capacityApplyToProV2', 'STELLARRACK-P1': 'capacityApplyToRackP1',
     'STELLARRACK-P2': 'capacityApplyToRackP2', 'CLOUD-SHARE': 'capacityApplyToCloudShare',
     'MOBILE-CLOUD-SHARE': 'capacityApplyToCloudShare', 'PHONE': 'capacityApplyToPhone', 'MOBILE': 'capacityApplyToPhone',
