@@ -21,7 +21,7 @@
           </view>
           <view v-if="!claimState.empty && !claimState.claimed" class="newcomer-task__reward">
             <text class="newcomer-task__reward-value">{{ rewardText }}</text>
-            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">UVT</text>
+            <text class="newcomer-task__unit" style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">{{ "\u00A0" }}UVT</text>
           </view>
         </view>
         <view v-if="!claimState.empty && !questUnavailable && (!remoteApiEnabled || dayOneWindow)" class="newcomer-task__clock" style="text-align: right; flex-shrink: 0">
@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': targetClosed(task) }">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': !!rowReason(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -74,10 +74,11 @@
           <view style="min-width: 0">
             <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : isActionable(task) ? undefined : { flexWrap: 'wrap' }">
               <!-- An App-only row opens nothing, so its whole name stays readable and the tag drops below when both don't fit. -->
-              <text :class="task.appOnly ? 'newcomer-task__app-name' : isActionable(task) ? 'truncate' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text :class="task.appOnly ? 'newcomer-task__app-name' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
               <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
-              <text v-else :style="catStyle(task)">{{ task.cat }}</text>
+              <text v-else class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
             </view>
+            <!-- A pending row that cannot be opened says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
             <text v-if="rowReason(task)" class="newcomer-task__reason">{{ rowReason(task) }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
@@ -337,11 +338,8 @@ function isActionable(task: QuestTask) {
   return task.eligible && !dayOneExpired.value && !isDone(task) && taskNavigationState(task) === "available";
 }
 
-// A pending web row whose target the catalog shows closed (an App-only row already says why with its tag).
-function targetClosed(task: QuestTask) {
-  return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
-}
-
+// Why a pending row cannot be opened: its claim window has passed, its target is closed, or its route did not resolve.
+// A done row needs no reason; an App-only row already says why with its tag.
 function rowReason(task: QuestTask): string {
   if (isDone(task)) return "";
   // Day-One eligibility follows the frozen claim window.
@@ -413,7 +411,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : targetClosed(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : rowReason(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
@@ -421,7 +419,9 @@ function labelStyle(task: QuestTask): CSSProperties {
 
 function catStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
-  if (props.missionLayout) return {font:'400 12px/16px var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-nex-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-success-ink)' : 'var(--v5-warning-ink)'};
+  // A category is an attribute, not a status (01 §1.1.1 rule 4, 03 §3.8): the common one stays neutral, the other two take
+  // attribute-tag inks (teal for identity, brand-2 coral for social), each at least 4.5:1 on the card surface.
+  if (props.missionLayout) return {font:'var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5)', color: task.cat === t.value.home.dayOneCatIdentity ? 'var(--v5-tech-cyan-ink)' : task.cat === t.value.home.dayOneCatSocial ? 'var(--v5-brand-2-tag-ink)' : 'var(--v5-ink-3)'};
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "12px",
@@ -480,6 +480,8 @@ const toggleStyle: CSSProperties = {
 .newcomer-task__app-name { min-width: 0; overflow-wrap: break-word; }
 .newcomer-task__reason { display: block; margin-top: 2px; overflow-wrap: break-word; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 .newcomer-task__label--wrap { min-width: 0; overflow-wrap: break-word; }
+/* A wrapping task name never squeezes its category into a character-by-character column (03 §3.6.1). */
+.newcomer-task__cat { flex-shrink: 0; white-space: nowrap; }
 .newcomer-task__circle--closed { opacity: .5; }
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
@@ -594,7 +596,8 @@ const toggleStyle: CSSProperties = {
 
 
 .newcomer-task--mission .newcomer-task__count { display:inline-flex; align-items:center; height:24px; min-width:38px; box-sizing:border-box; justify-content:center; padding:0 8px; }
-.newcomer-task--mission .newcomer-task__reward { gap:6px; margin-top:17.5px; }
+/* The no-break space before UVT (03 §3.6.1) carries ~3px of the approved 6px gap. */
+.newcomer-task--mission .newcomer-task__reward { gap:3px; margin-top:17.5px; }
 .newcomer-task--mission .newcomer-task__unit { margin-left:0!important; }
 /* The countdown stays in the row, so it keeps its real width (countdown or the expired label) and the title and task count
    wrap beside it; it is centred on the title's first line, 12px down. */

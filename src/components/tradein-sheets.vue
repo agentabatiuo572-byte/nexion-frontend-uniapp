@@ -324,7 +324,7 @@
     </view>
     <view v-if="recoveryNotice" class="tis-dlg-due">
       <text class="tis-dlg-due__label">{{ t.tradein.recoveryDueLabel }}</text>
-      <text v-if="recoveryNotice.due" class="tis-dlg-due__amount">{{ recoveryNotice.due.int }}<text class="tis-amt__dec">{{ recoveryNotice.due.dec }}</text><text class="tis-dlg-due__unit">USDT</text></text>
+      <text v-if="recoveryNotice.due" class="tis-dlg-due__amount">{{ recoveryNotice.due.int }}<text class="tis-amt__dec">{{ recoveryNotice.due.dec }}</text><text class="tis-dlg-due__unit">{{ '\u00A0USDT' }}</text></text>
       <text v-else class="tis-dlg-due__amount tis-amt--unknown">—</text>
     </view>
   </NxNoticeDialog>
@@ -342,7 +342,7 @@
     </view>
     <view v-if="capacityNotice" class="tis-dlg-due">
       <text class="tis-dlg-due__label">{{ t.tradein.recoveryDueLabel }}</text>
-      <text class="tis-dlg-due__amount">{{ capacityNotice.due.int }}<text class="tis-amt__dec">{{ capacityNotice.due.dec }}</text><text class="tis-dlg-due__unit">USDT</text></text>
+      <text class="tis-dlg-due__amount">{{ capacityNotice.due.int }}<text class="tis-amt__dec">{{ capacityNotice.due.dec }}</text><text class="tis-dlg-due__unit">{{ '\u00A0USDT' }}</text></text>
     </view>
   </NxNoticeDialog>
 </template>
@@ -2176,7 +2176,7 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-dlg-due { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); margin-top: var(--v5-space-4); }
 .tis-dlg-due__label { white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .tis-dlg-due__amount { white-space: nowrap; font-family: var(--font-amount); font-weight: 500; font-size: var(--ui-type-page-title); line-height: var(--ui-type-page-title-lh); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--v5-ink); }
-.tis-dlg-due__unit { margin-left: var(--v5-space-1); letter-spacing: 0; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
+.tis-dlg-due__unit { letter-spacing: 0; font: 500 var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 /* Retire / choice with one item: the stated credit under the name (board B-5b). */
 .tis-hero__credit { display: block; margin-top: calc(var(--v5-space-1) / 2); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); font-variant-numeric: tabular-nums; }
 /* Slot full (B-6a): the arriving machine on its floor shadow, then the device that steps down in a surface-2 row. */

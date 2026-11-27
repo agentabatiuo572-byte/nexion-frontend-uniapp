@@ -39,12 +39,15 @@
             <text class="vcs-name">{{ v.name }}</text>
             <text class="vcs-scope">{{ scopeText(v) }}</text>
             <text class="vcs-expiry">{{ expiryText(v) }}</text>
+            <!-- The product is no longer in the catalog: the reason sits right above the greyed 「马上去使用」, which points to it (03 §3.1 禁用). -->
+            <text v-if="voucherTargetStatus(v) === 'unavailable'" :id="`vcs-target-${v.id}`" class="vcs-reason">{{ t.voucher.targetUnavailable }}</text>
             <!-- One control whose role follows the voucher (03 §3.1, 3.9; ticket-material voucher cards keep brand glass for 领取,
                  04 §4.1 福利与代金券): 领取 repeated down a list is brand glass M; once claimed, 「去使用」 is an inline brand
-                 text action with a trailing arrow into the next page. The same node stays,
-                 so focus stays on it when the claim lands. The slot keeps the 44px row in both states. -->
+                 text action with a trailing arrow into the next page. The same node stays, and the slot keeps the 44px row.
+                 From the claim request to its read-back the tapped 领取 shows the shared busy spinner at a locked width (03 §3.1);
+                 the other cards' 领取 keep their normal look, and onClaim's single in-flight guard stops a second request. -->
             <view class="vcs-cta">
-              <NxButton :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
+              <NxButton :disabled="voucher.isClaimed(v.id) && voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `vcs-target-${v.id}` : undefined" :variant="voucher.isClaimed(v.id) ? 'text' : 'brand'" size="medium" :label="voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta" :icon="voucher.isClaimed(v.id) ? 'arrow-right' : undefined" :busy="voucher.claimingVoucherId === v.id" @click="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)" />
             </view>
           </view>
         </view>
@@ -302,6 +305,13 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5);
   font-variant-numeric: tabular-nums;
   color: var(--v5-ink-3);
+}
+/* The disabled 「马上去使用」's reason: auxiliary-description role (10 §10.1, 390 13/20) in secondary ink (03 §3.1 禁用). */
+.vcs-reason {
+  margin-top: 2px;
+  font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5);
+  color: var(--v5-ink-3);
+  overflow-wrap: break-word;
 }
 .vcs-cta {
   /* 主人 2026-08-16:CTA 落卡片右下角,与上方文字块拉开,不挤在一起 */

@@ -49,8 +49,10 @@
                   <text class="block voucher-ticket__wrap" :style="ticketNameStyle">{{ v.name }}</text>
                   <text class="block voucher-ticket__wrap" :style="rowSubStyle">{{ scopeText(v) }}</text>
                   <text class="block" :style="rowSubTightStyle">{{ expiryText(v) }}</text>
+                  <!-- The product is no longer in the catalog: the reason ends the text beside the greyed 「去使用」, which points to it (03 §3.1 禁用). -->
+                  <text v-if="voucherTargetStatus(v) === 'unavailable'" :id="`voucher-target-${v.id}`" class="block voucher-ticket__wrap" :style="rowSubTightStyle">{{ t.voucher.targetUnavailable }}</text>
                 </view>
-                <NxButton class="shrink-0 voucher-ticket__action" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
+                <NxButton :disabled="voucherTargetStatus(v) === 'unavailable'" :aria-describedby="voucherTargetStatus(v) === 'unavailable' ? `voucher-target-${v.id}` : undefined" class="shrink-0 voucher-ticket__action" variant="brand" size="small" :label="t.rewards.useCta" @click="onUse(v)" />
               </view>
             </view>
           </view>
@@ -73,7 +75,7 @@
                   <text class="block voucher-ticket__wrap" :style="ticketNameExpiredStyle">{{ v.name }}</text>
                   <text class="block voucher-ticket__wrap" :style="rowSubStyle">{{ scopeText(v) }}</text>
                 </view>
-                <view class="shrink-0 inline-flex voucher-ticket__action" :style="expiredBadgeStyle"><text>{{ t.rewards.expiredBadge }}</text></view>
+                <NxTag class="voucher-ticket__action" tone="unavailable" :label="t.rewards.expiredBadge" />
               </view>
             </view>
           </view>
@@ -130,6 +132,7 @@ import { useAutoRecovery } from "@/composables/use-auto-recovery";
 import { toast } from "@/store/ui";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import { formatDisplayDate } from "@/lib/display-date";
 import { platformDisplayText } from "@/lib/brand-copy";
 
@@ -437,8 +440,8 @@ function vIconStyle(dim: boolean): CSSProperties {
   };
 }
 const rowTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, color: "var(--v5-ink)" };
-const rowSubStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "12px", color: "var(--v5-ink-3)", overflowWrap: "break-word" };
+const rowSubStyle: CSSProperties = { marginTop: "3px", fontSize: "var(--ui-type-meta)", color: "var(--v5-ink-3)" };
+const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "var(--ui-type-meta)", color: "var(--v5-ink-3)", overflowWrap: "break-word" };
 const rowDateStyle: CSSProperties = { fontFamily: "var(--font-metric)", marginTop: "2px", fontSize: "12px", lineHeight: "16px", color: "var(--v5-ink-3)" };
 function rewardAmountText(bill: Bill): string {
   return formatUsd(bill.amountExact ?? bill.amount, bill.symbol === 'USDT' ? 'detail' : 'overview', true).replace('$', '');
@@ -472,13 +475,6 @@ const useBtnTextStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-on-brand)",
-};
-const expiredBadgeStyle: CSSProperties = {
-  padding: "3px 9px",
-  borderRadius: "var(--v5-radius-full)",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink-4)",
-  fontSize: "12px",
 };
 // Empty state — de-card white-list: dashed border-strong, no fill.
 const emptyStyle: CSSProperties = {
