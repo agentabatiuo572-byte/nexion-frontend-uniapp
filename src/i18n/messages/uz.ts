@@ -730,6 +730,7 @@ export const uz: Messages = {
     errorTooFrequent: "Juda tez-tez — {s} son.dan keyin urining",
     errorOtpInvalid: "Kod notoʻgʻri — qolgan urinishlar: {n}",
     errorOtpExpired: "Kod eskirdi — yangisini soʻrang",
+    codeExpiredSubtitle: "Oldingi kodning muddati tugadi",
     errorOtpExhausted: "Kod bekor qilindi — yangisini soʻrang",
     errorOtpNotFound: "Avval tasdiqlash kodini soʻrang",
     errorOtpSendUnavailable: "Tasdiqlash kodi yuborilmadi. Keyinroq qayta urinib koʻring.",

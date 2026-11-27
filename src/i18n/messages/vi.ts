@@ -373,6 +373,7 @@ export const vi: Messages = {
     errorTooFrequent: "Thao tác quá nhanh, vui lòng thử lại sau {s}s",
     errorOtpInvalid: "Mã sai — còn {n} lần thử",
     errorOtpExpired: "Mã đã hết hạn, vui lòng lấy mã mới.",
+    codeExpiredSubtitle: "Mã trước đã hết hạn",
     errorOtpExhausted: "Mã đã vô hiệu, vui lòng lấy mã mới.",
     errorOtpNotFound: "Hãy lấy mã xác minh trước đã",
     errorOtpSendUnavailable: "Mã xác minh chưa được gửi. Vui lòng thử lại sau.",

@@ -33,6 +33,7 @@
       <!-- #endif -->
       <template v-if="!loginRecoveryPending">
         <text v-if="step === 1 && mode === 'reset'" class="lg-sub">{{ t.login.resetSubtitle }}</text>
+        <text v-else-if="step === 2 && otpChallengeMissing" class="lg-sub">{{ t.authOtp.codeExpiredSubtitle }}</text>
         <text v-else-if="step === 2" class="lg-sub">{{ t.login.codeSentTo }} <text class="lg-sub__ph">{{ country }} {{ phone }}</text></text>
         <text v-else-if="step === 3" class="lg-sub">{{ t.login.newPasswordHint }}</text>
       </template>

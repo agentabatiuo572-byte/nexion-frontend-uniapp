@@ -372,6 +372,7 @@ export const en = {
     errorTooFrequent: "Too frequent — retry in {s}s",
     errorOtpInvalid: "Incorrect code — {n} attempts left",
     errorOtpExpired: "Code expired — request a new one",
+    codeExpiredSubtitle: "The last code has expired",
     errorOtpExhausted: "Code invalidated — request a new one",
     errorOtpNotFound: "Request a verification code first",
     errorOtpSendUnavailable: "The verification code has not been sent. Please try again later.",

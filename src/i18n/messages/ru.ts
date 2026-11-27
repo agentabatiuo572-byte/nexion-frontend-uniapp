@@ -730,6 +730,7 @@ export const ru: Messages = {
     errorTooFrequent: "Слишком часто — повтор через {s} с",
     errorOtpInvalid: "Неверный код. Осталось попыток: {n}",
     errorOtpExpired: "Срок действия кода истёк — запросите новый",
+    codeExpiredSubtitle: "Предыдущий код истёк",
     errorOtpExhausted: "Код недействителен — запросите новый",
     errorOtpNotFound: "Сначала запросите код",
     errorOtpSendUnavailable: "Код подтверждения не отправлен. Повторите попытку позже.",

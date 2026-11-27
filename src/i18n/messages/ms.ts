@@ -730,6 +730,7 @@ export const ms: Messages = {
     errorTooFrequent: "Terlalu kerap — cuba lagi dalam {s}s",
     errorOtpInvalid: "Kod salah — baki percubaan: {n}",
     errorOtpExpired: "Kod tamat tempoh — minta kod baharu",
+    codeExpiredSubtitle: "Kod sebelumnya telah tamat tempoh",
     errorOtpExhausted: "Kod tidak sah lagi — minta kod baharu",
     errorOtpNotFound: "Minta kod pengesahan dahulu",
     errorOtpSendUnavailable: "Kod pengesahan belum dihantar. Sila cuba lagi nanti.",
