@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': targetClosed(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -71,11 +71,15 @@
             </svg>
             <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: missionLayout ? 'var(--v5-ink-3)' : task.color }">{{ task.order }}</text>
           </view>
-          <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : undefined">
-            <!-- An App-only row opens nothing, so its whole name stays readable and the tag drops below when both don't fit. -->
-            <text :class="task.appOnly ? 'newcomer-task__app-name' : 'truncate'" :style="labelStyle(task)">{{ task.label }}</text>
-            <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
-            <text v-else :style="catStyle(task)">{{ task.cat }}</text>
+          <view style="min-width: 0">
+            <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0" :style="task.appOnly ? { flexWrap: 'wrap', alignItems: 'center' } : undefined">
+              <!-- An App-only row opens nothing, so its whole name stays readable and the tag drops below when both don't fit. -->
+              <text :class="task.appOnly ? 'newcomer-task__app-name' : targetClosed(task) ? 'newcomer-task__label--wrap' : 'truncate'" :style="labelStyle(task)">{{ task.label }}</text>
+              <NxTag v-if="task.appOnly && !isDone(task)" tone="unavailable" :label="t.home.dayOneAppOnlyTag" />
+              <text v-else :style="catStyle(task)">{{ task.cat }}</text>
+            </view>
+            <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
+            <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -327,6 +331,11 @@ function isActionable(task: QuestTask) {
   return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
 }
 
+// A pending web row whose target the catalog shows closed (an App-only row already says why with its tag).
+function targetClosed(task: QuestTask) {
+  return !task.appOnly && task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
+}
+
 const appOnlyPending = computed(() => !dayOneExpired.value && tasks.value.some((task) => task.appOnly && task.eligible && !isDone(task)));
 const appDownloadHref = computed(() => appDownloadUrl(stakingDisplay.config.share.appDownload.officialUrl));
 function openAppDownload() {
@@ -388,7 +397,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : targetClosed(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
@@ -453,6 +462,9 @@ const toggleStyle: CSSProperties = {
 .newcomer-task__app-copy > .nx-card-action { float: right; clear: right; margin-left: 12px; }
 .newcomer-task__app-copy > .nx-card-footer__note { display: block; }
 .newcomer-task__app-name { min-width: 0; overflow-wrap: break-word; }
+.newcomer-task__reason { display: block; margin-top: 2px; overflow-wrap: break-word; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.newcomer-task__label--wrap { min-width: 0; overflow-wrap: break-word; }
+.newcomer-task__circle--closed { opacity: .5; }
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
 .newcomer-task__observation-item { margin-top: var(--v5-space-2); }

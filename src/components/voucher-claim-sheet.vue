@@ -292,6 +292,7 @@ useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
   margin-top: 4px;
   font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5);
   color: var(--v5-ink-3);
+  overflow-wrap: break-word;
 }
 .vcs-expiry {
   margin-top: 2px;

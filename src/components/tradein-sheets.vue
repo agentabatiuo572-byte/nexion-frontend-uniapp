@@ -302,13 +302,25 @@
     </view>
   </view>
   <!-- The last trade-in's payment result is not confirmed: continuing it is a 决定 (03 §3.5.1), so a centred confirm with the
-       device pair and the amount still due, the same anatomy as the capacity resume below. Back / Esc take 稍后再说. -->
+       device block (03 §3.5: one row per device, art, name, its device number and where it goes) and the amount still due.
+       The target is not delivered yet, so its row has the product name and no number. Back / Esc take 稍后再说. -->
   <NxNoticeDialog :open="recoveryNoticeOpen" icon="clock" tone="warning" :title="t.tradein.recoveryPending"
     :primary="purchaseActionText" :secondary="t.tradein.recoveryLater" @primary="onConfirmTradein" @secondary="hide">
-    <view v-if="recoveryNotice" class="tis-dlg-pair" role="img" :aria-label="recoveryNotice.pairLabel">
-      <view class="tis-dlg-pair__side" aria-hidden="true"><DeviceArt class="tis-dlg-pair__art tis-dlg-pair__art--src" :device="recoveryNotice.oldDevice" /><text class="tis-dlg-pair__name">{{ recoveryNotice.oldName }}</text></view>
-      <svg class="tis-dlg-pair__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
-      <view class="tis-dlg-pair__side" aria-hidden="true"><CatalogMachineImage class="tis-dlg-pair__art" :sku="recoveryNotice.newKind" :image-url="recoveryNotice.newImageUrl" scope-key="tradein-target" /><text class="tis-dlg-pair__name tis-dlg-pair__name--dst">{{ recoveryNotice.newName }}</text></view>
+    <view v-if="recoveryNotice" class="tis-dlg-fate">
+      <view class="tis-dlg-fate__row">
+        <DeviceArt class="tis-dlg-fate__art" :device="recoveryNotice.oldDevice" />
+        <view class="tis-dlg-fate__meta">
+          <text class="tis-dlg-fate__name">{{ recoveryNotice.oldName }}</text>
+          <view class="tis-dlg-fate__sub"><NxCodeValue v-if="recoveryNotice.oldDevice?.instanceNo" class="tis-dlg-fate__code" :value="recoveryNotice.oldDevice.instanceNo" :label="recoveryNotice.oldName" :copyable="false" /><text class="tis-dlg-fate__text">{{ recoveryNotice.oldDevice?.instanceNo ? '· ' : '' }}{{ t.tradein.recoverySourceFate }}</text></view>
+        </view>
+      </view>
+      <view class="tis-dlg-fate__row">
+        <CatalogMachineImage class="tis-dlg-fate__art" :sku="recoveryNotice.newKind" :image-url="recoveryNotice.newImageUrl" scope-key="tradein-target" />
+        <view class="tis-dlg-fate__meta">
+          <text class="tis-dlg-fate__name">{{ recoveryNotice.newName }}</text>
+          <view class="tis-dlg-fate__sub"><text class="tis-dlg-fate__text">{{ recoveryNotice.newFate }}</text></view>
+        </view>
+      </view>
     </view>
     <view v-if="recoveryNotice" class="tis-dlg-due">
       <text class="tis-dlg-due__label">{{ t.tradein.recoveryDueLabel }}</text>
@@ -345,6 +357,7 @@ import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import NxButton from "@/components/ui/nx-button.vue";
 import NxTag from "@/components/ui/nx-tag.vue";
 import NxHintBubble from "@/components/ui/nx-hint-bubble.vue";
+import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import DeviceArt from "@/components/device-art.vue";
 import CatalogMachineImage from "@/components/catalog-machine-image.vue";
 import { capacityCheckoutHref, checkoutCapacityUnreadableTargetKey, describeCapacityOriginal, reportCheckoutKeepResumeKey, type CheckoutCapacityPaymentRow, type CheckoutKeepResume } from "@/components/checkout/checkout-keep-resume";
@@ -1986,8 +1999,12 @@ const recoveryNotice = computed(() => {
   const oldName = sourceDeviceLabel(oldDevice, quote?.sourceProductName);
   const newKind = quote?.targetProductNo ?? s.newKind;
   const newName = targetProductLabel(newKind, quote?.targetProductName);
-  return { oldDevice, oldName, newKind, newName, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
-    pairLabel: fmt(t.value.tradein.sheetTitle, { from: oldName, to: newName }), due: quote ? amountParts(quote.payableUsdt, 6) : null };
+  // Where the new device goes follows the quote, as on checkout (inheritActiveHint / inheritInventoryHint).
+  const newFate = quote?.targetDeviceStatus === "INACTIVE" ? t.value.tradein.recoveryTargetInventoryFate
+    : quote?.targetDeviceStatus === "ACTIVE" ? t.value.tradein.recoveryTargetActiveFate
+      : quote ? t.value.myDevices.inventorySectionActivationUnconfirmed : "—";
+  return { oldDevice, oldName, newKind, newName, newFate, newImageUrl: getProduct(newKind)?.imageUrl ?? null,
+    due: quote ? amountParts(quote.payableUsdt, 6) : null };
 });
 // The capacity resume confirm (board B-6c): the machine and the amount still due, from the saved original command.
 const capacityNotice = computed(() => {
@@ -2143,13 +2160,18 @@ useDialogA11y(sheetVisible, ".tis-root", closeSheetLayer, true);
 .tis-hint > svg { flex: none; margin-top: calc(var(--v5-space-1) / 2); color: var(--v5-warning-ink); }
 .tis-hint__text { min-width: 0; overflow-wrap: break-word; font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); color: var(--v5-ink); }
 /* Recovery confirm (B-4e): the device pair stacked small, then the amount still due. */
-.tis-dlg-pair { align-self: stretch; display: flex; align-items: flex-start; justify-content: center; gap: var(--ui-space-row-y); margin-top: var(--v5-space-4); }
-.tis-dlg-pair__side { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); width: 104px; min-width: 0; }
-.tis-dlg-pair__art { width: 44px; height: 44px; }
-.tis-dlg-pair__art--src { opacity: .82; }
-.tis-dlg-pair__name { max-width: 100%; overflow-wrap: break-word; text-align: center; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
-.tis-dlg-pair__name--dst { font-weight: 500; color: var(--v5-ink); }
-.tis-dlg-pair__arrow { flex: none; margin-top: var(--v5-space-3); color: var(--v5-ink-4); }
+/* Device block (03 §3.5, same anatomy as the slot-replacement undo dialog, board S7): one surface-2 block, a row per device. */
+.tis-dlg-fate { align-self: stretch; margin-top: var(--v5-space-4); padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); text-align: left; }
+.tis-dlg-fate__row { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 6px; }
+.tis-dlg-fate__row + .tis-dlg-fate__row { border-top: 1px solid color-mix(in srgb, var(--v5-ink) 8%, transparent); }
+.tis-dlg-fate__art { flex: none; width: 48px; height: 48px; margin: -4px 0; }
+.tis-dlg-fate__meta { flex: 1 1 auto; min-width: 0; }
+.tis-dlg-fate__name { display: block; overflow-wrap: break-word; color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
+.tis-dlg-fate__sub { display: flex; align-items: baseline; column-gap: 6px; margin-top: 2px; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); }
+.tis-dlg-fate__code { max-width: 100%; color: var(--v5-ink-3); font: var(--ui-type-inline-figure-weight) var(--ui-type-meta)/var(--ui-type-list-subtitle-lh) var(--font-metric); letter-spacing: 0; }
+/* Beside a code the fate keeps its full width and wraps only once the code is down to prefix … tail. */
+.tis-dlg-fate__code + .tis-dlg-fate__text { flex: 0 0 auto; max-width: calc(100% - 11ch - 6px); overflow-wrap: break-word; }
+.tis-dlg-fate__text { min-width: 0; overflow-wrap: break-word; }
 .tis-dlg-due { display: flex; flex-direction: column; align-items: center; gap: calc(var(--v5-space-1) / 2); margin-top: var(--v5-space-4); }
 .tis-dlg-due__label { white-space: nowrap; font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); color: var(--v5-ink-3); }
 .tis-dlg-due__amount { white-space: nowrap; font-family: var(--font-amount); font-weight: 500; font-size: var(--ui-type-page-title); line-height: var(--ui-type-page-title-lh); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--v5-ink); }

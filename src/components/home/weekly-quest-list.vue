@@ -51,20 +51,22 @@
         </view>
 
         <!-- pending: navigate to target route -->
-        <view v-else class="weekly-quest-row weekly-pending flex items-center px-4 py-3" :class="rowInactive(q) ? 'opacity-50' : 'active:opacity-80'" :role="rowInactive(q) ? undefined : 'button'" :tabindex="rowInactive(q) ? -1 : 0" :aria-disabled="rowInactive(q)" :style="pendingRowStyle" @click="onRowCta(q)">
-          <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
+        <!-- An inactive row is not dimmed as a whole: the number circle drops to 50%, the title takes the secondary ink and
+             the arrow goes, so a closed target's reason stays at full contrast in the description slot (03 §3.5 单选行). -->
+        <view v-else class="weekly-quest-row weekly-pending flex items-center px-4 py-3" :class="rowInactive(q) ? '' : 'active:opacity-80'" :role="rowInactive(q) ? undefined : 'button'" :tabindex="rowInactive(q) ? -1 : 0" :aria-disabled="rowInactive(q)" :style="pendingRowStyle" @click="onRowCta(q)">
+          <view class="grid place-items-center shrink-0" :class="{ 'weekly-number--inactive': rowInactive(q) }" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>
           <view class="flex-1">
-            <text class="block" :style="pendingLabelStyle">{{ titleOf(q) }}</text>
-            <text class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
+            <text class="block" :style="rowInactive(q) ? inactiveLabelStyle : pendingLabelStyle">{{ titleOf(q) }}</text>
+            <!-- 目标业务停摆时不给可赚取数字:它与「不可完成」同屏是自相矛盾的。原因占说明位，优先于类别。 -->
+            <text v-if="targetClosed(q)" class="block weekly-closed-reason">{{ t.questClaim.definitionInactive }}</text>
+            <text v-else class="block" :style="categoryLabelStyle">{{ categoryOf(q) }}</text>
           </view>
-          <view class="flex items-baseline" style="gap: var(--v5-space-1)">
-            <!-- 目标业务停摆时不给可赚取数字:它与「不可完成」同屏是自相矛盾的。 -->
-            <text v-if="targetClosed(q)" :style="pendingPausedStyle">{{ t.questClaim.definitionInactive }}</text>
-            <text v-else :style="pendingRewardStyle">+{{ formatAmount(rewardOf(q)) }} UVT</text>
+          <view v-if="!targetClosed(q)" class="flex items-baseline" style="gap: var(--v5-space-1)">
+            <text :style="pendingRewardStyle">+{{ formatAmount(rewardOf(q)) }} UVT</text>
           </view>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: -2px; flex-shrink: 0"><path d="m9 6 6 6-6 6" /></svg>
+          <svg v-if="!rowInactive(q)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: -2px; flex-shrink: 0"><path d="m9 6 6 6-6 6" /></svg>
         </view>
       </view>
       <view v-if="tier2Quests.length === 0" class="px-4 py-3" :style="pendingLabelStyle">
@@ -289,11 +291,13 @@ const pendingLabelStyle: CSSProperties = {
   fontSize: "15px",
   color: "var(--v5-ink)",
 };
+const inactiveLabelStyle: CSSProperties = { ...pendingLabelStyle, color: "var(--v5-ink-3)" };
+// The period line is the only reason an expired row gives, so it reads in the secondary ink (01 §1.1.1), not the disabled one.
 const periodStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-metric)",
   fontSize: "12px",
-  color: "var(--v5-ink-4)",
+  color: "var(--v5-ink-3)",
 };
 const categoryLabelStyle: CSSProperties = {
   marginTop: "2px",
@@ -303,12 +307,6 @@ const categoryLabelStyle: CSSProperties = {
 };
 const claimErrorStyle: CSSProperties = { ...categoryLabelStyle, color: "var(--v5-ink)" };
 const refreshErrorStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)", borderBottom: "1px solid var(--v5-border)" };
-/** 「未开放」标记与奖励数字同槽位:同样是 12px 等宽,但不得像可赚取的金额一样抢眼。 */
-const pendingPausedStyle: CSSProperties = {
-  fontFamily: "var(--font-metric)",
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-};
 const pendingRewardStyle: CSSProperties = {
   fontFamily: "var(--font-metric)",
   fontWeight: 500,
@@ -353,4 +351,6 @@ const bonusDoneTextStyle: CSSProperties = {
  .weekly-claimable, .weekly-pending { min-height:60px; padding-top:8px !important; padding-bottom:8px !important; box-sizing:border-box; }.weekly-claimable :deep(.nx-button__surface) { --ui-button-ink:var(--v5-ink) !important; }
 .weekly-quest-row { box-sizing:border-box; min-height:60px; padding-top:7.5px!important; padding-bottom:7.5px!important; border-bottom:var(--ui-weekly-row-border); }
 .weekly-list-heading {padding:14px 16px 6px !important;}
+.weekly-number--inactive { opacity: .5; }
+.weekly-closed-reason { margin-top: 2px; overflow-wrap: break-word; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
 </style>
