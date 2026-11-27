@@ -31,7 +31,8 @@ export interface ConfirmOptions {
   /** 谁开的框(如页面实例的 owner 标记)—— 页面卸载时只收自己开的,不碰别人排队中的框。 */
   owner?: string;
   /** Optional detail list (label/value rows) — switches the dialog to the centred detail layout. */
-  rows?: { label: string; value: string; amount?: boolean }[];
+  /** `code`: a string to check character by character (a payout address): whole, under its label (03 §3.6.1). */
+  rows?: { label: string; value: string; amount?: boolean; code?: boolean }[];
   /** Badge above the title in the detail layout. */
   glyph?: "withdraw";
   /** 03 §3.5: when the confirmed object is a device, this block stands in for the message, one row per device with its
@@ -39,6 +40,17 @@ export interface ConfirmOptions {
   devices?: { name: string; code?: string; fate: string; image?: string | null }[];
   /** One consequence line under the device block (10.2 弹层提示行: warning icon, ink text). */
   note?: string;
+  /** A titled list of numbered rules under the detail rows (the withdrawal confirm carries its rules, user 2026-11-27).
+   *  With it, only the rows and the rules scroll; the glyph, title and actions stay on screen. */
+  rules?: { title: string; items: RuleItem[] };
+}
+
+/** One numbered rule: {placeholders} in body take a figures value (ink 500, kept on one line) or a plain values value. */
+export interface RuleItem {
+  title: string;
+  body: string;
+  figures?: Record<string, string>;
+  values?: Record<string, string>;
 }
 
 interface ConfirmInternal extends ConfirmOptions {

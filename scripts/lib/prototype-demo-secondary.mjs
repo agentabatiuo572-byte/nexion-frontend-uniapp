@@ -5,7 +5,7 @@ import { previewAccountId } from './prototype-demo-identity.mjs';
 import { demoHasLongContent, demoLongBankStrongReview, demoLongWithdrawalNo } from './prototype-demo-long-content.mjs';
 import { demoTeamBusinessDate } from './prototype-demo-events.mjs';
 import { demoEarningReceipts, demoEarningReceipt, demoReceiptWire, demoVisibleEarningReceipts } from './prototype-demo-notifications.mjs';
-import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
+import { demoCommissionEvents, demoCommissionGroups, demoCommissionTotals, demoPayoutDateOrders, demoSettledTasks, demoTeamPeriod, demoTeamWeek, postDemoWalletEntries } from './prototype-demo-wallet.mjs';
 const proof={source:'server',sourceEnvironment:'PRODUCTION',runId:'',serverCanonical:true};
 const day=86400000;
 
@@ -167,13 +167,14 @@ export function demoWithdrawals(state, now = Date.now(), user = demoWithdrawalUs
       return { withdrawalNo: demoHasLongContent(state) ? demoLongWithdrawalNo(sample) : sample,
         amount: 100, netReceive: 99, fee: 1, status, at: sampleAt - (i + 2) * day, holdUntil: sampleAt - day };
     }));
-  const chainRows = chainOrders.map(({ at, holdUntil = at, ...order }) => ({
+  const payoutDateOrders = history ? [] : demoPayoutDateOrders(state, sampleAt);
+  const chainRows = [...payoutDateOrders, ...chainOrders].map(({ at, holdUntil = at, riskRoute, ...order }) => ({
     ...order, targetAddress: `0x${'1'.repeat(40)}`, chain: 'USDT-BEP20',
     holdUntil: new Date(holdUntil).toISOString(), createdAt: new Date(at).toISOString(),
     networkConfirmUsd: order.fee, networkFee: order.fee, penaltyFee: 0, grossFee: order.fee,
     nexBurned: 0, nexRefunded: 0, nexRefundedAt: null, feeWaived: 0, actualFee: order.fee,
     policyVersion: 'money-policy', useNexFeeOffset: false,
-    riskRoute: order.amount <= 100 ? 'fast-pass' : 'manual', idSource: 'server',
+    riskRoute: riskRoute ?? (order.amount <= 100 ? 'fast-pass' : 'manual'), idSource: 'server',
   }));
   const bankRows = Object.values(state.bankDemo?.orders ?? {}).map(row => ({
     withdrawalNo: row.withdrawalNo, targetAddress: 'BANK-VND:' + row.beneficiaryNo, amount: row.bank.amountUsdt,
@@ -228,7 +229,7 @@ export function secondaryDemo(url,state,request,walletBills){
     const {earningPush,...preferences}=state.notificationPreferences;
     return state.fleetState==='earning-credit'?{...preferences,earningPush}:preferences;
   }
-  if(p==='/api/withdrawals/bank/config')return {enabled:true,banks:[],bankCodeRequired:false,bindingOtpRequired:!empty,bankSelection:'ACCOUNT_ROUTED',bankRoutingVerified:true,payType:'BANKQR',unresolvedIntent:null,beneficiary:empty?null:{bankCode:'',bankName:'ACCOUNT_ROUTED',maskedAccount:'••••4242',effectiveAt:iso,nextChangeAt:iso,beneficiaryNo:'DEMO-BANK-1',canWithdraw:true,bankRoutingVerified:true},policy:{version:1,minAmountUsd:10,maxAmountUsd:10000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:100},capacity:{maxWithdrawableUsdt:facts.maxWithdrawableUsdt,dailyRemainingCount:facts.dailyRemainingCount,dailyLimitCount:facts.dailyLimitCount,dailyCountResetAt:new Date(facts.dailyCountResetAt).toISOString(),withdrawalEnabled:true}};
+  if(p==='/api/withdrawals/bank/config')return {enabled:true,banks:[],bankCodeRequired:false,bindingOtpRequired:!empty,bankSelection:'ACCOUNT_ROUTED',bankRoutingVerified:true,payType:'BANKQR',unresolvedIntent:null,beneficiary:empty?null:{bankCode:'',bankName:'ACCOUNT_ROUTED',maskedAccount:'••••4242',effectiveAt:iso,nextChangeAt:iso,beneficiaryNo:'DEMO-BANK-1',canWithdraw:true,bankRoutingVerified:true},policy:{version:1,minAmountUsd:3,maxAmountUsd:100000,feeRatePct:1,feeMinUsd:1,feeMaxUsd:25},capacity:{maxWithdrawableUsdt:facts.maxWithdrawableUsdt,dailyRemainingCount:facts.dailyRemainingCount,dailyLimitCount:facts.dailyLimitCount,dailyCountResetAt:new Date(facts.dailyCountResetAt).toISOString(),withdrawalEnabled:true}};
   if(p==='/api/payment-methods')return {serverCanonical:true,cards:empty?[]:[{tokenId:'9001',version:1,brand:'visa',last4:'4242',expiry:'12/30',holder:'ALEX DEMO',status:'BOUND',isDefault:true,boundAt:iso,source:'mock',sandbox:true,providerCanonical:false}]};
   if(p.startsWith('/api/goals')){
     state.goals??=[{id:1,targetUsdt:1000,deadlineAt:now+30*day,createdAt:now-10*day,achieved:false,achievedAt:null,progressPct:37.5,lifetimeEarningsUsdt:375},{id:2,targetUsdt:100,deadlineAt:now-day,createdAt:now-40*day,achieved:true,achievedAt:now-2*day,progressPct:100,lifetimeEarningsUsdt:375}];

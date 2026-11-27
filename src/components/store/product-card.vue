@@ -163,7 +163,7 @@ const promotionSignIn=computed(()=>!!props.activityId&&!promotionUnavailable.val
 const { imageSrc, imageError: fallbackProductImage } = useProductImage(() => props.product.imageUrl);
 const photo = computed(() => {
   const imageUrl = imageSrc.value;
-  return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.id, props.product.tier) } : null;
+  return imageUrl ? { src: imageUrl, tierCode: productTierCode(props.product.seriesCode, props.product.tier) } : null;
 });
 
 
@@ -191,6 +191,7 @@ const entered = ref(false);
 watch(artInView, visible => { if (visible) entered.value = true; });
 const { eligibility, retry: retryEligibility } = useRemotePurchaseEligibility(() => props.product.id, cardInView);
 const stockUnavailable = computed(() => productOutOfStock(props.product) || eligibility.value.outOfStock);
+const specsUnavailable = computed(() => props.product.purchaseBlockedReason === "PRODUCT_SPECS_UNAVAILABLE");
 useAutoRecovery({ failed: () => remoteApiEnabled && cardInView.value && eligibility.value.status === "error", retry: retryEligibility });
 const gate = computed(() => stockUnavailable.value
   ? {
@@ -220,9 +221,10 @@ const gate = computed(() => stockUnavailable.value
 const gateDetailsOpen = ref(false);
 let lastGateToggleAt = 0;
 const gateLockedView = computed(() => gate.value.gated && gate.value.blocked);
-const buyUnavailable = computed(() => promotionUnavailable.value || stockUnavailable.value || catalogUnavailable.value
+const buyUnavailable = computed(() => promotionUnavailable.value || stockUnavailable.value || specsUnavailable.value || catalogUnavailable.value
   || (!promotionSignIn.value&&remoteApiEnabled && (gate.value.soldOut || eligibility.value.status === "loading")));
 const gateLabel = computed(() => {
+  if (specsUnavailable.value) return t.value.store.specUnavailable;
   if (stockUnavailable.value) return t.value.store.temporarilyOutOfStock;
   if (!remoteApiEnabled) return gate.value.soldOut ? t.value.store.gateSoldOut : t.value.store.gateLockedEyebrow;
   if (eligibility.value.status === "loading") return t.value.store.purchaseEligibilityLoading;
@@ -269,7 +271,7 @@ const buyLabel = computed(() =>
 // Only a confirmed state shows: sold out or an eligibility answer of "no". A catalogue that has not been read yet
 // shows nothing, so it never looks like a known refusal (03 §3.5.2). The tag and the name use gateLabel, the confirmed
 // reason, so a retained catalogue that is refreshing or failed to refresh never swaps it for a read status (03 §3.4).
-const compactUnavailable = computed(() => stockUnavailable.value
+const compactUnavailable = computed(() => stockUnavailable.value || specsUnavailable.value
   || (remoteApiEnabled && eligibility.value.status === "ready" && !eligibility.value.eligible));
 // A voucher or activity entry buys at its own terms, and its detail page shows no trial-credit entry: no tag there either.
 const trialCreditOption = useTrialCreditOption(() => props.product.id);

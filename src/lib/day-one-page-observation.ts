@@ -12,5 +12,10 @@ export async function reportDayOnePageObservation(
   const instanceKey = currentInstance();
   // An absent/unknown frozen task cannot be assigned a local recovery identity.
   if (!instanceKey) return;
-  await dayOneObservationRecovery.report({ ...input, questCode, instanceKey, currentInstance });
+  await dayOneObservationRecovery.report({
+    ...input, questCode, instanceKey, currentInstance,
+    onRecorded() {
+      if (questCode === "view_product_roi") void quest.refreshRemote();
+    },
+  });
 }

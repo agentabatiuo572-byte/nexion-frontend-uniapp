@@ -1,16 +1,23 @@
-import { getProduct } from "@/mock/products";
+import { PRODUCTS, type Product } from "@/mock/products";
 import { productCatalogState, productCatalogPresentation, isProductCatalogDisplayCurrent } from "@/store/product-catalog";
 import { productTierCode } from "./product-image";
 
 const ROOT = "/static/img/products/uvel-v3";
 
+/** Older device instances can carry the same catalog number in a different case. */
+export function findDeviceCatalogProduct(products: readonly Product[], productCode?: string | null): Product | undefined {
+  if (!productCode) return undefined;
+  const normalized = productCode.toLowerCase();
+  return products.find(product => product.id === productCode)
+    ?? products.find(product => product.id.toLowerCase() === normalized);
+}
+
 /** SKU images come only from the same approved catalog used by the storefront. */
 export function getProductMedia(id: string | null | undefined) {
-  if (!id) return null;
-  const product = productCatalogState.status === "ready" ? getProduct(id) ?? getProduct(id.toLowerCase()) : undefined;
-  const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products : undefined;
-  const current = product ?? display?.find(product => product.id.toLowerCase() === id.toLowerCase());
-  return current?.imageUrl ? { src: current.imageUrl, tierCode: productTierCode(current.id, current.tier) } : null;
+  const display = isProductCatalogDisplayCurrent() ? productCatalogPresentation.value?.products
+    : productCatalogState.status === "ready" ? PRODUCTS : undefined;
+  const current = display && findDeviceCatalogProduct(display, id);
+  return current?.imageUrl ? { src: current.imageUrl, tierCode: productTierCode(current.seriesCode, current.tier) } : null;
 }
 
 // Genesis is an independent entitlement, never a seventh device SKU.

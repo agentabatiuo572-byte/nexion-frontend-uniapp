@@ -23,6 +23,7 @@ export interface AppHomeWorkload {
 }
 
 export interface AppHomeDeviceRanking {
+  productNo?: string;
   imageUrl?: string;
   rank: number;
   name: string | null;
@@ -140,7 +141,7 @@ function ranking(v: unknown): AppHomeDeviceRanking {
   const kind = v.kind == null ? null : (typeof v.kind === "string" && DEVICE_KINDS.has(v.kind as DeviceKind) ? v.kind as DeviceKind : null);
   const dailyUsdt = v.dailyUsdt == null ? null : nonNegative(v.dailyUsdt);
   if (rank === null || rank < 1 || (v.kind != null && kind === null) || (v.dailyUsdt != null && dailyUsdt === null)) return invalid();
-  return { rank, name: text(v.name), kind, dailyUsdt, dailyUsdtRange: dailyUsdtRange(v), imageUrl: productMediaUrl(v.imageUrl) };
+  return { rank, name: text(v.name), kind, dailyUsdt, dailyUsdtRange: dailyUsdtRange(v), imageUrl: productMediaUrl(v.imageUrl), productNo: text(v.productNo) ?? undefined };
 }
 function client(v: unknown): AppHomeOnGridClient {
   if (!isRow(v)) return invalid();

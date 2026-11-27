@@ -61,7 +61,7 @@
           :aria-disabled="!isActionable(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)">
+          <view :style="circleStyle(task)" :class="{ 'newcomer-task__circle--closed': targetClosed(task) }">
             <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
                  → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
                  两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
@@ -71,9 +71,13 @@
             </svg>
             <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: missionLayout ? 'var(--v5-ink-3)' : task.color }">{{ task.order }}</text>
           </view>
-          <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-            <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
-            <text :style="catStyle(task)">{{ task.cat }}</text>
+          <view style="min-width: 0">
+            <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
+              <text :class="isActionable(task) ? 'truncate' : 'newcomer-task__label--wrap'" :style="labelStyle(task)">{{ task.label }}</text>
+              <text class="newcomer-task__cat" :style="catStyle(task)">{{ task.cat }}</text>
+            </view>
+            <!-- A pending row whose target is closed says why, in the description slot at full contrast (03 §3.4, §3.5 单选行). -->
+            <text v-if="targetClosed(task)" class="newcomer-task__reason">{{ t.questClaim.definitionInactive }}</text>
           </view>
           <text v-if="task.nex !== null && !missionLayout" :style="rewardStyle(task)">{{ `+${formatAmount(task.nex)} UVT` }}<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ formatAmount(task.usdt) }}</text></text>
           <view>
@@ -87,16 +91,11 @@
 
     <NxButton v-if="remoteApiEnabled && !questUnavailable && !claimState.empty && (claimState.claimCode || quest.dayOneClaiming)" class="newcomer-task__claim" variant="brand" size="medium" :disabled="!props.active" :busy="quest.dayOneClaiming" :label="t.home.dayOneClaimReward" :busy-label="t.home.dayOneClaiming" @click="onClaim" />
     <view v-if="expanded && observationNotices.length" class="newcomer-task__observation">
-      <view v-for="notice in observationNotices" :key="notice.task.id" class="newcomer-task__observation-item">
-        <text role="status">{{ notice.task.label }} · {{ observationMessage(notice.reason) }}</text>
+      <view v-for="task in observationNotices" :key="task.id" class="newcomer-task__observation-item">
+        <text role="status">{{ task.label }} · {{ t.home.dayOneObservationUnconfirmed }}</text>
         <view class="newcomer-task__observation-actions">
-          <view v-if="notice.reason !== 'unconfirmed'" role="button" :tabindex="props.active ? 0 : -1"
-            :aria-disabled="!props.active" class="newcomer-task__observation-action"
-            @click="recoverObservation(notice.task)">
-            <text>{{ notice.reason === 'terms' ? t.home.dayOneObservationTermsAction : t.home.dayOneObservationSetupAction }}</text>
-          </view>
           <view role="button" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
-            class="newcomer-task__observation-action" @click="recoverObservation(notice.task, true)">
+            class="newcomer-task__observation-action" @click="recoverObservation(task)">
             <text>{{ t.home.dayOneObservationRetry }}</text>
           </view>
         </view>
@@ -143,7 +142,8 @@ import type { QuestTaskCategory } from "@/api/quest-api";
 import { selectHomeQuestRows } from "./home-quest-source";
 import { dayOneClaimState } from "@/lib/day-one-claim-state";
 import { dayOneQuestDisplayName } from "@/lib/quest-presentation";
-import { dayOneObservationRecovery, observationRecoveryRoute, type DayOneObservationReason } from "@/lib/day-one-observation-recovery";
+import { questActionRouteUnavailable } from "@/composables/use-quest-target-availability";
+import { dayOneObservationRecovery } from "@/lib/day-one-observation-recovery";
 import { remoteAccountScope } from "@/lib/remote-account-epoch";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
@@ -241,27 +241,17 @@ function observationIdentity(task: QuestTask) {
 }
 const observationNotices = computed(() => {
   app.accountKey; app.accountBindingEpoch;
-  return remoteApiEnabled ? tasks.value.flatMap(task => {
+  return remoteApiEnabled ? tasks.value.filter(task => {
     const identity = observationIdentity(task);
-    const reason = identity && isActionable(task) ? dayOneObservationRecovery.notice(identity) : undefined;
-    return reason ? [{ task, reason }] : [];
+    return identity && isActionable(task) && dayOneObservationRecovery.hasNotice(identity);
   }) : [];
 });
-function observationMessage(reason: DayOneObservationReason): string {
-  return reason === "onboarding" ? t.value.home.dayOneObservationSetup
-    : reason === "terms" ? t.value.home.dayOneObservationTerms : t.value.home.dayOneObservationUnconfirmed;
-}
-function recoverObservation(task: QuestTask, retryOnly = false): void {
+function recoverObservation(task: QuestTask): void {
   if (!props.active || !isActionable(task)) return;
   const identity = observationIdentity(task);
-  const reason = identity && dayOneObservationRecovery.notice(identity);
-  if (!identity || !reason) return;
+  if (!identity || !dayOneObservationRecovery.hasNotice(identity)) return;
   dayOneObservationRecovery.retry(identity);
-  let web = false;
-  // #ifdef H5
-  web = true;
-  // #endif
-  navTo(retryOnly ? task.href : observationRecoveryRoute(reason, web, task.href));
+  navTo(task.href);
 }
 const claimState = computed(() => dayOneClaimState(
   quest.remoteQuests, quest.dayOneRequiredTaskCount, quest.dayOneSnapshotStatus, nowTick.value * 1000,
@@ -319,7 +309,11 @@ function onClaim() {
 }
 
 function isActionable(task: QuestTask) {
-  return task.eligible && !dayOneExpired.value && !isDone(task);
+  return task.eligible && !dayOneExpired.value && !isDone(task) && !questActionRouteUnavailable(task.href);
+}
+
+function targetClosed(task: QuestTask) {
+  return task.eligible && !dayOneExpired.value && !isDone(task) && questActionRouteUnavailable(task.href);
 }
 
 function onRowTap(task: QuestTask) {
@@ -376,7 +370,7 @@ function labelStyle(task: QuestTask): CSSProperties {
     fontFamily: "var(--font-v5)",
     fontSize: props.missionLayout ? "var(--ui-type-list-title)" : "var(--ui-type-list-subtitle)",
     lineHeight: props.missionLayout ? "var(--ui-type-list-title-lh)" : undefined,
-    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : "var(--v5-ink)",
+    color: done ? (props.missionLayout ? "var(--v5-ink-3)" : "var(--v5-ink-4)") : targetClosed(task) ? "var(--v5-ink-3)" : "var(--v5-ink)",
     fontWeight: 500,
     textDecoration: done && !props.missionLayout ? "line-through" : "none",
   };
@@ -435,6 +429,10 @@ const toggleStyle: CSSProperties = {
 
 <style scoped>
 .newcomer-task__reward-hint { margin-bottom: var(--v5-space-2); font-size: 12px; color: var(--v5-ink-3); }
+.newcomer-task__reason { display: block; margin-top: 2px; overflow-wrap: break-word; font: 400 var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); color: var(--v5-ink-3); }
+.newcomer-task__label--wrap { min-width: 0; overflow-wrap: break-word; }
+.newcomer-task__cat { flex-shrink: 0; white-space: nowrap; }
+.newcomer-task__circle--closed { opacity: .5; }
 .newcomer-task__observation { margin-top: var(--v5-space-3); color: var(--v5-ink-2); font-size: var(--ui-type-body); }
 .newcomer-task__observation-item { margin-top: var(--v5-space-2); }
 .newcomer-task__observation-actions { display: flex; flex-wrap: wrap; gap: var(--v5-space-2); }

@@ -5,6 +5,7 @@
 import type { PhaseId } from "@/store/product-phase";
 import type { ServerLanguage } from "@/i18n";
 
+export type ProductSeriesCode = "S1" | "PRO" | "PRO_V2" | "RACK_P1" | "RACK_P2" | "CLOUD_SHARE";
 export type ProductTaskLevel = 1 | 2 | 3 | 4;
 export type ProductBadgeKind = "recommended" | "bestSeller" | "trending" | "upgradePick" | "flagship" | "lowBarrier" | "custom";
 
@@ -28,6 +29,8 @@ export interface Product {
   id: string;
   name: string;
   tier: "Entry" | "Pro" | "Flagship" | "Share";
+  seriesCode: ProductSeriesCode | null;
+  seriesRepresentative: boolean;
   tagline: string;
   catalogRequestLocale?: ServerLanguage;
   storeSortRank?: number;
@@ -109,6 +112,9 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   {
     id: "stellarbox-s1",
+    seriesCode: "S1",
+    seriesRepresentative: true,
+    badgeKind: "bestSeller",
     productType: "DEVICE",
     name: "UVELBox S1",
     tier: "Entry",
@@ -135,6 +141,9 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarbox-pro",
+    seriesCode: "PRO",
+    seriesRepresentative: true,
+    badgeKind: "trending",
     productType: "DEVICE",
     name: "UVELBox Pro",
     tier: "Pro",
@@ -163,6 +172,9 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarbox-pro-v2",
+    seriesCode: "PRO_V2",
+    seriesRepresentative: false,
+    badgeKind: "upgradePick",
     productType: "DEVICE",
     name: "UVELBox Pro v2",
     tier: "Pro",
@@ -191,6 +203,9 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarrack-p1",
+    seriesCode: "RACK_P1",
+    seriesRepresentative: true,
+    badgeKind: "flagship",
     productType: "DEVICE",
     name: "UVELRack P1",
     tier: "Flagship",
@@ -220,6 +235,9 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarrack-p2",
+    seriesCode: "RACK_P2",
+    seriesRepresentative: false,
+    badgeKind: "flagship",
     productType: "DEVICE",
     name: "UVELRack P2",
     tier: "Flagship",
@@ -248,6 +266,9 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "cloud-share",
+    seriesCode: "CLOUD_SHARE",
+    seriesRepresentative: true,
+    badgeKind: "lowBarrier",
     name: "Cloud Share",
     tier: "Share",
     productType: "SHARE",

@@ -1,5 +1,5 @@
 import { parseEstimateRange } from "./estimate-range";
-import type { Product, ProductBadgeKind, ProductTaskLevel, PurchaseGate } from "@/mock/products";
+import type { Product, ProductBadgeKind, ProductSeriesCode, ProductTaskLevel, PurchaseGate } from "@/mock/products";
 import type { PhaseId } from "@/store/product-phase";
 
 export type CatalogProduct = Product;
@@ -21,6 +21,7 @@ export class ProductCatalogContractError extends Error {
 }
 
 const TIERS = new Set<Product["tier"]>(["Entry", "Pro", "Flagship", "Share"]);
+const SERIES_CODES = new Set<ProductSeriesCode>(["S1", "PRO", "PRO_V2", "RACK_P1", "RACK_P2", "CLOUD_SHARE"]);
 const PHASES = new Set<PhaseId>(["P1", "P2", "P3", "P4", "P5", "P6"]);
 const LIFECYCLES = new Set<NonNullable<Product["status"]>>(["active", "legacy"]);
 const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
@@ -56,6 +57,12 @@ function optionalString(value: unknown): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   if (typeof value !== "string") return invalid();
   return value;
+}
+
+function seriesCode(value: unknown): ProductSeriesCode | null {
+  if (value == null) return null;
+  if (!SERIES_CODES.has(value as ProductSeriesCode)) return invalid();
+  return value as ProductSeriesCode;
 }
 
 function badgeKind(value: unknown): Product["badgeKind"] {
@@ -195,6 +202,8 @@ function product(value: unknown): CatalogProduct {
     name: nonEmptyString(source.name),
     storeSortRank: optionalInteger(source.storeSortRank),
     tier: tier as Product["tier"],
+    seriesCode: seriesCode(source.seriesCode),
+    seriesRepresentative: source.seriesRepresentative === undefined ? false : booleanValue(source.seriesRepresentative),
     tagline: requiredString(source.tagline),
     badge: optionalString(source.badge),
     badgeKind: badgeKind(source.badgeKind),

@@ -199,8 +199,8 @@ export function demoTeamWeek(at) {
 export const demoCreditedDeposit=state=>demoHasEarningsHistory(state)
   ?{depositId:'CR-77',grossAmountUsdt:50.123456,creditedUsdt:50,createdAt:state.previewFactsAt}:null;
 
-export const demoChainDepositFee = '0.123456';
-export const demoChainDepositMinimum = '50';
+export const demoChainDepositFee = '0';
+export const demoChainDepositMinimum = '5';
 
 export function demoChainDepositAddress(state, network, allocate = false) {
   const existing = state.chainDepositAddresses?.[network]
@@ -400,6 +400,22 @@ export function demoStreakFacts(state,now) {
     lastCheckInDate,checkedInToday:lastCheckInDate===today};
 }
 
+export function demoPayoutDateOrders(state, now) {
+  if (state.withdrawReviewState !== 'payout-dates' || state.dataState === 'empty') return [];
+  // Use earlier Vietnam business dates so the historical withdrawals do not count against today's quota.
+  const sampleAt = state.withdrawalSamplesAt ??= now;
+  const yesterday = new Date(Date.parse(demoTeamBusinessDate(sampleAt)) - day);
+  const vietnamMidnight = yesterday.getTime() - 7 * 3600000;
+  return [
+    { withdrawalNo: 'WD-' + '3'.repeat(32), weekday: 5, minute: 15, amount: 60 },
+    { withdrawalNo: 'WD-' + '4'.repeat(32), weekday: 2, minute: 23 * 60 + 45, amount: 70 },
+  ].map(({ withdrawalNo, weekday, minute, amount }) => {
+    const daysBack = (yesterday.getUTCDay() - weekday + 7) % 7;
+    const at = vietnamMidnight - daysBack * day + minute * 60000;
+    return { withdrawalNo, amount, netReceive: amount - 1, fee: 1, status: 'PROCESSING', at, riskRoute: 'manual' };
+  });
+}
+
 export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   initializeDemoWalletCheckpoint(state);
   const events=demoCommissionGroups(state,seedAt);
@@ -451,18 +467,18 @@ export function demoWalletBills(state,now,seedAt,tasks,longRefs) {
   const history=demoDeletionHistory(state);
   const swap=history?.swap;
   const stake=demoDeletionStake(state);
-  const deletionEntries=[
+  const historicalEntries=[
     ...(swap?[
       [swap.exchangeNo+'-OUT','UVT','OUT',swap.fromAmount,'EXCHANGE_SWAP','swap',swap.at],
       [swap.exchangeNo+'-IN','USDT','IN',swap.toAmount,'EXCHANGE_SWAP','swap',swap.at],
     ]:[]),
-    ...(history?.withdrawals??[]).flatMap(withdrawal=>[
+    ...(history?.withdrawals??demoPayoutDateOrders(state,now)).flatMap(withdrawal=>[
       [withdrawal.withdrawalNo+':USDT:PRINCIPAL','USDT','OUT',withdrawal.netReceive,'WITHDRAW_NET_PRINCIPAL','withdraw',withdrawal.at],
       [withdrawal.withdrawalNo+':USDT:NETWORK_FEE','USDT','OUT',withdrawal.fee,'WITHDRAW_NETWORK_FEE','withdraw',withdrawal.at],
     ]),
     ...(stake?[[stake.positionNo+'-OPEN','USDT','OUT',stake.amountUsdt,'STAKING_OPEN','stake',Date.parse(stake.lockedAt)]]:[]),
   ];
-  seeds.push(...deletionEntries.map(([bizNo,asset,direction,amount,bizType,category,at])=>
+  seeds.push(...historicalEntries.map(([bizNo,asset,direction,amount,bizType,category,at])=>
     ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));
   seeds.push(...longRefs.map(([bizNo,asset,direction,amount,bizType,category,at])=>
     ({id:bizNo,bizNo,bizType,asset,direction,amount,category,at,status:'SUCCESS',remark:''})));

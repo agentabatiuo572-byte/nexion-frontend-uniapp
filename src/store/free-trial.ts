@@ -61,7 +61,7 @@ export type { TrialStatus } from "./trial-boundary";
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "quota-exhausted" | "risk" | "product-unavailable" | "capacity-full" | "unknown";
-export type TrialStartFailure = TrialIneligibleReason | "onboarding-required" | "terms-required" | "terms-changed" | "read-failed" | "rejected" | "confirming" | "storage-unavailable";
+export type TrialStartFailure = TrialIneligibleReason | "terms-changed" | "read-failed" | "rejected" | "confirming" | "storage-unavailable";
 export type TrialClaimTerms = Pick<TrialConfig, "trialProductId" | "trialTermsVersion" | "trialDays" | "shadowDailyUSD" | "trialOffsetCapUSD">
   & { deviceName: string | null };
 
@@ -300,6 +300,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const confirmedHomeOffer = shallowRef<{
     status: "none" | "ended";
     capacityFull: boolean;
+    reason?: TrialIneligibleReason;
     deviceName: string;
     productId: string | null;
     imageUrl?: string;
@@ -460,7 +461,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     }
     // Validate the whole policy before committing snapshot or promotion presentation.
     const trialConfig = useTrialConfig();
-    trialConfig.applyAuthoritative(next.config);
+    const productUnavailable = !next.canStart && next.eligibilityReason === "product-unavailable"
+      && ["ELIGIBLE", "FAILED", "CANCELLED"].includes(next.serverState);
+    trialConfig.applyAuthoritative(next.config, productUnavailable);
     const confirmedExpiry = next.status === "ended" && next.endReason === "expired";
     if (pendingExpiryClaim !== next.claimNo || !confirmedExpiry) pendingExpiryClaim = null;
     if (confirmedExpiry && next.claimNo && confirmedLifecycle?.claimNo === next.claimNo
@@ -502,6 +505,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       || (next.status === "ended" && next.canStart) ? {
         status: next.status,
         capacityFull,
+        reason: next.eligibilityReason,
         deviceName: config.trialProductName,
         productId: resolveTrialCheckoutProductId(config.trialProductId),
         imageUrl: config.imageUrl,
@@ -1034,13 +1038,6 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       } catch (error) {
         if (requestedEpoch !== accountBindingEpoch) return { ok: false, reason: "read-failed" };
         const failure = asApiError(error);
-        // The shared write gate refuses before the trial command executes.
-        // Preserve the original key, but do not reconcile this refusal as success.
-        if (failure.kind === "http" && failure.status === 428 && failure.code === 428
-            && (failure.message === "USER_ONBOARDING_REQUIRED" || failure.message === "LEGAL_TERMS_ACK_REQUIRED")) {
-          finishLifecycle(pending, true);
-          return { ok: false, reason: failure.message === "USER_ONBOARDING_REQUIRED" ? "onboarding-required" : "terms-required" };
-        }
         const reason = commandFailureReason(failure.message);
         const termsChanged = isApiRefusal(error, 409, TRIAL_TERMS_CHANGED);
         if (failure.kind === "http" && failure.status === 409 && failure.code === 409 && reason !== "unknown") {

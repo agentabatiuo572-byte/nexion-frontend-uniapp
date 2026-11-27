@@ -10,9 +10,18 @@ export function isProductAvailable(product: Product, currentPhase: PhaseParams):
   return !product.unlocksAtPhase || isPhaseReached(currentPhase, product.unlocksAtPhase);
 }
 
+export function isProductReleased(product: Product, currentPhase: PhaseParams): boolean {
+  return product.releaseState ? product.releaseState === "AVAILABLE" : isProductAvailable(product, currentPhase);
+}
+
 export function productOutOfStock(product: Product | undefined): boolean {
   return product?.purchaseBlockedReason === "PRODUCT_OUT_OF_STOCK"
     || product?.inventoryMode === "FINITE" && product.stock === 0;
+}
+
+export function productSpecsUnavailable(product: Product | undefined): boolean {
+  return product?.purchaseBlockedReason === "PRODUCT_SPECS_UNAVAILABLE"
+    || product?.purchaseBlocked === true && !productOutOfStock(product);
 }
 
 export function productHasStock(product: Product | undefined): boolean {

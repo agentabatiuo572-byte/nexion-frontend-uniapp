@@ -54,6 +54,15 @@ const ZH_WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五",
 const VI_WEEKDAYS = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
 const EN_SHORT_MONTHS = EN_MONTHS.map(month => month.slice(0, 3));
 
+/** An absolute calendar day, carried in UTC fields independently of the device time zone. */
+export function formatWalletCalendarDay(date: Date, locale: string): string {
+  const day = formatDateParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), locale);
+  const weekdays = cldrNames(locale)?.weekdays
+    ?? (locale.startsWith("zh") ? ZH_WEEKDAYS : locale.startsWith("vi") ? VI_WEEKDAYS : EN_WEEKDAYS);
+  const weekday = weekdays[date.getUTCDay()];
+  return locale.startsWith("zh") ? `${day}（${weekday}）` : `${weekday}, ${day}`;
+}
+
 /** "今天 · 10月30日", "Yesterday · Oct 29", "Thứ Hai · 27/10"; another year adds the year. */
 export function walletBillDayLabel(ts: number, locale: string, now: number, words: { today: string; yesterday: string }): string {
   if (typeof ts !== "number" || !Number.isFinite(ts) || ts <= 0) return "—";

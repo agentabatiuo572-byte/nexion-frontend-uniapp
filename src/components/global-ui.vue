@@ -13,7 +13,7 @@
     :aria-label="topConfirm.title"
     @click="cancelConfirm"
   >
-    <view class="nx-glass-sheet nx-modal nx-dialog-pop-in" :class="{ 'nx-modal--detail': topConfirm.rows?.length }" @click.stop>
+    <view class="nx-glass-sheet nx-modal nx-dialog-pop-in" :class="{ 'nx-modal--detail': topConfirm.rows?.length, 'nx-modal--rules': topConfirm.rules }" @click.stop>
       <view v-if="topConfirm.rows?.length && topConfirm.glyph" class="nx-modal__glyph" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg></view>
       <view v-else-if="topConfirm.icon" class="nx-modal__glyph" :class="`nx-modal__glyph--${topConfirm.icon}`" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -38,13 +38,21 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         <text class="nx-modal__hint-t">{{ topConfirm.note }}</text>
       </view>
-      <!-- Detail layout (e.g. withdrawal): a recessed list of what will happen, the last row the amount received. -->
+      <!-- Detail layout (e.g. withdrawal): a recessed list of what will happen, the last row the amount received. With rules,
+           rows and rules share one scrolling region; without them the wrapper adds nothing. -->
+      <view v-if="topConfirm.rows?.length || topConfirm.rules" :class="{ 'nx-modal__scroll': topConfirm.rules }">
       <view v-if="topConfirm.rows?.length" class="nx-modal__rows">
-        <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount }">
+        <view v-for="row in topConfirm.rows" :key="row.label" class="nx-modal__row" :class="{ 'nx-modal__row--amount': row.amount, 'nx-modal__row--code': row.code }">
           <text class="nx-modal__k">{{ row.label }}</text>
-          <text v-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
+          <NxCodeValue v-if="row.code" class="nx-modal__code" :value="row.value" :label="row.label" full :copyable="false" />
+          <text v-else-if="row.amount" class="nx-modal__v"><text class="nx-modal__cur">{{ amountAnatomy(row.value)[0] }}</text>{{ amountAnatomy(row.value)[1] }}<text class="nx-modal__dec">{{ amountAnatomy(row.value)[2] }}</text></text>
           <text v-else class="nx-modal__v">{{ row.value }}</text>
         </view>
+      </view>
+      <view v-if="topConfirm.rules" class="nx-modal__rules">
+        <text class="nx-modal__rules-title" role="heading" aria-level="3">{{ topConfirm.rules.title }}</text>
+        <NxRulesList :items="topConfirm.rules.items" />
+      </view>
       </view>
       <view class="nx-modal__actions">
         <view
@@ -95,6 +103,7 @@ import { computed } from "vue";
 import ToastHost from "@/components/toast-host.vue";
 import DeviceArt from "@/components/device-art.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
+import NxRulesList from "@/components/ui/nx-rules-list.vue";
 import { useUI } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import MilestoneCelebration from "@/components/milestone-celebration.vue";
@@ -224,8 +233,17 @@ useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr", undefined
 .nx-modal__row + .nx-modal__row { border-top: 1px solid var(--v5-border); }
 .nx-modal__k { min-width: 0; max-width: 55%; overflow-wrap: break-word; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); }
 .nx-modal__v { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-align: right; font-variant-numeric: tabular-nums; }
+/* A code row (payout address): the whole string on its own line under the label, mono, wrapping evenly (03 §3.6.1). */
+.nx-modal__row--code { flex-direction: column; align-items: stretch; gap: 4px; }
+.nx-modal__row--code .nx-modal__k { max-width: none; }
+.nx-modal__code { color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); }
 .nx-modal__row--amount .nx-modal__v { color: var(--v5-success-ink); font: 500 20px/26px var(--font-amount); letter-spacing: -.02em; }
 .nx-modal--detail .nx-modal__actions { margin-top: 20px; }
+/* Rules under the rows: the dialog stops scrolling as a whole; the rows and rules scroll between a fixed head and actions. */
+.nx-modal--rules { overflow: hidden; }
+.nx-modal > .nx-modal__scroll { flex-shrink: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nx-modal__rules { margin-top: 20px; text-align: left; }
+.nx-modal__rules-title { display: block; margin-bottom: 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 /* Device block (03 §3.5): one surface-2 block, a row per device (art, name, number · where it goes), as the devices page. */
 .nx-modal__devices { margin-top: 16px; padding: 4px 0; border-radius: var(--v5-radius-m); background: var(--v5-surface-2); text-align: left; }
 .nx-modal__device { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 6px; }

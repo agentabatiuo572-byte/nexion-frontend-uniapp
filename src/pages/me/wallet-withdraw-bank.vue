@@ -18,9 +18,10 @@
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
-          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ money(order.bank.amountUsdt) }} USDT</text></view>
-          <view class="row"><text>{{ c.fee }}</text><text>{{ money(order.bank.feeUsdt) }}</text></view>
-          <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ money(order.settlementEvidence!.amountUsdt!) }}</text></view>
+          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ usdt2(order.bank.amountUsdt) + '\u00A0USDT' }}</text></view>
+          <view class="row"><text>{{ c.fee }}</text><text>{{ usdt2(order.bank.feeUsdt) }}</text></view>
+          <view class="row"><text>{{ c.net }}</text><text>{{ usdt2(order.bank.netUsdt) }}</text></view>
+          <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ usdt2(order.settlementEvidence!.amountUsdt!) }}</text></view>
           <view v-if="terminal && order.settlementEvidence?.checkedAt" class="row"><text>{{ c.confirmedAt }}</text><text>{{ displayDate(order.settlementEvidence.checkedAt) }}</text></view>
         </view>
         <view class="bar-space bar-space--result" />
@@ -63,8 +64,12 @@
             <view class="aura" aria-hidden="true"><view /><view /></view>
             <view class="slab nx-tint">
               <view class="slab__head"><text class="k">{{ c.amount }}</text></view>
-              <text class="slab__amt">{{ money(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
-              <text v-if="displayConfig.policy && displayConfig.capacity" class="hint">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }} · {{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text>
+              <text class="slab__amt">{{ usdt2(quote.amountUsdt) }}<text class="slab__unit">USDT</text></text>
+              <!-- Balance and single limit on two lines, as on the amount step, so the range never breaks at its dash. -->
+              <view v-if="displayConfig.policy && displayConfig.capacity" class="limits">
+                <text>{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
+                <text>{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
+              </view>
             </view>
           </view>
           <view class="ticket" :aria-label="c.quoteTitle">
@@ -77,8 +82,8 @@
               </view>
             </view>
             <view class="ticket__rows">
-              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ money(quote.feeUsdt) }}</text></view>
-              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ money(quote.netUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.fee }}</text><text class="qrow__v">{{ usdt2(quote.feeUsdt) }}</text></view>
+              <view class="qrow"><text class="k">{{ c.net }}</text><text class="qrow__v">{{ usdt2(quote.netUsdt) }}</text></view>
               <view class="qrow"><text class="k">{{ c.rate }}</text><text class="qrow__v">{{ formatHowNumber(quote.rateVnd, dateLocale()) }}</text></view>
             </view>
             <view class="tear" aria-hidden="true" />
@@ -113,7 +118,8 @@
                 <text class="slab__unit">USDT</text>
               </view>
               <view class="limits" v-if="displayConfig.policy && displayConfig.capacity">
-                <text><text data-testid="bank-balance">{{ format(c.availableLabel, { amount: money(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text> · <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: money(displayConfig.policy.minAmountUsd), max: money(displayConfig.policy.maxAmountUsd) }) }}</text></text>
+                <text data-testid="bank-balance">{{ format(c.availableLabel, { amount: usdt2(displayConfig.capacity.maxWithdrawableUsdt) }) }}</text>
+                <text data-testid="bank-single-limit">{{ format(c.rangeLabel, { min: usdt2(displayConfig.policy.minAmountUsd), max: usdt2(displayConfig.policy.maxAmountUsd) }) }}</text>
               </view>
               <text v-if="amountError" class="error-text" role="alert">{{ amountError }}</text>
             </view>
@@ -124,7 +130,8 @@
             <view class="refresh-limits" role="button" tabindex="0" data-testid="bank-refresh-limits" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.refreshLimits }}</text></view>
           </view>
           <view v-if="displayConfig.capacity?.dailyRemainingCount === 0" class="notice" role="status"><text>{{ c.dailyExhausted }} {{ displayDate(displayConfig.capacity.dailyCountResetAt) }}</text></view>
-          <text class="hint pad">{{ c.feeIncluded }} {{ feeRule }}</text>
+          <text class="hint pad">{{ feeNote || c.feeIncluded }}</text>
+          <view v-if="rulesReady" class="rules-link"><NxButton variant="link" icon="chevron-right" :label="c.rules.title" aria-haspopup="dialog" @click="rulesMode = 'read'" /></view>
           <view class="action text-link" role="button" tabindex="0" :aria-disabled="busy" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.backToAccount }}</text></view>
         </template>
         <view v-if="error || (!quote && displayConfig.enabled && (!displayConfig.policy || !displayConfig.capacity))" class="action secondary" role="button" tabindex="0" data-testid="bank-refresh" :aria-disabled="busy" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ c.reload }}</text></view>
@@ -157,7 +164,7 @@
       </view>
       <view v-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote) && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
         <template v-if="quote">
-          <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="submit" @keydown.enter.prevent="submit" @keydown.space.prevent="submit"><text>{{ c.confirm }}</text></view>
+          <view v-if="!quoteExpired" class="action primary" role="button" tabindex="0" data-testid="bank-submit" :aria-disabled="busy || !canSubmit" @click="confirmSubmit" @keydown.enter.prevent="confirmSubmit" @keydown.space.prevent="confirmSubmit"><text>{{ c.confirm }}</text></view>
         </template>
         <template v-else-if="formStep === 'account'">
           <view class="action secondary nx-tray-text" role="button" tabindex="0" :aria-disabled="busy" @click="manageBank" @keydown.enter.prevent="manageBank" @keydown.space.prevent="manageBank"><text>{{ displayConfig.beneficiary ? c.changeAccount : c.addAccount }}</text></view>
@@ -166,13 +173,28 @@
         <view v-else class="action primary" role="button" tabindex="0" data-testid="bank-quote" :aria-disabled="busy || !canContinue || !!amountProblem" @click="getQuote" @keydown.enter.prevent="getQuote" @keydown.space.prevent="getQuote"><text>{{ c.quote }}</text></view>
       </view>
     </template>
+    <!-- 提现说明:只读时一个「确认」;确认提现时同一个弹窗,「确认提现」按原流程提交,「取消」回到报价(勾选保留)。
+         确认时先列这笔的对象和后果(03 §3.5),取同一份报价:收款账号尾号、总扣、银行到账金额,再接提现说明。 -->
+    <NxNoticeDialog :open="rulesMode !== null && rulesReady" :title="rulesMode === 'submit' && quote ? c.confirmTitle : c.rules.title" :primary="rulesMode === 'submit' ? c.confirm : useTranslations.ui.confirm"
+      :secondary="rulesMode === 'submit' ? useTranslations.ui.cancel : undefined" icon="none" scroll-body focus-title mask-secondary :dismissible="rulesMode === 'read'"
+      @primary="rulesPrimary" @secondary="rulesMode = null" @dismiss="rulesMode = null">
+      <template v-if="rulesMode === 'submit' && quote">
+        <view class="cfm-rows" data-testid="bank-confirm-rows">
+          <view class="cfm-row"><text class="cfm-k">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="cfm-v">{{ dots(quote.maskedAccount) }}</text></view>
+          <view class="cfm-row"><text class="cfm-k">{{ c.totalDebit }}</text><text class="cfm-v">{{ usdt2(quote.amountUsdt) + '\u00A0USDT' }}</text></view>
+          <view class="cfm-row cfm-row--amount"><text class="cfm-k">{{ c.receive }}</text><text class="cfm-v">{{ formatAmount(quote.amountVnd, 'VND') }}</text></view>
+        </view>
+        <text class="cfm-rules-title" role="heading" aria-level="3">{{ c.rules.title }}</text>
+      </template>
+      <NxRulesList :items="rulesItems" />
+    </NxNoticeDialog>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
 import { formatHowNumber } from "@/lib/rank-how-content";
 import { formatFinanceAmount as formatAmount } from "@/lib/finance-amount-display";
-import { formatGroupedAmount } from "@/lib/amount-display";
+import { formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { computed, ref, watch } from "vue";
 import { toast } from "@/store/ui";
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
@@ -180,6 +202,10 @@ import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxResultHead from "@/components/ui/nx-result-head.vue";
+import NxButton from "@/components/ui/nx-button.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
+import NxRulesList from "@/components/ui/nx-rules-list.vue";
+import type { RuleItem } from "@/store/ui";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale } from "@/i18n/format";
@@ -249,6 +275,8 @@ function readPendingQuoteNo(): string | null {
   return typeof pending === "string" && /^BQ-[a-f0-9]{32}$/.test(pending) ? pending : null;
 }
 const money = (value: number) => formatAmount(value);
+// Quote, confirm and result amounts (principal, fee, net, refund): two decimals cut off, never rounded. Display only.
+const usdt2 = (value: number) => formatTruncatedAmount(value);
 const displayDate = (value: string) => formatBankDateTime(value, dateLocale());
 const quoteExpired = computed(() => !!quote.value && (parseServerTimestamp(quote.value.expiresAt) ?? 0) <= now.value);
 const canSubmit = computed(() => newWithdrawalAllowed.value && accepted.value && !!quote.value && !quoteExpired.value && !uncertain.value && config.value?.enabled === true
@@ -278,13 +306,39 @@ const quoteRatio = computed(() => {
 });
 const secondsLeft = computed(() => Math.max(0, Math.ceil(((parseServerTimestamp(quote.value?.expiresAt) ?? 0) - now.value) / 1000)));
 const title = computed(() => quote.value ? c.value.confirmTitle : formStep.value === "amount" ? c.value.amountTitle : c.value.recipientTitle);
-const feeRule = computed(() => displayConfig.value?.policy ? format(c.value.feeRule, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
+const feeNote = computed(() => displayConfig.value?.policy ? format(c.value.feeNote, { rate: formatHowNumber(displayConfig.value.policy.feeRatePct, dateLocale()), min: money(displayConfig.value.policy.feeMinUsd), max: money(displayConfig.value.policy.feeMaxUsd) }) : "");
 const amountError = computed(() => {
   const problem = silentRead.value ? bankAmountError(amount.value, displayConfig.value) : amountProblem.value;
   if (!amount.value || !problem) return "";
   return c.value.amountErrors[problem];
 });
 function format(template: string, values: Record<string, string | number>) { return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? "")); }
+// ── 提现说明:只在拿到单笔限额（policy）时出现。'submit' 是提交前的同一个弹窗,报价失效时收起。──
+const rulesMode = ref<"read" | "submit" | null>(null);
+const rulesReady = computed(() => !!displayConfig.value?.policy);
+const rulesItems = computed(() => {
+  const policy = displayConfig.value?.policy, r = c.value.rules;
+  if (!policy) return [];
+  const items: RuleItem[] = [
+    { title: r.amountTitle, body: r.amountBody, figures: { range: `${formatGroupedAmount(policy.minAmountUsd, "full")}–${formatGroupedAmount(policy.maxAmountUsd, "full")}\u00A0USDT` } },
+    { title: r.etaTitle, body: r.etaBody, figures: { window: r.window, weekend: r.weekend } },
+    { title: r.feeTitle, body: r.feeBody },
+    { title: r.accountTitle, body: r.accountBody },
+  ];
+  return items;
+});
+watch(() => !!quote.value && !quoteExpired.value, (live) => { if (!live && rulesMode.value === "submit") rulesMode.value = null; });
+function confirmSubmit() {
+  refreshPendingAttempt();
+  if (busy.value || !canSubmit.value || uncertain.value) return;
+  if (rulesReady.value) rulesMode.value = "submit";
+  else void submit();
+}
+function rulesPrimary() {
+  const submitting = rulesMode.value === "submit";
+  rulesMode.value = null;
+  if (submitting) void submit();
+}
 function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.value = "amount"; }
 function useMax() { if (!busy.value && canContinue.value && maxAmount.value > 0) amount.value = maxAmount.value.toFixed(6).replace(/\.?0+$/, ""); }
 function toggleConsent() { if (!busy.value && !quoteExpired.value) accepted.value = !accepted.value; }
@@ -582,6 +636,9 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .limits { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--v5-ink-3); margin-top: 12px; line-height: 1.5; }
 .refresh-limits { min-height: 44px; display: flex; align-items: center; color: var(--v5-brand); cursor: pointer; align-self: flex-start; }
 .fee-rule { display: block; margin-top: 6px; }
+/* 「提现说明 ›」 under the fee sentence, right-aligned (03 §3.9 文字链接). */
+.rules-link { display: flex; justify-content: flex-end; min-height: 44px; align-items: center; margin: 4px 0 0; }
+.rules-link :deep(text) { white-space: nowrap; }
 .details { margin: 20px 0; }
 .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--v5-border); font-size: var(--ui-type-list-subtitle); }
 /* The label wraps before a value is squeezed: amounts and dates stay on one line, the code ellipsizes in the middle. */
@@ -642,7 +699,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .slab .amount-input { display: flex; align-items: baseline; gap: 0; margin-top: 4px; padding: 0; border: 0; border-radius: 0; }
 .slab .amount-input input { flex: 0 1 auto; max-width: calc(100% - 48px); height: 48px; color: var(--v5-ink); font: 500 40px/48px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .slab .use-max { min-width: 0; min-height: 32px; padding: 0 4px; font: 500 13px/18px var(--font-v5); }
-.slab .limits { margin-top: 4px; font: 400 12px/18px var(--font-v5); }
+.slab .limits { gap: 0; margin-top: 4px; font: 400 12px/18px var(--font-v5); }
 .daily { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 4px 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .daily .refresh-limits { flex-shrink: 0; white-space: nowrap; font: 500 12px/18px var(--font-v5); }
 .ticket { position: relative; margin-top: 12px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
@@ -670,6 +727,15 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .acct__change::after { content: ""; position: absolute; inset: -6px -2px; }
 .consent { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .consent .checkbox { width: 22px; height: 22px; border-radius: 7px; font-size: 13px; }
+/* Confirm: this withdrawal's rows above the rules, the recessed detail list of the USDT submit confirm. */
+.cfm-rows { padding: 4px 14px; border-radius: 16px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
+[data-theme="light"] .cfm-rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.cfm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
+.cfm-row + .cfm-row { border-top: 1px solid var(--v5-border); }
+.cfm-k { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.cfm-v { flex: none; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
+.cfm-row--amount .cfm-v { color: var(--v5-success-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
+.cfm-rules-title { display: block; margin: 20px 0 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 .text-link { min-height: 44px; margin-top: 8px; background: transparent; color: var(--v5-ink-3); font: 500 13px/18px var(--font-v5); }
 .bar-space { height: 110px; }
 .bar-space--result { height: 168px; }

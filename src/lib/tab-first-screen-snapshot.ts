@@ -31,7 +31,7 @@ export interface TabSnapshotData {
   vouchers: Array<{ id: string; startAt: number; endAt: number; claimableOnStore: boolean;
     type: "fixed" | "percent"; amountUSD: number | null; percent: number | null; maxDiscountUSD: number | null }>;
   promotions: PromotionEntrySnapshot[];
-  catalogYield: Pick<StoreYieldAuthority, "entry" | "pro" | "rack" | "ladder">;
+  representativeCatalogYield: Pick<StoreYieldAuthority, "entry" | "pro" | "rack" | "ladder">;
   phoneYield: YieldAmount | null;
 }
 export type TabSnapshotKey = keyof TabSnapshotData;
@@ -42,7 +42,7 @@ interface Context {
 type Blocks = { [K in TabSnapshotKey]?: { generatedAt: string | null; receivedAt: number; data: TabSnapshotData[K] } };
 interface Row { schema: 1; context: Context; blocks: Blocks }
 export interface TabSnapshotWriteScope { binding: number; revisions: Record<TabSnapshotKey, number> }
-const keys: TabSnapshotKey[] = ["home", "wallet", "commission", "network", "rank", "referral", "release", "market", "vouchers", "promotions", "catalogYield", "phoneYield"];
+const keys: TabSnapshotKey[] = ["home", "wallet", "commission", "network", "rank", "referral", "release", "market", "vouchers", "promotions", "representativeCatalogYield", "phoneYield"];
 const revisions = Object.fromEntries(keys.map(key => [key, 0])) as Record<TabSnapshotKey, number>;
 const displayed = shallowRef<Row | null>(null);
 const clock = ref(Date.now());
@@ -78,7 +78,7 @@ const schemas: Record<TabSnapshotKey, Schema> = {
     template: { oneOf: ["SKU_GIFT", "FIRST_PURCHASE", "DIRECT_REFERRAL", "MULTI_PRODUCT", "REPURCHASE"] }, title: localized,
     startsAt: s, endsAt: s, serverTime: s, bannerImageUrl: nullable(s), kind: { oneOf: ["gift", "coupon", "spark", "plain"] }, benefit: s, href: s,
     slots: list({ anyOf: [fields(promotionSlot), fields({ ...promotionSlot, imageUrl: nullable(s) })] }) })),
-  catalogYield: fields({ entry: amount, pro: amount, rack: amount, ladder: list(fields({ id: { oneOf: ["phone", "entry", "pro", "proV2", "rack", "rackP2"] }, amount, widthPct: n })) }),
+  representativeCatalogYield: fields({ entry: amount, pro: amount, rack: amount, ladder: list(fields({ id: { oneOf: ["phone", "entry", "pro", "proV2", "rack", "rackP2"] }, amount, widthPct: n })) }),
   phoneYield: amount,
 };
 function record(value: unknown): value is Record<string, unknown> { return !!value && typeof value === "object" && !Array.isArray(value); }
@@ -99,6 +99,8 @@ function valid(value: unknown, schema: Schema): boolean {
 function parseRow(value: unknown): Row | null {
   if (!record(value) || value.schema !== 1 || !valid(value.context, fields({ accountKey: s, environment: s, baseUrl: s, locale: s,
     sessionChainId: s, sessionGroup: nullable(s), installationId: nullable(s), appSessionVersion: nullable(c) })) || !record(value.blocks)) return null;
+  // The legacy block used fixed product numbers. Other blocks keep their existing contract.
+  delete value.blocks.catalogYield;
   for (const [key, block] of Object.entries(value.blocks)) {
     if (!keys.includes(key as TabSnapshotKey) || !record(block) || !valid(block.receivedAt, n)
       || !(block.generatedAt === null || parseServerTimestamp(block.generatedAt) !== null)
@@ -106,7 +108,7 @@ function parseRow(value: unknown): Row | null {
   }
   const row = value as unknown as Row;
   // Existing rows may have been written before the catalog enforced ordered pairs.
-  const catalog = row.blocks.catalogYield?.data;
+  const catalog = row.blocks.representativeCatalogYield?.data;
   for (const amount of [row.blocks.phoneYield?.data, catalog?.entry, catalog?.pro, catalog?.rack,
     ...(catalog?.ladder.map(({ amount }) => amount) ?? [])]) {
     if (amount?.usdRange) amount.usdRange = parseEstimateRange(amount.usdRange.low, amount.usdRange.high);

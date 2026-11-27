@@ -22,7 +22,7 @@
           <view class="nx-dep-net__nm">
             <text class="nx-dep-net__name">{{ nw.label }}</text>
             <text v-if="!fundsServerEnabled && nw.id === 'usdt-trc20'" class="nx-dep-net__sub">{{ t.topupChrome.netRecommended }}</text>
-            <text v-else class="nx-dep-net__sub">{{ fmt(t.topupChrome.netFee, { fee: formatAmount(fundsServerEnabled ? networkPolicies.find((policy) => policy.network === nw.label)?.feeUsdtExact : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }) }}</text>
+            <text v-else class="nx-dep-net__sub">{{ netFeeText(fundsServerEnabled ? networkPolicies.find((policy) => policy.network === nw.label)?.feeUsdtExact : CHAIN_DEPOSIT_FEE_USDT[nw.id]) }}</text>
           </view>
           <view class="nx-dep-net__ck" aria-hidden="true" />
         </view>
@@ -71,7 +71,7 @@
         <view class="nx-dep-tear" aria-hidden="true" />
         <view class="nx-dep-ticket__bot">
           <view class="nx-dep-addr">
-            <text class="nx-dep-addr__a">{{ shortAddr }}</text>
+            <NxCodeValue class="nx-dep-addr__a" :value="address" :label="t.topupChrome.rules.addressTitle" full :copyable="false" />
             <view :class="['nx-dep-copy-address-cta nx-frosted-button', { 'nx-dep-copy--done': copied }]" role="button" tabindex="0" :aria-label="copied ? t.topupChrome.addrCopied : t.topupChrome.copyAddress" @click="copyAddr">
               <svg v-if="copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
               <text>{{ t.bankPane.copyCta }}</text>
@@ -79,8 +79,8 @@
           </view>
           <!-- 费用/最低额/确认数 — 服务端或 deposits-core 常量单源 -->
           <view class="nx-dep-trio">
-            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">${{ formatAmount(minDeposit) }}</text></view>
-            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ formatAmount(feeUsdt) + '\u00A0USDT' }}</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.minDeposit }}</text><text class="nx-dep-trio__v">{{ formatAmount(minDeposit) + '\u00A0USDT' }}</text></view>
+            <view><text class="nx-dep-k">{{ t.topupChrome.fee }}</text><text class="nx-dep-trio__v">{{ feeAmountText(feeUsdt) + '\u00A0USDT' }}</text></view>
             <view><text class="nx-dep-k">{{ t.topupChrome.confirmationsLabel }}</text><text class="nx-dep-trio__v">{{ confirmations }}</text></view>
           </view>
         </view>
@@ -91,7 +91,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4M12 17h.01" /></svg>
         <text>{{ t.topupChrome.depositAddrNote }}</text>
       </view>
-      <view v-if="activeNet" class="nx-dep-amount-note"><text>{{ t.topupChrome.amountAtSenderNote }}</text></view>
+      <view v-if="activeNet" class="nx-dep-amount-note"><text>{{ isFreeFee(feeUsdt) ? t.topupChrome.amountAtSenderNoteFree : t.topupChrome.amountAtSenderNote }}</text></view>
 
       <!-- ── 没有开放的网络:说明暂未开放 + 一个出口(03 §3.4);最近入金照常显示 ── -->
       <view v-if="channelClosed" class="nx-dep-closed" role="status">
@@ -105,6 +105,11 @@
 
       <!-- ── 指引 / 工单入口 ── -->
       <view class="nx-dep-rows nx-dep-links">
+        <view v-if="rulesPolicy" class="nx-dep-rules-link nx-dep-link" role="button" tabindex="0" aria-haspopup="dialog" @click="rulesOpen = true">
+          <NxIconTile tone="amber" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg></NxIconTile>
+          <text class="nx-dep-link__t">{{ t.topupChrome.rules.title }}</text>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </view>
         <view class="nx-dep-usdt-guide-link nx-dep-link" role="button" tabindex="0" @click="goGuide">
           <NxIconTile tone="teal" size="m"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg></NxIconTile>
           <text class="nx-dep-link__t">{{ t.topupChrome.howToGetUsdt }}</text>
@@ -160,12 +165,28 @@
         </view>
       </view>
     </view>
+
+    <!-- 充值说明: a centred notice with one exit, 确认 (user 2026-11-27). It opens by itself once per account on this device
+         when the policy has an open network; Esc / back put it away without counting it as read. -->
+    <NxNoticeDialog :open="rulesOpen && !!rulesPolicy" :title="t.topupChrome.rules.title" :primary="t.ui.confirm" icon="none" scroll-body dismissible focus-title
+      @primary="confirmRules" @dismiss="rulesOpen = false">
+      <view v-if="rulesPolicy" class="nx-dep-rules" role="list">
+        <view v-for="(item, index) in rulesItems" :key="index" class="nx-dep-rule" role="listitem">
+          <text class="nx-dep-rule__n" aria-hidden="true">{{ index + 1 }}</text>
+          <view class="nx-dep-rule__copy">
+            <text class="nx-dep-rule__t">{{ item.title }}</text>
+            <text class="nx-dep-rule__d"><text v-for="(part, i) in item.parts" :key="i" :class="{ 'nx-dep-rule__fig': part.value }">{{ part.text }}</text></text>
+          </view>
+        </view>
+      </view>
+      <view class="nx-dep-rules__foot"><NxButton variant="link" icon="chevron-right" :label="t.help.contactSupport" @click="supportFromRules" /></view>
+    </NxNoticeDialog>
   </view>
 </template>
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
-import { formatAmount as formatBaseAmount } from "@/lib/amount-display";
+import { formatAmount as formatBaseAmount, formatGroupedAmount, formatTruncatedAmount } from "@/lib/amount-display";
 import { exactDepositAmount, type CregisNetworkPolicy } from "@/api/cregis-deposit-api";
 const formatAmount = (value: number | string | null | undefined) => formatBaseAmount(value, 2);
 import { ref, computed, nextTick, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
@@ -180,6 +201,7 @@ import { useT } from "@/i18n/use-t";
 import NxCodeValue from "@/components/ui/nx-code-value.vue";
 import NxIconTile from "@/components/ui/nx-icon-tile.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
@@ -474,13 +496,9 @@ function moveNet(delta: number) {
   });
 }
 
-// ── 专属地址(同账号同网络恒定;中段省略防溢出,复制取全量)──
+// ── 专属地址(同账号同网络恒定;付款前要逐字核对,完整显示、均匀折行,03 §3.6.1)──
 const address = computed(() => fundsServerEnabled ? serverAddress.value
   : activeNet.value ? dep.depositAddress(activeNet.value) : "");
-const shortAddr = computed(() => {
-  const a = address.value;
-  return a.length > 24 ? `${a.slice(0, 12)}…${a.slice(-8)}` : a;
-});
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 function copyAddr() {
   if (!address.value) return;
@@ -506,6 +524,60 @@ const qrImage = computed(() => {
   // Keep black/white pixels and a four-module quiet zone inside the bitmap.
   return code.createDataURL(4, 16);
 });
+
+// ── 手续费:正好为 0 才算免费;未知不是免费(01 §1.2 实际零为 0,未知为「—」)──
+function isFreeFee(fee: string | number | null | undefined): boolean {
+  return fee != null && formatBaseAmount(fee, "full") === "0";
+}
+/** Fee shown to the user: two places at most, cut not rounded (user 2026-11-27), trailing zeros dropped (0, 0.5, 0.12). */
+function feeAmountText(fee: string | number | null | undefined): string {
+  return formatTruncatedAmount(fee).replace(/\.?0+$/, "");
+}
+function netFeeText(fee: string | number | null | undefined): string {
+  return isFreeFee(fee) ? t.value.topupChrome.netFeeFree : fmt(t.value.topupChrome.netFee, { fee: feeAmountText(fee) });
+}
+
+// ── 充值说明:只在拿到有效策略且所选网络开放时出现,金额取所选网络的这条策略(和网络行、票据同一个值)──
+const rulesPolicy = computed(() => networkPolicies.value.find((policy) => policy.enabled && policy.network === CHANNEL_SHORT[net.value]) ?? null);
+const rulesOpen = ref(false);
+// A translated sentence split around its placeholders, so each figure takes its own weight in any word order.
+function rulesParts(template: string, values: Record<string, string>): { text: string; value: boolean }[] {
+  return template.split(/(\{\w+\})/).filter(Boolean).map((part) => {
+    const key = /^\{(\w+)\}$/.exec(part)?.[1];
+    return key && key in values ? { text: values[key], value: true } : { text: part, value: false };
+  });
+}
+const rulesItems = computed(() => {
+  const policy = rulesPolicy.value;
+  if (!policy) return [];
+  const r = t.value.topupChrome.rules;
+  const usdt = (value: string) => `${formatGroupedAmount(value, "full")}\u00A0USDT`;
+  const networks = visibleNets.value.map((nw) => nw.label).join(r.networkJoin);
+  return [
+    { title: r.minTitle, parts: rulesParts(r.minBody, { min: usdt(policy.minDepositUsdtExact) }) },
+    { title: r.networkTitle, parts: rulesParts(fmt(r.networkBody, { networks }), {}) },
+    { title: r.addressTitle, parts: rulesParts(r.addressBody, {}) },
+    { title: r.etaTitle, parts: rulesParts(r.etaBody, { eta: r.eta }) },
+    { title: r.issueTitle, parts: rulesParts(r.issueBody, {}) },
+    { title: r.feeTitle, parts: isFreeFee(policy.feeUsdtExact) ? rulesParts(r.feeFreeBody, {}) : rulesParts(r.feeBody, { fee: `${feeAmountText(policy.feeUsdtExact)}\u00A0USDT` }) },
+  ];
+});
+// Seen once 确认 is pressed, per account on this device; until then it opens by itself the first time the pane has terms.
+const rulesSeenKey = () => `uvel-deposit-rules-seen-v1:${auth.accountId}`;
+let rulesAutoOpened = false;
+watch(rulesPolicy, (policy) => {
+  if (!policy || rulesAutoOpened) return;
+  rulesAutoOpened = true;
+  if (!uni.getStorageSync(rulesSeenKey())) rulesOpen.value = true;
+}, { immediate: true });
+function confirmRules() {
+  uni.setStorageSync(rulesSeenKey(), "1");
+  rulesOpen.value = false;
+}
+function supportFromRules() {
+  rulesOpen.value = false;
+  goSupport();
+}
 
 // ── 入口 ──
 function goGuide() {
@@ -669,15 +741,18 @@ const retryBtnStyle: CSSProperties = {
 <style scoped>
 /* P-44 USDT channel: network radio rows, address ticket (white QR plate, tear line, address well), warning box, list cards. */
 .nx-dep-nets { display: flex; flex-direction: column; gap: 8px; margin: 8px -2px 0; }
-.nx-dep-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+.nx-dep-net { position: relative; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 16px; box-sizing: border-box; border-radius: var(--v5-radius-m); background: var(--v5-surface); box-shadow: inset 0 0 0 1px var(--v5-border); cursor: pointer; transition: transform 120ms cubic-bezier(.2,.8,.2,1); }
+/* Radio rows follow the list row height (03 §3.5 → 10.3): 64px, 56px below 375. */
+@media (max-width: 374px) { .nx-dep-net { min-height: 56px; } }
 .nx-dep-net:active { transform: scale(.97); }
 .nx-dep-net:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--v5-brand) 60%, transparent); }
+/* 03 §3.5 单选行: selected = brand 10% fill + 1.5px brand inner stroke; unselected ring 1.5px 辅助色 (ink-3). */
+.nx-dep-net--on { background: color-mix(in srgb, var(--v5-brand) 10%, var(--v5-surface)); box-shadow: inset 0 0 0 1.5px var(--v5-brand); }
 .nx-dep-net__nm { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .nx-dep-net__name { color: var(--v5-ink); font: var(--ui-type-list-title-weight) var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-dep-net--on .nx-dep-net__name { color: var(--v5-brand); }
-.nx-dep-net__sub { min-width: 0; overflow: hidden; color: var(--v5-ink-3); font: 400 12px/16px var(--font-v5); text-overflow: ellipsis; white-space: nowrap; }
-.nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-4); }
+.nx-dep-net__sub { min-width: 0; overflow: hidden; color: var(--v5-ink-3); font: var(--ui-type-list-subtitle-weight) var(--ui-type-list-subtitle)/var(--ui-type-list-subtitle-lh) var(--font-v5); text-overflow: ellipsis; white-space: nowrap; }
+.nx-dep-net__ck { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--v5-ink-3); }
 .nx-dep-net--on .nx-dep-net__ck { box-shadow: inset 0 0 0 2px var(--v5-brand); }
 .nx-dep-net--on .nx-dep-net__ck::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--v5-brand); }
 .nx-dep-ticket { position: relative; margin: 12px -2px 0; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
@@ -692,8 +767,8 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-ticket__bot { padding: 16px; }
 .nx-dep-addr { display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .nx-dep-addr { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
-.nx-dep-addr__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 13px/18px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
-.nx-dep-copy-address-cta { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-ink); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
+.nx-dep-addr__a { flex: 1; min-width: 0; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); }
+.nx-dep-copy-address-cta { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); color: var(--v5-brand); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .nx-dep-copy-address-cta::after { content: ""; position: absolute; inset: -6px -2px; }
 .nx-dep-copy-address-cta:active { transform: scale(.97); }
 .nx-dep-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; text-align: center; }
@@ -706,10 +781,20 @@ const retryBtnStyle: CSSProperties = {
 .nx-dep-amount-note { margin-top: 10px; padding: 0 2px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .nx-dep-rows { margin: 16px -2px 0; overflow: hidden; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .nx-dep-link { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--v5-ink); cursor: pointer; }
-.nx-dep-link__t { flex: 1; min-width: 0; font: 400 15px/20px var(--font-v5); }
+.nx-dep-link__t { flex: 1; min-width: 0; font: 400 var(--ui-type-list-title)/var(--ui-type-list-title-lh) var(--font-v5); }
 .nx-dep-link + .nx-dep-link, .nx-dep-record-row + .nx-dep-record-row { border-top: 1px solid var(--v5-border); }
 .nx-dep-link > svg, .nx-dep-link > .nx-native-svg { flex: none; color: var(--v5-ink-4); }
 .nx-dep-link:active { opacity: .7; }
+/* 充值说明 items (04 §4.7 numbered item): 24px brand-soft index, subheading, long-form rules body; figures in ink 500. */
+.nx-dep-rules { display: flex; flex-direction: column; gap: 16px; }
+.nx-dep-rule { display: flex; gap: 12px; align-items: flex-start; }
+.nx-dep-rule__n { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 var(--ui-type-description)/1 var(--font-v5); font-variant-numeric: tabular-nums; }
+.nx-dep-rule__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nx-dep-rule__t { color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); overflow-wrap: break-word; }
+.nx-dep-rule__d { color: var(--v5-ink-2); font: var(--ui-type-long-form-weight) var(--ui-type-long-form)/var(--ui-type-long-form-lh) var(--font-v5); overflow-wrap: break-word; }
+/* A figure and its unit or range never split (03 §3.6.1); uni text sets its own white-space, so nowrap sits on the figure. */
+.nx-dep-rule__fig { color: var(--v5-ink); font-weight: 500; white-space: nowrap; }
+.nx-dep-rules__foot { display: flex; justify-content: center; margin-top: 20px; padding-bottom: 4px; }
 .nx-dep-closed { display: flex; flex-direction: column; align-items: center; padding: 32px 0 8px; text-align: center; }
 .nx-dep-closed__t { margin-top: 12px; color: var(--v5-ink); font: var(--ui-type-subheading-weight) var(--ui-type-subheading)/var(--ui-type-subheading-lh) var(--font-v5); }
 .nx-dep-closed__cta { margin-top: 12px; }

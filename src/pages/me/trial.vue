@@ -286,6 +286,7 @@ import { useTrialConfig, computeTrialOffset, formatTrialDiscountPercent, resolve
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useDataVisibility } from "@/store/data-visibility";
 import { getProduct } from "@/mock/products";
+import { productDisplayName } from "@/lib/product-display-name";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { navReplace, navTo, takeNavigationParameters } from "@/lib/route";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
@@ -531,7 +532,12 @@ const totalParts = computed<[string, string]>(() => (visibility.hidden ? [visibi
 const dueParts = computed(() => amountParts(purchaseQuote.value?.amountUSD ?? 0));
 // The discount this order really gets, at the two decimals its row shows.
 const earlySaving = computed(() => !!earlyQuote.value && ticketDiscounts.value.early > 0);
-const ticketDeviceName = computed(() => (selectedOption.value?.productName ?? trialDeviceName.value).replace(/ /g, "\u00A0"));
+const ticketDeviceName = computed(() => {
+  const option = selectedOption.value;
+  const name = option ? productDisplayName(option.productNo, t.value.headerTitles.storeProduct, option.productName)
+    : trialDeviceName.value;
+  return name.replace(/ /g, "\u00A0");
+});
 // The trial device keeps the price it was claimed at; say so when the store price differs.
 const claimPriceDiffers = computed(() => {
   const option = selectedOption.value;
@@ -582,10 +588,13 @@ const trialBuyDisabled = computed(() => authorityUnavailable.value || (originalP
     : trialProductUnavailable.value && !trialCatalogLoading.value));
 // A balance payment whose result is still being read: no button in the tray, only its status (03 §3.5.2 提交结果未知).
 const originalConfirming = computed(() => originalPurchase.value?.kind === "BALANCE" && originalPurchase.value.status !== "RESUMABLE");
+const restartProductUnconfigured = computed(() => status.value === "ended"
+  && displayState.value?.eligibilityReason === "product-unavailable" && !trialProductId.value);
 const trialBuyCtaText = computed(() => {
   const original = originalPurchase.value;
   if (original) return original.status === "AWAITING_PAYMENT" || original.status === "RESUMABLE"
     ? t.value.orders.pendingContinue : detail.value.viewProgress;
+  if (restartProductUnconfigured.value) return w.value.entryUnavailable;
   if (usePurchaseOptions.value) {
     if (waitingForReselection.value) return detail.value.chooseDevice;
     return selectedOption.value && purchaseQuote.value
@@ -628,6 +637,7 @@ const barNote = computed(() => {
   if (staleDisplay.value && isActiveCycle.value) return t.value.exchange.staleSnapshot;
   if (staleDisplay.value) return lifecycle.value.autoRetrying;
   if (claimVisible.value) return canStartNow.value ? "" : ineligibleReasonText.value;
+  if (restartProductUnconfigured.value) return lifecycle.value.deviceUnclaimable;
   if (originalPurchase.value) return originalPurchase.value.status === "RESUMABLE" ? purchase.value.coUnfinished : "";
   if (usePurchaseOptions.value) {
     const only = purchaseOptionsView.value.options[0];
@@ -697,7 +707,8 @@ async function goCheckout() {
   openingPurchase.value = true;
   try {
     if (original?.kind === "EXTERNAL") {
-      await resumeTrialPurchasePayment(original.paymentNo, original.claimNo, original.device.productNo, original.device.productName, visit.current, {
+      const name = productDisplayName(original.device.productNo, t.value.headerTitles.storeProduct, original.device.productName);
+      await resumeTrialPurchasePayment(original.paymentNo, original.claimNo, original.device.productNo, name, visit.current, {
         onDelivered: completion => {
           if (visit.current()) checkout.settleExternal(original.claimNo, parseTrialConvertReceipt(completion.receipt));
         },
