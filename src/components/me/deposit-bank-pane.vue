@@ -18,11 +18,6 @@
     </view>
     <view v-if="createError" style="margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--v5-danger-soft)">
       <text class="block" style="font-size: 12px; line-height: 1.5; color: var(--v5-danger); overflow-wrap: break-word">{{ createError }}</text>
-      <view v-if="createRecovery" class="nx-bank-setup-recovery active-press" role="button" tabindex="0"
-        @click="goCreateRecovery" @keydown.enter.prevent="goCreateRecovery" @keydown.space.prevent="goCreateRecovery"
-        style="min-height: 44px; display: flex; align-items: center; color: var(--v5-brand)">
-        <text>{{ t.bankPane.termsRecoveryCta }}</text>
-      </view>
     </view>
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
@@ -551,18 +546,7 @@ const ctaEnabled = computed(() => fxUsable.value && inRange.value && !creating.v
 // ── 生成付款单(mock ~600ms 延迟演加载态:按钮内联 spinner「生成中…」)──
 const creating = ref(false);
 const createError = ref("");
-const createRecovery = ref<"terms" | null>(null);
 const formCtaVisible = computed(() => paneView.value === "form" && paymentSessionReady.value && fx.configReady && !fx.syncFailed && bankRailAvailable.value);
-function goCreateRecovery() {
-  if (!paymentSessionReady.value || creating.value || dep.currentAccountKey() !== app.accountKey) return;
-  if (createRecovery.value !== "terms") return;
-  dep.bankRecoveryDraft = { accountKey: app.accountKey, amount: amount.value };
-  navTo("/pages/onboarding/terms");
-}
-watch(() => app.accountBindingEpoch, () => {
-  if (createRecovery.value) createError.value = "";
-  createRecovery.value = null;
-});
 let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
@@ -570,7 +554,6 @@ function createOrder(presetUsdt?: number) {
     || creating.value || readError.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
-  createRecovery.value = null;
   if (presetUsdt === undefined) createError.value = "";
   const expectedAccountKey = dep.currentAccountKey();
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
@@ -648,12 +631,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
             break;
         }
       }
-      if (cause instanceof ApiError && cause.kind === "http" && cause.status === 428 && cause.code === 428) {
-        if (cause.message === "LEGAL_TERMS_ACK_REQUIRED") {
-          approvedBusinessFailureCopy = t.value.bankPane.termsRequired;
-          if (stillCurrent()) createRecovery.value = "terms";
-        }
-      }
       if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
         approvedBusinessFailureCopy = t.value.bankPane.hostedRejectedNote;
       }
@@ -675,7 +652,6 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       success: (it) => {
         if (!stillCurrent()) return;
         createError.value = "";
-        createRecovery.value = null;
         dep.bankRecoveryDraft = null;
         autoResumePending.value = false;
         viewIntentId.value = it.intentId;

@@ -107,7 +107,7 @@
           <view v-if="notice.reason !== 'unconfirmed'" role="button" :tabindex="props.active ? 0 : -1"
             :aria-disabled="!props.active" class="newcomer-task__observation-action"
             @click="recoverObservation(notice.task)">
-            <text>{{ notice.reason === 'terms' ? t.home.dayOneObservationTermsAction : t.home.dayOneObservationSetupAction }}</text>
+            <text>{{ t.home.dayOneObservationSetupAction }}</text>
           </view>
           <view role="button" :tabindex="props.active ? 0 : -1" :aria-disabled="!props.active"
             class="newcomer-task__observation-action" @click="recoverObservation(notice.task, true)">
@@ -267,8 +267,7 @@ const observationNotices = computed(() => {
   }) : [];
 });
 function observationMessage(reason: DayOneObservationReason): string {
-  return reason === "onboarding" ? t.value.home.dayOneObservationSetup
-    : reason === "terms" ? t.value.home.dayOneObservationTerms : t.value.home.dayOneObservationUnconfirmed;
+  return reason === "onboarding" ? t.value.home.dayOneObservationSetup : t.value.home.dayOneObservationUnconfirmed;
 }
 function recoverObservation(task: QuestTask, retryOnly = false): void {
   if (!props.active || !isActionable(task)) return;

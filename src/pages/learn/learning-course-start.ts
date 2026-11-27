@@ -3,7 +3,7 @@ import { ApiError, isApiRefusal, type ApiErrorKind } from "@/api/errors";
 import { observationRejectionReason } from "@/lib/day-one-observation-recovery";
 
 export interface LearningCourseStartFailure {
-  reason: "onboarding" | "terms" | "network" | "unconfirmed";
+  reason: "onboarding" | "network" | "unconfirmed";
   kind: ApiErrorKind | "unknown";
   status?: number;
   code?: number;
