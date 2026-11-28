@@ -510,6 +510,7 @@ export const ru: Messages = {
     quoteTitle: "Расчёт",
     change: "Сменить",
     resumeUsdt: "Сначала проверьте незавершённый вывод USDT, затем начинайте новый.",
+    resumeUsdtCta: "Открыть незавершённый вывод USDT",
     resumeBank: "Посмотреть предыдущий вывод на банковский счёт.",
     addAccount: "Добавить счёт получателя",
     changeAccount: "Сменить счёт получателя",

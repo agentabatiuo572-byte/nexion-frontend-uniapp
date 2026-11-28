@@ -7,14 +7,16 @@
       <view v-if="error && (order || uncertain || displayIntents.length || displayConfig || (requestedOrder === null && pendingAttempt))" class="notice danger" role="alert"><text>{{ error }}</text></view>
       <!-- Not while a still placeholder below stands in: it already carries the loading status in the loaded layout's place. -->
       <text v-if="busy && !silentRead && !stillPlaceholder()" class="muted loading" role="status">{{ c.loading }}</text>
-      <view v-if="remoteSessionReady && pendingAttempt" class="notice" role="status" data-testid="bank-pending-usdt">
-        <text>{{ c.resumeUsdt }}</text>
-        <NxButton class="page-action" variant="secondary" label="USDT" data-testid="bank-resume-usdt" :disabled="busy" @click="openUsdt" />
+      <!-- A pending USDT withdrawal: where the quote tray already gives the reason (03 §3.1, one sentence once) only the way to
+           it stays here, its label readable alone; elsewhere the sentence stays with it. -->
+      <view v-if="remoteSessionReady && pendingAttempt" :class="pendingInTray ? 'resume-usdt' : 'notice'" :role="pendingInTray ? undefined : 'status'" data-testid="bank-pending-usdt">
+        <text v-if="!pendingInTray">{{ c.resumeUsdt }}</text>
+        <NxButton class="page-action" variant="secondary" icon="arrow-right" :label="c.resumeUsdtCta" data-testid="bank-resume-usdt" :disabled="busy" @click="openUsdt" />
       </view>
 
       <template v-if="order">
         <NxResultHead class="result-head" :tone="resultTone" :icon="outcome === 'held' ? 'shield' : undefined" :title="statusLabel" :description="c.resultNotes[outcome]" title-testid="bank-order-status" :live="!terminal" />
-        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">{{ '\u00A0' }}VND</text></text></view>
+        <view class="amount-card"><text class="muted">{{ c.receiveLabel }}</text><text class="money">{{ formatAmount(order.bank.amountVnd, 'VND') }}<text class="money__unit">{{ '\u00A0₫' }}</text></text></view>
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
@@ -57,8 +59,9 @@
           <!-- Changing the account is offered before a quote exists; a live quote is left with "重新填写金额" first. -->
           <view v-if="!quote" class="acct__change nx-frosted-button" role="button" tabindex="0" :aria-disabled="navigationLocked" :aria-label="c.changeAccount" @click="goBack" @keydown.enter.prevent="goBack" @keydown.space.prevent="goBack"><text>{{ c.change }}</text></view>
         </view>
-        <!-- On the account step this reason sits in the tray above 继续提现 (continueReason); the amount and quote steps keep the notice. -->
-        <view v-if="(formStep === 'amount' && displayConfig.beneficiary && !hasVerifiedBankIdentity(displayConfig.beneficiary)) || (quote && !hasVerifiedBankIdentity(quote))" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
+        <!-- Unverified routing: the tray says it above the grey button (account and amount steps through the account reason,
+             the quote through submitNote). Only an expired quote, which has no button, keeps it here. -->
+        <view v-if="quote && quoteExpired && !hasVerifiedBankIdentity(quote)" class="notice" role="status"><text>{{ c.bankRoutingUnverified }}</text></view>
 
         <template v-if="quote">
           <view class="stage">
@@ -349,8 +352,18 @@ const submitReason = computed(() => {
   // Channel, account, limits and daily count come first (PRD); a stale quote is said only when none applies. Both still block.
   return configBlockReason.value || (quoteLimitsChanged.value ? c.value.quoteLimitsChanged : "");
 });
-// The tray line above 确认提现 (03 §3.1 bottom bar): the blocking reason first, then the unticked confirmation; it goes once ticked.
-const submitNote = computed(() => submitReason.value || (quote.value && !quoteExpired.value && !accepted.value ? c.value.consentRequired : ""));
+// Display only, the one tray line above 确认提现 (03 §3.1 bottom bar). Order: channel, account, limits and count; the quote's
+// unverified routing and a pending USDT withdrawal; a stale quote; the unticked confirmation. The guards stay as they are.
+const submitNote = computed(() => {
+  if (!quote.value || quoteExpired.value) return "";
+  return configBlockReason.value
+    || (!hasVerifiedBankIdentity(quote.value) ? c.value.bankRoutingUnverified : "")
+    || (pendingAttempt.value ? c.value.resumeUsdt : "")
+    || (quoteLimitsChanged.value ? c.value.quoteLimitsChanged : "")
+    || (!accepted.value ? c.value.consentRequired : "");
+});
+// The quote tray carries the reason, so the pending-USDT notice keeps only its way out.
+const pendingInTray = computed(() => !!quote.value && !quoteExpired.value);
 // The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
 const cardTag = computed(() => {
   const shown = displayConfig.value, c0 = c.value;
@@ -772,6 +785,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
    line with the shared 44px hit layer: 重新加载 in brand; 重新填写金额 and 返回收款账户 give up or step back, so they take
    the shared quiet reverse-action style (.nx-reverse-action: ink-3, 13/18, 400) and do not compete with the bar. */
 .page-action { width: 100%; margin-top: 12px; }
+.resume-usdt { margin-top: 8px; }
 .bank-withdraw .page-action--intent { min-width: 0; }
 .bank-withdraw .page-text-action { display: flex; width: max-content; margin: 21px auto 13px; }
 /* Margins collapse, so a second text button right below takes 34: the two 44px hit layers keep 8 between them. */
@@ -794,11 +808,13 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 /* Result amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38), the page's main amount, at 500 (01.2). The unit follows
    a no-break space (03 §3.6.1) instead of a margin. */
 .money { display: block; margin-top: 8px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.money__unit { margin-left: 4px; color: var(--v5-ink-3); font: 500 max(12px, .4em)/16px var(--font-v5); }
+/* The ₫ is a currency symbol (01.2): max(12px, .55em), 500, secondary ink, as on the quote ticket. */
+.money__unit { color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
 /* Result: centred head, then the amount; actions sit in the fixed bar. */
 .result-head { margin: var(--v5-space-2) 0 var(--v5-space-1); }
 .intent-code { max-width: 100%; color: inherit; }
-.consent { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 12px; line-height: 1.6; cursor: pointer; margin-bottom: 10px; }
+/* Confirmation row: 10.1 辅助说明 role in secondary ink; 44px target (01.3). */
+.consent { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; margin: 16px 4px 0; color: var(--v5-ink-3); font: var(--ui-type-description-weight) var(--ui-type-description)/var(--ui-type-description-lh) var(--font-v5); cursor: pointer; }
 .checkbox { width: 20px; height: 20px; flex-shrink: 0; border: 1px solid var(--v5-border-strong); border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 .checkbox.checked { background: var(--v5-brand); color: var(--v5-on-brand); border-color: var(--v5-brand); }
 /* P-45 bank withdrawal: physical bank card, compact account row, amount on glass, quote ticket, fixed actions. */
@@ -883,14 +899,12 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .ticket__vnd { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ticket__cur { color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
 .ticket__net .hint { margin-top: 6px; }
-.consent { margin: 16px 4px 0; }
 .acct__change { position: relative; flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .acct__change::after { content: ""; position: absolute; inset: -6px -2px; }
-.consent { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
 .consent .checkbox { width: 22px; height: 22px; border-radius: 7px; font-size: 13px; }
 /* Confirm: this withdrawal's rows above the rules, the recessed detail list of the USDT submit confirm. */
-.cfm-rows { padding: 4px 14px; border-radius: 16px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
-[data-theme="light"] .cfm-rows { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+/* An info block inside the dialog (01.3): surface-2, 12px corners, no shadow. */
+.cfm-rows { padding: 4px 14px; border-radius: 12px; background: var(--v5-surface-2); }
 .cfm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; box-sizing: border-box; }
 .cfm-row + .cfm-row { border-top: 1px solid var(--v5-border); }
 .cfm-k { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }

@@ -158,6 +158,7 @@ export const vi: Messages = {
     quoteTitle: "Báo giá",
     change: "Đổi",
     resumeUsdt: "Kiểm tra lệnh rút USDT đang chờ trước khi tạo lệnh mới.",
+    resumeUsdtCta: "Xem lệnh rút USDT đang chờ",
     resumeBank: "Xem lệnh rút ngân hàng trước đó.",
     addAccount: "Thêm tài khoản nhận tiền", changeAccount: "Đổi tài khoản nhận tiền",
     recoveryUnavailable: "Chưa thể tải trạng thái rút tiền. Vui lòng tải lại.",

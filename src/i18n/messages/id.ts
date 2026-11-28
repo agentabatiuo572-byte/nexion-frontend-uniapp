@@ -510,6 +510,7 @@ export const id: Messages = {
     quoteTitle: "Penawaran",
     change: "Ganti",
     resumeUsdt: "Cek penarikan USDT yang tertunda sebelum memulai yang lain.",
+    resumeUsdtCta: "Lihat penarikan USDT yang tertunda",
     resumeBank: "Lihat penarikan bank sebelumnya.",
     addAccount: "Tambah rekening penerima",
     changeAccount: "Ganti rekening penerima",

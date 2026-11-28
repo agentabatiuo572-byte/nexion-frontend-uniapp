@@ -510,6 +510,7 @@ export const fil: Messages = {
     quoteTitle: "Quote",
     change: "Palitan",
     resumeUsdt: "Suriin muna ang pending na withdrawal ng USDT bago gumawa ng bago.",
+    resumeUsdtCta: "Tingnan ang pending na withdrawal ng USDT",
     resumeBank: "Tingnan ang nauna mong bank withdrawal.",
     addAccount: "Magdagdag ng account",
     changeAccount: "Palitan ang account",

@@ -916,9 +916,11 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-chip[aria-disabled="true"] { opacity: .45; cursor: default; }
 .nx-bank-chip:not([aria-disabled="true"]):active { transform: scale(.97); }
 .nx-bank-chip:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
-.nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(min-content, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
-  background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
-[data-theme="light"] .nx-bank-facts { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+/* Statistic cells: the 纯色 material (01 §1.1.2), surface with the light-only soft shadow, card corners and inset (01.3).
+   Positioned so it paints over the slab's blurred aura instead of taking a corner glow. */
+.nx-bank-facts { position: relative; display: grid; grid-template-columns: repeat(3, minmax(min-content, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 16px; border-radius: var(--ui-radius-surface);
+  background: var(--v5-surface); }
+[data-theme="light"] .nx-bank-facts { box-shadow: var(--v5-glass-shadow); }
 .nx-bank-facts__unit { grid-column: 1 / -1; justify-self: end; margin: -6px 0 -6px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-bank-fact { min-width: 0; }
 .nx-bank-fact > .nx-bank-k { padding-top: 3px; }
