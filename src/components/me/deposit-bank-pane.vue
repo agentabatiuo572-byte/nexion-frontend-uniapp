@@ -73,12 +73,11 @@
 
     <!-- ── 付款单(awaiting_payment)── -->
     <template v-else-if="paneView === 'order'">
-      <view class="nx-step-in" :style="hostedRejected || intent?.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
+      <view class="nx-step-in" :style="createPending || hostedRejected || intent?.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
-        <template v-if="hostedRejected || intent?.paymentMode === 'hosted'">
-          <!-- Rejected before it was created: the shared result head (03 §3.6.1), not the countdown stage, and no payable summary:
-               no payment order exists, so there is nothing to pay or to credit. -->
-          <view v-if="hostedRejected" class="nx-bank-state"><NxResultHead tone="danger" :title="t.bankPane.hostedRejectedTitle" /></view>
+        <template v-if="createPending || hostedRejected || intent?.paymentMode === 'hosted'">
+          <!-- Use the existing result head for an unknown or rejected create. Only confirmed orders show payment details. -->
+          <view v-if="createPending || hostedRejected" class="nx-bank-state"><NxResultHead :tone="createPending ? 'warning' : 'danger'" :title="createPending ? t.bankPane.createPendingTitle : t.bankPane.hostedRejectedTitle" :description="createPending ? t.bankPane.createPendingBody : undefined" /></view>
           <view v-else class="nx-bank-stage">
             <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
             <view class="nx-bank-slab nx-bank-pay nx-tint">
@@ -92,16 +91,16 @@
                 <text class="nx-bank-cd">{{ countdownParts[0] }}<text class="nx-bank-cd__time">{{ countdownText }}</text>{{ countdownParts[1] }}</text>
             </view>
           </view>
-          <view v-if="!hostedRejected && intent" class="nx-bank-sum">
+          <view v-if="!createPending && !hostedRejected && intent" class="nx-bank-sum">
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--big">{{ fmtVnd(intent.vndAmount) }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) + '\u00A0USDT' }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.fx.rateLabel }}</text><text class="nx-bank-sum__v">1 USDT ≈ {{ fmtVnd(intent.fxRate) }}</text></view>
           </view>
-          <view v-if="!hostedRejected" class="nx-bank-hint">
+          <view v-if="!createPending && !hostedRejected" class="nx-bank-hint">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
             <text>{{ hostedCanOpen ? t.bankPane.hostedSecureNote : t.bankPane.hostedPendingNote }}</text>
           </view>
-          <view v-if="hostedRejected" class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.help.contactSupport" @click="goSupport" /></view>
+          <view v-if="createPending || hostedRejected" class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.help.contactSupport" @click="goSupport" /></view>
         </template>
 
         <template v-else-if="intent">
@@ -642,6 +641,17 @@ async function finishCreditedFlow() {
   }
   navBack("/pages/me/me");
 }
+// Resubmit of the create whose outcome is unknown (BUG-819), started only by the user from the bottom bar (03 §3.5.2).
+// Placeholder, wired by the logic side: replay the original create under its original key in the body below. The bar
+// shows its busy state and takes no second tap while replayingCreate is true.
+const replayingCreate = ref(false);
+async function replayPendingCreate() {
+  if (replayingCreate.value) return;
+  replayingCreate.value = true;
+  try {
+    // Logic side: replay the original create key here.
+  } finally { replayingCreate.value = false; }
+}
 function startNewTopup() {
   autoResumePending.value = false;
   confirmedCreateRejection.value = null;
@@ -873,8 +883,11 @@ const createReason = computed(() => {
   return amountError.value || t.value.bankPane.amountFormatError;
 });
 const primaryAction = computed<PaneAction | null>(() => {
-  if (createPending.value) return null;
   const it = intent.value, copy = t.value.bankPane;
+  // Outcome unknown: the retried action is this page's main action and it sat in the bar, so it stays the bar's primary
+  // (03 §3.1 提交动作重试 exception, 04.0), with what it does said once above it.
+  if (createPending.value) return { className: "nx-bank-replay-create-cta", label: copy.createPendingReplayCta, enabled: !replayingCreate.value,
+    busy: replayingCreate.value, external: false, note: copy.createPendingReplayNote, run: () => { void replayPendingCreate(); } };
   const regenAction = (enabled: boolean): PaneAction => ({ className: "nx-bank-regen-cta", label: creating.value ? copy.creating : copy.regenCta,
     enabled, busy: creating.value, external: false, run: regen });
   if (paneView.value === "form") return formCtaVisible.value ? { className: "nx-bank-create-cta", label: creating.value ? copy.creating : copy.createCta,
