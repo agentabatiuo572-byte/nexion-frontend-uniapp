@@ -186,7 +186,7 @@ export function bankDemo(url, state, request) {
   }
   if (path.startsWith('/api/withdrawals/bank/orders/') && method === 'GET') {
     const row = demo.orders[path.split('/').pop()];
-    if (!row) fail('BANK_ORDER_NOT_FOUND', 404);
+    if (!row) fail('BANK_WITHDRAWAL_NOT_FOUND', 404);
     return orderView(row);
   }
   if (path === '/api/payout-addresses/otp/send' && method === 'POST') return challenge('address');
