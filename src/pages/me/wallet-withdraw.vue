@@ -113,7 +113,8 @@
       <view class="wd-route mx-4">
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.networkLabel }}</text>
-          <text class="wd-net" data-testid="withdraw-network-tag">{{ remoteSessionReady ? network.slice(5) : '—' }}</text>
+          <NxTag v-if="remoteSessionReady" tone="brand" :label="network.slice(5)" data-testid="withdraw-network-tag" />
+          <text v-else class="wd-route__a wd-route__a--empty" data-testid="withdraw-network-tag">—</text>
           <text v-if="remoteSessionReady" class="wd-route__note">{{ networkHint(network) }}</text>
         </view>
         <view class="wd-route__r">
@@ -122,7 +123,7 @@
           <text v-else-if="pendingAttempt" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else-if="payoutReadStatus !== 'ready'" class="wd-route__a wd-route__a--empty">—</text>
           <text v-else-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
-          <text v-else class="wd-route__a wd-route__a--empty">{{ t.addrRebind.emptyGuideTitle }}</text>
+          <text v-else class="wd-route__a wd-route__a--empty">{{ shownNetworkClosed ? t.bankWithdrawal.noAddress : t.addrRebind.emptyGuideTitle }}</text>
           <view
             v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && boundAddress"
             class="nx-withdraw-manage-entry wd-manage nx-frosted-button"
@@ -134,8 +135,8 @@
             <text>{{ t.addrRebind.manageCta }}</text>
           </view>
         </view>
-        <!-- 空状态引导(一次设置长期使用;非报错态) -->
-        <view v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && !boundAddress" class="wd-route__guide">
+        <!-- 空状态引导(一次设置长期使用;非报错态)。所选网络已关闭时不引导添加,出路是费用区的「重新选择网络」。 -->
+        <view v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && !boundAddress && !shownNetworkClosed" class="wd-route__guide">
           <text class="wd-route__guide-body">{{ t.addrRebind.emptyGuideBody }}</text>
           <view class="nx-withdraw-add-address-cta wd-add nx-frosted-button" role="button" tabindex="0" :aria-label="t.addrRebind.addCta" @click="goManage"  @keydown.enter.prevent="goManage" @keydown.space.prevent="goManage">
             <text>{{ t.addrRebind.addCta }}</text>
@@ -221,15 +222,17 @@
 
       <!-- 当日额度:圆点 = 每日笔数(已用为实心);「有没有这句话」与「闸生不生效」同一个条件(limitCount ≤0 不显示)。
            「提现说明 ›」在这一行右端,放不下时整个链接换到下一行右对齐;没有额度句时这一行只有链接。 -->
-      <template v-if="withdrawalPolicyCurrent">
-        <view v-if="(dailyFactsDisplayable && limitFacts.dailyLimitConfigured) || rulesReady" class="wd-quota mx-4">
-          <view v-if="dailyFactsDisplayable && limitFacts.dailyLimitConfigured" class="wd-quota__use">
+      <!-- The row stays put while the policy is read (03 §3.4): a refresh keeps the last values, a number no read can vouch for
+           shows 「—」, and whether 提现说明 opens is still rulesReady. -->
+      <view v-if="quotaUsageShown || !shownNetworkClosed" class="wd-quota mx-4">
+        <view v-if="quotaUsageShown" class="wd-quota__use">
+          <template v-if="dailyFactsDisplayable">
             <view v-for="i in Math.min(dailyFacts.limitCount, 10)" :key="i" class="wd-quota__pip" :class="{ 'wd-quota__pip--used': i <= limitFacts.dailyUsedCount }" aria-hidden="true" />
-            <text>{{ dailyUsageText }}</text>
-          </view>
-          <NxButton v-if="rulesReady" class="wd-rules-link" variant="link" icon="chevron-right" :label="t.walletV3.withdrawRules.title" aria-haspopup="dialog" @click="rulesOpen = true" />
+          </template>
+          <text>{{ dailyUsageText }}</text>
         </view>
-      </template>
+        <NxButton v-if="!shownNetworkClosed" class="wd-rules-link" variant="link" icon="chevron-right" :label="t.walletV3.withdrawRules.title" :disabled="!rulesReady" aria-haspopup="dialog" @click="rulesOpen = true" />
+      </view>
 
       <!-- Reverse-talk staking alternative -->
       <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked && !remoteEligibilityFailed" :amount-num="amountNum" />
@@ -276,6 +279,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import NxTag from "@/components/ui/nx-tag.vue";
 import NxSheet from "@/components/ui/nx-sheet.vue";
 import NxSwitch from "@/components/ui/nx-switch.vue";
 import NxNoticeDialog from "@/components/ui/nx-notice-dialog.vue";
@@ -719,10 +723,12 @@ const limitFacts = computed(() => withdrawalLimitFacts({
 const perWithdrawalLimitText = computed(() => fmt(t.value.wallet.perWithdrawalLimit, {
   amount: formatTruncatedAmount(limitFacts.value.perWithdrawalMaximum),
 }));
+// Display only. With no policy the limit is unknown, so the line stays with 「—」; the count also needs the withdrawal list.
+const quotaUsageShown = computed(() => !withdrawalPolicy.value || limitFacts.value.dailyLimitConfigured);
 const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
-  used: String(limitFacts.value.dailyUsedCount),
-  remaining: String(limitFacts.value.dailyRemainingCount ?? 0),
-  limit: String(dailyFacts.value.limitCount),
+  used: dailyFactsDisplayable.value ? String(limitFacts.value.dailyUsedCount) : "—",
+  remaining: dailyFactsDisplayable.value ? String(limitFacts.value.dailyRemainingCount ?? 0) : "—",
+  limit: withdrawalPolicy.value ? String(dailyFacts.value.limitCount) : "—",
 }));
 /**
  * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
@@ -921,7 +927,7 @@ const feeConfigUsable = computed(() => {
     && policy.nexFeeOffsetRate > 0;
 });
 // 骨架条:形状对齐真实明细行(标签窄、数值宽),非通用转圈。
-const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-2)";
+const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-3)";
 const submittingQuote = ref<WithdrawalQuote | null>(null);
 const activeQuote = computed(() => submittingQuote.value ?? (pendingAttempt.value
   ? pendingAttempt.value.confirmedQuote
@@ -1701,7 +1707,6 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-route__r + .wd-route__r { border-top: 1px solid var(--v5-border); }
 /* Labels keep at least the zh width; long-language labels grow and wrap by word instead of running under the value. */
 .wd-route__k { flex: none; width: min-content; min-width: 52px; max-width: 72px; overflow-wrap: break-word; }
-.wd-net { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--v5-radius-full); background: var(--v5-brand-soft); color: var(--v5-brand); font: 500 12px/16px var(--font-v5); }
 .wd-manage:focus-visible, .wd-add:focus-visible { outline: 2px solid var(--v5-brand); outline-offset: 2px; }
 .wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-route__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
@@ -1711,8 +1716,8 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-route__guide { padding: 0 0 14px; }
 .wd-route__guide-body { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-add { margin-top: 10px; --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); color: var(--v5-brand); }
-.wd-fee { margin-top: 12px; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
-[data-theme="light"] .wd-fee { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+/* A content block on the page floor: solid surface with the light shadow, like the route card (01 §1.1.2 纯色). */
+.wd-fee { margin-top: 12px; padding: 4px 16px; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
 .wd-fee__r { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; border-top: 1px solid var(--v5-border); }
 .nx-fee-offset-switch[aria-disabled="true"] { opacity: .5; }
 .wd-fee > .wd-fee__r:first-child, .wd-fee > .wd-fee__offset:first-child > .wd-fee__r, .wd-fee__r--net { border-top: 0; }
