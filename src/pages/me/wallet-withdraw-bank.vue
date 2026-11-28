@@ -91,7 +91,7 @@
             <view class="tear" aria-hidden="true" />
             <view class="ticket__net">
               <text class="k">{{ c.receive }}</text>
-              <text class="ticket__vnd">{{ formatAmount(quote.amountVnd, 'VND') }}<text class="ticket__cur">₫</text></text>
+              <text class="ticket__vnd">{{ formatAmount(quote.amountVnd, 'VND') }}<text class="ticket__cur">{{ '\u00A0₫' }}</text></text>
               <text class="hint">{{ c.feeIncluded }}</text>
             </view>
           </view>
@@ -134,7 +134,7 @@
         </template>
         <NxButton v-if="error" class="page-text-action" variant="text" size="small" :label="c.reload" data-testid="bank-refresh" :disabled="busy" @click="load" />
         <!-- The account step bar holds two buttons that stack in long languages; leave room for both. -->
-        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitReason : formStep === 'amount' && !!quoteReason }" />
+        <view class="bar-space" :class="{ 'bar-space--result': !quote && formStep === 'account' && !!displayConfig.beneficiary, 'bar-space--result-note': !quote && formStep === 'account' && !!continueReason, 'bar-space--note': quote ? !!submitNote : formStep === 'amount' && !!quoteReason }" />
       </template>
       <!-- First config or ?order= receipt read with nothing to show (03 §3.4, §3.5.2): when it fails, the page's one centred
            result and its one 重新加载; while it runs, the still placeholder below. An ?order= number that is not a withdrawal
@@ -175,7 +175,7 @@
       </view>
       <view v-if="displayConfig && remoteSessionReady && (!pendingAttempt || quote) && !order && !(uncertain || displayIntents.length || displayConfig.unresolvedIntent === undefined)" class="bar nx-glass-bar">
         <template v-if="quote">
-          <text v-if="submitReason" class="nx-tray-note" role="status" data-testid="bank-submit-reason">{{ submitReason }}</text>
+          <text v-if="submitNote" class="nx-tray-note" role="status" data-testid="bank-submit-reason">{{ submitNote }}</text>
           <NxButton v-if="!quoteExpired" variant="primary" :label="c.confirm" data-testid="bank-submit" :disabled="busy || !canSubmit" @click="confirmSubmit" />
         </template>
         <template v-else-if="formStep === 'account'">
@@ -348,6 +348,8 @@ const submitReason = computed(() => {
   // Channel, account, limits and daily count come first (PRD); a stale quote is said only when none applies. Both still block.
   return configBlockReason.value || (quoteLimitsChanged.value ? c.value.quoteLimitsChanged : "");
 });
+// The tray line above 确认提现 (03 §3.1 bottom bar): the blocking reason first, then the unticked confirmation; it goes once ticked.
+const submitNote = computed(() => submitReason.value || (quote.value && !quoteExpired.value && !accepted.value ? c.value.consentRequired : ""));
 // The card tag: a short word, green only when a withdrawal can start; a closed channel reads 暂不可用 like the tray (04.4, 03 §3.8).
 const cardTag = computed(() => {
   const shown = displayConfig.value, c0 = c.value;
@@ -423,7 +425,7 @@ const rulesQuoteDetails = computed(() => {
   return {
     account: dots(current.maskedAccount),
     debit: `${usdt2(current.amountUsdt)}\u00A0USDT`,
-    receive: formatAmount(current.amountVnd, "VND"),
+    receive: `${formatAmount(current.amountVnd, "VND")}\u00A0₫`,
   };
 });
 function continueWithdrawal() { if (!busy.value && canContinue.value) formStep.value = "amount"; }
@@ -885,7 +887,7 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
    follows the 01.2 amount anatomy (max(12px, .55em), 500, secondary ink). Size: the 10.1 display-title role, the nearest
    to the old 28/34 (390: 26/34, 360: 24/32), in the amount face at 500 (01.2: amounts do not take 600). */
 .ticket__vnd { display: block; margin-top: 4px; color: var(--v5-ink); font: 500 var(--ui-type-display-title)/var(--ui-type-display-title-lh) var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ticket__cur { margin-left: 2px; color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
+.ticket__cur { color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
 .ticket__net .hint { margin-top: 6px; }
 .consent { margin: 16px 4px 0; }
 .acct__change { position: relative; flex: none; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }

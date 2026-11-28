@@ -56,10 +56,13 @@
           </view>
         </view>
 
+        <!-- Same unit in all three: written once across the well and read per figure (03 §3.6.1); a fee in ₫ makes the row
+             mixed, and then each figure carries its own unit. -->
         <view class="nx-bank-facts">
-          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factFee }}</text><text class="nx-bank-fact__v">{{ feeFact.text }}<text v-if="feeFact.unit" class="nx-bank-fact__u">{{ '\u00A0' + feeFact.unit }}</text></text><text v-if="fx.configReady && fx.feeUsdt > 0 && fx.feeVnd > 0" class="nx-bank-fact__sub">{{ fmtVnd(fx.feeVnd) }}</text></view>
-          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factTodayRemaining }}</text><text class="nx-bank-fact__v">{{ todayRemainingFact }}<text v-if="todayRemainingFact !== '—'" class="nx-bank-fact__u">{{ '\u00A0USDT' }}</text></text></view>
-          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factSingleLimit }}</text><text class="nx-bank-fact__v">{{ limitFact }}<text v-if="limitFact !== '—'" class="nx-bank-fact__u">{{ '\u00A0USDT' }}</text></text></view>
+          <text v-if="factsUnit" class="nx-bank-facts__unit" aria-hidden="true">{{ factsUnit }}</text>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factFee }}</text><text class="nx-bank-fact__v">{{ feeFact.text }}<text v-if="feeFact.unit" :class="factsUnit ? 'nx-sr-only' : 'nx-bank-fact__u'">{{ '\u00A0' + feeFact.unit }}</text></text><text v-if="fx.configReady && fx.feeUsdt > 0 && fx.feeVnd > 0" class="nx-bank-fact__sub">{{ fmtVnd(fx.feeVnd) }}</text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factTodayRemaining }}</text><text class="nx-bank-fact__v">{{ todayRemainingFact }}<text v-if="todayRemainingFact !== '—'" :class="factsUnit ? 'nx-sr-only' : 'nx-bank-fact__u'">{{ '\u00A0USDT' }}</text></text></view>
+          <view class="nx-bank-fact"><text class="nx-bank-k">{{ t.bankPane.factSingleLimit }}</text><text class="nx-bank-fact__v">{{ limitFact }}<text v-if="limitFact !== '—'" :class="factsUnit ? 'nx-sr-only' : 'nx-bank-fact__u'">{{ '\u00A0USDT' }}</text></text></view>
         </view>
 
         <view class="nx-bank-hint">
@@ -74,7 +77,8 @@
       <view class="nx-step-in" :style="intent.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
         <template v-if='intent.paymentMode === "hosted"'>
-          <!-- Rejected before it was created: the shared result head (03 §3.6.1), not the countdown stage. -->
+          <!-- Rejected before it was created: the shared result head (03 §3.6.1), not the countdown stage, and no payable summary:
+               no payment order exists, so there is nothing to pay or to credit. -->
           <view v-if="hostedRejected" class="nx-bank-state"><NxResultHead tone="danger" :title="t.bankPane.hostedRejectedTitle" /></view>
           <view v-else class="nx-bank-stage">
             <view class="nx-bank-stage__aura" aria-hidden="true"><view /><view /></view>
@@ -89,7 +93,7 @@
                 <text class="nx-bank-cd">{{ countdownParts[0] }}<text class="nx-bank-cd__time">{{ countdownText }}</text>{{ countdownParts[1] }}</text>
             </view>
           </view>
-          <view class="nx-bank-sum">
+          <view v-if="!hostedRejected" class="nx-bank-sum">
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--big">{{ fmtVnd(intent.vndAmount) }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) + '\u00A0USDT' }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.fx.rateLabel }}</text><text class="nx-bank-sum__v">1 USDT ≈ {{ fmtVnd(intent.fxRate) }}</text></view>
@@ -461,6 +465,8 @@ const feeFact = computed(() => {
   if (fx.feeUsdt <= 0 && fx.feeVnd > 0) return { text: formatAmount(fx.feeVnd, "VND"), unit: "₫" };
   return { text: shortUsdt(Math.max(fx.feeUsdt, 0)), unit: "USDT" };
 });
+// Remaining and limit are always USDT; only a fee in ₫ mixes the row. Kept while the facts read "—", so the well holds its height.
+const factsUnit = computed(() => feeFact.value.unit === "₫" ? "" : "USDT");
 // Whole numbers for presets and the three facts ("1,000"), keeping cents only when present.
 function shortUsdt(value: number): string { return formatAmount(value).replace(/\.00$/, ""); }
 const quickAmounts = computed(() => [100, 500, 1000, 5000].map(value => ({ value, label: shortUsdt(value),
@@ -911,6 +917,7 @@ defineExpose({ paneView, primaryAction, secondaryAction });
 .nx-bank-facts { display: grid; grid-template-columns: repeat(3, minmax(min-content, 1fr)); gap: 8px; margin: 12px -2px 0; padding: 14px 16px; border-radius: 14px;
   background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .nx-bank-facts { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
+.nx-bank-facts__unit { grid-column: 1 / -1; justify-self: end; margin: -6px 0 -6px; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .nx-bank-fact { min-width: 0; }
 .nx-bank-fact > .nx-bank-k { padding-top: 3px; }
 .nx-bank-fact + .nx-bank-fact { padding-left: 12px; border-left: 1px solid var(--v5-border); }
