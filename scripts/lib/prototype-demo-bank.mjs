@@ -212,6 +212,7 @@ export function bankDemo(url, state, request) {
       nextChangeAllowedAt: new Date(now + demoPayoutAddressCooldownDays * DAY).toISOString(),
       changePending: true,
     };
+    if (current && state.payoutAddressReadState === 'rebind-readback-error') state.payoutAddressReadFailures = 1;
     return snapshot(demo.addresses[network]);
   });
 }

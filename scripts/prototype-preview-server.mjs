@@ -311,6 +311,10 @@ const server=http.createServer(async(req,res)=>{
         const taskSelection=demoOptions.taskState.some(([value])=>value===update.taskState);
         if(taskSelection)selectDemoDayOneAccount(state,Date.now());
         if (demoOptions.withdrawQuoteState.some(([value]) => value === update.withdrawQuoteState)) state.withdrawQuoteChangeConsumed = false;
+        if (demoOptions.payoutAddressReadState.some(([value]) => value === update.payoutAddressReadState)) {
+          state.payoutAddressInitialRead = update.payoutAddressReadState === 'refresh-error';
+          state.payoutAddressReadFailures = 0;
+        }
         // A waiting slot replacement is a full-fleet scene.
         if(update.slotReplacementState==='pending')state.fleetState='full';
         else if(state.fleetState!=='full')state.slotReplacementState='none';

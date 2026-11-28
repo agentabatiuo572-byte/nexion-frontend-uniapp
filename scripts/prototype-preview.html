@@ -24,6 +24,7 @@ const language=document.getElementById('locale'),savedLocale=JSON.parse(localSto
 const explicitChoice=savedLocale?.explicitChoice??(savedLocale?.userSet?savedLocale.code:null)??'zh';language.value=explicitChoice;page.disabled=true;language.disabled=true;fetch('/preview-language?code='+explicitChoice).finally(()=>{frame.src='/?nx_device=off#/pages/'+page.value;page.disabled=false;language.disabled=false});language.onchange=async()=>{localStorage.setItem('nexgrid-locale-v1',JSON.stringify({type:'object',data:{explicitChoice:language.value}}));await fetch('/preview-language?code='+language.value);frame.contentWindow.location.reload()};
 const labels={rankPreset:'我的等级 · 等级预设',rankSalaryState:'我的等级 · 月薪数据',rankSalaryClaimState:'我的等级 · 领取结果',rankReviewState:'我的等级 · V8 审核',rankPriorState:'我的等级 · 前序条件',rankCoolingState:'我的等级 · 奖励冷却',rankDeviceLevel2State:'我的等级 · 设备收益二级',contentState:'内容长度',withdrawRecoveryState:'USDT 提现原键核对',withdrawQuoteState:'USDT 提现确认报价',interfaceLanguagesState:'界面语言',accountDeletionState:'注销结清状态',checkoutState:'购买资格与容量',trialQuoteState:'试用报价',powerUpState:'连签增益',trialState:'试用生命周期',trialReadState:'试用读取',trialStartReceiptState:'领取结果',trialCancelReceiptState:'取消结果',purchaseCreateReceiptState:'外部建单结果',trialPurchaseListState:'试用可购设备',trialDefaultDiscountState:'试用默认优惠',trialDeviceDiscountState:'Pro v2 单独优惠',trialPurchaseOptionTarget:'样例设备',trialPurchaseOptionState:'样例设备状态',trialPurchaseReadState:'试用清单读取',trialPurchasePriceState:'试用商城改价',trialOriginalPurchaseState:'试用原购买',trialPurchaseWindow:'试用抵扣时间',realtimeState:'客服连接状态',messageSendState:'消息发送状态',messageState:'消息演示',notificationPageState:'通知分页',supportReadbackState:'旧会话原命令核对结果',machineImageState:'机型图片联动',catalogState:'商城商品',taskState:'新手 / 每周任务',eventState:'活动',raffleState:'抽奖场景',pairingState:'共享算力配对',benefitState:'代金券 / 试用',voucherScopeState:'代金券 · 适用范围',weekEndState:'本周任务 · 结束时间',dataState:'数据状态',trustSectionsState:'信任资料版块',stakingState:'质押功能',bankState:'银行提现结果',bankLimitsState:'银行卡提现额度',bankAvailabilityState:'银行卡提现状态',billRefsState:'账单单号',withdrawNetworksState:'USDT 提现网络',riskState:'风险说明',streakState:'连续签到',ambassadorState:'区域大使申请',ambassadorIoState:'区域大使材料读写',ambassadorRank:'区域大使等级',promotionEligibility:'购机活动资格',sessionState:'登录状态',jobsBaseState:'全球作业基数',homeDisplayState:'H9 数字增长',globeShareState:'全球网络节点占比',promotionTiming:'购机活动时间边界',promotionRewardType:'购机活动奖励类型',promotionRewardState:'推广赠品状态',paymentState:'外部付款结果',topupState:'银行卡充值状态',orderTopupState:'为订单充值（USDT）',deviceTaskSampleState:'设备作业样例',slotReplacementState:'在线设备替换',depositFeeState:'USDT 充值手续费',withdrawReviewState:'USDT 提现审核与记录',fleetState:'在线设备数量'};
 labels.oauthProviderScenario='第三方授权';
+labels.payoutAddressReadState='提现地址读取';
 // A scenario change always reloads the phone: a page of the old scenario must not keep acting in the new one.
 let scenarioEpoch;
 function applyWithdrawalRecoverySeed({ accountKey, attempt }) {
@@ -50,14 +51,19 @@ async function update(changes,reload=true) {
   scenarioEpoch=result.state.scenarioEpoch;
   render(result);
   const topup=changes.orderTopupState&&result.state.orderTopupPreview;
+  let href;
   if(topup){
     const query=new URLSearchParams({orderNo:topup.orderNo,network:topup.network,name:topup.name??''});
     // uni-app reuses the current page when only its hash query changes.
-    const href='/?nx_device=off&previewOrder='+encodeURIComponent(topup.orderNo)+'#/pages/me/wallet-topup?'+query;
-    if(frame.contentWindow.location.href===new URL(href,location.href).href)frame.contentWindow.location.reload();
-    else frame.src=href;
-  }else if(['rejected','credited','expired'].includes(changes.topupState)){
-    const href='/?nx_device=off&previewBankTopup='+changes.topupState+'#/pages/me/wallet-topup?channel=bank';
+    href='/?nx_device=off&previewOrder='+encodeURIComponent(topup.orderNo)+'#/pages/me/wallet-topup?'+query;
+  }else if(['rejected','create-rejected','credited','expired'].includes(changes.topupState)){
+    href='/?nx_device=off&previewBankTopup='+changes.topupState+'#/pages/me/wallet-topup?channel=bank';
+  }else if(changes.payoutAddressReadState==='refresh-error'){
+    href='/?nx_device=off&previewPayoutAddress=refresh-error#/pages/me/wallet-withdraw';
+  }else if(changes.payoutAddressReadState==='rebind-readback-error'){
+    href='/?nx_device=off&previewPayoutAddress=rebind-readback-error#/pages/me/wallet-address-rebind?network=usdt-bep20';
+  }
+  if(href){
     if(frame.contentWindow.location.href===new URL(href,location.href).href)frame.contentWindow.location.reload();
     else frame.src=href;
   }else if(reload)frame.contentWindow.location.reload();
