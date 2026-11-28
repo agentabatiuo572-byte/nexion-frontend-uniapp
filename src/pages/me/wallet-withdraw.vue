@@ -65,14 +65,14 @@
       <!-- P-45: withdrawable balance card — amount anatomy (cents and the USDT unit in ink-3) plus what is held back. -->
       <view class="wd-bal mx-4">
         <text class="wd-k">{{ t.wallet.withdrawableLabel }}</text>
-        <text v-if="withdrawalFactsDisplayable" class="wd-bal__amt">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(maxWithdrawable))[1] }}</text><text class="wd-unit">{{ '\u00A0USDT' }}</text></text>
+        <text v-if="balanceDisplayable" class="wd-bal__amt">{{ amountParts(formatTruncatedAmount(displayedMaxWithdrawable))[0] }}<text class="wd-dec">{{ amountParts(formatTruncatedAmount(displayedMaxWithdrawable))[1] }}</text><text class="wd-unit">{{ '\u00A0USDT' }}</text></text>
         <text v-else class="wd-bal__amt">—</text>
-        <view v-if="withdrawalFactsDisplayable && heldBuckets" class="wd-locks">
+        <view v-if="balanceDisplayable && heldBuckets" class="wd-locks">
           <view class="wd-locks__i"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><text>{{ t.wallet.heldReviewChip }}</text><text class="wd-locks__v">{{ formatTruncatedAmount(heldBuckets.review) + '\u00A0USDT' }}</text></view>
           <view class="wd-locks__i"><text>{{ t.wallet.heldLockedChip }}</text><text class="wd-locks__v">{{ formatTruncatedAmount(heldBuckets.locked) + '\u00A0USDT' }}</text></view>
           <text>{{ t.wallet.heldNotYet }}</text>
         </view>
-        <view v-if="withdrawalFactsDisplayable && app.user.usdtBalance < 0" class="wd-debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ fmt(t.me.walletDebtNote, { amount: formatTruncatedAmount(-app.user.usdtBalance) }) }}</text></view>
+        <view v-if="balanceDisplayable && app.user.usdtBalance < 0" class="wd-debt" role="note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg><text>{{ fmt(t.me.walletDebtNote, { amount: formatTruncatedAmount(-app.user.usdtBalance) }) }}</text></view>
       </view>
 
       <!-- Amount on a liquid-glass slab over the aura; the minimum sits right under it. -->
@@ -89,12 +89,12 @@
             <input class="wd-amtrow__input" :style="{ width: `calc(${Math.max(amount.length, 4)} * (1ch - .02em) + 4px)` }" type="text" inputmode="decimal" :value="remoteSessionReady ? amount : ''" :placeholder="remoteSessionReady ? '0.00' : ''" :aria-label="t.wallet.amountLabel" :disabled="inputsLocked" @input="onAmount" />
             <text class="wd-amtrow__unit">USDT</text>
           </view>
-          <view class="wd-k wd-min"><text v-if="withdrawalFactsDisplayable">{{ minAmountLine }}</text><text v-else>—</text></view>
+          <view class="wd-k wd-min"><text v-if="balanceDisplayable">{{ minAmountLine }}</text><text v-else>—</text></view>
           <text v-if="(withdrawalFactsNeedsRetry || (!withdrawalQuoteRefreshing && !withdrawalActionsFresh))
             && !(submitHintVisible && !submitting && submitDisabledReason === withdrawalReadStatusText)"
             class="wd-line" role="status">{{ withdrawalReadStatusText }}</text>
-          <text v-if="withdrawalFactsDisplayable && withdrawalRatioLine" class="wd-line">{{ withdrawalRatioLine }}</text>
-          <text v-if="withdrawalFactsDisplayable && withdrawalPolicy && limitFacts.perWithdrawalMaximum < maxWithdrawable" class="wd-line">{{ perWithdrawalLimitText }}</text>
+          <text v-if="balanceDisplayable && withdrawalRatioLine" class="wd-line">{{ withdrawalRatioLine }}</text>
+          <text v-if="balanceDisplayable && withdrawalPolicySnapshot && displayLimitFacts.perWithdrawalMaximum < displayedMaxWithdrawable" class="wd-line">{{ perWithdrawalLimitText }}</text>
         </view>
       </view>
 
@@ -146,10 +146,8 @@
 
       <!-- Summary: gross fee → NEX offset → net fee → receive (de-carded to floor) -->
       <!-- 明细井:网络确认费 → UVT 抵扣开关 → 实际到账(画板顺序)。 -->
-      <!-- Why 提交 is grey is said once, above it in the bar (03 §3.1); the well never repeats it (06 §6.1). The well keeps its
-           place while the policy is read (03 §3.4): with no policy yet the fee row holds a still skeleton bar, after a failed read
-           or with an unusable rate it shows 「—」, and a refresh keeps the last policy on screen. Display only: submitting still
-           needs the current policy. With no withdrawal network open at all the well has nothing left to show. -->
+      <!-- The fee row holds a skeleton on the first read, keeps the last known network fee on refresh failure,
+           and shows 「—」 if the fee is unknown (03 §3.4). The current policy still gates submission. -->
       <view v-if="!(shownNetworkClosed && !pendingAttempt && NETWORKS.length === 0)" class="wd-fee mx-4">
       <view v-if="shownNetworkClosed && !pendingAttempt" class="wd-fee__msg">
         <NxButton v-if="NETWORKS.length > 0" variant="text" size="small" :label="t.bankWithdrawal.rechooseNetwork" @click="chooseNetworkAgain" />
@@ -161,8 +159,8 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
           </view>
         </view>
-        <view v-if="!withdrawalPolicy && !withdrawalPolicyError" :style="feeSkeletonValueStyle" aria-hidden="true" />
-        <text v-else class="wd-fee__v">—</text>
+        <view v-if="!withdrawalPolicySnapshot && !withdrawalPolicyError" :style="feeSkeletonValueStyle" aria-hidden="true" />
+        <text v-else class="wd-fee__v">{{ retainedNetworkFeeText }}</text>
       </view>
       <!-- 空状态:金额未输入 —— 给占位说明,不留空白也不显示 $0.00 假明细 -->
       <view v-else-if="amountNum <= 0" class="wd-fee__msg">
@@ -226,8 +224,8 @@
            shows 「—」, and whether 提现说明 opens is still rulesReady. -->
       <view v-if="quotaUsageShown || !shownNetworkClosed" class="wd-quota mx-4">
         <view v-if="quotaUsageShown" class="wd-quota__use">
-          <template v-if="dailyFactsDisplayable">
-            <view v-for="i in Math.min(dailyFacts.limitCount, 10)" :key="i" class="wd-quota__pip" :class="{ 'wd-quota__pip--used': i <= limitFacts.dailyUsedCount }" aria-hidden="true" />
+          <template v-if="quotaDisplayable">
+            <view v-for="i in Math.min(displayDailyLimitCount, 10)" :key="i" class="wd-quota__pip" :class="{ 'wd-quota__pip--used': i <= displayLimitFacts.dailyUsedCount }" aria-hidden="true" />
           </template>
           <text>{{ dailyUsageText }}</text>
         </view>
@@ -295,7 +293,7 @@ import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
 import { normalizeReviewWindowDays, normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { computeWithdrawalMaximum, formatWithdrawalRatioPercent, resolveWithdrawalUseMax } from "@/lib/withdrawal-use-max";
 import { withdrawalLimitFacts } from "@/lib/withdrawal-limit-facts";
-import { financialFactState, shouldRequestWithdrawalEligibility, withdrawalFactsActionsFresh } from "@/lib/withdrawal-facts-state";
+import { financialFactState, shouldRequestWithdrawalEligibility, withdrawalFactsActionsFresh, type FinancialFactState } from "@/lib/withdrawal-facts-state";
 import { isCurrentWithdrawalFactsRequest } from "@/lib/withdrawal-facts-request-fence";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
@@ -346,6 +344,8 @@ const payoutReadStatus = computed(() => payout.readStatusFor(app.accountKey));
 const payoutReadCopy = useFinanceReviewCopy();
 const phase = useProductPhase();
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
+// Last successful policy for display within the current account binding.
+const withdrawalPolicySnapshot = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
 const withdrawalPolicyError = ref("");
 let withdrawalPolicyRefreshSequence = 0;
@@ -529,13 +529,14 @@ async function loadWithdrawalPolicy(): Promise<void> {
   const runScope = captureRuntimeRevision();
   const refreshSequence = ++withdrawalPolicyRefreshSequence;
   withdrawalPolicyLoading.value = true;
-  withdrawalPolicyError.value = "";
   try {
     const policy = await withdrawalApi.policy();
     if (!isCurrentWithdrawalFactsScope(
       requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
     )) return;
     withdrawalPolicy.value = policy;
+    withdrawalPolicySnapshot.value = policy;
+    withdrawalPolicyError.value = "";
   } catch (cause) {
     if (!isCurrentWithdrawalFactsScope(
       requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
@@ -557,18 +558,30 @@ const withdrawalPolicyStatus = computed<"idle" | "loading" | "ready" | "error">(
   return withdrawalPolicy.value ? "ready" : "idle";
 });
 const withdrawalPolicyCurrent = computed(() => withdrawalPolicyStatus.value === "ready");
-const withdrawalFactsState = computed(() => financialFactState(remoteApiEnabled, [
+const balanceFactSources = computed(() => [
   { hasSnapshot: app.remoteFleetHasSnapshot, status: app.remoteFleetStatus },
   { hasSnapshot: earningsReleaseHasSnapshot.value, status: earningsReleaseStatus.value },
-  { hasSnapshot: withdrawalPolicy.value !== null, status: withdrawalPolicyStatus.value },
+]);
+const policyFactSource = computed(() => ({
+  hasSnapshot: withdrawalPolicy.value !== null, status: withdrawalPolicyStatus.value,
+}));
+const withdrawalListFactSource = computed(() => ({
+  hasSnapshot: app.remoteWithdrawalListHasSnapshot, status: app.remoteWithdrawalListStatus,
+}));
+const withdrawalFactsState = computed(() => financialFactState(remoteApiEnabled, [
+  ...balanceFactSources.value, policyFactSource.value,
 ]));
 const dailyFactsState = computed(() => financialFactState(remoteApiEnabled, [
-  { hasSnapshot: app.remoteFleetHasSnapshot, status: app.remoteFleetStatus },
-  { hasSnapshot: earningsReleaseHasSnapshot.value, status: earningsReleaseStatus.value },
-  { hasSnapshot: withdrawalPolicy.value !== null, status: withdrawalPolicyStatus.value },
-  { hasSnapshot: app.remoteWithdrawalListHasSnapshot, status: app.remoteWithdrawalListStatus },
+  ...balanceFactSources.value, policyFactSource.value, withdrawalListFactSource.value,
 ]));
-const withdrawalFactsDisplayable = computed(() => withdrawalFactsState.value === "ready" || withdrawalFactsState.value === "refreshing");
+function factsDisplayable(state: FinancialFactState): boolean {
+  return state === "ready" || state === "refreshing";
+}
+const balanceDisplayable = computed(() => (!remoteApiEnabled || withdrawalPolicySnapshot.value !== null)
+  && factsDisplayable(financialFactState(remoteApiEnabled, balanceFactSources.value)));
+const quotaDisplayable = computed(() => balanceDisplayable.value
+  && factsDisplayable(financialFactState(remoteApiEnabled, [withdrawalListFactSource.value])));
+const withdrawalFactsDisplayable = computed(() => factsDisplayable(withdrawalFactsState.value));
 const withdrawalFactsFresh = computed(() => withdrawalFactsState.value === "ready");
 const withdrawalFactsRefreshing = computed(() => withdrawalFactsState.value === "refreshing");
 const withdrawalFactsStale = computed(() => withdrawalFactsState.value === "stale");
@@ -578,14 +591,15 @@ const withdrawalFactsNeedsRetry = computed(() =>
   || dailyFactsState.value === "stale"
   || dailyFactsState.value === "unavailable",
 );
-const dailyFactsDisplayable = computed(() => dailyFactsState.value === "ready" || dailyFactsState.value === "refreshing");
+const dailyFactsDisplayable = computed(() => factsDisplayable(dailyFactsState.value));
 const dailyFactsRefreshing = computed(() => dailyFactsState.value === "refreshing");
 const withdrawalQuoteRefreshing = computed(() => withdrawalFactsRefreshing.value || dailyFactsRefreshing.value);
 const withdrawalActionsFresh = computed(() => withdrawalFactsActionsFresh(
   withdrawalFactsState.value,
   dailyFactsState.value,
 ));
-function factsStatusText(state: "ready" | "loading" | "refreshing" | "stale" | "unavailable"): string {
+function factsStatusText(state: FinancialFactState): string {
+  if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
   if (state === "loading" || state === "refreshing") return t.value.help.loadingMore;
   if (state === "stale") return t.value.wallet.fundsStaleBody;
   return t.value.wallet.fundsUnavailableTitle;
@@ -656,6 +670,10 @@ function invalidateWithdrawalFacts(): void {
   defaultNetworkSettled = false;
 }
 
+watch([() => app.accountKey, () => app.accountBindingEpoch], () => {
+  withdrawalPolicySnapshot.value = null;
+}, { flush: "sync" });
+
 // Cold entry retries as soon as session restore binds the visible page's account.
 watch([() => app.accountBindingEpoch, remoteSessionReady], ([epoch, ready], [previousEpoch]) => {
   if (epoch !== previousEpoch) invalidateWithdrawalFacts();
@@ -665,6 +683,7 @@ watch([() => app.accountBindingEpoch, remoteSessionReady], ([epoch, ready], [pre
 }, { flush: "post" });
 
 const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision((_scope, reason) => {
+  if (reason === "authority") withdrawalPolicySnapshot.value = null;
   if (reason === "authority" || withdrawalRecovery.value?.state === "NOT_SEEN") recoveryResult.value = null;
   withdrawalRecoveryRuntimeEpoch.value += 1;
   invalidateWithdrawalFacts();
@@ -689,9 +708,12 @@ const maxWithdrawable = computed(() => {
   return computeWithdrawalMaximum(preRatioWithdrawable.value, ratio);
 });
 const minWithdrawable = computed(() => withdrawalPolicy.value?.minAmount ?? 0);
+const displayedMaxWithdrawable = computed(() => computeWithdrawalMaximum(
+  preRatioWithdrawable.value, withdrawalPolicySnapshot.value?.balanceMaxRatio ?? 0,
+));
 const withdrawalRatioLine = computed(() => {
-  const ratio = withdrawalPolicy.value?.balanceMaxRatio ?? 0;
-  const held = Math.max(0, preRatioWithdrawable.value - maxWithdrawable.value);
+  const ratio = withdrawalPolicySnapshot.value?.balanceMaxRatio ?? 0;
+  const held = Math.max(0, preRatioWithdrawable.value - displayedMaxWithdrawable.value);
   if (ratio <= 0 || ratio >= 0.999999 || held <= 0.000001) return "";
   return fmt(t.value.wallet.withdrawalRatioLine, {
     pct: formatWithdrawalRatioPercent(ratio),
@@ -699,36 +721,28 @@ const withdrawalRatioLine = computed(() => {
   });
 });
 /**
- * 🔴 日限的两件事实**只从这一个地方取**,文案与闸共用它 —— 说的那个 N 和拦人用的 N
- * 必须字面同源。此前文案取服务端 policy、判定取本地 config.withdrawRules(远端同步
- * 压根不覆盖 withdrawRules,永远是前端写死的 1):服务端配 3 笔而客户端按 1 笔拦,
- * 用户被自己的 App 挡在门外(z1 审计 P0-1 回源时发现的第二处缺陷)。
- *
- * 笔数不在这里算:把 app.withdrawals 原件交给 core 现算(平台日 UTC+7),
- * 页面不许自己 filter —— 判定留在 core 才有行为门覆盖得到。
- *
- * policy 取不到 → limitCount = 0 → 既有规则「上限 ≤0 视为未配置」→ 不限制。
- * 这个方向是**故意**的:后端不可达时宁可放行让服务端去拒,也不能把提现锁死。
+ * 日限守卫只使用当前策略。额度展示用最后一次成功的策略，两者复用 core 的平台日计数。
  */
 const dailyFacts = computed(() => ({
   limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
   withdrawals: app.withdrawals,
 }));
-const limitFacts = computed(() => withdrawalLimitFacts({
-  perWithdrawalMaximum: maxWithdrawable.value,
-  dailyLimitCount: dailyFacts.value.limitCount,
+const displayDailyLimitCount = computed(() => withdrawalPolicySnapshot.value?.dailyLimitCount ?? 0);
+const displayLimitFacts = computed(() => withdrawalLimitFacts({
+  perWithdrawalMaximum: displayedMaxWithdrawable.value,
+  dailyLimitCount: displayDailyLimitCount.value,
   withdrawals: dailyFacts.value.withdrawals,
   now: nowTick.value,
 }));
 const perWithdrawalLimitText = computed(() => fmt(t.value.wallet.perWithdrawalLimit, {
-  amount: formatTruncatedAmount(limitFacts.value.perWithdrawalMaximum),
+  amount: formatTruncatedAmount(displayLimitFacts.value.perWithdrawalMaximum),
 }));
 // Display only. With no policy the limit is unknown, so the line stays with 「—」; the count also needs the withdrawal list.
-const quotaUsageShown = computed(() => !withdrawalPolicy.value || limitFacts.value.dailyLimitConfigured);
+const quotaUsageShown = computed(() => !withdrawalPolicySnapshot.value || displayLimitFacts.value.dailyLimitConfigured);
 const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
-  used: dailyFactsDisplayable.value ? String(limitFacts.value.dailyUsedCount) : "—",
-  remaining: dailyFactsDisplayable.value ? String(limitFacts.value.dailyRemainingCount ?? 0) : "—",
-  limit: withdrawalPolicy.value ? String(dailyFacts.value.limitCount) : "—",
+  used: quotaDisplayable.value ? String(displayLimitFacts.value.dailyUsedCount) : "—",
+  remaining: quotaDisplayable.value ? String(displayLimitFacts.value.dailyRemainingCount ?? 0) : "—",
+  limit: withdrawalPolicySnapshot.value ? String(displayDailyLimitCount.value) : "—",
 }));
 /**
  * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
@@ -779,7 +793,9 @@ const dailyLimitReachedText = computed(() => {
 // 重放是「今天不能提了,**而且先前那笔可能已经占掉了额度**」——
 // 只说前半句会让用户以为先前那笔没成功,转头去开新的一笔,那正是要防的事。
 const dailyLimitReachedWithPendingText = computed(() => t.value.walletV3.withdrawDailyLimitWithPending);
-const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: formatTruncatedAmount(minWithdrawable.value) }));
+const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, {
+  n: formatTruncatedAmount(withdrawalPolicySnapshot.value?.minAmount ?? 0),
+}));
 const devMode = ref(false);
 onLoad((options) => {
   devMode.value = import.meta.env.DEV && options?.dev === "1";
@@ -938,6 +954,12 @@ const feeConfigUsable = computed(() => {
   return policy !== null
     && (!!pendingAttempt.value || policy.enabledNetworks.includes(network.value))
     && policy.nexFeeOffsetRate > 0;
+});
+const retainedNetworkFeeText = computed(() => {
+  const policy = withdrawalPolicySnapshot.value;
+  if (!policy || pendingAttempt.value || amountNum.value <= 0 || !policy.enabledNetworks.includes(network.value)) return "—";
+  const networkFee = policy.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]];
+  return "−" + formatTruncatedAmount(networkFee) + "\u00A0USDT";
 });
 // 骨架条:形状对齐真实明细行(标签窄、数值宽),非通用转圈。
 const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-3)";
