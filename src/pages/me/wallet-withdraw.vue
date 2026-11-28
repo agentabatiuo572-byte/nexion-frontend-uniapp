@@ -621,15 +621,31 @@ async function loadWithdrawalFacts(): Promise<void> {
   ]);
 }
 
-useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteFleetStatus === "error", retry: () => app.refreshRemoteFleet() });
-useAutoRecovery({ failed: () => remoteApiEnabled && earningsReleaseStatus.value === "error", retry: () => refreshEarningsReleaseStatus(app.accountKey) });
-useAutoRecovery({ failed: () => remoteApiEnabled && app.remoteWithdrawalListStatus === "error", retry: () => app.refreshRemoteWithdrawalList(app.accountKey) });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && app.remoteFleetStatus === "error",
+  retry: () => app.refreshRemoteFleet(),
+  repeatMs: 30_000,
+});
+useAutoRecovery({
+  failed: () => remoteApiEnabled && earningsReleaseStatus.value === "error",
+  retry: () => refreshEarningsReleaseStatus(app.accountKey),
+  repeatMs: 30_000,
+});
+useAutoRecovery({
+  failed: () => remoteApiEnabled && app.remoteWithdrawalListStatus === "error",
+  retry: () => app.refreshRemoteWithdrawalList(app.accountKey),
+  repeatMs: 30_000,
+});
 useAutoRecovery({
   failed: () => remoteApiEnabled && !!withdrawalPolicyError.value && !withdrawalPolicyLoading.value,
   retry: loadWithdrawalPolicy,
   repeatMs: 30_000,
 });
-useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote() });
+useAutoRecovery({
+  failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error",
+  retry: () => payout.refreshRemote(),
+  repeatMs: 30_000,
+});
 
 function invalidateWithdrawalFacts(): void {
   // A retained policy/eligibility belongs to the previous account or bearer
@@ -1336,10 +1352,12 @@ watch([quoteInputs, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdra
       remoteEligibility.value = null;
       remoteEligibilityFailed.value = false;
     }
+    // Recovery owns failed reads for unchanged quote inputs.
+    if (remoteEligibilityFailed.value) return;
     const timer = setTimeout(() => void readRemoteEligibility(), 250);
     onCleanup(() => clearTimeout(timer));
   }, { immediate: true });
-useAutoRecovery({ failed: () => remoteEligibilityFailed.value, retry: readRemoteEligibility });
+useAutoRecovery({ failed: () => remoteEligibilityFailed.value, retry: readRemoteEligibility, repeatMs: 30_000 });
 
 async function handleSubmit() {
   if (!remoteSessionReady.value || withdrawalCommandBusy.value) return;

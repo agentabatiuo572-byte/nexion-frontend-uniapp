@@ -437,11 +437,14 @@ function scope() {
   return () => alive && revision === id && app.accountKey === owner && app.accountBindingEpoch === epoch
     && apiRuntimeConfig.environment === environment && apiRuntimeConfig.baseUrl === baseUrl;
 }
-// An ?order= number that fails the withdrawal-number check is a dead link, not a read that can recover.
+// Invalid references and authoritative not-found responses share the dead-link result.
 const orderRouteInvalid = ref(false);
 function report(err: unknown) {
   if (!config.value) configPresentation.value = null;
-  orderRouteInvalid.value = err instanceof Error && err.message === "BANK_ORDER_ROUTE_INVALID";
+  if (requestedOrder !== null) {
+    orderRouteInvalid.value = (err instanceof Error && err.message === "BANK_ORDER_ROUTE_INVALID")
+      || isApiRefusal(err, 404, "BANK_WITHDRAWAL_NOT_FOUND");
+  }
   error.value = c.value.error;
 }
 async function run(action: (current: () => boolean) => Promise<void>, quietRead = false) {
@@ -460,6 +463,7 @@ async function run(action: (current: () => boolean) => Promise<void>, quietRead 
 }
 function load() { return loadConfig(false); }
 async function loadConfig(recoverConfig: boolean) {
+  if (orderRouteInvalid.value) return;
   await run(async current => {
     const owner = app.accountKey, epoch = app.accountBindingEpoch;
     const readingReceipt = requestedOrder !== null || !!order.value;
@@ -580,8 +584,9 @@ useAutoRecovery({
 // Re-read missing limits and failed refreshes through the same recovery owner (03 §3.5.2).
 const limitsMissing = computed(() => !!config.value?.enabled && !!config.value.beneficiary && (!config.value.policy || !config.value.capacity));
 const canRereadConfig = () => !order.value && !uncertain.value && (configRefreshFailed.value || limitsMissing.value);
+const canRereadOrderLink = () => requestedOrder !== null && !order.value && !!error.value && !orderRouteInvalid.value;
 useAutoRecovery({
-  failed: () => canReadVisibleBankPage() && canRereadConfig() && !busy.value,
+  failed: () => canReadVisibleBankPage() && !busy.value && (canRereadConfig() || canRereadOrderLink()),
   retry: () => loadConfig(true),
   repeatMs: 30_000,
 });
@@ -589,7 +594,7 @@ useAutoRecovery({
 watch([visible, foregroundReadAllowed, remoteSessionReady, () => auth.isAuthenticated], ([isVisible, allowed, sessionReady, authenticated], [wasVisible]) => {
   if (!isVisible || !allowed || !sessionReady || !authenticated) return;
   // Orders and unknown results have one read owner; load() would reset consent.
-  if (order.value || uncertain.value || canRereadConfig()) return;
+  if (order.value || uncertain.value || canRereadConfig() || canRereadOrderLink()) return;
   if (!wasVisible || (!config.value && !quote.value)) void load();
 });
 
@@ -713,6 +718,7 @@ function startNew() {
 }
 function clearScope() {
   pendingQuoteNo.value = null; refusedQuoteNo.value = null; capacityRefusalQuoteNo = null; orderReadGeneration++;
+  orderRouteInvalid.value = false;
   revision++; configPresentation.value = null; config.value = null; quote.value = null; order.value = null; busy.value = false; silentRead.value = false; readingConfig.value = false; configReadInFlight.value = false; error.value = ""; uncertain.value = false;
   amount.value = ""; formStep.value = "account"; accepted.value = false; lastCapacityResetRead = "";
 }

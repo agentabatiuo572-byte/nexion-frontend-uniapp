@@ -267,29 +267,17 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     if(!bank.seeded){
       bank.seeded=true;
       const preset = state.topupState;
-      const reviewStatus = { mismatch: 'mismatch_review', receipt: 'receipt_review', late: 'late_review' }[preset];
-      if (!empty && (reviewStatus || ['paying', 'manual', 'credited', 'expired'].includes(preset))) {
-        const settling = preset === 'credited', expiring = preset === 'expired';
+      if (!empty && ['paying', 'rejected', 'credited', 'expired'].includes(preset)) {
+        const settling = preset === 'credited', expiring = preset === 'expired', rejected = preset === 'rejected';
         const lockMs = bankFx.lockWindowMinutes * 60000;
-        const late = reviewStatus === 'late_review';
-        const receivedAt = now - 10000;
         // The pane adopts a live order and shows expiry when its normal read sees that order expire.
-        let expiresAt = expiring ? now + 2000 : now - 28000 + lockMs;
-        // The late receipt arrived after the grace window, on an order already marked expired.
-        if (late) expiresAt = receivedAt - bankConfig.graceMinutes * 60000 - 60000;
+        const expiresAt = expiring ? now + 2000 : now - 28000 + lockMs;
         const vndAmount = 500 * bankFx.quoteRateVndPerUsdt;
-        const payment = preset === 'manual' || reviewStatus ? {
-          paymentMode:'manual',memoCode:'DEMO-P44',
-          bankAccount:{accountName:'演示收款户名',accountNumber:'0000000000',bankName:'演示银行'},
-        }:{paymentMode:'hosted',providerStatus:settling?'pending':'created',
-          ...(settling?{}:{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'})};
+        const providerStatus = rejected ? 'rejected' : settling ? 'pending' : 'created';
         bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount,
-          status:reviewStatus ?? 'awaiting_payment',expiresAt:new Date(expiresAt).toISOString(),createdAt:new Date(expiresAt-lockMs).toISOString(),
-          creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:late?2:reviewStatus?1:0,...payment,
-          ...(reviewStatus ? {
-            receivedVnd: preset === 'mismatch' ? vndAmount - bankConfig.toleranceVnd - 1000 : vndAmount,
-            matchedAt: new Date(receivedAt).toISOString(),
-          } : {})});
+          status:'awaiting_payment',expiresAt:new Date(expiresAt).toISOString(),createdAt:new Date(expiresAt-lockMs).toISOString(),
+          creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:0,paymentMode:'hosted',providerStatus,
+          ...(providerStatus==='created'?{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'}:{})});
         if(settling)bank.settlingPreset=bank.items[0].intentNo;
       }
     }else if(method==='GET'&&bank.settlingPreset){
