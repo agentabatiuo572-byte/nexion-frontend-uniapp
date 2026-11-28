@@ -14,7 +14,37 @@ const minWithdrawal = 3; // D5 launch minimum (B142), shared by policy and eligi
 // HdPayHostedDepositService / AppVietQrIntentService: hosted capacity is unknown, not a manual bank pool.
 const bankConfig={enabled:true,paymentMode:'hosted',dailyCapacityKnown:false,minDepositUsdt:5,maxDepositUsdt:5000,todayRemainingDepositUsdt:0,todayRemainingVnd:0,toleranceVnd:1000,graceMinutes:10,version:1,feeVnd:0,feeUsdt:0};
 const bankFx={baseRateVndPerUsdt:25000,buySpreadPct:0,quoteRateVndPerUsdt:25000,lockWindowMinutes:15,version:1};
+const demoHostedPaymentUrl = 'https://api.hdpayadmin.com/pay/demo-preview-only';
 const refuse=(status,message,data)=>{throw Object.assign(new Error(message),{status,data});};
+
+function creditDemoBankTopup(state, item, now) {
+  const credit = state.walletMovements?.find(row => row.bizNo === item.intentNo && row.bizType === 'VIETQR_DEPOSIT');
+  if (!credit) postDemoWalletEntries(state, {bizNo:item.intentNo,bizType:'VIETQR_DEPOSIT',asset:'USDT',direction:'IN',category:'topup',at:now,amount:item.usdtAmount});
+  Object.assign(item, {status:'credited',providerStatus:'created',version:item.version+1,creditedUsdt:item.usdtAmount,
+    receivedVnd:item.vndAmount,matchedAt:new Date(credit?.at??now).toISOString()});
+  delete item.paymentUrl;
+}
+
+function resolveDemoBankTopupCreate(state, item, result, now) {
+  if (result === 'confirming' || item.providerStatus !== 'submit_unknown') return;
+  if (result === 'credited') {
+    creditDemoBankTopup(state, item, now);
+    return;
+  }
+  item.version++;
+  if (result === 'rejected') {
+    item.providerStatus = 'rejected';
+  } else {
+    item.providerStatus = 'created';
+    if (result === 'expired') {
+      item.status = 'expired';
+      item.expiresAt = new Date(now).toISOString();
+    } else {
+      item.paymentUrl = demoHostedPaymentUrl;
+    }
+  }
+}
+
 export const demoUsdtWithdrawalNetworks = ["USDT-BEP20", "USDT-ERC20"];
 export const demoWithdrawalNetworks = state => ({ "bep20-erc20": demoUsdtWithdrawalNetworks, bep20: ["USDT-BEP20"], erc20: ["USDT-ERC20"], closed: [] }[state.withdrawNetworksState] ?? demoUsdtWithdrawalNetworks);
 export const demoPayoutAddressDelayHours = 24;
@@ -273,7 +303,15 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
   }
   if(bankIntent){
     // Seed once per scenario; reloads and polling read the same timestamps, amounts and command results.
-    const bank=state.bankTopupDemo??={items:[],commands:{}};
+    const createUnknown = state.topupState === 'create-unknown';
+    let bank;
+    if (createUnknown) {
+      if (user === null) refuse(401, 'USER_AUTH_REQUIRED');
+      const accounts = state.bankTopupUnknownByUser ??= {};
+      bank = accounts[user] ??= {items:[]};
+    } else {
+      bank = state.bankTopupDemo ??= {items:[],commands:{}};
+    }
     if(!bank.seeded){
       bank.seeded=true;
       const preset = state.topupState;
@@ -287,19 +325,21 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
         bank.items.push({intentNo:'VQR-DEMO-P44',usdtAmount:500,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount,
           status:'awaiting_payment',expiresAt:new Date(expiresAt).toISOString(),createdAt:new Date(expiresAt-lockMs).toISOString(),
           creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,version:0,paymentMode:'hosted',providerStatus,
-          ...(providerStatus==='created'?{paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'}:{})});
+          ...(providerStatus==='created'?{paymentUrl:demoHostedPaymentUrl}:{})});
         if(settling)bank.settlingPreset=bank.items[0].intentNo;
       }
     }else if(method==='GET'&&bank.settlingPreset){
       // The first list read lets the pane adopt the live payment. Its next read sees settlement of the same intent.
       const item=bank.items.find(row=>row.intentNo===bank.settlingPreset);
-      const credit=state.walletMovements?.find(row=>row.bizNo===item.intentNo&&row.bizType==='VIETQR_DEPOSIT');
-      if(!credit)postDemoWalletEntries(state,{bizNo:item.intentNo,bizType:'VIETQR_DEPOSIT',asset:'USDT',direction:'IN',category:'topup',at:now,amount:item.usdtAmount});
-      Object.assign(item,{status:'credited',providerStatus:'created',version:1,creditedUsdt:item.usdtAmount,receivedVnd:item.vndAmount,matchedAt:new Date(credit?.at??now).toISOString()});
+      creditDemoBankTopup(state, item, now);
       delete bank.settlingPreset;
     }
+    const readback = state.bankTopupReadbackState ?? 'confirming';
+    if (createUnknown && method === 'GET' && !bankIntent[1]) {
+      for (const item of bank.items) resolveDemoBankTopupCreate(state, item, readback, now);
+    }
     // Like get/list: expire awaiting rows once, and remove a hosted URL from terminal reads.
-    if(method==='GET')for(const item of bank.items)if(item.status==='awaiting_payment'&&Date.parse(item.expiresAt)<=now){item.status='expired';item.version++;delete item.paymentUrl;}
+    if(method==='GET')for(const item of bank.items)if(item.status==='awaiting_payment'&&(!createUnknown||item.providerStatus==='created')&&Date.parse(item.expiresAt)<=now){item.status='expired';item.version++;delete item.paymentUrl;}
     const intentNo=bankIntent[1]?.trim();
     if(intentNo){
       if(!/^[A-Za-z0-9:_-]{8,64}$/.test(intentNo))refuse(422,'VIETQR_INTENT_NO_INVALID');
@@ -325,10 +365,13 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       // The HTTP boundary accepts JSON numbers (or decimal strings, as Jackson does); new orders use whole USDT.
       const usdtAmount=Number(amount);
       if(!['number','string'].includes(typeof amount)||!Number.isFinite(usdtAmount)||usdtAmount<=0||usdtAmount>10000||Math.abs(usdtAmount*100-Math.round(usdtAmount*100))>1e-8)refuse(422,'VIETQR_AMOUNT_SCALE_INVALID');
-      const replay=Object.hasOwn(bank.commands,key)?bank.commands[key]:undefined;
+      const replay = createUnknown
+        ? bank.items.find(item => item.createIdempotencyKey === key)
+        : Object.hasOwn(bank.commands,key) ? bank.commands[key] : undefined;
       if(replay){
         if(replay.usdtAmount!==usdtAmount)refuse(409,'IDEMPOTENCY_REQUEST_CONFLICT');
-        if(replay.status==='expired')refuse(503,'HDPAY_ORDER_STATE_INVALID');
+        if (createUnknown) resolveDemoBankTopupCreate(state, replay, 'created', now);
+        else if(replay.status==='expired')refuse(503,'HDPAY_ORDER_STATE_INVALID');
         return replay;
       }
       if(!Number.isInteger(usdtAmount))refuse(422,'VIETQR_AMOUNT_SCALE_INVALID');
@@ -337,13 +380,17 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       if(state.topupState==='create-rejected')refuse(422,'HDPAY_ORDER_CREATE_REJECTED');
       const item={intentNo:'VQR-'+randomUUID().replaceAll('-','').slice(0,20).toUpperCase(),usdtAmount,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:usdtAmount*bankFx.quoteRateVndPerUsdt,
         status:'awaiting_payment',expiresAt:new Date(now+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:iso,creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,
-        version:0,paymentMode:'hosted',providerStatus:'created',paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'};
-      bank.items.unshift(item);bank.commands[key]=item;state.topupState='paying';
+        version:0,paymentMode:'hosted',
+        ...(createUnknown ? {providerStatus:'submit_unknown',createIdempotencyKey:key} : {providerStatus:'created',paymentUrl:demoHostedPaymentUrl})};
+      bank.items.unshift(item);
+      if (createUnknown) refuse(503, 'HDPAY_ORDER_SUBMISSION_UNKNOWN');
+      bank.commands[key]=item;state.topupState='paying';
       return item;
     }else if(method==='GET'){
       const limit=Number(url.searchParams.get('limit')??20);
       if(!Number.isInteger(limit)||limit<-2147483648||limit>2147483647)refuse(400,'REQUEST_PARAMETER_INVALID');
-      return {items:bank.items.slice(0,Math.max(1,Math.min(50,limit)))};
+      const items = bank.items.slice(0,Math.max(1,Math.min(50,limit)));
+      return {items:createUnknown && readback === 'legacy' ? items.map(({createIdempotencyKey: _key, ...item}) => item) : items};
     }
   }
   // Hosted settlement credits the intent; its INFLIGHT reconciliation is excluded by the receipts endpoint.
