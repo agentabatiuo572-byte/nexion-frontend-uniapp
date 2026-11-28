@@ -174,7 +174,7 @@ export const zh: Messages = {
     bindingNotice: "绑定后立即生效。有提现处理中时不能更换。",
     effective: "生效时间", amount: "提现金额", quote: "获取报价", fee: "换汇手续费（USDT）",
     net: "兑换金额（USDT）", rate: "每 USDT 兑换 VND", receive: "银行到账金额", expires: "报价到期时间", confirm: "确认提现",
-    confirmNotice: "提交后，本笔 USDT 暂不可用，直至提现处理完成。请勿重复提交。",
+    confirmNotice: "提交后，本笔 USDT 在提现完成前不可用，请勿重复提交。",
     notSubmitted: "报价尚未提交。",
     intentClosed: "原报价已结束。",
     reload: "重新加载", unknown: "正在自动确认原提交结果，请勿重复发起提现。",
