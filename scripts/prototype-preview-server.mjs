@@ -354,7 +354,11 @@ const server=http.createServer(async(req,res)=>{
         }
         if(state.billRefsState==='b84-deposit')demoChainDepositAddress(state,'ERC20');
         // The bank top-up selector starts that fixture afresh; ordinary reads and presentation changes keep its orders.
-        if(update.topupState)delete state.bankTopupDemo;
+        if(scenarioChange||update.topupState)delete state.bankTopupUnknownByUser;
+        if(update.topupState){
+          delete state.bankTopupDemo;
+          state.bankTopupReadbackState='confirming';
+        }
         // The empty account's wallet holds nothing and the low-balance account's 820.64: facts every wallet payment
         // checks, not only numbers on screen.
         // Saved payout addresses and their OTP belong to the account scenario too.
