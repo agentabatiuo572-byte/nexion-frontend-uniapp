@@ -4554,8 +4554,6 @@ export const ms: Messages = {
     withdrawConfirmTitle: "Sahkan pengeluaran",
     withdrawConfirmCta: "Sahkan",
     feeDetailPlaceholder: "Masukkan jumlah untuk melihat pecahan caj",
-    feeConfigUnavailableTitle: "Kadar caj dikemas kini",
-    feeConfigUnavailableBody: "Kadar caj terkini tidak tersedia. Penghantaran dijeda. Sila cuba lagi nanti.",
     complianceHoldTitle: "Semakan pematuhan pengeluaran",
     complianceReviewRequired: "Pengeluaran ini memerlukan semakan pematuhan manual.",
     complianceHoldUntilBody: "Pengeluaran ini memerlukan semakan manual. Tempoh semakan tamat pada {time}; kelulusan atau tamat tempoh tidak bermakna dana telah diterima.",

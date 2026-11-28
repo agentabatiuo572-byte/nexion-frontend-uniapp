@@ -4554,8 +4554,6 @@ export const uz: Messages = {
     withdrawConfirmTitle: "Yechishni tasdiqlash",
     withdrawConfirmCta: "Tasdiqlash",
     feeDetailPlaceholder: "Haq tafsilotlarini koʻrish uchun summani kiriting",
-    feeConfigUnavailableTitle: "Haqlar yangilanmoqda",
-    feeConfigUnavailableBody: "Soʻnggi haq stavkalarini yuklab boʻlmadi. Yuborish toʻxtatildi. Keyinroq qayta urinib koʻring.",
     complianceHoldTitle: "Pul yechishning muvofiqlik tekshiruvi",
     complianceReviewRequired: "Bu pul yechish muvofiqlikni qoʻlda tekshirishni talab qiladi.",
     complianceHoldUntilBody: "Bu pul yechish qoʻlda tekshiriladi. Tekshiruv muddati {time} tugaydi; tasdiqlash yoki muddat tugashi mablagʻ kelib tushganini anglatmaydi.",
