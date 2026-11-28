@@ -256,7 +256,16 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     }
     return demoWithdrawalEligibility(state, input, now, facts, policy).view;
   }
-  if (p === "/api/payout-addresses") return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: demoPayoutAddressCooldownDays, effectiveDelayHours: demoPayoutAddressDelayHours, inFlightWithdrawalBlocked: true };
+  if (p === "/api/payout-addresses" && method === 'GET') {
+    if (state.payoutAddressInitialRead) {
+      state.payoutAddressInitialRead = false;
+      state.payoutAddressReadFailures = 2;
+    } else if (state.payoutAddressReadFailures > 0) {
+      state.payoutAddressReadFailures -= 1;
+      refuse(503, 'PAYOUT_ADDRESS_READ_UNAVAILABLE');
+    }
+    return { ...proof, addresses: demoPayoutAddresses(state, now), serverNowEpochMs: now, changeCooldownDays: demoPayoutAddressCooldownDays, effectiveDelayHours: demoPayoutAddressDelayHours, inFlightWithdrawalBlocked: true };
+  }
   if (p === "/api/app/payments/config") return { ...proof, source: "nx_vietqr_config", vietQr: { ...bankConfig, enabled: state.topupChannels !== "bank-off" } };
   if (p === "/api/app/payments/fx-quote") {
     if(url.searchParams.get('fiat')?.toUpperCase()!=='VND'||url.searchParams.get('asset')?.toUpperCase()!=='USDT')refuse(422,'FX_PAIR_NOT_SUPPORTED');
@@ -325,6 +334,7 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       if(!Number.isInteger(usdtAmount))refuse(422,'VIETQR_AMOUNT_SCALE_INVALID');
       if(usdtAmount<bankConfig.minDepositUsdt||usdtAmount>bankConfig.maxDepositUsdt)refuse(422,'VIETQR_AMOUNT_OUT_OF_RANGE');
       if(bank.items.filter(row=>row.status==='awaiting_payment'&&Date.parse(row.expiresAt)>now).length>=5)refuse(409,'VIETQR_ACTIVE_INTENT_LIMIT_REACHED');
+      if(state.topupState==='create-rejected')refuse(422,'HDPAY_ORDER_CREATE_REJECTED');
       const item={intentNo:'VQR-'+randomUUID().replaceAll('-','').slice(0,20).toUpperCase(),usdtAmount,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:usdtAmount*bankFx.quoteRateVndPerUsdt,
         status:'awaiting_payment',expiresAt:new Date(now+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:iso,creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,
         version:0,paymentMode:'hosted',providerStatus:'created',paymentUrl:'https://api.hdpayadmin.com/pay/demo-preview-only'};

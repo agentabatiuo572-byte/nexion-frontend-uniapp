@@ -1172,8 +1172,11 @@ const quoteDisplayBlocked = computed(() =>
   && disabledReasonFor(amountNum.value, eligibility.value, true) !== "",
 );
 const quoteRowsVisible = computed(() => !!activeQuote.value || remoteEligibilityFailed.value || !!pendingAttempt.value);
-const feeDetailReady = computed(() => (pendingAttempt.value || NETWORKS.value.length > 0)
-  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && quoteRowsVisible.value);
+const retainedFeeDetailReady = computed(() => !withdrawalPolicy.value && !!withdrawalPolicyError.value
+  && !!withdrawalPolicySnapshot.value && !pendingAttempt.value && !!remoteEligibility.value?.quote);
+const feeDetailReady = computed(() => retainedFeeDetailReady.value
+  || ((pendingAttempt.value || NETWORKS.value.length > 0)
+    && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && quoteRowsVisible.value));
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
@@ -1371,7 +1374,7 @@ async function readRemoteEligibility(): Promise<void> {
 }
 
 const quoteInputs = computed(() => [amountNum.value, network.value, displayedAddress.value, offsetWithNex.value,
-  pendingAttempt.value?.key, app.accountBindingEpoch, withdrawalPolicy.value?.policyVersion] as const);
+  pendingAttempt.value?.key, app.accountBindingEpoch, withdrawalPolicySnapshot.value?.policyVersion] as const);
 watch([quoteInputs, boundAddress, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdrawalPageVisible, foregroundReadAllowed],
   ([inputs], [previousInputs], onCleanup) => {
     remoteEligibilityEpoch += 1;
