@@ -271,8 +271,9 @@ const NETWORKS = computed(() => ALL_NETWORKS.filter((nw) => canSelectNewUsdtNetw
     && networkPolicy.value.enabledNetworks.some((enabled) => enabled.toLowerCase() === nw.id)))));
 const network = ref<ChainDepositChannel>("usdt-bep20");
 const withdrawReturnUrl = computed(() => `/pages/me/wallet-withdraw?network=${CHAIN_TO_WITHDRAW_NETWORK[network.value]}`);
+const networkDisplayable = computed(() => NETWORKS.value.some((nw) => nw.id === network.value));
 const networkAvailable = computed(() => (!payoutAddressServerEnabled || networkPolicyStatus.value === "ready")
-  && NETWORKS.value.some((nw) => nw.id === network.value));
+  && networkDisplayable.value);
 
 // The success action names where finish()'s navBack lands: the page this one was opened from, else the withdraw page.
 const backTarget = ref<string | null>(null);
@@ -294,13 +295,18 @@ const explicitStep = ref<Step>("base");
 const mode = ref<"add" | "change">("add");
 const successIsChange = ref(false);
 const current = computed(() => payout.currentFor(network.value));
+const hasDisplayableAddress = computed(() => !!payout.displayCurrentFor(app.accountKey, network.value));
+const remoteReadStatus = computed(() => payout.readStatusFor(app.accountKey));
+const addressReadReady = computed(() => !payoutAddressServerEnabled
+  || (remoteReadStatus.value === "ready" && !!payout.provenance));
 const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
 const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
   if (explicitStep.value === "success") return "success";
-  if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance)) return "unknown";
-  if (!networkAvailable.value) return "unknown";
+  if (!addressReadReady.value || !networkAvailable.value) {
+    return networkDisplayable.value && hasDisplayableAddress.value ? "view" : "unknown";
+  }
   if (explicitStep.value === "otp") return "otp";
   if (explicitStep.value === "form") return "form";
   return current.value ? "view" : "form"; // base:空槽直接落添加表单(内联引导语)
@@ -352,18 +358,15 @@ const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.val
 const changeBlock = computed(() => {
   return payout.changeBlockReason(network.value, projectedServerNow.value);
 });
-// The change action sits in the bottom bar only while a change can start (no in-flight withdrawal, cooldown or unknown time).
-// Placeholder for the logic patch: true while the address on screen is a retained snapshot whose re-read is running or
-// has failed. A change cannot start then; the bar shows the grey button and its reason instead.
-const changeBlockedByRead = computed(() => false);
+const changeBlockedByRead = computed(() => hasDisplayableAddress.value && remoteReadStatus.value !== "ready");
 const changeAvailable = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value && !changeBlockedByRead.value);
-const changeReadBlocked = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value && changeBlockedByRead.value);
+const changeReadBlocked = computed(() => step.value === "view" && !changeBlock.value && changeBlockedByRead.value);
 // The note tray's height follows its wrap (04 §4.0: content clears the tray's height + 38).
 const noteTray = ref<unknown>(null);
 const noteTrayHeight = useTrayHeight(noteTray, ".rb-bar--note", () => [changeReadBlocked.value, copy.value.addressUnavailable, t.value.addrRebind.changeCta]);
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
-  if (!networkAvailable.value || changeBlock.value || changeBlockedByRead.value) return;
+  if (!changeAvailable.value) return;
   mode.value = "change";
   explicitStep.value = "form";
   focusSoon([".rb-form .rb-title"]);
@@ -652,11 +655,8 @@ const mockNow = ref(mockServerNow());
 const monotonicNow = ref<number | null>(readTrustedMonotonicNowMs());
 const clockFault = ref(false);
 const readApiOrigin = ref({ ...apiRuntimeConfig });
-const remoteReadStatus = computed(() => payout.readStatusFor(app.accountKey));
-watch([() => step.value !== "unknown", () => payout.stateFor(network.value).nextChangeAt], ([displayReady, at]) => {
-  // Use the page's display gate: address and policy must both be ready, so the
-  // recorded refusal and the normal overview swap in the same render.
-  if (!displayReady || !cooldownRefused.value || at === null) return;
+watch([() => addressReadReady.value && networkAvailable.value, () => payout.stateFor(network.value).nextChangeAt], ([readsReady, at]) => {
+  if (!readsReady || !cooldownRefused.value || at === null) return;
   backToBase();
 }, { flush: "sync" });
 const remoteRefreshPending = computed(() => remoteReadStatus.value === "loading" || networkPolicyStatus.value === "loading");
@@ -734,7 +734,6 @@ async function refreshNetworkPolicy() {
     networkPolicyStatus.value = "ready";
   } catch {
     if (!isCurrent()) return;
-    networkPolicy.value = null;
     networkPolicyStatus.value = "error";
   }
 }
@@ -759,7 +758,8 @@ onHide(() => {
   pageVisible = false;
   if (otpError.value) backToBase();
   invalidatePageCommand();
-  clearNetworkPolicy();
+  policyGeneration++;
+  networkPolicyStatus.value = "idle";
 });
 watch(() => [app.accountKey, app.accountBindingEpoch, readApiOrigin.value] as const, () => {
   withdrawalListEntryPending = true;
@@ -864,8 +864,10 @@ function finish() {
 }
 // The centred read result holds while its re-read runs (the button shows it is working) and leaves once the page has content.
 const readFailureShown = ref(false);
-watch(remoteReadFailed, (failed) => { if (failed) readFailureShown.value = true; });
-watch(() => step.value !== "unknown", (shown) => { if (shown) readFailureShown.value = false; });
+watch([remoteReadFailed, step], ([failed, currentStep]) => {
+  if (currentStep !== "unknown") readFailureShown.value = false;
+  else if (failed) readFailureShown.value = true;
+});
 // Registered after every value `step` reads, so its first evaluation sees them initialised.
 // The code step and the result replace the control that opened them: focus the code input, then the result title.
 watch(() => step.value, (next, previous) => {
