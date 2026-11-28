@@ -20,7 +20,7 @@
         <view class="account-card"><text class="muted">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="account-number">{{ dots(order.bank.maskedAccount) }}</text></view>
         <view class="details">
           <view class="row row--code"><text>{{ c.orderNumber }}</text><NxCodeValue :value="order.withdrawalNo" :label="c.orderNumber" fill /></view>
-          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ usdt2(order.bank.amountUsdt) + '\u00A0USDT' }}</text></view>
+          <view class="row"><text>{{ c.totalDebit }}</text><text>{{ usdt2(order.bank.amountUsdt) }}<text class="row__unit">{{ '\u00A0USDT' }}</text></text></view>
           <view class="row"><text>{{ c.fee }}</text><text>{{ usdt2(order.bank.feeUsdt) }}</text></view>
           <view class="row"><text>{{ c.net }}</text><text>{{ usdt2(order.bank.netUsdt) }}</text></view>
           <view v-if="outcome === 'refunded'" class="row"><text>{{ c.refundAmount }}</text><text>{{ usdt2(order.settlementEvidence!.amountUsdt!) }}</text></view>
@@ -813,6 +813,8 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .row > text:first-child { flex: 0 1 auto; min-width: 0; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .row > text:last-child { flex: none; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .row--code { align-items: center; }
+/* A unit after a figure (01.2): the 辅助数值 role in secondary ink. */
+.row__unit { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 /* Result amount: the 10.1 钱包主金额上限 role (390: 36/44, 360: 32/38), the page's main amount, at 500 (01.2). The unit follows
    a no-break space (03 §3.6.1) instead of a margin. */
 .money { display: block; margin-top: 8px; font: 500 var(--ui-type-wallet-amount)/var(--ui-type-wallet-amount-lh) var(--font-amount); font-variant-numeric: tabular-nums; white-space: nowrap; }
