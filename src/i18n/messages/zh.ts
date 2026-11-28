@@ -5667,7 +5667,7 @@ openSeaErrorPool: {
     dailyCapacityBelowMin: "今日剩余额度不足最低充值金额 {min}\u00A0USDT。",
     fxReadRetrying: "暂时无法读取牌价，正在自动重试。",
     hostedSecureNote: "请在付款页获取收款账户或二维码，核对金额后转账。",
-    hostedPendingNote: "订单确认中，请稍后刷新。",
+    hostedPendingNote: "订单确认中，确认后这里会自动更新。",
     hostedRejectedTitle: "付款单未生成",
     createPendingTitle: "正在确认这笔充值",
     createPendingBody: "结果确认后这里会更新。",

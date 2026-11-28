@@ -5661,7 +5661,7 @@ openSeaErrorPool: {
     dailyCapacityBelowMin: "Hạn mức còn lại hôm nay thấp hơn mức nạp tối thiểu {min}\u00A0USDT.",
     fxReadRetrying: "Chưa tải được tỷ giá. Đang tự động thử lại.",
     hostedSecureNote: "Vui lòng lấy tài khoản nhận hoặc mã QR trên trang thanh toán, kiểm tra số tiền rồi chuyển khoản.",
-    hostedPendingNote: "Đơn đang được xác nhận. Vui lòng làm mới sau ít phút.",
+    hostedPendingNote: "Đơn đang được xác nhận. Trang sẽ tự cập nhật khi xác nhận xong.",
     hostedRejectedTitle: "Chưa tạo được lệnh thanh toán",
     createPendingTitle: "Đang xác nhận khoản nạp này",
     createPendingBody: "Trang này sẽ cập nhật khi có kết quả.",

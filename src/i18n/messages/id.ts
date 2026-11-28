@@ -5987,7 +5987,7 @@ export const id: Messages = {
     dailyCapacityBelowMin: "Sisa batas top up hari ini di bawah minimum {min}\u00A0USDT.",
     fxReadRetrying: "Kurs belum bisa dimuat. Mencoba lagi otomatis.",
     hostedSecureNote: "Dapatkan rekening penerima atau kode QR dari halaman pembayaran. Periksa jumlahnya sebelum transfer.",
-    hostedPendingNote: "Pesanan Anda sedang dikonfirmasi. Muat ulang sebentar lagi.",
+    hostedPendingNote: "Pesanan Anda sedang dikonfirmasi. Halaman ini diperbarui otomatis setelah dikonfirmasi.",
     hostedRejectedTitle: "Pesanan pembayaran tidak dibuat",
     createPendingTitle: "Mengonfirmasi top up ini",
     createPendingBody: "Halaman ini diperbarui setelah hasilnya terkonfirmasi.",

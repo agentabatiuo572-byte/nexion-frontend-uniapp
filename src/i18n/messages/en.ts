@@ -5758,7 +5758,7 @@ openSeaErrorPool: {
     dailyCapacityBelowMin: "Today's remaining capacity is below the {min}\u00A0USDT minimum.",
     fxReadRetrying: "Unable to load the rate. Retrying automatically.",
     hostedSecureNote: "Get the receiving account or QR code from the payment page. Check the amount before transferring.",
-    hostedPendingNote: "Your order is being confirmed. Please refresh shortly.",
+    hostedPendingNote: "Your order is being confirmed. This page updates once it's confirmed.",
     hostedRejectedTitle: "Payment order not created",
     createPendingTitle: "Confirming this top-up",
     createPendingBody: "This page updates once the result is confirmed.",
