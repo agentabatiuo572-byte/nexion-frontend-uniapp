@@ -18,6 +18,7 @@ import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+import { isTransientReadFailure } from "@/lib/remote-read-failure";
 import { subscribeRuntimeRevision } from "@/api/order-api";
 import { occupiesWithdrawalSlot } from "./withdrawal-arrival-core";
 import {
@@ -185,6 +186,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   function applyRemoteSnapshot(snapshot: PayoutAddressSnapshot, scope: PayoutRemoteRequest) {
     book.value = remoteBook(snapshot);
+    remoteDisplayAvailable.value = true;
     remoteProvenance.value = snapshot;
     remoteChangeCooldownDays.value = snapshot.changeCooldownDays;
     remoteEffectiveDelayHours.value = snapshot.effectiveDelayHours;
@@ -202,10 +204,12 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   type PayoutRemoteRequest = RemoteAccountRequest & { apiOrigin: ApiRuntimeConfig };
   const remoteReadState = ref<{ scope: PayoutRemoteRequest; status: PayoutAddressReadStatus } | null>(null);
+  const remoteDisplayAvailable = ref(false);
   let remoteReadInFlight: { scope: PayoutRemoteRequest; promise: Promise<boolean> } | null = null;
 
   function clearRemoteSnapshot() {
     book.value = emptyBook();
+    remoteDisplayAvailable.value = false;
     remoteChangeCooldownDays.value = null;
     remoteEffectiveDelayHours.value = null;
     remoteProvenance.value = null;
@@ -251,15 +255,17 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
         const snapshot = await payoutAddressApi.list();
         if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
         if (!runtimeProvenanceValid(snapshot)) {
+          remoteDisplayAvailable.value = false;
           remoteReadState.value = { scope: request, status: "error" };
           return false;
         }
         applyRemoteSnapshot(snapshot, request);
         return true;
-      } catch {
+      } catch (cause) {
         // A stale failure belongs to the previous account/request and must not
         // surface an error or clear the current account's canonical state.
         if (version !== remoteLoadVersion || !scopeIsCurrent(request)) return true;
+        if (!isTransientReadFailure(cause)) remoteDisplayAvailable.value = false;
         remoteReadState.value = { scope: request, status: "error" };
         return false;
       }
@@ -274,8 +280,10 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   // prepareProductCatalog also notifies API-origin changes through this channel.
   // Catalog publications/failures do not change the address book's authority:
   // keep both the snapshot and any in-flight read when its scope is still current.
-  onScopeDispose(subscribeRuntimeRevision(() => {
-    if (!payoutAddressServerEnabled || !remoteReadState.value || scopeIsCurrent(remoteReadState.value.scope)) return;
+  onScopeDispose(subscribeRuntimeRevision((_scope, reason) => {
+    if (!payoutAddressServerEnabled || !remoteReadState.value) return;
+    if (reason !== "authority" && scopeIsCurrent(remoteReadState.value.scope)) return;
+    remoteReadInFlight = null;
     clearRemoteSnapshot();
     void refreshRemote();
   }));
@@ -360,6 +368,12 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   /** 当前地址(null = 未设置 → 提现页空态引导卡)。 */
   function currentFor(network: ChainDepositChannel) {
     return stateFor(network).current;
+  }
+
+  /** The withdrawal page can display the last valid address during a temporary read failure. */
+  function displayCurrentFor(accountKey: string, network: ChainDepositChannel) {
+    if (payoutAddressServerEnabled && (!remoteDisplayAvailable.value || readStatusFor(accountKey) === "idle")) return null;
+    return currentFor(network);
   }
 
   /** 喂风控判定的绑定快照(加工在 core 的 eligibilityBindingFor,行为哨兵覆盖)。 */
@@ -493,6 +507,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     hasAnyAddress,
     stateFor,
     currentFor,
+    displayCurrentFor,
     bindingFor,
     changeBlockReason,
     addAddress,
