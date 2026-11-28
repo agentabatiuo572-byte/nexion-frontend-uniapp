@@ -103,21 +103,23 @@ check("🔴 质押劝阻卡 v-if 三合取齐挂(>0 · ≥最低额 · !quoteBlo
   code.includes('<StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked"'),
   "minWithdrawable 回退 0 后 `0 >= 0` 恒真 —— 少 amountNum > 0 这道门,空表单直接弹劝阻卡");
 
-// ── ③ 四态齐且**加载态可达** ──────────────────────────
+// ── ③ 费用行三态,首读骨架可达,失败不放手动重试(03 §3.4、§3.5.2) ──
 // 漏网史:加载态原本排在失败态**后面**,而重试只可能从失败态发起,
 // 此时失败态 v-if 恒真 → 骨架永远抢不到 → 死 UI(25ms 采样 14 帧从未出现)。
-const orderLoading = code.indexOf('v-if="feeConfigLoading"');
+// BUG-816:读取失败不再给手动重试,由同一恢复入口持续重读;首读骨架和「—」同在不可用分支里,骨架在前。
 const orderUnusable = code.indexOf('v-else-if="!feeConfigUsable"');
 const orderEmpty = code.indexOf('v-else-if="amountNum <= 0"');
-check("🔴 加载态排在失败态之前(否则重试期间骨架永远抢不到 = 死 UI)",
-  orderLoading >= 0 && orderUnusable > orderLoading,
-  `loading@${orderLoading} unusable@${orderUnusable}`);
+const orderSkeleton = code.indexOf('<view v-if="!withdrawalPolicySnapshot && !withdrawalPolicyError" :style="feeSkeletonValueStyle"');
+check("🔴 首读骨架在不可用分支里、排在「—」之前(读取中不显示失败)",
+  orderUnusable >= 0 && orderSkeleton > orderUnusable && orderSkeleton < orderEmpty,
+  `unusable@${orderUnusable} skeleton@${orderSkeleton} empty@${orderEmpty}`);
 check("空状态(未输入金额)存在且排在默认态之前",
   orderEmpty > orderUnusable);
-check("四态齐(加载 / 不可用 / 未输入 / 默认)",
-  orderLoading >= 0 && orderUnusable >= 0 && orderEmpty >= 0 && /<view v-else class="wd-fee__r">/.test(code));
-check("失败态给了重试出口",
-  /@click="retryFeeConfig"/.test(code) && /async function retryFeeConfig/.test(code));
+check("三态齐(不可用含首读骨架 / 未输入 / 默认)",
+  orderUnusable >= 0 && orderEmpty >= 0 && /<view v-else class="wd-fee__r">/.test(code));
+check("失败态不放手动重试,由同一恢复入口每 30 秒持续重读",
+  !/retryFeeConfig/.test(code)
+  && /failed: \(\) => remoteApiEnabled && !!withdrawalPolicyError\.value && !withdrawalPolicyLoading\.value,\s*retry: loadWithdrawalPolicy,\s*repeatMs: 30_000/.test(code));
 check("重试真能重拉配置(不是只清本地标志)",
   // z1(2026-08-10):重试改走 loadWithdrawalPolicy(仍是真重拉,只是换了通道)。
   /await loadWithdrawalPolicy\(\)/.test(code));

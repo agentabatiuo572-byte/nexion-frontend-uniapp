@@ -727,7 +727,9 @@ const withdrawalRatioLine = computed(() => {
   });
 });
 /**
- * 日限守卫只使用当前策略。额度展示用最后一次成功的策略，两者复用 core 的平台日计数。
+ * 日限守卫只使用当前策略。额度展示用最后一次成功的策略，两者复用 core 的平台日计数；文案和闸用的是同一个 N。
+ * policy 取不到 → limitCount = 0 → 既有规则「上限 ≤0 视为未配置」→ 不限制。这个方向是故意的：
+ * 后端不可达时宁可放行让服务端去拒，也不能把提现锁死。
  */
 const dailyFacts = computed(() => ({
   limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
@@ -825,7 +827,8 @@ const network = computed(() => pendingAttempt.value?.network ?? selectedNetwork.
 let networkChosen = false, defaultNetworkSettled = false, replacingHiddenNetwork = false;
 // A closed network blocks new submissions; an unresolved command still has its exact replay path.
 const networkClosed = computed(() => withdrawalPolicyCurrent.value && !NETWORKS.value.some((item) => item.id === network.value));
-// Display only: the fee well reads the policy snapshot, so a refresh keeps its content (03 §3.4). networkClosed stays the guard.
+// Display only: keyed on the policy on screen, which stays while a refresh runs, so the closed-network link does not flicker
+// (03 §3.4); a failed read clears it. networkClosed stays the guard.
 const shownNetworkClosed = computed(() => withdrawalPolicy.value !== null && !NETWORKS.value.some((item) => item.id === network.value));
 function chooseNetworkAgain() {
   if (pendingAttempt.value) return;
