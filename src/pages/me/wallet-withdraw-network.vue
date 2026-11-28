@@ -79,8 +79,8 @@ async function load() {
   } catch { if (current()) { policy.value = null; readFailed.value = true; } }
   finally { if (current()) loading.value = false; }
 }
-useAutoRecovery({ failed: () => readFailed.value && !loading.value, retry: load });
-useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote() });
+useAutoRecovery({ failed: () => readFailed.value && !loading.value, retry: load, repeatMs: 30_000 });
+useAutoRecovery({ failed: () => remoteApiEnabled && payout.readStatusFor(app.accountKey) === "error", retry: () => payout.refreshRemote(), repeatMs: 30_000 });
 function reset() { revision++; policy.value = null; readFailed.value = false; if (visible) void load(); }
 watch(() => [app.accountKey, app.accountBindingEpoch] as const, () => {
   if (visible && remoteApiEnabled) void payout.refreshRemote();

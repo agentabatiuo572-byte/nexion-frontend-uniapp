@@ -681,7 +681,7 @@ watch(() => payout.serverClock, (anchor) => {
   clockFault.value = now === null || !anchor || now < anchor.receivedMonotonicAt;
 }, { immediate: true, flush: "sync" });
 
-useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot });
+useAutoRecovery({ failed: () => payoutAddressServerEnabled && remoteReadFailed.value, retry: retryRemoteSnapshot, repeatMs: 30_000 });
 let withdrawalListEntryPending = true;
 function refreshWithdrawalListOnEntry() {
   // Keep one read per entry after the existing cold-session catalogue read.
