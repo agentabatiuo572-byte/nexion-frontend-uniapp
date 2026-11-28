@@ -255,7 +255,7 @@ import type { DepositIntent } from "@/store/types";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
-import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
+import { buildVietQrTransferSteps, vietQrCreateUnavailableCopy } from "@/lib/vietqr-remote-safety";
 import { findResumablePaymentIntent, openHostedPaymentPage, validateHostedPaymentUrl } from "@/lib/hosted-payment";
 
 const t = useT();
@@ -311,13 +311,15 @@ let pendingPaymentRead: (PaymentReadScope & { intents: DepositIntent[] }) | null
 const successfulPaymentRead = ref<PaymentReadScope | null>(null);
 const existingPaymentChoice = ref<ExistingPaymentChoice | null>(null);
 
+const createPending = computed(() => paymentSessionReady.value && dep.currentAccountKey() === app.accountKey
+  && dep.remoteBankCreatePending);
 const intent = computed<DepositIntent | null>(
-  () => dep.intents.find((i) => i.intentId === viewIntentId.value) ?? null,
+  () => createPending.value ? dep.remoteBankCreateIntent : dep.intents.find(i => i.intentId === viewIntentId.value) ?? null,
 );
 
 type PaneView = "form" | "order" | "waiting" | "credited" | "expired" | "mismatch" | "receipt_review" | "late_review";
 const paneView = computed<PaneView>(() => {
-  if (currentCreateRejected.value) return "order";
+  if (createPending.value || currentCreateRejected.value) return "order";
   const it = intent.value;
   if (!it || it.status === "cancelled" || it.status === "return_pending") return "form";
   if (it.status === "awaiting_payment") return paidPressed.value ? "waiting" : "order";
@@ -411,11 +413,23 @@ watch(
 watch(
   () => dep.intents.map((item) => `${item.intentId}:${item.status}`).join("|"),
   () => {
-    if (!autoResumePending.value || viewIntentId.value) return;
+    if (!autoResumePending.value || viewIntentId.value || createPending.value) return;
     const resume = findResumablePaymentIntent(dep.intents);
     if (!resume) return;
     viewIntentId.value = resume.intentId;
     autoResumePending.value = false;
+  },
+  { immediate: true },
+);
+watch(
+  [pageActive, createPending, () => dep.remoteBankCreateIntent],
+  ([active, pending]) => {
+    if (!active || !pending) return;
+    const resolved = dep.resolveRemoteBankCreate();
+    if (!resolved) return;
+    autoResumePending.value = false;
+    viewIntentId.value = resolved.intentId;
+    paidPressed.value = false;
   },
   { immediate: true },
 );
@@ -509,7 +523,7 @@ let createTimer: ReturnType<typeof setTimeout> | undefined;
 function createOrder(presetUsdt?: number) {
   const usdt = presetUsdt ?? amountNum.value;
   if ((presetUsdt === undefined && !amountValid.value) || !Number.isSafeInteger(usdt)
-    || creating.value || readError.value || !fxUsable.value || usdt < minDeposit.value
+    || creating.value || createPending.value || readError.value || !fxUsable.value || usdt < minDeposit.value
     || usdt > maxDeposit.value || (dailyCapacityKnown.value && usdt > todayRemainingDeposit.value)) return;
   creating.value = true;
   const expectedAccountKey = dep.currentAccountKey();
@@ -554,6 +568,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     creating.value = false;
     return;
   }
+  autoResumePending.value = false;
   let approvedBusinessFailureCopy = "";
   let explicitlyRejected = false;
   await runRecoverableFundsOperation(async () => {
@@ -561,33 +576,14 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       const it = remoteApiEnabled
         ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
         : dep.createBankIntent(usdt);
+      if (it === "pending") return null;
       if (!it) throw new Error(t.value.fx.updating);
       return it;
     } catch (cause) {
-      // Only translate the exact known 503 envelope; never render raw server
-      // text or use this presentation choice to classify/retire a command key.
-      if (cause instanceof ApiError && cause.kind === "http" && cause.status === 503 && cause.code === 503) {
-        switch (cause.message) {
-          case "LEGAL_TERMS_UNAVAILABLE":
-            approvedBusinessFailureCopy = t.value.bankPane.createTermsUnavailable;
-            break;
-          case "FX_QUOTE_UNAVAILABLE":
-            approvedBusinessFailureCopy = t.value.bankPane.createFxUnavailable;
-            break;
-          case "VIETQR_BANK_RAIL_UNAVAILABLE":
-          case "VIETQR_CHANNEL_UNAVAILABLE":
-            approvedBusinessFailureCopy = t.value.bankPane.createBankUnavailable;
-            break;
-          case "HDPAY_CONFIGURATION_INCOMPLETE":
-          case "PAYMENT_CONFIG_UNAVAILABLE":
-            approvedBusinessFailureCopy = t.value.bankPane.createServiceUnavailable;
-            break;
-        }
-      }
-      if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
-        explicitlyRejected = cause.kind === "http" && cause.status === 422 && cause.code === 422;
-        approvedBusinessFailureCopy = t.value.bankPane.hostedRejectedNote;
-      }
+      const unavailableCopy = vietQrCreateUnavailableCopy(cause);
+      if (unavailableCopy) approvedBusinessFailureCopy = t.value.bankPane[unavailableCopy];
+      explicitlyRejected = cause instanceof ApiError && cause.kind === "http" && cause.status === 422
+        && cause.code === 422 && cause.message === "HDPAY_ORDER_CREATE_REJECTED";
       // Another payment can consume the last daily capacity after our preflight.
       // The server remains the final authority; translate this settled 422 into
       // the same explicit today-limit guidance instead of a generic retry error.
@@ -604,11 +600,10 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     }
     }, {
       success: (it) => {
-        if (!stillCurrent()) return;
-        autoResumePending.value = false;
+        if (!stillCurrent() || !it) return;
         viewIntentId.value = it.intentId;
         paidPressed.value = false;
-        if (pageActive.value && it.paymentMode === "hosted") openHostedOrder(it);
+        if (it.status === "awaiting_payment" && hostedCanOpen.value) openHostedOrder(it);
       },
       failure: (reason) => {
         if (!stillCurrent()) return;
@@ -677,9 +672,9 @@ const countdownRatio = computed(() => {
   return it && total > 0 ? Math.min(1, Math.max(0, (it.expireAt - nowTick.value) / total)) : 0;
 });
 const countdownParts = computed(() => { const [head = "", tail = ""] = t.value.bankPane.countdown.split("{time}"); return [head, tail]; });
-const hostedRejected = computed(() => currentCreateRejected.value
-  || (intent.value?.paymentMode === "hosted" && intent.value.providerStatus === "rejected"));
-const hostedCanOpen = computed(() => intent.value?.paymentMode === "hosted"
+const hostedRejected = computed(() => !createPending.value && (currentCreateRejected.value
+  || (intent.value?.paymentMode === "hosted" && intent.value.providerStatus === "rejected")));
+const hostedCanOpen = computed(() => !createPending.value && intent.value?.paymentMode === "hosted"
   && intent.value.providerStatus === "created"
   && Boolean(intent.value.paymentUrl));
 const existingPaymentChoices = computed(() => {
@@ -878,6 +873,7 @@ const createReason = computed(() => {
   return amountError.value || t.value.bankPane.amountFormatError;
 });
 const primaryAction = computed<PaneAction | null>(() => {
+  if (createPending.value) return null;
   const it = intent.value, copy = t.value.bankPane;
   const regenAction = (enabled: boolean): PaneAction => ({ className: "nx-bank-regen-cta", label: creating.value ? copy.creating : copy.regenCta,
     enabled, busy: creating.value, external: false, run: regen });

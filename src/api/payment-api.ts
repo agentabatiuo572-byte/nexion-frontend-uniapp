@@ -52,6 +52,7 @@ export type VietQrIntentStatus =
 
 export interface VietQrIntentSnapshot {
   intentNo: string;
+  createIdempotencyKey?: string;
   usdtAmount: number;
   fxRate: number;
   vndAmount: number;
@@ -288,6 +289,7 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     ? providerStatusText as VietQrIntentSnapshot["providerStatus"] : undefined;
   const providerReason = paymentMode === "hosted" && providerStatus === "rejected"
     ? readProviderReason(source?.providerReason) : undefined;
+  const createIdempotencyKey = source?.createIdempotencyKey;
   const manualFieldsValid = Boolean(account && memoCode && accountName && accountNumber && bankName);
   const hostedSensitiveFieldsAbsent = source?.memoCode === undefined
     && source?.bankAccount === undefined
@@ -324,6 +326,9 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
   }
   return {
     intentNo,
+    // Older list responses omit the key and cannot identify an unconfirmed create.
+    ...(typeof createIdempotencyKey === "string" && /^[A-Za-z0-9:_-]{8,128}$/.test(createIdempotencyKey)
+      ? { createIdempotencyKey } : {}),
     usdtAmount,
     fxRate,
     vndAmount,

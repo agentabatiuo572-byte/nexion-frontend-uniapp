@@ -449,6 +449,8 @@ export type DepositIntentStatus =
 export interface DepositIntent {
   /** server mint `DP-YYYYMMDD-NNNN`(与链上同号段)。 */
   intentId: string;
+  /** Exact server correlation for an unconfirmed bank create. */
+  createIdempotencyKey?: string;
   /** 用户输入;≥ $10 等值,≤ 单笔上限 $5,000(D1 可配)。 */
   usdtAmount: number;
   /** 下单锁定牌价([FEAT-PAY03] quoteRate);单上恒定,后续调价不影响在途单。 */
