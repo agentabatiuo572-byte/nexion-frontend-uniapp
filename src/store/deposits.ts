@@ -1124,7 +1124,9 @@ export const useDeposits = defineStore("deposits", () => {
       snapshot = await paymentApi.createVietQrIntent(amount, key, !replay);
     } catch (cause) {
       const ambiguous = isAmbiguousOutcome(cause);
-      if (!replay && !ambiguous) finishVietQrCommand(command, key);
+      if (!replay && (!ambiguous || isApiRefusal(cause, 503, "VIETQR_CHANNEL_CONFIG_INVALID"))) {
+        finishVietQrCommand(command, key);
+      }
       if (!stillCurrent()) throw new Error("VIETQR_ACCOUNT_CHANGED");
       if (replay) {
         // A rejected session does not settle the original request. The read path can renew it.
@@ -1143,19 +1145,27 @@ export const useDeposits = defineStore("deposits", () => {
     }
     if (!stillCurrent()) throw new Error("VIETQR_ACCOUNT_CHANGED");
     const payable = isPayableVietQrCreateStatus(snapshot.status);
-    if (replay && payable && snapshot.paymentMode === "hosted" && snapshot.providerStatus !== "created") return "pending";
+    if (replay && snapshot.paymentMode === "hosted" && snapshot.providerStatus !== "created"
+      && (payable || snapshot.status === "expired")) return "pending";
+    const intent = remoteVietQrIntent(snapshot);
     if (payable) {
       bindVietQrIntent(command, key, snapshot.intentNo);
     } else {
       finishVietQrCommand(command, key);
     }
     if (replay) pendingRemoteBankCreate.value = null;
-    if (!payable && snapshot.status !== "credited") throw new Error("VIETQR_CREATE_REPLAY_NOT_PAYABLE");
-    const intent = remoteVietQrIntent(snapshot);
+    if (!payable && snapshot.status !== "credited" && !(replay && isExpiredHostedBankCreate(intent))) {
+      throw new Error("VIETQR_CREATE_REPLAY_NOT_PAYABLE");
+    }
     const record = remoteVietQrRecord(snapshot);
     intents.value = [intent, ...intents.value.filter(item => item.intentId !== intent.intentId)];
     if (record) records.value = [record, ...records.value.filter(item => item.depositId !== record.depositId)];
     return intent;
+  }
+
+  function isExpiredHostedBankCreate(intent: DepositIntent): boolean {
+    return intent.status === "expired" && intent.paymentMode === "hosted"
+      && intent.providerStatus === "created" && !intent.paymentUrl;
   }
 
   function resolveRemoteBankCreate(): DepositIntent | null {
@@ -1164,7 +1174,7 @@ export const useDeposits = defineStore("deposits", () => {
     if (!pending || !intent) return null;
     if (intent.status === "awaiting_payment" && intent.providerStatus === "created" && intent.paymentUrl) {
       bindVietQrIntent(pending.command, pending.key, intent.intentId);
-    } else if (intent.status === "credited" || intent.providerStatus === "rejected") {
+    } else if (intent.status === "credited" || intent.providerStatus === "rejected" || isExpiredHostedBankCreate(intent)) {
       finishVietQrCommand(pending.command, pending.key);
     } else {
       return null;
