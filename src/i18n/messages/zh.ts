@@ -4178,6 +4178,7 @@ timeHoursAgo: "{n}小时前",
 
     submitReasonFeeConfigUnavailable: "费率更新中，请稍后再试",
     submitReasonServiceUnavailable: "服务暂不可用，请稍后重试。",
+    withdrawReadRetrying: "暂时无法读取提现信息，正在自动重试。",
     submitReasonWithdrawalClosed: "提现通道暂时关闭，恢复后可提交。",
 
     dailyLimitReached: "今日提现次数已用完，{time} 后可再次提交。",

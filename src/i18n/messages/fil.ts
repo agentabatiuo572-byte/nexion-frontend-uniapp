@@ -4584,6 +4584,7 @@ export const fil: Messages = {
     submitReasonMaxAmount: "Ang mawi-withdraw mong balanse ay {n}\u00A0USDT.",
     submitReasonFeeConfigUnavailable: "Ina-update ang fee rate, subukan ulit mamaya",
     submitReasonServiceUnavailable: "Pansamantalang hindi available ang serbisyo. Subukan ulit mamaya.",
+    withdrawReadRetrying: "Hindi pa ma-load ang detalye ng withdrawal. Awtomatikong sinusubukan muli.",
     submitReasonWithdrawalClosed: "Pansamantalang sarado ang withdrawal channel. Makakapagsumite ka kapag bumukas ulit ito.",
     dailyLimitReached: "Naabot na ang limit sa bilang ng withdrawal ngayong araw. Makakapagsumite ka ulit pagkatapos ng {time}.",
     submitReasonAddressRequired: "Magdagdag muna ng address ng withdrawal.",

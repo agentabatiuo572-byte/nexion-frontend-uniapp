@@ -4584,6 +4584,7 @@ export const uz: Messages = {
     submitReasonMaxAmount: "Yechish mumkin boʻlgan balans: {n}\u00A0USDT.",
     submitReasonFeeConfigUnavailable: "Haqlar yangilanmoqda, birozdan keyin urining",
     submitReasonServiceUnavailable: "Xizmat vaqtincha mavjud emas. Keyinroq qayta urinib koʻring.",
+    withdrawReadRetrying: "Yechib olish maʼlumotlari hozircha yuklanmadi. Avtomatik qayta urinilmoqda.",
     submitReasonWithdrawalClosed: "Pul yechish vaqtincha yopiq. U qayta ochilgach, soʻrov yuborish mumkin.",
     dailyLimitReached: "Bugungi pul yechish limiti tugadi. Qayta yuborish vaqti: {time}.",
     submitReasonAddressRequired: "Avval yechish manzilini qoʻshing.",

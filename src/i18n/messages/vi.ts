@@ -4162,6 +4162,7 @@ timeHoursAgo: "{n} giờ",
 
     submitReasonFeeConfigUnavailable: "Đang cập nhật biểu phí, vui lòng thử lại sau",
     submitReasonServiceUnavailable: "Dịch vụ tạm thời chưa khả dụng. Vui lòng thử lại sau.",
+    withdrawReadRetrying: "Chưa thể tải thông tin rút tiền. Đang tự động thử lại.",
     submitReasonWithdrawalClosed: "Kênh rút tiền tạm thời đóng. Có thể gửi yêu cầu sau khi kênh mở lại.",
 
     dailyLimitReached: "Đã hết số lần rút tiền hôm nay. Có thể gửi yêu cầu sau {time}.",

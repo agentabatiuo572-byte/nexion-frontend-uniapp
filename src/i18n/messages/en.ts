@@ -4245,6 +4245,7 @@ timeHoursAgo: "{n}h ago",
 
     submitReasonFeeConfigUnavailable: "Fee rates are updating, please try again shortly",
     submitReasonServiceUnavailable: "Service is temporarily unavailable. Please try again later.",
+    withdrawReadRetrying: "Withdrawal details can't be loaded right now. Retrying automatically.",
     submitReasonWithdrawalClosed: "The withdrawal channel is temporarily closed. Submission is available after it reopens.",
 
     dailyLimitReached: "Today's withdrawal count is exhausted. Submission is available after {time}.",

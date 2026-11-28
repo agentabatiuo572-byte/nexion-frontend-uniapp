@@ -4584,6 +4584,7 @@ export const id: Messages = {
     submitReasonMaxAmount: "Saldo yang dapat ditarik {n}\u00A0USDT.",
     submitReasonFeeConfigUnavailable: "Tarif biaya sedang diperbarui, coba lagi sebentar lagi",
     submitReasonServiceUnavailable: "Layanan sementara tidak tersedia. Coba lagi nanti.",
+    withdrawReadRetrying: "Info penarikan belum dapat dimuat. Mencoba lagi secara otomatis.",
     submitReasonWithdrawalClosed: "Saluran penarikan sementara ditutup. Pengiriman bisa dilakukan setelah dibuka kembali.",
     dailyLimitReached: "Jatah penarikan hari ini sudah habis. Pengiriman bisa dilakukan setelah {time}.",
     submitReasonAddressRequired: "Tambahkan alamat penarikan terlebih dahulu.",

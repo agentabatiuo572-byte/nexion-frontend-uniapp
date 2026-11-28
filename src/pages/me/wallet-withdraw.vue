@@ -543,7 +543,7 @@ async function loadWithdrawalPolicy(): Promise<void> {
     withdrawalPolicy.value = null;
     // 焦虑文案收口(2026-08-15):原始 message/错误码只进日志,用户面一律人话。
     console.warn("[withdraw] policy fetch failed:", cause);
-    withdrawalPolicyError.value = t.value.walletV3.submitReasonServiceUnavailable;
+    withdrawalPolicyError.value = t.value.walletV3.withdrawReadRetrying;
   } finally {
     if (isCurrentWithdrawalFactsScope(
       requestedAccountKey, requestedAccountBindingEpoch, runScope.epoch, refreshSequence, withdrawalPolicyRefreshSequence,
@@ -1207,7 +1207,7 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQ
     return fmt(t.value.walletV3.submitReasonMinAmount, { n: formatTruncatedAmount(minWithdrawable.value) });
   }
   if (!forQuoteDisplay && remoteEligibilityFailed.value) {
-    return decision.quote ? t.value.ui.refreshFailed : t.value.walletV3.submitReasonServiceUnavailable;
+    return t.value.walletV3.withdrawReadRetrying;
   }
   if (remoteApiEnabled && decision.configVersion === "remote-pending") {
     return forQuoteDisplay ? "" : t.value.help.loadingMore;

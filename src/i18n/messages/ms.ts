@@ -4584,6 +4584,7 @@ export const ms: Messages = {
     submitReasonMaxAmount: "Baki boleh dikeluarkan ialah {n}\u00A0USDT.",
     submitReasonFeeConfigUnavailable: "Kadar caj sedang dikemas kini, sila cuba lagi sebentar",
     submitReasonServiceUnavailable: "Perkhidmatan tidak tersedia buat sementara. Sila cuba lagi nanti.",
+    withdrawReadRetrying: "Maklumat pengeluaran belum dapat dimuatkan. Mencuba semula secara automatik.",
     submitReasonWithdrawalClosed: "Saluran pengeluaran ditutup buat sementara. Penghantaran tersedia selepas ia dibuka semula.",
     dailyLimitReached: "Had bilangan pengeluaran hari ini telah habis. Penghantaran tersedia selepas {time}.",
     submitReasonAddressRequired: "Tambah alamat pengeluaran dahulu.",
