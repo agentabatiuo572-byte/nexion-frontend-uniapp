@@ -157,6 +157,7 @@ export const en = {
     quoteTitle: "Quote",
     change: "Change",
     resumeUsdt: "Check the pending USDT withdrawal before starting another.",
+    resumeUsdtCta: "View pending USDT withdrawal",
     resumeBank: "View your earlier bank withdrawal.",
     addAccount: "Add receiving account", changeAccount: "Change receiving account",
     recoveryUnavailable: "Unable to load withdrawal status. Please reload.",

@@ -510,6 +510,7 @@ export const uz: Messages = {
     quoteTitle: "Narx",
     change: "Boshqasi",
     resumeUsdt: "Yangisini boshlashdan oldin kutilayotgan USDT yechish soʻrovini tekshiring.",
+    resumeUsdtCta: "Kutilayotgan USDT yechish soʻrovini ochish",
     resumeBank: "Oldingi bankka yechish soʻrovini koʻrish.",
     addAccount: "Qabul qiluvchi hisob qoʻshish",
     changeAccount: "Hisobni almashtirish",

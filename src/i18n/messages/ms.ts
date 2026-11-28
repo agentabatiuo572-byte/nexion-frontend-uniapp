@@ -510,6 +510,7 @@ export const ms: Messages = {
     quoteTitle: "Sebut harga",
     change: "Tukar",
     resumeUsdt: "Semak pengeluaran USDT yang tertunda sebelum memulakan yang lain.",
+    resumeUsdtCta: "Lihat pengeluaran USDT yang tertunda",
     resumeBank: "Lihat pengeluaran bank anda sebelum ini.",
     addAccount: "Tambah akaun penerima",
     changeAccount: "Tukar akaun penerima",

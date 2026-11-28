@@ -158,6 +158,7 @@ export const zh: Messages = {
     quoteTitle: "报价",
     change: "更换",
     resumeUsdt: "请先核对进行中的 USDT 提现，再发起新提现。",
+    resumeUsdtCta: "查看进行中的 USDT 提现",
     resumeBank: "查看之前的银行卡提现。",
     addAccount: "添加收款账户", changeAccount: "更换收款账户",
     recoveryUnavailable: "暂时无法读取提现状态，请重新加载。",

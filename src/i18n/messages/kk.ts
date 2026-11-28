@@ -510,6 +510,7 @@ export const kk: Messages = {
     quoteTitle: "Баға",
     change: "Өзгерту",
     resumeUsdt: "Жаңа шығару бастамас бұрын өңделіп жатқан USDT шығаруын тексеріңіз.",
+    resumeUsdtCta: "Өңделіп жатқан USDT шығаруын ашу",
     resumeBank: "Бұрынғы банкке шығаруды қарау.",
     addAccount: "Ақша түсетін шот қосу",
     changeAccount: "Ақша түсетін шотты өзгерту",
