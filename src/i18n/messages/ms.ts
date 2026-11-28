@@ -5995,7 +5995,7 @@ export const ms: Messages = {
     dailyCapacityBelowMin: "Baki had hari ini di bawah minimum {min}\u00A0USDT.",
     fxReadRetrying: "Kadar belum dapat dimuatkan. Mencuba semula secara automatik.",
     hostedSecureNote: "Dapatkan akaun penerima atau kod QR daripada halaman bayaran. Semak jumlah sebelum memindahkan.",
-    hostedPendingNote: "Pesanan anda sedang disahkan. Sila muat semula sebentar lagi.",
+    hostedPendingNote: "Pesanan anda sedang disahkan. Halaman ini dikemas kini secara automatik selepas disahkan.",
     hostedRejectedTitle: "Pesanan bayaran tidak dicipta",
     createPendingTitle: "Mengesahkan tambah nilai ini",
     createPendingBody: "Halaman ini dikemas kini selepas keputusan disahkan.",

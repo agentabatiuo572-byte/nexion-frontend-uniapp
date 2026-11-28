@@ -5995,7 +5995,7 @@ export const fil: Messages = {
     dailyCapacityBelowMin: "Mas mababa ang natitirang limit ngayon sa minimum na {min}\u00A0USDT.",
     fxReadRetrying: "Hindi pa ma-load ang rate. Awtomatikong sinusubukan muli.",
     hostedSecureNote: "Kunin ang account na tatanggap o QR code sa page ng bayad. Suriin ang halaga bago mag-transfer.",
-    hostedPendingNote: "Kinukumpirma ang order mo. Mag-refresh mamaya.",
+    hostedPendingNote: "Kinukumpirma ang order mo. Kusang mag-a-update ang page na ito kapag nakumpirma na.",
     hostedRejectedTitle: "Hindi nagawa ang order ng bayad",
     createPendingTitle: "Kinukumpirma ang top-up na ito",
     createPendingBody: "Mag-a-update ang page na ito kapag nakumpirma na ang resulta.",

@@ -5995,7 +5995,7 @@ export const uz: Messages = {
     dailyCapacityBelowMin: "Bugungi qolgan limit eng kam summadan ({min}\u00A0USDT) kam.",
     fxReadRetrying: "Kurs yuklanmadi. Avtomatik qayta urinilmoqda.",
     hostedSecureNote: "Qabul qiluvchi hisob yoki QR kodni toʻlov sahifasidan oling. Oʻtkazishdan oldin summani tekshiring.",
-    hostedPendingNote: "Buyurtmangiz tasdiqlanmoqda. Birozdan keyin yangilang.",
+    hostedPendingNote: "Buyurtmangiz tasdiqlanmoqda. Tasdiqlangach, sahifa avtomatik yangilanadi.",
     hostedRejectedTitle: "Toʻlov hujjati yaratilmadi",
     createPendingTitle: "Bu toʻldirish tasdiqlanmoqda",
     createPendingBody: "Natija tasdiqlangach, bu yer yangilanadi.",
