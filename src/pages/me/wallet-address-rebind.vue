@@ -163,18 +163,15 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
             <text class="block" :style="warnTextStyle">{{ t.addrRebind.timeStatusUnavailable }}</text>
+            <!-- The read blocks the change, so its in-place entry stays (03 §3.5.2): the shared recovery text button, 13/18 (10.2). -->
             <view
-              class="nx-rebind-refresh-time inline-flex items-center active:opacity-70"
+              class="nx-rebind-refresh-time nx-card-recovery-action nx-card-recovery-action--inline"
               :class="{ 'opacity-50': remoteRefreshPending }"
-              style="min-height: 44px"
               role="button" tabindex="0"
               :aria-disabled="remoteRefreshPending ? 'true' : 'false'"
               @click="retryRemoteSnapshot"
-
               @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"
-            >
-              <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ remoteRefreshPending ? t.addrRebind.refreshingStatus : t.addrRebind.refreshTimeStatusCta }}</text>
-            </view>
+            ><text>{{ remoteRefreshPending ? t.addrRebind.refreshingStatus : t.addrRebind.refreshTimeStatusCta }}</text></view>
           </view>
         </view>
 
@@ -194,13 +191,19 @@
             </view>
           </view>
         </view>
-        <view v-if="changeAvailable" class="rb-bar-space" />
+        <view v-if="changeAvailable || changeReadBlocked" class="rb-bar-space" :style="changeReadBlocked && noteTrayHeight ? { height: noteTrayHeight + 38 + 'px' } : undefined" />
       </view>
     </view>
     <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <template #pageFixed>
       <!-- 页面主操作在底部操作栏(04 DS-30):能更换时一个主要按钮 -->
       <view v-if="changeAvailable" class="rb-bar nx-glass-bar"><NxButton class="rb-bar__single nx-rebind-change-cta" variant="primary" :label="t.addrRebind.changeCta" @click="startChange" /></view>
+      <!-- A change cannot start while the address on screen is a snapshot whose re-read has not landed (03 §3.1 bottom bar,
+           §3.4 禁用态与原因一致): the shared grey primary, its reason one line above it in the tray, no other button. -->
+      <view v-else-if="changeReadBlocked" ref="noteTray" class="rb-bar rb-bar--note nx-glass-bar">
+        <text class="nx-tray-note" role="status">{{ copy.addressUnavailable }}</text>
+        <NxButton class="rb-bar__single nx-rebind-change-cta" variant="primary" :label="t.addrRebind.changeCta" disabled />
+      </view>
       <!-- 表单、验证码、成功页的主操作也在底部操作栏,用共享按钮(03 §3.1):次要为托盘里的文字按钮 -->
       <view v-if="step === 'form'" class="rb-bar nx-glass-bar">
         <NxButton class="nx-rebind-cancel-link" variant="secondary" :label="t.addrRebind.cancelCta" @click="cancelForm" />
@@ -217,6 +220,7 @@
 
 <script setup lang="ts">
 import { useAutoRecovery } from "@/composables/use-auto-recovery";
+import { useTrayHeight } from "@/composables/use-tray-height";
 import { formatDisplayDateTime } from "@/lib/display-date";
 import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import { onHide, onLoad, onShow } from "@dcloudio/uni-app";
@@ -349,10 +353,17 @@ const changeBlock = computed(() => {
   return payout.changeBlockReason(network.value, projectedServerNow.value);
 });
 // The change action sits in the bottom bar only while a change can start (no in-flight withdrawal, cooldown or unknown time).
-const changeAvailable = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value);
+// Placeholder for the logic patch: true while the address on screen is a retained snapshot whose re-read is running or
+// has failed. A change cannot start then; the bar shows the grey button and its reason instead.
+const changeBlockedByRead = computed(() => false);
+const changeAvailable = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value && !changeBlockedByRead.value);
+const changeReadBlocked = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value && changeBlockedByRead.value);
+// The note tray's height follows its wrap (04 §4.0: content clears the tray's height + 38).
+const noteTray = ref<unknown>(null);
+const noteTrayHeight = useTrayHeight(noteTray, ".rb-bar--note", () => [changeReadBlocked.value, copy.value.addressUnavailable, t.value.addrRebind.changeCta]);
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
-  if (!networkAvailable.value || changeBlock.value) return;
+  if (!networkAvailable.value || changeBlock.value || changeBlockedByRead.value) return;
   mode.value = "change";
   explicitStep.value = "form";
   focusSoon([".rb-form .rb-title"]);
@@ -987,6 +998,7 @@ const successRowValStyle: CSSProperties = {
 .rb-bar-space { height: 110px; }
 .rb-bar__single { display: flex; flex: 1 1 0; }
 .rb-bar { position: absolute; z-index: 36; display: flex; }
+.rb-bar--note { flex-direction: column; }
 .rb-bar__main { display: flex; flex: 1 1 0; }
 @media (prefers-reduced-motion: reduce) { .rb-net { transition: none; } .rb-net:active { transform: none; } }
 .nx-rebind-resend-label { display: flex; align-items: center; white-space: pre; font-size: 12px; }
