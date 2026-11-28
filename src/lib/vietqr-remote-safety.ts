@@ -38,6 +38,7 @@ export function vietQrCreateUnavailableCopy(cause: unknown) {
     case "LEGAL_TERMS_UNAVAILABLE": return "createTermsUnavailable";
     case "FX_QUOTE_UNAVAILABLE": return "createFxUnavailable";
     case "VIETQR_BANK_RAIL_UNAVAILABLE":
+    case "VIETQR_CHANNEL_CONFIG_INVALID":
     case "VIETQR_CHANNEL_UNAVAILABLE": return "createBankUnavailable";
     case "HDPAY_CONFIGURATION_INCOMPLETE":
     case "PAYMENT_CONFIG_UNAVAILABLE": return "createServiceUnavailable";
