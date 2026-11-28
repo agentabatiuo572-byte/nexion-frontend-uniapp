@@ -335,7 +335,9 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
     }
     const readback = state.bankTopupReadbackState ?? 'confirming';
     if (createUnknown && method === 'GET' && !bankIntent[1]) {
-      for (const item of bank.items) resolveDemoBankTopupCreate(state, item, readback, now);
+      // The panel's readback settles the preset's original command only.
+      const original = bank.items.find(item => item.createIdempotencyKey === bank.unknownKey);
+      if (original) resolveDemoBankTopupCreate(state, original, readback, now);
     }
     // Like get/list: expire awaiting rows once, and remove a hosted URL from terminal reads.
     if(method==='GET')for(const item of bank.items)if(item.status==='awaiting_payment'&&(!createUnknown||item.providerStatus==='created')&&Date.parse(item.expiresAt)<=now){item.status='expired';item.version++;delete item.paymentUrl;}
@@ -375,13 +377,20 @@ const repurchaseProof = { ...proof, source: "nx_repurchase_product + nx_config_i
       if(usdtAmount<bankConfig.minDepositUsdt||usdtAmount>bankConfig.maxDepositUsdt)refuse(422,'VIETQR_AMOUNT_OUT_OF_RANGE');
       if(bank.items.filter(row=>row.status==='awaiting_payment'&&Date.parse(row.expiresAt)>now).length>=5)refuse(409,'VIETQR_ACTIVE_INTENT_LIMIT_REACHED');
       if(state.topupState==='create-rejected')refuse(422,'HDPAY_ORDER_CREATE_REJECTED');
+      // Only the preset's first command has an unknown result; a later command (e.g. 重新生成付款单) is an ordinary new order.
+      const unknownResult = createUnknown && !bank.unknownKey;
       const item={intentNo:'VQR-'+randomUUID().replaceAll('-','').slice(0,20).toUpperCase(),usdtAmount,fxRate:bankFx.quoteRateVndPerUsdt,vndAmount:usdtAmount*bankFx.quoteRateVndPerUsdt,
         status:'awaiting_payment',expiresAt:new Date(now+bankFx.lockWindowMinutes*60000).toISOString(),createdAt:iso,creditedUsdt:0,feeVnd:bankConfig.feeVnd,feeUsdt:bankConfig.feeUsdt,
         version:0,paymentMode:'hosted',
-        ...(createUnknown ? {providerStatus:'submit_unknown',createIdempotencyKey:key} : {providerStatus:'created',paymentUrl:demoHostedPaymentUrl})};
+        ...(unknownResult ? {providerStatus:'submit_unknown'} : {providerStatus:'created',paymentUrl:demoHostedPaymentUrl}),
+        ...(createUnknown ? {createIdempotencyKey:key} : {})};
       bank.items.unshift(item);
-      if (createUnknown) refuse(503, 'HDPAY_ORDER_SUBMISSION_UNKNOWN');
-      bank.commands[key]=item;state.topupState='paying';
+      if (unknownResult) {
+        bank.unknownKey = key;
+        refuse(503, 'HDPAY_ORDER_SUBMISSION_UNKNOWN');
+      }
+      // The unknown preset keeps its orders in its own per-account store.
+      if (!createUnknown) { bank.commands[key]=item; state.topupState='paying'; }
       return item;
     }else if(method==='GET'){
       const limit=Number(url.searchParams.get('limit')??20);
