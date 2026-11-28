@@ -4153,10 +4153,6 @@ timeHoursAgo: "{n}小时前",
 
     feeDetailPlaceholder: "输入金额后显示费用明细",
 
-    feeConfigUnavailableTitle: "费率更新中",
-
-    feeConfigUnavailableBody: "暂无法获取最新费率，已暂停提交。请稍后重试。",
-
     // Sprint 3 — 合规审查 banner(用户视角:监管要求,不暴露 phase 概念)
     complianceHoldTitle: "提现合规复核",
     complianceReviewRequired: "本笔提现需人工合规复核。",

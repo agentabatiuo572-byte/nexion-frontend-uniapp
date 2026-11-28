@@ -4139,10 +4139,6 @@ timeHoursAgo: "{n} giờ",
 
     feeDetailPlaceholder: "Nhập số tiền để xem chi tiết phí",
 
-    feeConfigUnavailableTitle: "Đang cập nhật biểu phí",
-
-    feeConfigUnavailableBody: "Chưa lấy được biểu phí mới nhất. Đã tạm dừng gửi yêu cầu. Vui lòng thử lại sau.",
-
     complianceHoldTitle: "Rà soát tuân thủ khi rút tiền",
     complianceReviewRequired: "Yêu cầu rút này cần rà soát tuân thủ thủ công.",
     complianceHoldUntilBody: "Yêu cầu rút này cần xét duyệt thủ công. Thời gian rà soát kết thúc lúc {time}; được duyệt hoặc hết hạn không có nghĩa là tiền đã đến.",

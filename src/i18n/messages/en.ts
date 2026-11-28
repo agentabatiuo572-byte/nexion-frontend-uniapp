@@ -4220,10 +4220,6 @@ timeHoursAgo: "{n}h ago",
 
     feeDetailPlaceholder: "Enter an amount to see the fee breakdown",
 
-    feeConfigUnavailableTitle: "Fee rates updating",
-
-    feeConfigUnavailableBody: "The latest fee rates are unavailable. Submission is paused. Please try again later.",
-
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
     complianceHoldTitle: "Withdrawal compliance review",
     complianceReviewRequired: "This withdrawal requires manual compliance review.",

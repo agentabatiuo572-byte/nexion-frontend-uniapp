@@ -4562,8 +4562,6 @@ export const kk: Messages = {
     withdrawConfirmTitle: "Шығаруды растау",
     withdrawConfirmCta: "Растау",
     feeDetailPlaceholder: "Комиссия мәліметін көру үшін соманы енгізіңіз",
-    feeConfigUnavailableTitle: "Мөлшерлеме жаңартылуда",
-    feeConfigUnavailableBody: "Соңғы комиссия мөлшерлемелері қолжетімсіз. Жіберу тоқтатылды. Кейінірек қайталап көріңіз.",
     complianceHoldTitle: "Қаражат шығарудың сәйкестік тексеруі",
     complianceReviewRequired: "Бұл қаражат шығару талаптарға сәйкестігін қолмен тексеруді қажет етеді.",
     complianceHoldUntilBody: "Бұл қаражат шығару қолмен тексеріледі. Тексеру мерзімі {time} аяқталады; мақұлдау не мерзімнің аяқталуы қаражаттың түскенін білдірмейді.",

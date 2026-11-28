@@ -4562,8 +4562,6 @@ export const id: Messages = {
     withdrawConfirmTitle: "Konfirmasi penarikan",
     withdrawConfirmCta: "Konfirmasi",
     feeDetailPlaceholder: "Masukkan jumlah untuk melihat rincian biaya",
-    feeConfigUnavailableTitle: "Tarif biaya sedang diperbarui",
-    feeConfigUnavailableBody: "Tarif biaya terbaru tidak tersedia. Pengiriman dijeda. Coba lagi nanti.",
     complianceHoldTitle: "Tinjauan kepatuhan penarikan",
     complianceReviewRequired: "Penarikan ini memerlukan tinjauan kepatuhan manual.",
     complianceHoldUntilBody: "Penarikan ini memerlukan tinjauan manual. Masa tinjauan berakhir pada {time}; persetujuan atau berakhirnya masa ini tidak berarti dana sudah diterima.",

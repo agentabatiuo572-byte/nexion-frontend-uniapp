@@ -4562,8 +4562,6 @@ export const fil: Messages = {
     withdrawConfirmTitle: "Kumpirmahin ang withdrawal",
     withdrawConfirmCta: "Kumpirmahin",
     feeDetailPlaceholder: "Maglagay ng halaga para makita ang breakdown ng fee",
-    feeConfigUnavailableTitle: "Ina-update ang fee rate",
-    feeConfigUnavailableBody: "Hindi available ang pinakabagong fee rate. Naka-pause ang pagsumite. Subukan ulit mamaya.",
     complianceHoldTitle: "Pagsusuri ng pagsunod sa withdrawal",
     complianceReviewRequired: "Kailangan ng manual na pagsusuri sa pagsunod ang withdrawal na ito.",
     complianceHoldUntilBody: "Kailangan ng manual na pagsusuri ang withdrawal na ito. Matatapos ang panahon ng pagsusuri sa {time}; hindi ibig sabihin ng pag-apruba o pagtatapos na natanggap na ang pondo.",

@@ -4562,8 +4562,6 @@ export const ru: Messages = {
     withdrawConfirmTitle: "Подтвердите вывод",
     withdrawConfirmCta: "Вывести",
     feeDetailPlaceholder: "Введите сумму, чтобы увидеть комиссии",
-    feeConfigUnavailableTitle: "Комиссии обновляются",
-    feeConfigUnavailableBody: "Актуальные комиссии недоступны, отправка приостановлена. Повторите попытку позже.",
     complianceHoldTitle: "Проверка соответствия вывода",
     complianceReviewRequired: "Этот вывод требует ручной проверки соответствия требованиям.",
     complianceHoldUntilBody: "Этот вывод требует ручной проверки. Период проверки заканчивается {time}; одобрение или истечение срока не означает зачисление средств.",
