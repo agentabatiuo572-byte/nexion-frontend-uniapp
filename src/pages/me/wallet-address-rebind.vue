@@ -366,7 +366,8 @@ const changeReadBlocked = computed(() => step.value === "view" && !changeBlock.v
 // The note tray's height follows its wrap (04 §4.0: content clears the tray's height + 38).
 const noteTray = ref<unknown>(null);
 // The reason names the read that is not current: the address first, then the withdrawal rules.
-const changeReadBlockedText = computed(() => remoteReadStatus.value !== "ready" ? copy.value.addressUnavailable
+const changeReadBlockedText = computed(() => remoteReadStatus.value === "loading" ? copy.value.addressLoading
+  : remoteReadStatus.value !== "ready" ? copy.value.addressUnavailable
   : networkPolicyStatus.value === "loading" ? t.value.addrRebind.refreshingStatus : t.value.walletV3.withdrawReadRetrying);
 const noteTrayHeight = useTrayHeight(noteTray);
 function startChange() {
