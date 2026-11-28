@@ -100,7 +100,7 @@ export interface VietQrReceiptPage {
 export interface PaymentApi {
   config(): Promise<PaymentConfig>;
   fxQuote(): Promise<FxQuoteSnapshot>;
-  createVietQrIntent(usdtAmount: number, idempotencyKey: string): Promise<VietQrIntentSnapshot>;
+  createVietQrIntent(usdtAmount: number, idempotencyKey: string, retryAfterAuth?: boolean): Promise<VietQrIntentSnapshot>;
   listVietQrIntents(limit?: number): Promise<VietQrIntentSnapshot[]>;
   getVietQrIntent(intentNo: string): Promise<VietQrIntentSnapshot>;
   cancelVietQrIntent(
@@ -409,12 +409,13 @@ export function createPaymentApi(client: ApiClient, mode: ApiEnvironment = "prod
       method: "GET",
       path: "/api/app/payments/fx-quote?fiat=VND&asset=USDT",
     }), mode),
-    createVietQrIntent: async (usdtAmount, idempotencyKey) =>
+    createVietQrIntent: async (usdtAmount, idempotencyKey, retryAfterAuth) =>
       parseIntent(await client.request({
         method: "POST",
         path: "/api/app/deposits/vietqr/intents",
         body: { usdtAmount },
         idempotencyKey,
+        retryAfterAuth,
       })),
     listVietQrIntents: async (limit = 20) => parseIntentList(await client.request({
       method: "GET",

@@ -252,7 +252,7 @@ import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
 import { remoteApiEnabled, sessionVault } from "@/api/runtime";
-import { ApiError } from "@/api/errors";
+import { ApiError, isApiRefusal } from "@/api/errors";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 import { buildVietQrTransferSteps, vietQrCreateUnavailableCopy } from "@/lib/vietqr-remote-safety";
 import { findResumablePaymentIntent, openHostedPaymentPage, validateHostedPaymentUrl } from "@/lib/hosted-payment";
@@ -302,6 +302,7 @@ async function retryReadData() {
 }
 type PaymentReadScope = { accountKey: string; bindingEpoch: number };
 const confirmedCreateRejection = ref<PaymentReadScope | null>(null);
+const replayingCreate = ref(false);
 const currentCreateRejected = computed(() => paymentSessionReady.value
   && confirmedCreateRejection.value?.accountKey === app.accountKey
   && confirmedCreateRejection.value.bindingEpoch === app.accountBindingEpoch);
@@ -421,9 +422,9 @@ watch(
   { immediate: true },
 );
 watch(
-  [pageActive, createPending, () => dep.remoteBankCreateIntent],
-  ([active, pending]) => {
-    if (!active || !pending) return;
+  [pageActive, createPending, replayingCreate, () => dep.remoteBankCreateIntent],
+  ([active, pending, replaying]) => {
+    if (!active || !pending || replaying) return;
     const resolved = dep.resolveRemoteBankCreate();
     if (!resolved) return;
     autoResumePending.value = false;
@@ -528,12 +529,12 @@ function createOrder(presetUsdt?: number) {
   const expectedAccountKey = dep.currentAccountKey();
   createTimer = setTimeout(() => { void completeCreateOrder(usdt, expectedAccountKey); }, 600);
 }
-async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
+async function completeCreateOrder(usdt: number, expectedAccountKey: string, replay = false) {
   const expectedAppAccountKey = app.accountKey;
   const expectedBindingEpoch = app.accountBindingEpoch;
   const stillCurrent = () => pageActive.value && app.accountKey === expectedAppAccountKey
     && app.accountBindingEpoch === expectedBindingEpoch && dep.currentAccountKey() === expectedAccountKey;
-  if (remoteApiEnabled) {
+  if (remoteApiEnabled && !replay) {
     // 收款账户的日额度会在另一笔入账后变化；提交前必须重读服务端快照，
     // 不能拿进入页面时缓存的 5000 上限继续创建一张服务端必拒绝的付款单。
     await fx.load();
@@ -572,10 +573,10 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
   let explicitlyRejected = false;
   await runRecoverableFundsOperation(async () => {
     try {
-      const it = remoteApiEnabled
-        ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
-        : dep.createBankIntent(usdt);
-      if (it === "pending") return null;
+      const it = replay ? await dep.replayRemoteBankCreate(expectedAccountKey)
+        : remoteApiEnabled ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
+          : dep.createBankIntent(usdt);
+      if (it === "pending" || (replay && !it)) return null;
       if (!it) throw new Error(t.value.fx.updating);
       return it;
     } catch (cause) {
@@ -586,8 +587,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       // Another payment can consume the last daily capacity after our preflight.
       // The server remains the final authority; translate this settled 422 into
       // the same explicit today-limit guidance instead of a generic retry error.
-      if (cause instanceof ApiError && cause.kind === "business"
-        && cause.message === "VIETQR_DAILY_CAPACITY_EXCEEDED") {
+      if (isApiRefusal(cause, 422, "VIETQR_DAILY_CAPACITY_EXCEEDED")) {
         await fx.load();
         if (fx.fxAvailable && fx.configReady && dailyCapacityKnown.value) {
           approvedBusinessFailureCopy = fmt(t.value.bankPane.dailyCapacityExceeded, {
@@ -606,15 +606,16 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       },
       failure: (reason) => {
         if (!stillCurrent()) return;
+        if (replay || explicitlyRejected) startNewTopup();
+        if (replay) amount.value = String(usdt);
         if (explicitlyRejected) {
           // The 422 is tied to this submit and carries no intent ID.
-          startNewTopup();
           confirmedCreateRejection.value = { accountKey: expectedAppAccountKey, bindingEpoch: expectedBindingEpoch };
           return;
         }
         toast.error(approvedBusinessFailureCopy || reason);
       },
-      settled: () => { creating.value = false; },
+      settled: () => { if (!replay) creating.value = false; },
       // lib 新契约:fallback = 用户面人话(原始 cause 由 lib 进日志)。审计 R3 抓获:此处
       // 曾仍传 "VIETQR_CREATE_FAILED",lib 改版后它从「极端边界才漏出」变成「每次失败必弹」。
     }, t.value.bankPane.createFailedNote);
@@ -641,15 +642,12 @@ async function finishCreditedFlow() {
   }
   navBack("/pages/me/me");
 }
-// Resubmit of the create whose outcome is unknown (BUG-819), started only by the user from the bottom bar (03 §3.5.2).
-// Placeholder, wired by the logic side: replay the original create under its original key in the body below. The bar
-// shows its busy state and takes no second tap while replayingCreate is true.
-const replayingCreate = ref(false);
 async function replayPendingCreate() {
-  if (replayingCreate.value) return;
+  const usdt = dep.remoteBankCreateAmount;
+  if (replayingCreate.value || !createPending.value || usdt === undefined) return;
   replayingCreate.value = true;
   try {
-    // Logic side: replay the original create key here.
+    await completeCreateOrder(usdt, dep.currentAccountKey(), true);
   } finally { replayingCreate.value = false; }
 }
 function startNewTopup() {
