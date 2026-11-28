@@ -14,7 +14,7 @@
       <SubPageHeader :back="withdrawReturnUrl" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
       <!-- ── 网络:上下排列的单选行(选中 = 品牌描边 + 实心点),与充值页同语汇 ── -->
-      <view class="mx-4 rb-nets-wrap">
+      <view v-if="!(step === 'unknown' && readFailureShown)" class="mx-4 rb-nets-wrap">
         <text class="rb-k">{{ t.addrRebind.networkLabel }}</text>
         <view class="rb-nets" role="radiogroup" :aria-label="t.addrRebind.networkLabel">
           <view
@@ -32,10 +32,13 @@
         </view>
       </view>
 
-      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending" style="padding: 16px 0">
-        <text class="block" :style="stateBodyStyle">{{ networkPolicyStatus === 'ready' && !NETWORKS.length ? t.wallet.withdrawalChannelsClosed : remoteReadFailed ? copy.addressUnavailable : copy.addressLoading }}</text>
+      <!-- Nothing to show yet (03 §3.4, §3.5.2): a failed read is the page's one centred result and its one 重新加载, while
+           auto-recovery keeps reading; a running read is one loading line. A refused save stays readable under either. -->
+      <view v-if="step === 'unknown'" class="mx-4 nx-rebind-read-status" role="status" aria-live="polite" :aria-busy="remoteRefreshPending">
+        <text v-if="networkPolicyStatus === 'ready' && !NETWORKS.length" class="block" :style="stateBodyStyle" style="padding-top: 16px">{{ t.wallet.withdrawalChannelsClosed }}</text>
+        <EmptyState v-else-if="readFailureShown" kind="recoverable-error" page :title="t.pageLoad.unknown" :cta-label="t.ui.reload" :cta-busy="remoteRefreshPending" @cta="retryRemoteSnapshot" />
+        <text v-else class="block" :style="stateBodyStyle" style="padding-top: 16px">{{ copy.addressLoading }}</text>
         <text v-if="otpError" class="block nx-rebind-refusal" :style="errorTextStyle">{{ otpError }}</text>
-        <view v-if="remoteReadFailed" class="nx-rebind-read-retry w-full grid place-items-center" :style="primaryCtaStyle" role="button" :aria-disabled="remoteRefreshPending" :tabindex="remoteRefreshPending ? -1 : 0" @click="retryRemoteSnapshot" @keydown.enter.prevent="retryRemoteSnapshot" @keydown.space.prevent="retryRemoteSnapshot"><text>{{ remoteRefreshPending ? copy.addressLoading : copy.retry }}</text></view>
       </view>
       <!-- ── 成功态 ── -->
       <view v-else-if="step === 'success'" class="mx-4 nx-step-in" :data-effective-at="currentEffectiveAt" :data-address-effective="addressEffective">
@@ -225,6 +228,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import NxButton from "@/components/ui/nx-button.vue";
+import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { dateLocale, fmt } from "@/i18n/format";
 import { navBack, navTo, takeNavigationQuery } from "@/lib/route";
@@ -847,6 +851,10 @@ function finish() {
   invalidatePageCommand();
   navBack(withdrawReturnUrl.value); // 无页面栈时保留当前网络,地址由响应式 store 即时回填
 }
+// The centred read result holds while its re-read runs (the button shows it is working) and leaves once the page has content.
+const readFailureShown = ref(false);
+watch(remoteReadFailed, (failed) => { if (failed) readFailureShown.value = true; });
+watch(() => step.value !== "unknown", (shown) => { if (shown) readFailureShown.value = false; });
 // Registered after every value `step` reads, so its first evaluation sees them initialised.
 // The code step and the result replace the control that opened them: focus the code input, then the result title.
 watch(() => step.value, (next, previous) => {
@@ -899,13 +907,6 @@ const historyRowStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "12px",
   background: "var(--v5-surface)",
-};
-const primaryCtaStyle: CSSProperties = {
-  marginTop: "16px",
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
 };
 const freezeBannerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
