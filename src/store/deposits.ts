@@ -38,6 +38,7 @@ import {
   isPayableVietQrCreateStatus,
   isVietQrCreateOutcomeUnknown,
   remoteGenerationMatches,
+  vietQrCreateUnavailableCopy,
 } from "@/lib/vietqr-remote-safety";
 import {
   beginVietQrReceiptPageRead,
@@ -51,6 +52,7 @@ import {
   finishVietQrCommand,
   finishVietQrCommandByIntent,
   hasPendingVietQrCommand,
+  readUnboundVietQrCreate,
   vietQrCommandKey,
   type VietQrCommandIdentity,
 } from "@/lib/vietqr-command-key";
@@ -254,7 +256,8 @@ export const useDeposits = defineStore("deposits", () => {
       //  不依赖这行。tsconfig 没开 noUnusedLocals,机器门抓不到,是独立审计逐行读出来的。)
       records.value = [];
       intents.value = [];
-      pendingRemoteBankCreate.value = null;
+      pendingRemoteBankCreate.value = remoteApiEnabled && serverAccountKey !== "default"
+        ? readUnboundVietQrCreate(serverAccountKey) : null;
       resetRemoteReceiptPage();
       // 开发与生产统一读取服务端 VietQR provider。
       serverStatus.value = "idle";
@@ -1124,14 +1127,15 @@ export const useDeposits = defineStore("deposits", () => {
       snapshot = await paymentApi.createVietQrIntent(amount, key, !replay);
     } catch (cause) {
       const ambiguous = isAmbiguousOutcome(cause);
-      if (!replay && (!ambiguous || isApiRefusal(cause, 503, "VIETQR_CHANNEL_CONFIG_INVALID"))) {
+      const settledConflict = isApiRefusal(cause, 409, "HDPAY_ORDER_NOT_PAYABLE", "VIETQR_ACTIVE_INTENT_LIMIT_REACHED");
+      if (!replay && (!ambiguous || settledConflict || vietQrCreateUnavailableCopy(cause))) {
         finishVietQrCommand(command, key);
       }
       if (!stillCurrent()) throw new Error("VIETQR_ACCOUNT_CHANGED");
       if (replay) {
         // A rejected session does not settle the original request. The read path can renew it.
         if (cause instanceof ApiError && cause.kind === "auth") return "pending";
-        if (ambiguous && !isApiRefusal(cause, 409, "HDPAY_ORDER_NOT_PAYABLE", "VIETQR_ACTIVE_INTENT_LIMIT_REACHED")) {
+        if (ambiguous && !settledConflict) {
           return "pending";
         }
         finishVietQrCommand(command, key);
