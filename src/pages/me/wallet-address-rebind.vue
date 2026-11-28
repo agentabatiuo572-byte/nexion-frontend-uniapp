@@ -290,10 +290,10 @@ const history = computed(() => payout.stateFor(network.value).history);
 const historyDesc = computed(() => [...history.value].reverse());
 const historyOpen = ref(false);
 const step = computed<"unknown" | "view" | "form" | "otp" | "success">(() => {
+  if (explicitStep.value === "success") return "success";
   if (payoutAddressServerEnabled && (remoteReadStatus.value !== "ready" || !payout.provenance)) return "unknown";
   if (!networkAvailable.value) return "unknown";
   if (explicitStep.value === "otp") return "otp";
-  if (explicitStep.value === "success") return "success";
   if (explicitStep.value === "form") return "form";
   return current.value ? "view" : "form"; // base:空槽直接落添加表单(内联引导语)
 });

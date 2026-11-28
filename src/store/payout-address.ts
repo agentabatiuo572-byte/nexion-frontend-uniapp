@@ -320,59 +320,35 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
     const request = requestScope();
     if (!isChainAddressValid(input.network, input.address)) throw new Error("PAYOUT_ADDRESS_FORMAT_INVALID");
-    let receipt: Awaited<ReturnType<typeof payoutAddressApi.save>>;
+    let row: PayoutAddressRow | null;
     try {
-      receipt = await payoutAddressApi.save({
+      row = await payoutAddressApi.save({
         network: TO_SERVER_NETWORK[input.network],
         address: input.address.trim(),
         challengeNo: input.challengeNo,
         code: input.code,
         idempotencyKey: input.idempotencyKey,
       });
-      if (!scopeIsCurrent(request)) throw scopeChangedError();
     } catch (cause) {
       if (!scopeIsCurrent(request)) throw scopeChangedError();
       throw cause;
     }
+    if (!scopeIsCurrent(request)) throw scopeChangedError();
 
-    // A committed write replaces this network's display even if the next list
-    // read fails. Invalidate pre-write reads and wait for readback before actions.
-    const readbackVersion = ++remoteLoadVersion;
+    // The write is final. Start a fresh list read for action readiness and let
+    // the existing read recovery handle any failure after the save.
     remoteReadInFlight = null;
-    remoteReadState.value = { scope: request, status: "loading" };
-    const row = receipt.row;
-    const usableRow = row !== null && row.network === TO_SERVER_NETWORK[input.network]
-      && runtimeProvenanceValid(row) && isChainAddressValid(input.network, row.address);
+    void refreshRemote();
+    const savedAddress = row !== null && row.network === TO_SERVER_NETWORK[input.network]
+      && runtimeProvenanceValid(row) && isChainAddressValid(input.network, row.address)
+      ? remoteNetworkState(row)
+      : null;
     const addressBook = remoteDisplayAvailable.value ? book.value : emptyBook();
     book.value = {
       ...addressBook,
-      [input.network]: usableRow ? remoteNetworkState(row) : emptyNetworkState(),
+      [input.network]: savedAddress ?? emptyNetworkState(),
     };
-    if (usableRow) remoteDisplayAvailable.value = true;
-
-    // save 是动作路径:服务端已收单但回读失败必须冒给调用方(rebind 页 catch 展示错误)。
-    // 🔴 readback 直读服务端,不复用 refreshRemote(z6 审计 P1:并发后台刷新抢 version 会让
-    //    superseded→true 造成假成功)。readback 在写之后、单调最新:++version 作废一切
-    //    在飞旧读后直接应用。
-    let snapshot: Awaited<ReturnType<typeof payoutAddressApi.list>>;
-    try {
-      snapshot = await payoutAddressApi.list();
-      if (!scopeIsCurrent(request)) throw scopeChangedError();
-    } catch (cause) {
-      if (!scopeIsCurrent(request)) throw scopeChangedError();
-      if (readbackVersion === remoteLoadVersion) {
-        markRemoteReadError(request, isTransientReadFailure(cause));
-      }
-      throw receipt.error ?? new Error("PAYOUT_ADDRESS_READBACK_UNAVAILABLE");
-    }
-    remoteLoadVersion += 1;
-    if (!scopeIsCurrent(request)) throw scopeChangedError();
-    if (!runtimeProvenanceValid(snapshot)) {
-      markRemoteReadError(request, false);
-      throw new Error("PAYOUT_ADDRESS_PROVENANCE_INVALID");
-    }
-    applyRemoteSnapshot(snapshot, request);
-    if (!usableRow) throw receipt.error ?? new Error("PAYOUT_ADDRESS_RESPONSE_INVALID");
+    if (savedAddress) remoteDisplayAvailable.value = true;
   }
 
   /** 账号切换重绑:装载该账号的地址簿(防跨账号继承地址与历史)。 */
