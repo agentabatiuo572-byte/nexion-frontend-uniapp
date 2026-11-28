@@ -48,7 +48,7 @@
           <view style="margin-top: 14px" class="w-full">
             <view class="flex items-center justify-between" :style="successRowStyle">
               <text :style="successRowLabelStyle">{{ t.addrRebind.successNewAddr }}</text>
-              <text class="font-mono tabular-nums" :style="successRowValStyle">{{ maskAddressMid(current?.address ?? '') }}</text>
+              <text class="font-mono tabular-nums" :style="successRowValStyle">{{ current?.address ? maskAddressMid(current.address) : '—' }}</text>
             </view>
           </view>
         </view>
