@@ -36,6 +36,7 @@ import type { VietQrIntentSnapshot, VietQrIntentStatus } from "@/api/payment-api
 import { isAmbiguousOutcome } from "@/api/errors";
 import {
   isPayableVietQrCreateStatus,
+  isVietQrCreateOutcomeUnknown,
   remoteGenerationMatches,
 } from "@/lib/vietqr-remote-safety";
 import {
@@ -128,6 +129,12 @@ export const useDeposits = defineStore("deposits", () => {
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import 的编排收口)。
   const records = ref<DepositRecord[]>([]);
   const intents = ref<DepositIntent[]>([]);
+  const pendingRemoteBankCreate = ref<{ command: VietQrCommandIdentity; key: string } | null>(null);
+  const remoteBankCreatePending = computed(() => pendingRemoteBankCreate.value !== null);
+  const remoteBankCreateIntent = computed(() => {
+    const pending = pendingRemoteBankCreate.value;
+    return pending ? intents.value.find(item => item.paymentMode === "hosted" && item.createIdempotencyKey === pending.key) ?? null : null;
+  });
   const serverStatus = ref<"idle" | "loading" | "ready" | "error">("ready");
   const serverError = ref("");
   const remoteReceiptPage = createVietQrReceiptPageState<ServerReceiptListItem>();
@@ -244,6 +251,7 @@ export const useDeposits = defineStore("deposits", () => {
       //  不依赖这行。tsconfig 没开 noUnusedLocals,机器门抓不到,是独立审计逐行读出来的。)
       records.value = [];
       intents.value = [];
+      pendingRemoteBankCreate.value = null;
       resetRemoteReceiptPage();
       // 开发与生产统一读取服务端 VietQR provider。
       serverStatus.value = "idle";
@@ -911,6 +919,7 @@ export const useDeposits = defineStore("deposits", () => {
     const createdAt = snapshot.createdAt ? Date.parse(snapshot.createdAt) : Date.parse(snapshot.expiresAt);
     return {
       intentId: snapshot.intentNo,
+      ...(snapshot.createIdempotencyKey ? { createIdempotencyKey: snapshot.createIdempotencyKey } : {}),
       usdtAmount: snapshot.usdtAmount,
       fxRate: snapshot.fxRate,
       vndAmount: snapshot.vndAmount,
@@ -1080,8 +1089,9 @@ export const useDeposits = defineStore("deposits", () => {
     syncRemoteVietQrPolling();
   }
 
-  async function createRemoteBankIntent(amount: number, rawExpectedAccountKey: string): Promise<DepositIntent | null> {
+  async function createRemoteBankIntent(amount: number, rawExpectedAccountKey: string): Promise<DepositIntent | "pending" | null> {
     if (!remoteApiEnabled) return null;
+    if (remoteBankCreatePending.value) return "pending";
     if (!Number.isSafeInteger(amount) || amount <= 0) return null;
     const expectedAccountKey = serverAccountKey;
     const expectedGeneration = remoteGeneration;
@@ -1091,35 +1101,49 @@ export const useDeposits = defineStore("deposits", () => {
       action: "CREATE",
       fingerprint: amount.toFixed(6),
     };
-    for (let createAttempt = 0; createAttempt < 2; createAttempt += 1) {
+    const idempotencyKey = vietQrCommandKey(mutation);
+    let snapshot: VietQrIntentSnapshot;
+    try {
+      snapshot = await paymentApi.createVietQrIntent(amount, idempotencyKey);
+    } catch (cause) {
+      if (!isAmbiguousOutcome(cause)) finishVietQrCommand(mutation, idempotencyKey);
       if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
         throw new Error("VIETQR_ACCOUNT_CHANGED");
       }
-      const idempotencyKey = vietQrCommandKey(mutation);
-      let snapshot: VietQrIntentSnapshot;
-      try {
-        snapshot = await paymentApi.createVietQrIntent(amount, idempotencyKey);
-        if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
-          throw new Error("VIETQR_ACCOUNT_CHANGED");
-        }
-      } catch (cause) {
-        if (!isAmbiguousOutcome(cause)) finishVietQrCommand(mutation, idempotencyKey);
-        throw cause;
-      }
-      bindVietQrIntent(mutation, idempotencyKey, snapshot.intentNo);
-      if (!isPayableVietQrCreateStatus(snapshot.status)) {
-        // A prior unknown response may have left this command unbound locally even though
-        // the server already completed, cancelled or returned its intent. Resolve that
-        // generation, then mint exactly one fresh command for the user's current click.
-        finishVietQrCommand(mutation, idempotencyKey);
-        if (createAttempt === 0) continue;
-        throw new Error("VIETQR_CREATE_REPLAY_NOT_PAYABLE");
-      }
-      const intent = remoteVietQrIntent(snapshot);
-      intents.value = [intent, ...intents.value.filter((item) => item.intentId !== intent.intentId)];
-      return intent;
+      if (!isVietQrCreateOutcomeUnknown(cause)) throw cause;
+      pendingRemoteBankCreate.value = { command: mutation, key: idempotencyKey };
+      syncRemoteVietQrPolling();
+      return "pending";
     }
-    throw new Error("VIETQR_CREATE_RETRY_EXHAUSTED");
+    if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+      throw new Error("VIETQR_ACCOUNT_CHANGED");
+    }
+    if (isPayableVietQrCreateStatus(snapshot.status)) {
+      bindVietQrIntent(mutation, idempotencyKey, snapshot.intentNo);
+    } else {
+      finishVietQrCommand(mutation, idempotencyKey);
+      if (snapshot.status !== "credited") throw new Error("VIETQR_CREATE_REPLAY_NOT_PAYABLE");
+    }
+    const intent = remoteVietQrIntent(snapshot);
+    const record = remoteVietQrRecord(snapshot);
+    intents.value = [intent, ...intents.value.filter(item => item.intentId !== intent.intentId)];
+    if (record) records.value = [record, ...records.value.filter(item => item.depositId !== record.depositId)];
+    return intent;
+  }
+
+  function resolveRemoteBankCreate(): DepositIntent | null {
+    const pending = pendingRemoteBankCreate.value;
+    const intent = remoteBankCreateIntent.value;
+    if (!pending || !intent) return null;
+    if (intent.status === "awaiting_payment" && intent.providerStatus === "created" && intent.paymentUrl) {
+      bindVietQrIntent(pending.command, pending.key, intent.intentId);
+    } else if (intent.status === "credited" || intent.providerStatus === "rejected") {
+      finishVietQrCommand(pending.command, pending.key);
+    } else {
+      return null;
+    }
+    pendingRemoteBankCreate.value = null;
+    return intent;
   }
 
   async function cancelRemoteBankIntent(intentId: string): Promise<{ ok: boolean; conflict?: boolean }> {
@@ -1205,6 +1229,9 @@ export const useDeposits = defineStore("deposits", () => {
     startRemoteVietQrPolling,
     stopRemoteVietQrPolling,
     createRemoteBankIntent,
+    remoteBankCreatePending,
+    remoteBankCreateIntent,
+    resolveRemoteBankCreate,
     cancelRemoteBankIntent,
     _devSimulateIncomingTransfer,
     _devResolveDustHold,
