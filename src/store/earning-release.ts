@@ -17,6 +17,8 @@ export interface ReleaseOutcome {
 }
 
 export const earningsReleaseSnapshot = shallowRef<EarningsReleaseStatus | null>(null);
+// The withdrawal page can keep displaying this through a transient read failure.
+export const earningsReleaseDisplaySnapshot = shallowRef<EarningsReleaseStatus | null>(null);
 export const earningsReleaseStatus = shallowRef<"idle" | "loading" | "ready" | "error">("idle");
 export const earningsReleaseHasSnapshot = shallowRef(false);
 let activeEarningsReleaseAccountKey = "default";
@@ -34,6 +36,7 @@ export function bindEarningsReleaseAccount(accountKey: string): void {
   activeEarningsReleaseAccountKey = accountKey || "default";
   earningsReleaseRefreshSequence += 1;
   earningsReleaseSnapshot.value = null;
+  earningsReleaseDisplaySnapshot.value = null;
   earningsReleaseHasSnapshot.value = false;
   earningsReleaseStatus.value = "idle";
 }
@@ -76,6 +79,7 @@ export function refreshEarningsReleaseStatus(
       if (activeEarningsReleaseAccountKey !== requestedAccountKey
         || refreshSequence !== earningsReleaseRefreshSequence || readScope !== releaseReadScope()) return status;
       earningsReleaseSnapshot.value = status;
+      earningsReleaseDisplaySnapshot.value = status;
       earningsReleaseHasSnapshot.value = true;
       earningsReleaseStatus.value = "ready";
       saveTabSnapshot(snapshotWrite, "release", { pending: status.buckets.pending_review, locked: status.buckets.bonus_locked }, null);
@@ -83,10 +87,12 @@ export function refreshEarningsReleaseStatus(
     } catch (error) {
       if (activeEarningsReleaseAccountKey === requestedAccountKey
         && refreshSequence === earningsReleaseRefreshSequence && readScope === releaseReadScope()) {
-        // This store is read directly by wallet surfaces that do not consume the
-        // status ref. Do not leave a failed quote visible for them to present as
-        // current; a refresh may retain its snapshot only while it is loading.
-        if (!isTransientReadFailure(error)) invalidateTabSnapshots(["release"], snapshotWrite);
+        // Clear the current result for direct consumers. Only transient failures
+        // preserve the separate display copy.
+        if (!isTransientReadFailure(error)) {
+          earningsReleaseDisplaySnapshot.value = null;
+          invalidateTabSnapshots(["release"], snapshotWrite);
+        }
         earningsReleaseSnapshot.value = null;
         earningsReleaseHasSnapshot.value = false;
         earningsReleaseStatus.value = "error";

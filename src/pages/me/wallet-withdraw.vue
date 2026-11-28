@@ -297,7 +297,11 @@ import { financialFactState, shouldRequestWithdrawalEligibility, withdrawalFacts
 import { isCurrentWithdrawalFactsRequest } from "@/lib/withdrawal-facts-request-fence";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
-import { earningsReleaseHasSnapshot, earningsReleaseSnapshot, earningsReleaseStatus, refreshEarningsReleaseStatus } from "@/store/earning-release";
+import {
+  earningsReleaseDisplaySnapshot, earningsReleaseHasSnapshot, earningsReleaseSnapshot,
+  earningsReleaseStatus, refreshEarningsReleaseStatus,
+} from "@/store/earning-release";
+import type { EarningsReleaseStatus } from "@/api/earnings-release-api";
 // 账单不再直连 useBills:提现的钱由服务端扣,只补收据 —— 走 postReceiptForAccount
 // (postMoneyBill 会照 draft 符号再扣一次本地余额)。分录形状由 withdrawalBillDrafts 单源构造。
 import { postReceiptForAccount } from "@/lib/money-receipt";
@@ -577,10 +581,11 @@ const dailyFactsState = computed(() => financialFactState(remoteApiEnabled, [
 function factsDisplayable(state: FinancialFactState): boolean {
   return state === "ready" || state === "refreshing";
 }
-const balanceDisplayable = computed(() => (!remoteApiEnabled || withdrawalPolicySnapshot.value !== null)
-  && factsDisplayable(financialFactState(remoteApiEnabled, balanceFactSources.value)));
+const balanceDisplayable = computed(() => !remoteApiEnabled || (
+  withdrawalPolicySnapshot.value !== null && app.remoteFleetHasSnapshot && earningsReleaseDisplaySnapshot.value !== null
+));
 const quotaDisplayable = computed(() => balanceDisplayable.value
-  && factsDisplayable(financialFactState(remoteApiEnabled, [withdrawalListFactSource.value])));
+  && (!remoteApiEnabled || app.remoteWithdrawalListHasSnapshot));
 const withdrawalFactsDisplayable = computed(() => factsDisplayable(withdrawalFactsState.value));
 const withdrawalFactsFresh = computed(() => withdrawalFactsState.value === "ready");
 const withdrawalFactsRefreshing = computed(() => withdrawalFactsState.value === "refreshing");
@@ -602,7 +607,7 @@ function factsStatusText(state: FinancialFactState): string {
   if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
   if (state === "loading" || state === "refreshing") return t.value.help.loadingMore;
   if (state === "stale") return t.value.wallet.fundsStaleBody;
-  return t.value.wallet.fundsUnavailableTitle;
+  return t.value.walletV3.withdrawReadRetrying;
 }
 const withdrawalFactsStatusText = computed(() => factsStatusText(withdrawalFactsState.value));
 const dailyFactsStatusText = computed(() => factsStatusText(dailyFactsState.value));
@@ -697,23 +702,24 @@ const stopWithdrawalFactsRuntimeWatch = subscribeRuntimeRevision((_scope, reason
 // 已随 c37e642 的本地扣款链一并移除 —— **提交路径**上客户端不再扣款,超额请求由本
 // computed 的 fail-closed 上限拦 + 服务端 reservation 拒;别再指望 app.ts 的提交函数里
 // 有总余额门(建单**成功之后**的 applyWithdrawalDebit 另有一道扣款闸,那是另一段链)。
-const preRatioWithdrawable = computed(() => {
-  if (earningsReleaseSnapshot.value?.clusterRestricted) return 0;
-  const buckets = earningsReleaseSnapshot.value?.buckets;
-  if (!buckets) return 0;
+function withdrawableBeforeRatio(release: EarningsReleaseStatus | null): number {
+  if (!release || release.clusterRestricted) return 0;
+  const { buckets } = release;
   return Math.max(0, app.user.usdtBalance - buckets.pending_review - buckets.bonus_locked);
-});
+}
+const preRatioWithdrawable = computed(() => withdrawableBeforeRatio(earningsReleaseSnapshot.value));
 const maxWithdrawable = computed(() => {
   const ratio = withdrawalPolicy.value?.balanceMaxRatio ?? 0;
   return computeWithdrawalMaximum(preRatioWithdrawable.value, ratio);
 });
 const minWithdrawable = computed(() => withdrawalPolicy.value?.minAmount ?? 0);
+const displayedPreRatioWithdrawable = computed(() => withdrawableBeforeRatio(earningsReleaseDisplaySnapshot.value));
 const displayedMaxWithdrawable = computed(() => computeWithdrawalMaximum(
-  preRatioWithdrawable.value, withdrawalPolicySnapshot.value?.balanceMaxRatio ?? 0,
+  displayedPreRatioWithdrawable.value, withdrawalPolicySnapshot.value?.balanceMaxRatio ?? 0,
 ));
 const withdrawalRatioLine = computed(() => {
   const ratio = withdrawalPolicySnapshot.value?.balanceMaxRatio ?? 0;
-  const held = Math.max(0, preRatioWithdrawable.value - displayedMaxWithdrawable.value);
+  const held = Math.max(0, displayedPreRatioWithdrawable.value - displayedMaxWithdrawable.value);
   if (ratio <= 0 || ratio >= 0.999999 || held <= 0.000001) return "";
   return fmt(t.value.wallet.withdrawalRatioLine, {
     pct: formatWithdrawalRatioPercent(ratio),
@@ -1128,7 +1134,7 @@ function clearSubmitFreeze() {
 // ⑤ 默认态: 审核中/锁定金额折叠展示(不参与可提最大值)。
 // Held funds shown as chips on the balance card (confirming / pending release); nothing when both are zero.
 const heldBuckets = computed(() => {
-  const b = earningsReleaseSnapshot.value?.buckets;
+  const b = earningsReleaseDisplaySnapshot.value?.buckets;
   return !b || (b.pending_review <= 0 && b.bonus_locked <= 0) ? null : { review: b.pending_review, locked: b.bonus_locked };
 });
 // Amount anatomy: whole part and cents rendered separately so the cents can sit in ink-3.
