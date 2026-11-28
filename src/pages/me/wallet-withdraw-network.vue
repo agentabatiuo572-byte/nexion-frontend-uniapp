@@ -18,7 +18,6 @@
       <text v-else-if="readFailed" class="status" role="status">{{ t.bankWithdrawal.recoveryUnavailable }}</text>
       <!-- 全部网络关闭:共享整页结果居中(03 §3.4、§3.5.2),一个出口回到提现方式选择,银行卡提现可能仍可用 -->
       <EmptyState v-else-if="policy && cards.length === 0" kind="locked-or-no-permission" page role="status" :title="t.bankWithdrawal.usdtClosedTitle" :cta-label="t.bankWithdrawal.otherMethodCta" @cta="toMethods" />
-      <text v-else-if="remoteApiEnabled && payout.readStatusFor(app.accountKey) === 'error'" class="status" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
       <view v-if="readFailed && !loading" class="reload" role="button" tabindex="0" @click="load" @keydown.enter.prevent="load" @keydown.space.prevent="load"><text>{{ t.bankWithdrawal.reload }}</text></view>
     </view>
   </AppChassis>
@@ -36,7 +35,6 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { formatFinanceAmount } from "@/lib/finance-amount-display";
 import { canSelectNewUsdtNetwork } from "@/lib/usdt-network-options";
-import { useFinanceReviewCopy } from "@/lib/finance-review-copy";
 import { useApp } from "@/store/app";
 import { usePayoutAddress } from "@/store/payout-address";
 import { fromWithdrawNetwork } from "@/store/payout-address-core";
@@ -49,7 +47,6 @@ import { captureRuntimeRevision, isCurrentRuntimeRevision, subscribeRuntimeRevis
 const NETWORK_ORDER: SupportedWithdrawalNetwork[] = ["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"];
 
 const t = useT(), app = useApp(), payout = usePayoutAddress();
-const payoutReadCopy = useFinanceReviewCopy();
 const policy = ref<WithdrawalPolicy | null>(null);
 const loading = ref(false), readFailed = ref(false);
 const cards = computed(() => {

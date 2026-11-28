@@ -4576,6 +4576,7 @@ export const kk: Messages = {
     submitReasonMaxAmount: "Шығаруға қолжетімді баланс: {n}\u00A0USDT.",
     submitReasonFeeConfigUnavailable: "Комиссия мөлшерлемелері жаңартылуда, біраздан соң қайталаңыз",
     submitReasonServiceUnavailable: "Қызмет уақытша қолжетімсіз. Кейінірек қайталап көріңіз.",
+    withdrawReadRetrying: "Шығару мәліметтері әзірге жүктелмеді. Автоматты түрде қайталануда.",
     submitReasonWithdrawalClosed: "Шығару арнасы уақытша жабық. Ол қайта ашылғанда жіберуге болады.",
     dailyLimitReached: "Бүгінгі шығару саны бітті. Қайта жіберуге болатын уақыт: {time}.",
     submitReasonAddressRequired: "Алдымен шығару мекенжайын қосыңыз.",

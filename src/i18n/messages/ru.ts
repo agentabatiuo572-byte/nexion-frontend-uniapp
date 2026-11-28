@@ -4576,6 +4576,7 @@ export const ru: Messages = {
     submitReasonMaxAmount: "Доступно для вывода: {n}\u00A0USDT.",
     submitReasonFeeConfigUnavailable: "Комиссии обновляются, повторите чуть позже",
     submitReasonServiceUnavailable: "Сервис временно недоступен. Повторите попытку позже.",
+    withdrawReadRetrying: "Не удаётся загрузить данные о выводе. Повторяем попытку автоматически.",
     submitReasonWithdrawalClosed: "Канал вывода временно закрыт. Отправить заявку можно после открытия.",
     dailyLimitReached: "Дневной лимит выводов исчерпан. Отправить снова можно после {time}.",
     submitReasonAddressRequired: "Сначала добавьте адрес вывода.",
