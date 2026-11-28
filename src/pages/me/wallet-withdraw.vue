@@ -120,7 +120,6 @@
           <text class="wd-k wd-route__k">{{ t.wallet.withdrawAddressLabel }}</text>
           <text v-if="!remoteSessionReady" class="wd-route__a wd-route__a--empty">—</text>
           <text v-else-if="pendingAttempt" class="wd-route__a">{{ boundAddressShort }}</text>
-          <text v-else-if="payoutReadStatus === 'error'" class="wd-route__a wd-route__a--empty wd-route__a--error" role="status">{{ payoutReadCopy.addressUnavailable }}</text>
           <text v-else-if="payoutReadStatus !== 'ready'" class="wd-route__a wd-route__a--empty">—</text>
           <text v-else-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else class="wd-route__a wd-route__a--empty">{{ t.addrRebind.emptyGuideTitle }}</text>
@@ -143,32 +142,26 @@
           </view>
         </view>
       </view>
-      <text v-if="withdrawalChannelStatusText" class="wd-note mx-4">{{ withdrawalChannelStatusText }}</text>
 
       <!-- Summary: gross fee → NEX offset → net fee → receive (de-carded to floor) -->
-      <!-- FEAT-WD01c ⑤ 明细区四态。费率不可用时不渲染数字，由策略读取自动恢复。 -->
-      <!-- 明细井:网络确认费 → UVT 抵扣开关 → 实际到账(画板顺序);各态条件与原先一致。 -->
-      <!-- Why 提交 is grey is said once, above it in the bar (03 §3.1); the well shows the fee row with 「—」 instead of repeating it
-           (06 §6.1). With no withdrawal network open at all the well has nothing left to show. -->
-      <view v-if="(withdrawalPolicyCurrent && !(networkClosed && !pendingAttempt && NETWORKS.length === 0)) || (feeConfigUsable && amountNum > 0 && !quoteBlocked)" class="wd-fee mx-4">
-      <template v-if="withdrawalPolicyCurrent">
-      <view v-if="withdrawalPolicyLoading" class="wd-fee__sk">
-        <view v-for="i in 3" :key="i" class="flex items-center justify-between">
-          <view :style="feeSkeletonLabelStyle" />
-          <view :style="feeSkeletonValueStyle" />
-        </view>
+      <!-- 明细井:网络确认费 → UVT 抵扣开关 → 实际到账(画板顺序)。 -->
+      <!-- Why 提交 is grey is said once, above it in the bar (03 §3.1); the well never repeats it (06 §6.1). The well keeps its
+           place while the policy is read (03 §3.4): with no policy yet the fee row holds a still skeleton bar, after a failed read
+           or with an unusable rate it shows 「—」, and a refresh keeps the last policy on screen. Display only: submitting still
+           needs the current policy. With no withdrawal network open at all the well has nothing left to show. -->
+      <view v-if="!(shownNetworkClosed && !pendingAttempt && NETWORKS.length === 0)" class="wd-fee mx-4">
+      <view v-if="shownNetworkClosed && !pendingAttempt" class="wd-fee__msg">
+        <NxButton v-if="NETWORKS.length > 0" variant="text" size="small" :label="t.bankWithdrawal.rechooseNetwork" @click="chooseNetworkAgain" />
       </view>
-      <view v-else-if="networkClosed && !pendingAttempt" class="wd-fee__msg">
-        <view v-if="NETWORKS.length > 0" class="wd-link" role="button" tabindex="0" @click="chooseNetworkAgain" @keydown.enter.prevent="chooseNetworkAgain" @keydown.space.prevent="chooseNetworkAgain">
-          <text>{{ t.bankWithdrawal.rechooseNetwork }}</text>
+      <view v-else-if="!feeConfigUsable" class="wd-fee__r">
+        <view class="inline-flex items-center" style="gap: 2px">
+          <text class="wd-k">{{ t.walletV3.feeConfirmRow }}</text>
+          <view class="grid place-items-center active:opacity-60" style="min-width: 44px; min-height: 44px; flex-shrink: 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true"  @keydown.enter.prevent="feeWhyOpen = true" @keydown.space.prevent="feeWhyOpen = true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+          </view>
         </view>
-      </view>
-      <view v-else-if="!feeConfigUsable" class="wd-fee__msg"
-        v-show="!(submitHintVisible && !submitting && submitDisabledReason === t.walletV3.submitReasonFeeConfigUnavailable)">
-        <view class="flex items-center justify-between">
-          <text class="wd-warn">{{ t.walletV3.feeConfigUnavailableTitle }}</text>
-        </view>
-        <text class="wd-line">{{ t.walletV3.feeConfigUnavailableBody }}</text>
+        <view v-if="!withdrawalPolicy && !withdrawalPolicyError" :style="feeSkeletonValueStyle" aria-hidden="true" />
+        <text v-else class="wd-fee__v">—</text>
       </view>
       <!-- 空状态:金额未输入 —— 给占位说明,不留空白也不显示 $0.00 假明细 -->
       <view v-else-if="amountNum <= 0" class="wd-fee__msg">
@@ -184,7 +177,6 @@
         </view>
         <text class="wd-fee__v">{{ activeQuote ? '−' + formatTruncatedAmount(activeQuote.networkFee) + '\u00A0USDT' : '—' }}</text>
       </view>
-      </template>
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关)。🔴 费率不可用时整块隐藏:凡是吃费用数据的区块都挂 feeConfigUsable 门。 -->
       <view v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked" class="wd-fee__offset">
         <view class="wd-fee__r">
@@ -208,11 +200,9 @@
         </view>
         <text class="wd-fee__hint">{{ offsetHintText }}</text>
         <!-- NEX=0:开关置灰 + 去赚 NEX 入口(复用 earn 路由;去了再回来,页面实例保留,开关状态不丢) -->
-        <view v-if="offsetToggleDisabled" class="wd-link" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex"  @keydown.enter.prevent="goEarnNex" @keydown.space.prevent="goEarnNex">
-          <text class="nx-after-arrow">{{ t.walletV3.earnNexCta }}</text>
-        </view>
+        <NxButton v-if="offsetToggleDisabled" class="wd-fee__act" variant="text" size="small" icon="arrow-right" :label="t.walletV3.earnNexCta" @click="goEarnNex" />
       </view>
-      <template v-if="withdrawalPolicyCurrent && feeDetailReady">
+      <template v-if="feeDetailReady">
         <view v-if="nexBurned > 0 || (offsetWithNex && !activeQuote)" class="wd-fee__r">
           <text class="wd-k wd-k--brand">{{ t.walletV3.feeOffsetRow }}</text>
           <text class="wd-fee__v wd-fee__v--brand">{{ activeQuote ? '+' + formatTruncatedAmount(feeWaived) + '\u00A0USDT · ' + fmtNex(nexBurned) + '\u00A0UVT' : '—' }}</text>
@@ -734,12 +724,6 @@ const dailyUsageText = computed(() => fmt(t.value.wallet.dailyWithdrawalUsage, {
   remaining: String(limitFacts.value.dailyRemainingCount ?? 0),
   limit: String(dailyFacts.value.limitCount),
 }));
-const withdrawalChannelStatusText = computed(() => {
-  const policy = withdrawalPolicy.value;
-  if (!policy) return "";
-  // Only a closed channel needs a line; the chosen network is already the tag above.
-  return !policy.withdrawalEnabled || policy.enabledNetworks.length === 0 ? t.value.wallet.withdrawalChannelsClosed : "";
-});
 /**
  * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
  *
@@ -813,6 +797,8 @@ const network = computed(() => pendingAttempt.value?.network ?? selectedNetwork.
 let networkChosen = false, defaultNetworkSettled = false, replacingHiddenNetwork = false;
 // A closed network blocks new submissions; an unresolved command still has its exact replay path.
 const networkClosed = computed(() => withdrawalPolicyCurrent.value && !NETWORKS.value.some((item) => item.id === network.value));
+// Display only: the fee well reads the policy snapshot, so a refresh keeps its content (03 §3.4). networkClosed stays the guard.
+const shownNetworkClosed = computed(() => withdrawalPolicy.value !== null && !NETWORKS.value.some((item) => item.id === network.value));
 function chooseNetworkAgain() {
   if (pendingAttempt.value) return;
   navBack("/pages/me/wallet-withdraw-network");
@@ -948,7 +934,6 @@ const feeConfigUsable = computed(() => {
     && policy.nexFeeOffsetRate > 0;
 });
 // 骨架条:形状对齐真实明细行(标签窄、数值宽),非通用转圈。
-const feeSkeletonLabelStyle = "width: 72px; height: 12px; border-radius: 4px; background: var(--v5-surface-2)";
 const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-2)";
 const submittingQuote = ref<WithdrawalQuote | null>(null);
 const activeQuote = computed(() => submittingQuote.value ?? (pendingAttempt.value
@@ -1721,13 +1706,11 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-route__note { flex: 1; min-width: 0; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-route__a { flex: 1; min-width: 0; overflow: hidden; color: var(--v5-ink); font: 500 14px/20px var(--font-metric); text-overflow: ellipsis; white-space: nowrap; }
 .wd-route__a--empty { color: var(--v5-ink-3); font: 400 13px/20px var(--font-v5); }
-.wd-route__a--error { color: var(--v5-danger); white-space: normal; }
 .wd-manage, .wd-add { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border-radius: var(--v5-radius-full); color: var(--v5-ink); font: 500 13px/18px var(--font-v5); cursor: pointer; }
 .wd-manage::after, .wd-add::after { content: ""; position: absolute; inset: -6px -2px; }
 .wd-route__guide { padding: 0 0 14px; }
 .wd-route__guide-body { display: block; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-add { margin-top: 10px; --ui-button-fill: color-mix(in srgb, var(--v5-brand) 14%, transparent); --ui-button-ink: var(--v5-brand); color: var(--v5-brand); }
-.wd-note { display: block; margin-top: 6px; padding: 0 4px; color: var(--v5-ink-4); font: 400 12px/18px var(--font-v5); }
 .wd-fee { margin-top: 12px; padding: 4px 16px; border-radius: 14px; background: color-mix(in srgb, var(--v5-ink) 4%, transparent); box-shadow: inset 0 2px 8px rgba(0,0,0,.45), inset 0 0 0 1px var(--v5-border); }
 [data-theme="light"] .wd-fee { box-shadow: inset 0 1px 4px rgba(20,16,8,.10), inset 0 0 0 1px var(--v5-border); }
 .wd-fee__r { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; border-top: 1px solid var(--v5-border); }
@@ -1737,9 +1720,9 @@ const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", mar
 .wd-fee__v--brand { color: var(--v5-brand); }
 .wd-fee__hint { display: block; margin: -4px 0 10px; color: var(--v5-ink-3); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
 .wd-fee__net { color: var(--v5-ink); font: 500 22px/28px var(--font-amount); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.wd-fee__msg, .wd-fee__sk { padding: 12px 0; }
-.wd-fee__sk { display: flex; flex-direction: column; gap: 8px; }
-.wd-warn { display: block; color: var(--v5-warning-ink); font: var(--ui-type-note-weight) var(--ui-type-note)/var(--ui-type-note-lh) var(--font-v5); }
+.wd-fee__msg { padding: 12px 0; }
+/* The earn link sits just under the hint and keeps the next row clear of its 44px target. */
+.wd-fee__act { margin: -2px 0 12px; }
 .wd-quota { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; margin-top: 14px; padding: 0 4px; color: var(--v5-ink-3); font: 400 12px/18px var(--font-v5); }
 .wd-quota__use { display: flex; align-items: center; gap: 8px; }
 /* The link keeps the row's right end; when it does not fit beside the quota line it moves whole to the next line, still right. */
