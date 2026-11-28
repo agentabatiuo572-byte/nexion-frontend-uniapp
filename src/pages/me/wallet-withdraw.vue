@@ -1172,11 +1172,14 @@ const quoteDisplayBlocked = computed(() =>
   && disabledReasonFor(amountNum.value, eligibility.value, true) !== "",
 );
 const quoteRowsVisible = computed(() => !!activeQuote.value || remoteEligibilityFailed.value || !!pendingAttempt.value);
+const liveFeeDetailReady = computed(() => (pendingAttempt.value || NETWORKS.value.length > 0)
+  && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && quoteRowsVisible.value);
+// A policy refresh failure keeps only the detail the live gate showed for these same quote inputs (03 §3.4).
+const shownQuoteInputs = ref<readonly unknown[] | null>(null);
 const retainedFeeDetailReady = computed(() => !withdrawalPolicy.value && !!withdrawalPolicyError.value
-  && !!withdrawalPolicySnapshot.value && !pendingAttempt.value && !!remoteEligibility.value?.quote);
-const feeDetailReady = computed(() => retainedFeeDetailReady.value
-  || ((pendingAttempt.value || NETWORKS.value.length > 0)
-    && feeConfigUsable.value && amountNum.value > 0 && !quoteBlocked.value && quoteRowsVisible.value));
+  && !!withdrawalPolicySnapshot.value && !pendingAttempt.value && !!remoteEligibility.value?.quote
+  && !!shownQuoteInputs.value && quoteInputs.value.every((input, index) => input === shownQuoteInputs.value?.[index]));
+const feeDetailReady = computed(() => retainedFeeDetailReady.value || liveFeeDetailReady.value);
 const quoteBlocked = computed(() =>
   quoteDisplayBlocked.value || !withdrawalFactsDisplayable.value || !dailyFactsDisplayable.value,
 );
@@ -1375,6 +1378,14 @@ async function readRemoteEligibility(): Promise<void> {
 
 const quoteInputs = computed(() => [amountNum.value, network.value, displayedAddress.value, offsetWithNex.value,
   pendingAttempt.value?.key, app.accountBindingEpoch, withdrawalPolicySnapshot.value?.policyVersion] as const);
+// Recorded only while the policy is current and settled: a re-read keeps any quote readable without vouching for it,
+// and a failed refresh must not reveal a quote the settled gate hid.
+watch([liveFeeDetailReady, quoteInputs, () => !!withdrawalPolicy.value && !withdrawalQuoteRefreshing.value,
+  () => remoteEligibility.value?.quote],
+  ([shown, inputs, policySettled, quote]) => {
+    if (!policySettled) return;
+    shownQuoteInputs.value = shown && !!quote && !pendingAttempt.value ? inputs : null;
+  }, { immediate: true });
 watch([quoteInputs, boundAddress, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdrawalPageVisible, foregroundReadAllowed],
   ([inputs], [previousInputs], onCleanup) => {
     remoteEligibilityEpoch += 1;

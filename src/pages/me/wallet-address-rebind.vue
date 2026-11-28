@@ -201,7 +201,7 @@
       <!-- A change cannot start while the address on screen is a snapshot whose re-read has not landed (03 §3.1 bottom bar,
            §3.4 禁用态与原因一致): the shared grey primary, its reason one line above it in the tray, no other button. -->
       <view v-else-if="changeReadBlocked" ref="noteTray" class="rb-bar rb-bar--note nx-glass-bar">
-        <text class="nx-tray-note" role="status">{{ copy.addressUnavailable }}</text>
+        <text class="nx-tray-note" role="status">{{ changeReadBlockedText }}</text>
         <NxButton class="rb-bar__single nx-rebind-change-cta" variant="primary" :label="t.addrRebind.changeCta" disabled />
       </view>
       <!-- 表单、验证码、成功页的主操作也在底部操作栏,用共享按钮(03 §3.1):次要为托盘里的文字按钮 -->
@@ -358,11 +358,16 @@ const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.val
 const changeBlock = computed(() => {
   return payout.changeBlockReason(network.value, projectedServerNow.value);
 });
-const changeBlockedByRead = computed(() => hasDisplayableAddress.value && remoteReadStatus.value !== "ready");
+// A change starts from current reads only: the address and, with the server, the network policy (03 §3.4).
+const changeBlockedByRead = computed(() => hasDisplayableAddress.value && (remoteReadStatus.value !== "ready"
+  || (payoutAddressServerEnabled && networkPolicyStatus.value !== "ready")));
 const changeAvailable = computed(() => step.value === "view" && !changeBlock.value && networkAvailable.value && !changeBlockedByRead.value);
 const changeReadBlocked = computed(() => step.value === "view" && !changeBlock.value && changeBlockedByRead.value);
 // The note tray's height follows its wrap (04 §4.0: content clears the tray's height + 38).
 const noteTray = ref<unknown>(null);
+// The reason names the read that is not current: the address first, then the withdrawal rules.
+const changeReadBlockedText = computed(() => remoteReadStatus.value !== "ready" ? copy.value.addressUnavailable
+  : networkPolicyStatus.value === "loading" ? t.value.addrRebind.refreshingStatus : t.value.walletV3.withdrawReadRetrying);
 const noteTrayHeight = useTrayHeight(noteTray);
 function startChange() {
   // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
@@ -569,6 +574,8 @@ async function applyAfterOtp(scope = captureCommandScope()) {
     if (!ok) return;
   }
   if (!draftIsCurrent()) return;
+  // Reads that went stale while the confirmation was open send nothing; the page already shows its grey bar.
+  if (!addressReadReady.value || !networkAvailable.value) return;
 
   if (payoutAddressServerEnabled) {
     try {
