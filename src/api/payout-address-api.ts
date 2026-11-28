@@ -37,6 +37,10 @@ export interface PayoutAddressOtpChallenge extends PayoutAddressProvenance {
   expiresInSeconds: number;
 }
 
+type PayoutAddressSaveReceipt =
+  | { row: PayoutAddressRow; error?: undefined }
+  | { row: null; error: ApiError };
+
 export interface PayoutAddressApi {
   list(): Promise<PayoutAddressSnapshot>;
   sendOtp(): Promise<PayoutAddressOtpChallenge>;
@@ -46,7 +50,7 @@ export interface PayoutAddressApi {
     challengeNo: string;
     code: string;
     idempotencyKey: string;
-  }): Promise<PayoutAddressRow & PayoutAddressProvenance>;
+  }): Promise<PayoutAddressSaveReceipt>;
 }
 
 const NETWORKS = new Set<PayoutAddressNetwork>(["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"]);
@@ -187,7 +191,13 @@ export function createPayoutAddressApi(client: ApiClient, mode: ApiEnvironment =
         idempotencyKey: input.idempotencyKey,
         timeoutMs: 30_000,
       });
-      return parseRow(raw, mode);
+      try {
+        return { row: parseRow(raw, mode) };
+      } catch (cause) {
+        if (!(cause instanceof ApiError)) throw cause;
+        // The command succeeded even when its row cannot be used for display.
+        return { row: null, error: cause };
+      }
     },
   };
 }
