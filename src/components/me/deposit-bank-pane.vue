@@ -11,8 +11,7 @@
   <view class="mx-4" style="padding: 0 2px">
     <FxRateLine v-if="paymentSessionReady" :style="paneView !== 'form' ? { display: 'none' } : undefined" :key="app.accountBindingEpoch" />
     <!-- A failed read of the rate or the order list leaves the form in place with 「—」 for what it could not read; 生成付款单
-         stays grey with the reason above it in the bar while the page re-reads by itself (03 §3.4, §3.5.2). A failed create
-         is said once by a toast (03 §3.5.1). -->
+         stays grey with the reason above it in the bar while the page re-reads by itself (03 §3.4, §3.5.2). -->
 
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
     <template v-if="paneView === 'form' && paymentSessionReady && (fx.configReady || fx.syncFailed)">
@@ -73,10 +72,10 @@
     </template>
 
     <!-- ── 付款单(awaiting_payment)── -->
-    <template v-else-if="paneView === 'order' && intent">
-      <view class="nx-step-in" :style="intent.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
+    <template v-else-if="paneView === 'order'">
+      <view class="nx-step-in" :style="hostedRejected || intent?.paymentMode === 'hosted' ? undefined : 'margin-top: 14px'">
         <!-- Hosted bank payment (P-44): live countdown ring on glass, order summary, then the bank page in the bottom bar. -->
-        <template v-if='intent.paymentMode === "hosted"'>
+        <template v-if="hostedRejected || intent?.paymentMode === 'hosted'">
           <!-- Rejected before it was created: the shared result head (03 §3.6.1), not the countdown stage, and no payable summary:
                no payment order exists, so there is nothing to pay or to credit. -->
           <view v-if="hostedRejected" class="nx-bank-state"><NxResultHead tone="danger" :title="t.bankPane.hostedRejectedTitle" /></view>
@@ -93,7 +92,7 @@
                 <text class="nx-bank-cd">{{ countdownParts[0] }}<text class="nx-bank-cd__time">{{ countdownText }}</text>{{ countdownParts[1] }}</text>
             </view>
           </view>
-          <view v-if="!hostedRejected" class="nx-bank-sum">
+          <view v-if="!hostedRejected && intent" class="nx-bank-sum">
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.expectedLabel }}</text><text class="nx-bank-sum__v nx-bank-sum__v--big">{{ fmtVnd(intent.vndAmount) }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.bankPane.creditLabel }}</text><text class="nx-bank-sum__v">{{ formatAmount(intent.usdtAmount) + '\u00A0USDT' }}</text></view>
             <view class="nx-bank-sum__r"><text class="nx-bank-k">{{ t.fx.rateLabel }}</text><text class="nx-bank-sum__v">1 USDT ≈ {{ fmtVnd(intent.fxRate) }}</text></view>
@@ -105,13 +104,13 @@
           <view v-if="hostedRejected" class="nx-bank-link-row"><NxButton class="nx-bank-support-link" variant="link" icon="chevron-right" :label="t.help.contactSupport" @click="goSupport" /></view>
         </template>
 
-        <template v-else>
+        <template v-else-if="intent">
         <view><text class="nx-bank-manual__cd">{{ fmt(t.bankPane.countdown, { time: countdownText }) }}</text></view>
         <view><text class="nx-bank-manual__amt">{{ fmtVnd(intent.vndAmount) }}</text></view>
         <view><text class="nx-bank-manual__line">{{ creditLineText }}</text></view>
         </template>
 
-        <template v-if="intent.paymentMode !== 'hosted'">
+        <template v-if="intent && intent.paymentMode !== 'hosted'">
         <!-- 远程没有服务端签发的二维码载荷时，禁止展示本地点阵与扫码文案。 -->
         <view v-if="intent.qrPayload" :style="qrBoxStyle">
           <image :src="intent.qrPayload" mode="aspectFit" style="width: 100%; height: 100%" />
@@ -303,6 +302,10 @@ async function retryReadData() {
   } finally { readRetryPending.value = false; }
 }
 type PaymentReadScope = { accountKey: string; bindingEpoch: number };
+const confirmedCreateRejection = ref<PaymentReadScope | null>(null);
+const currentCreateRejected = computed(() => paymentSessionReady.value
+  && confirmedCreateRejection.value?.accountKey === app.accountKey
+  && confirmedCreateRejection.value.bindingEpoch === app.accountBindingEpoch);
 type ExistingPaymentChoice = PaymentReadScope & { intentId: string; usdtAmount: number; expireAt: number; paymentUrl: string };
 let pendingPaymentRead: (PaymentReadScope & { intents: DepositIntent[] }) | null = null;
 const successfulPaymentRead = ref<PaymentReadScope | null>(null);
@@ -314,6 +317,7 @@ const intent = computed<DepositIntent | null>(
 
 type PaneView = "form" | "order" | "waiting" | "credited" | "expired" | "mismatch" | "receipt_review" | "late_review";
 const paneView = computed<PaneView>(() => {
+  if (currentCreateRejected.value) return "order";
   const it = intent.value;
   if (!it || it.status === "cancelled" || it.status === "return_pending") return "form";
   if (it.status === "awaiting_payment") return paidPressed.value ? "waiting" : "order";
@@ -551,6 +555,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
     return;
   }
   let approvedBusinessFailureCopy = "";
+  let explicitlyRejected = false;
   await runRecoverableFundsOperation(async () => {
     try {
       const it = remoteApiEnabled
@@ -580,6 +585,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         }
       }
       if (cause instanceof ApiError && cause.message === "HDPAY_ORDER_CREATE_REJECTED") {
+        explicitlyRejected = cause.kind === "http" && cause.status === 422 && cause.code === 422;
         approvedBusinessFailureCopy = t.value.bankPane.hostedRejectedNote;
       }
       // Another payment can consume the last daily capacity after our preflight.
@@ -606,6 +612,12 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
       },
       failure: (reason) => {
         if (!stillCurrent()) return;
+        if (explicitlyRejected) {
+          // The 422 is tied to this submit and carries no intent ID.
+          startNewTopup();
+          confirmedCreateRejection.value = { accountKey: expectedAppAccountKey, bindingEpoch: expectedBindingEpoch };
+          return;
+        }
         toast.error(approvedBusinessFailureCopy || reason);
       },
       settled: () => { creating.value = false; },
@@ -637,6 +649,7 @@ async function finishCreditedFlow() {
 }
 function startNewTopup() {
   autoResumePending.value = false;
+  confirmedCreateRejection.value = null;
   viewIntentId.value = null;
   paidPressed.value = false;
 }
@@ -664,8 +677,8 @@ const countdownRatio = computed(() => {
   return it && total > 0 ? Math.min(1, Math.max(0, (it.expireAt - nowTick.value) / total)) : 0;
 });
 const countdownParts = computed(() => { const [head = "", tail = ""] = t.value.bankPane.countdown.split("{time}"); return [head, tail]; });
-const hostedRejected = computed(() => intent.value?.paymentMode === "hosted"
-  && intent.value.providerStatus === "rejected");
+const hostedRejected = computed(() => currentCreateRejected.value
+  || (intent.value?.paymentMode === "hosted" && intent.value.providerStatus === "rejected"));
 const hostedCanOpen = computed(() => intent.value?.paymentMode === "hosted"
   && intent.value.providerStatus === "created"
   && Boolean(intent.value.paymentUrl));
@@ -870,12 +883,12 @@ const primaryAction = computed<PaneAction | null>(() => {
     enabled, busy: creating.value, external: false, run: regen });
   if (paneView.value === "form") return formCtaVisible.value ? { className: "nx-bank-create-cta", label: creating.value ? copy.creating : copy.createCta,
     enabled: ctaEnabled.value, busy: creating.value, external: false, note: createReason.value, run: () => createOrder() } : null;
+  if (paneView.value === "order" && hostedRejected.value) {
+    return { className: "nx-bank-new-topup-cta", label: copy.newTopupCta, enabled: !creating.value, busy: false, external: false, run: startNewTopup };
+  }
   if (paneView.value === "order" && it) {
     if (it.paymentMode !== "hosted") return { className: "nx-bank-paid-cta", label: copy.paidCta, enabled: true, busy: false, external: false, run: () => { paidPressed.value = true; } };
     if (hostedCanOpen.value) return { className: "nx-bank-hosted-continue-cta", label: copy.hostedContinueCta, enabled: true, busy: false, external: true, run: () => openHostedOrder(it) };
-    // Rejected before it was created: 重新发起充值 is the one bar action; it reopens the form, where the same amount or
-    // another one can be ordered (a bar 重新生成付款单 alone would leave no way back to the form).
-    return hostedRejected.value ? { className: "nx-bank-new-topup-cta", label: copy.newTopupCta, enabled: !creating.value, busy: false, external: false, run: startNewTopup } : null;
   }
   if (paneView.value === "credited" && it) return { className: "nx-bank-done-cta", label: copy.doneCta, enabled: true, busy: false, external: false, run: () => { void finishCreditedFlow(); } };
   if (paneView.value === "expired" && it) return regenAction(!creating.value);
