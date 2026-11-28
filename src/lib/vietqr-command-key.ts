@@ -160,6 +160,17 @@ export class VietQrCommandKeyRegistry {
       .some(command => command.accountKey === normalizedAccount);
   }
 
+  readUnboundCreate(accountKey: string) {
+    const normalizedAccount = accountKey.trim().toLowerCase();
+    const commands = Object.values(parse(this.storage.read(), this.createClientNonce).pending)
+      .filter(command => command.accountKey === normalizedAccount && command.action === "CREATE" && !command.intentNo);
+    if (commands.length !== 1) return null;
+    const { key, intentNo, ...command } = commands[0];
+    const amount = Number(command.fingerprint);
+    if (!Number.isFinite(amount) || amount <= 0 || amount.toFixed(6) !== command.fingerprint) return null;
+    return { command, key, amount };
+  }
+
   getOrCreate(identity: VietQrCommandIdentity): string {
     const scope = identityScope(identity);
     const state = parse(this.storage.read(), this.createClientNonce);
@@ -219,6 +230,7 @@ const registry = new VietQrCommandKeyRegistry({
 
 export const vietQrCommandKey = (identity: VietQrCommandIdentity) => registry.getOrCreate(identity);
 export const hasPendingVietQrCommand = (accountKey: string) => registry.hasPending(accountKey);
+export const readUnboundVietQrCreate = (accountKey: string) => registry.readUnboundCreate(accountKey);
 export const bindVietQrIntent = (identity: VietQrCommandIdentity, key: string, intentNo: string) =>
   registry.bindIntent(identity, key, intentNo);
 export const finishVietQrCommand = (identity: VietQrCommandIdentity, key: string) => registry.finish(identity, key);
