@@ -120,9 +120,8 @@
         <view class="wd-route__r">
           <text class="wd-k wd-route__k">{{ t.wallet.withdrawAddressLabel }}</text>
           <text v-if="!remoteSessionReady" class="wd-route__a wd-route__a--empty">—</text>
-          <text v-else-if="pendingAttempt" class="wd-route__a">{{ boundAddressShort }}</text>
+          <text v-else-if="pendingAttempt || displayedAddress" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else-if="payoutReadStatus !== 'ready'" class="wd-route__a wd-route__a--empty">—</text>
-          <text v-else-if="boundAddress" class="wd-route__a">{{ boundAddressShort }}</text>
           <text v-else class="wd-route__a wd-route__a--empty">{{ shownNetworkClosed ? t.bankWithdrawal.noAddress : t.addrRebind.emptyGuideTitle }}</text>
           <view
             v-if="remoteSessionReady && !pendingAttempt && payoutReadStatus === 'ready' && boundAddress"
@@ -850,9 +849,13 @@ function settleDefaultNetwork() {
   }
 }
 const chainNetwork = computed(() => fromWithdrawNetwork(network.value));
-const boundAddress = computed(() => pendingAttempt.value?.address ?? payout.currentFor(chainNetwork.value)?.address ?? "");
+const boundAddress = computed(() => pendingAttempt.value?.address ?? (
+  payoutReadStatus.value === "ready" ? payout.currentFor(chainNetwork.value)?.address ?? "" : ""
+));
+const displayedAddress = computed(() => pendingAttempt.value?.address
+  ?? payout.displayCurrentFor(app.accountKey, chainNetwork.value)?.address ?? "");
 // 掩码中段:与地址管理页共用 core.maskAddressMid 同一实现,不各写一份。
-const boundAddressShort = computed(() => (boundAddress.value ? maskAddressMid(boundAddress.value) : "—"));
+const boundAddressShort = computed(() => (displayedAddress.value ? maskAddressMid(displayedAddress.value) : "—"));
 
 const amountNum = computed(() => parseFloat(amount.value) || 0);
 const remoteEligibility = ref<WithdrawalEligibility | null>(null);
@@ -1032,7 +1035,7 @@ const withdrawalRiskNotice = computed(
     !pendingAttempt.value &&
     (!remoteApiEnabled || remoteEligibility.value !== null) &&
     !frozenNow.value &&
-    boundAddress.value.length > 10 &&
+    displayedAddress.value.length > 10 &&
     eligibility.value.route !== "pass" &&
     // reject 也要出横幅。它原本被排除在外,于是这条走廊上用户既看不到原因(共用地址等理由码有现成话术)、
     // 也没有下一步,全页只剩一句「当前暂不能提交」—— 而那句的语义是「等审核」,
@@ -1227,10 +1230,13 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility, forQ
   // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
   if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
   if (withdrawalPolicy.value?.withdrawalEnabled !== true) return t.value.walletV3.submitReasonWithdrawalClosed;
-  if (payoutReadStatus.value === "error") return payoutReadCopy.value.addressUnavailable;
-  if (payoutReadStatus.value !== "ready") return payoutReadCopy.value.addressLoading;
+  if (!forQuoteDisplay || !activeQuote.value || !displayedAddress.value) {
+    if (payoutReadStatus.value === "error") return payoutReadCopy.value.addressUnavailable;
+    if (payoutReadStatus.value !== "ready") return payoutReadCopy.value.addressLoading;
+  }
   // RM01a:该网络未设提现地址 → 最根本的前置,先说它(页面上方是引导卡,不是报错)。
-  if (boundAddress.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
+  const address = forQuoteDisplay ? displayedAddress.value : boundAddress.value;
+  if (address.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
   // No eligibility request is made until these inputs exist. Missing input is
   // not an in-flight request and must never be presented as perpetual loading.
   if (amount <= 0) return t.value.walletV3.submitReasonAmountRequired;
@@ -1364,9 +1370,9 @@ async function readRemoteEligibility(): Promise<void> {
   }
 }
 
-const quoteInputs = computed(() => [amountNum.value, network.value, boundAddress.value, offsetWithNex.value,
+const quoteInputs = computed(() => [amountNum.value, network.value, displayedAddress.value, offsetWithNex.value,
   pendingAttempt.value?.key, app.accountBindingEpoch, withdrawalPolicy.value?.policyVersion] as const);
-watch([quoteInputs, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdrawalPageVisible, foregroundReadAllowed],
+watch([quoteInputs, boundAddress, maxWithdrawable, dailyFacts, withdrawalActionsFresh, withdrawalPageVisible, foregroundReadAllowed],
   ([inputs], [previousInputs], onCleanup) => {
     remoteEligibilityEpoch += 1;
     // Only a refresh of the same inputs can retain the last quote on screen.
