@@ -200,8 +200,8 @@
       <template v-if="rulesMode === 'submit' && quote">
         <view class="cfm-rows" data-testid="bank-confirm-rows">
           <view class="cfm-row"><text class="cfm-k">{{ useTranslations.bankBinding.accountRoutedLabel }}</text><text class="cfm-v">{{ dots(quote.maskedAccount) }}</text></view>
-          <view class="cfm-row"><text class="cfm-k">{{ c.totalDebit }}</text><text class="cfm-v">{{ usdt2(quote.amountUsdt) + '\u00A0USDT' }}</text></view>
-          <view class="cfm-row cfm-row--amount"><text class="cfm-k">{{ c.receive }}</text><text class="cfm-v">{{ formatAmount(quote.amountVnd, 'VND') + '\u00A0₫' }}</text></view>
+          <view class="cfm-row"><text class="cfm-k">{{ c.totalDebit }}</text><text class="cfm-v">{{ usdt2(quote.amountUsdt) }}<text class="cfm-u">{{ '\u00A0USDT' }}</text></text></view>
+          <view class="cfm-row cfm-row--amount"><text class="cfm-k">{{ c.receive }}</text><text class="cfm-v">{{ formatAmount(quote.amountVnd, 'VND') }}<text class="cfm-cur">{{ '\u00A0₫' }}</text></text></view>
         </view>
         <text class="cfm-rules-title" role="heading" aria-level="3">{{ c.rules.title }}</text>
       </template>
@@ -896,6 +896,9 @@ onUnload(() => { alive = false; visible.value = false; stopTimer(); revision++; 
 .cfm-k { min-width: 0; overflow-wrap: break-word; color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
 .cfm-v { flex: none; white-space: nowrap; color: var(--v5-ink); font: var(--ui-type-inline-figure-weight) var(--ui-type-inline-figure)/var(--ui-type-inline-figure-lh) var(--font-metric); font-variant-numeric: tabular-nums; }
 .cfm-row--amount .cfm-v { color: var(--v5-ink); font: var(--ui-type-card-figure-weight) var(--ui-type-card-figure)/var(--ui-type-card-figure-lh) var(--font-amount); }
+/* 01.2 amount anatomy, as on the ticket: under 30px the unit takes the 辅助数值 role, the currency symbol max(12px, .55em) 500; both secondary ink. */
+.cfm-u { color: var(--v5-ink-3); font: var(--ui-type-meta-weight) var(--ui-type-meta)/var(--ui-type-meta-lh) var(--font-v5); }
+.cfm-cur { color: var(--v5-ink-3); font-size: max(12px, .55em); font-weight: 500; letter-spacing: 0; }
 .cfm-rules-title { display: block; margin: 20px 0 12px; color: var(--v5-ink); font: var(--ui-type-card-title-weight) var(--ui-type-card-title)/var(--ui-type-card-title-lh) var(--font-v5); }
 /* First config read (03 §3.4): still blocks where the bound account step's card and binding note land, no shimmer. */
 .first-read__card { display: flex; flex-direction: column; justify-content: space-between; height: 208px; margin-top: 15px; padding: 20px; box-sizing: border-box; border-radius: var(--ui-radius-surface); background: var(--v5-surface); box-shadow: var(--v5-glass-shadow); }
